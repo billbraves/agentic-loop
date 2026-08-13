@@ -1,0 +1,162 @@
+"""Tests for the governance-contract template render engine (pure stdlib)."""
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+SRC = Path(__file__).resolve().parents[1] / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from agentic_loop import contract_render as cr  # noqa: E402
+
+_SAMPLE_CFG = {
+    "roles": {
+        "orchestrator": "claude",
+        "developer": ["kimi", "claude"],
+        "reviewer": "claude",
+        "consultant": "codex",
+    },
+    "project": {"iterations_dir": "docs/plans"},
+    "safety": {
+        "forbidden_paths": ["profiles/", ".env", ".context/"],
+        "production_paths": ["~/.hermes/profiles/baofu-data"],
+    },
+    "review_policy": {"min_independence": "strong"},
+    "locks": {"owner_source": "env:CLAUDE_CODE_SESSION_ID", "ttl_minutes": 30},
+    "quality_gate": {
+        "rule": [
+            {"match": "packages/engine/**", "run": ["uv run pytest packages/engine/tests -q"]},
+        ]
+    },
+}
+
+
+def test_render_deterministic_and_strict():
+    tpl = "role: $consultant / indep: $min_independence"
+    vals = {"consultant": "codex", "min_independence": "strong"}
+    out1 = cr.render(tpl, vals)
+    out2 = cr.render(tpl, vals)
+    assert out1 == out2 == "role: codex / indep: strong"
+
+    with pytest.raises(KeyError):
+        cr.render("$missing_placeholder", {})
+
+
+def test_render_dollar_escape():
+    # literal dollar is written as $$ in a template
+    assert cr.render("cost is $$5 for $item", {"item": "x"}) == "cost is $5 for x"
+
+
+def test_build_values_deterministic_and_flattened():
+    v1 = cr.build_values(_SAMPLE_CFG, project_name="baofu")
+    v2 = cr.build_values(_SAMPLE_CFG, project_name="baofu")
+    assert v1 == v2
+    # array role flattened to a string
+    assert isinstance(v1["developer"], str)
+    assert "kimi" in v1["developer"] and "claude" in v1["developer"]
+    # every required placeholder present
+    for key in cr._REQUIRED_PLACEHOLDERS:
+        assert key in v1, "missing placeholder %s" % key
+        assert isinstance(v1[key], str)
+
+
+def test_build_values_defaults_on_minimal_config():
+    v = cr.build_values({}, project_name="proj")
+    # neutral, tool-agnostic defaults; no baked-in tool names
+    assert v["min_independence"] == "strong"
+    assert v["iterations_dir"] == "docs/plans"
+    assert v["forbidden_paths"] == "(none)"
+    # neutral language default when the project does not configure one
+    assert v["default_output_language"] == "English"
+    for key in cr._REQUIRED_PLACEHOLDERS:
+        assert key in v
+
+
+def test_default_output_language_from_config():
+    cfg = {"project": {"default_output_language": "Chinese"}}
+    v = cr.build_values(cfg, project_name="proj")
+    assert v["default_output_language"] == "Chinese"
+
+
+def test_script_cmd_placeholders_default_to_current_paths():
+    # de-tooled templates reference $merge_gate_cmd / $health_check_cmd; the
+    # engine default keeps this repo's current script paths (no rename implied)
+    v = cr.build_values({}, project_name="proj")
+    assert v["merge_gate_cmd"] == "scripts/agentic/codex_merge_gate.sh"
+    assert v["health_check_cmd"] == "scripts/agentic/kimi-health.sh"
+
+
+def test_script_cmd_placeholders_overridable():
+    cfg = {"scripts": {"merge_gate": "tools/gate.sh", "health_check": "tools/hc.sh"}}
+    v = cr.build_values(cfg, project_name="proj")
+    assert v["merge_gate_cmd"] == "tools/gate.sh"
+    assert v["health_check_cmd"] == "tools/hc.sh"
+
+
+def test_rendered_templates_have_no_tool_proper_names_by_default_config():
+    # with a tool-agnostic config, no rendered contract should carry codex/kimi
+    tool_agnostic = {
+        "roles": {"orchestrator": "A", "developer": "B", "reviewer": "A", "consultant": "C"},
+        "project": {"iterations_dir": "docs/plans", "default_output_language": "English"},
+        "scripts": {"merge_gate": "scripts/ci/merge_gate.sh",
+                    "health_check": "scripts/ci/health.sh"},
+    }
+    for name in ("AGENTS.md.tmpl", "CLAUDE.md.tmpl", "OPERATING_MODEL.md.tmpl"):
+        out = cr.render_template(name, tool_agnostic, project_name="proj")
+        assert "codex_merge_gate.sh" not in out
+        assert "kimi-health.sh" not in out
+
+
+def test_config_checksum_deterministic_and_sensitive():
+    v = cr.build_values(_SAMPLE_CFG, project_name="baofu")
+    c1 = cr.canonical_checksum(v)
+    c2 = cr.canonical_checksum(v)
+    assert c1 == c2 and len(c1) == 16
+
+    cfg2 = json.loads(json.dumps(_SAMPLE_CFG))
+    cfg2["roles"]["consultant"] = "gemini"
+    v2 = cr.build_values(cfg2, project_name="baofu")
+    assert cr.canonical_checksum(v2) != c1
+
+
+def test_stamp_fills_only_header_and_preserves_rest():
+    # stamp runs on an UN-rendered template: it fills the two header fields and
+    # leaves every other placeholder for the strict render() that follows.
+    txt = "head: v=$contract_template_version c=$config_checksum body: $consultant"
+    out = cr.stamp(txt, template_version="1", config_checksum="abc123")
+    assert "v=1 c=abc123" in out
+    assert "$consultant" in out  # non-stamp placeholder untouched
+
+
+def test_stamp_fails_closed_when_header_missing():
+    # a template that lost its stamp header must raise, not silently pass through
+    with pytest.raises(KeyError):
+        cr.stamp("no header here", template_version="1", config_checksum="x")
+
+
+def test_load_template_all_three():
+    for name in ("AGENTS.md.tmpl", "CLAUDE.md.tmpl", "OPERATING_MODEL.md.tmpl"):
+        txt = cr.load_template(name)
+        assert len(txt) > 0
+        assert "agentic-contract:" in txt  # stamp header present
+
+
+def test_render_template_official_flow_no_unfilled():
+    # the supported end-to-end path: load -> stamp header -> strict render,
+    # WITHOUT hand-injecting stamp fields into values.
+    for name in ("AGENTS.md.tmpl", "CLAUDE.md.tmpl", "OPERATING_MODEL.md.tmpl"):
+        out = cr.render_template(name, _SAMPLE_CFG, project_name="baofu")
+        assert "agentic-contract: template_version=1" in out
+        # no unfilled placeholder tokens remain (after $$ collapses to $)
+        collapsed = out.replace("$$", "")
+        assert "${" not in collapsed
+        assert "$consultant" not in collapsed and "$config_checksum" not in collapsed
+
+
+def test_render_template_stamps_deterministic_checksum():
+    # same config -> identical rendered output (checksum stable in header)
+    a = cr.render_template("AGENTS.md.tmpl", _SAMPLE_CFG, project_name="baofu")
+    b = cr.render_template("AGENTS.md.tmpl", _SAMPLE_CFG, project_name="baofu")
+    assert a == b

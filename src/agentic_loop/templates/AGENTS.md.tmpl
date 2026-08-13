@@ -1,0 +1,310 @@
+<!-- agentic-contract: template_version=$contract_template_version config_checksum=$config_checksum -->
+# $project_name Agent Operating Contract
+
+This file is the durable, cross-agent operating contract for this repository.
+It applies to every configured agent tool, human developers, and any sub-agent
+they launch. Chat history is not a source of truth.
+
+## 1. Authority and precedence
+
+When instructions conflict, use this order:
+
+1. The user's latest explicit decision.
+2. Production safety and data-integrity rules in this file.
+3. This repository operating contract.
+4. The active iteration product contract.
+5. The active phase plan.
+6. The active work-package brief and status file.
+7. Agent messages, summaries, or assumptions.
+
+Stop and escalate when a lower-level document would violate a higher-level
+rule. Never silently resolve a material conflict.
+
+## 1.1 Communication defaults
+
+- Default to $default_output_language output unless the user explicitly asks
+  for another language.
+- Start with the goal the current step serves, so priority is obvious before
+  command lists or implementation detail.
+- For read-only diagnostics, branch/worktree inspection, and status checks,
+  keep approvals narrow and deterministic; do not widen them into state-changing
+  operations.
+
+## 2. Roles
+
+- **User / Product Owner**: owns product value, business semantics, scope
+  changes, and production release approval.
+- **$orchestrator / Orchestrator and Reviewer**: clarifies requirements,
+  maintains the product contract and phase plans, dispatches work, reviews
+  evidence, and returns product decisions to the user.
+- **$consultant / Architecture and Incident Consultant**: independently reviews
+  architecture, time/data semantics, migrations, security, and difficult root
+  causes. Does not own routine implementation.
+- **$developer / Developer**: implements a frozen work package, writes and runs
+  tests, records evidence, and stops when the package requires a specification
+  change.
+- **$observer / Runtime Observer**: serves the product and collects production
+  metrics and feedback. It must not modify or deploy source code by itself.
+
+Always record both the role and the actual execution tool. A role name is not
+equivalent to a specific CLI; a consultation requires an actual consultant
+session or a clearly identified human-authored note.
+
+## 3. Required context recovery
+
+At the start of every new or compacted session:
+
+1. Read this file and the orchestrator protocol file when acting as the
+   orchestrator.
+2. Inspect `git status`, current branch, worktrees, and recent commits.
+3. Locate the active iteration under `$iterations_dir`.
+4. Read only its product contract, active phase plan, active WP brief, and
+   machine status file.
+5. Verify status claims against Git and test evidence before continuing.
+6. Report discrepancies before mutating files.
+
+Do not ask an agent to recover state from chat history alone.
+
+## 4. Work-package lifecycle
+
+The only valid states are:
+
+```text
+DRAFT -> APPROVED -> DISPATCHED -> IMPLEMENTING -> READY_FOR_REVIEW
+READY_FOR_REVIEW -> CHANGES_REQUESTED -> IMPLEMENTING
+READY_FOR_REVIEW -> APPROVED_FOR_MERGE -> MERGED -> RELEASED
+any active state -> BLOCKED
+```
+
+`APPROVED` means scope and acceptance criteria are frozen. `READY_FOR_REVIEW`
+means only that the $developer supplied evidence; it is not approval.
+
+Every WP must have:
+
+- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
+- a tracked JSON status file created from
+  `docs/agentic/templates/STATUS.json`;
+- one branch and one isolated worktree;
+- explicit allowed and forbidden paths;
+- exact acceptance tests and completion criteria;
+- actual executor, session ID when available, test evidence, and commit.
+
+**Merge-gate effort tier (optional, per-phase).** The independent merge gate
+(`$merge_gate_cmd`) defaults to a medium reasoning effort —
+the gate is a second, independent signature on an already-ACCEPTed WP reviewing
+a bounded diff, so routine work does not need the most expensive reasoning
+effort. When freezing the phase plan, you may declare a per-phase tier in an
+optional `$iterations_dir/<iteration_id>/phase-tiers.json` (template:
+`docs/agentic/templates/phase-tiers.json`): map architecture/contract-level
+phases to `"architecture"` (spends high effort, where a wrong ACCEPT means
+rework); everything else stays medium. This is set once per phase and every WP
+in it inherits the tier — no per-WP status field. Fail-safe toward the cheap
+tier: a missing file, missing phase, or unknown value resolves to medium; only
+an explicit `"architecture"` mapping spends high. This optimizes the CLI
+subscription weekly quota, not per-call cost.
+
+### 4.1 Dispatch command form and approval boundary
+
+- Dispatch the $developer role with a command whose prefix matches the
+  configured developer tool's allowlist so it skips the interactive permission
+  hook. Use the tool's work-dir flag, not a `cd` prefix: a `cd <worktree> && ...`
+  compound form has prefix `cd`, misses the allowlist, and is sent to human
+  review. ($developer_dispatch_hint.)
+- Background developer dispatch and low-risk `DRAFT -> APPROVED` scope freezes
+  proceed without human approval. Low-risk means engine-side additive change,
+  pure test/fixture, or docs, with every `risk.*` flag false and
+  product/business semantics untouched.
+- Human approval is still mandatory (never auto-dispatch/auto-freeze) when the WP
+  changes product or business semantics, touches action gating, has any
+  `risk.production_writes/network/real_notifications/irreversible` authorized, or
+  has an ambiguous brief. These are additionally caught by the permission hook's
+  mandatory-human patterns (production paths, merge/push, release/deploy, cron,
+  notifications, credentials) even if a command reaches it.
+
+### 4.2 Post-dispatch health monitoring (default)
+
+After every background developer dispatch, the orchestrator must start a Monitor
+that calls the objective-measurement script once every ~60s, instead of
+hand-writing a `tail -n40 <log>` stall judgement each time:
+
+```text
+$health_check_cmd <status.json> <output-file> <snapshot-file>
+  (snapshot lives OUTSIDE the worktree, e.g. a temp dir)
+```
+
+The script does single-shot pure measurement only (reads `status.state` + output
+tail hash + git dirty; accumulates a frozen counter across calls via the snapshot
+file) and prints exactly one contract line to stdout; first token is one of
+`PROGRESS` / `FROZEN_<N>m` / `DONE`. Exit code `0` = measurement succeeded,
+non-zero = script self-error only (`64` usage / `65` status unreadable / `66` git
+failed). It never launches the developer tool, writes status, kills processes,
+touches locks, or hits the network — adjudication, liveness probe, `TaskStop`,
+re-dispatch, status writes, and locks all remain the orchestrator's job.
+
+Dispatch on the stdout first token:
+
+- `PROGRESS ...` -> keep waiting, no action.
+- `FROZEN_3m tail="..."` (reached `FROZEN_STALL_TICKS`, default 3 samples) ->
+  alarm level; read the tail to see where it is stuck, do not re-dispatch yet.
+- `FROZEN_7m tail="..."` (reached `FROZEN_HARD_TICKS`, default 7 samples) -> read
+  the tail and adjudicate: stuck on a thinking sentence / "Let me make the
+  changes"-type line -> judged truly dead -> run the re-dispatch flow; stuck on a
+  long operation like "running pytest" -> wait one more round.
+- `DONE READY_FOR_REVIEW` -> enter independent review (the dual-sign line).
+- `DONE BLOCKED` -> report, hand to human.
+- Non-zero exit (`HEALTH_ERROR:` on stderr) -> the measurement itself failed
+  (path/JSON/git); fix the call, do not infer developer liveness from it.
+
+The freeze criterion is: output tail content hash unchanged **and** git dirty
+unchanged. Bare mtime does not count (avoids cache/log churn keeping a dead
+worker alive forever); a long thinking phase whose tail keeps changing is not
+frozen (removes false-positive kills). Thresholds are counted in **sample ticks**,
+not wall-clock, and are env-overridable (`FROZEN_STALL_TICKS` / `FROZEN_HARD_TICKS`
+/ `TAIL_LINES`).
+
+Re-dispatch flow (orchestrator-run, at most one circuit-breaker retry): `TaskStop`
+the old task; probe liveness (a `reply PROBE_OK` probe — failure usually means
+expired auth (401) / broken env, so stop and find the root cause, do not
+re-dispatch); check worktree cleanliness and by default keep the half-finished
+work so the new developer continues idempotently; prepend continuation context to
+the re-dispatch prompt (current `git status --porcelain` + `git diff --stat`
+summary + old output tail + a hard requirement to inspect existing changes,
+continue the fix, not restart from an empty tree, and not re-edit existing
+fixtures/status); take a `lock.sh heartbeat` before any status write
+(`HEARTBEAT_LOST` -> stop); a second `FROZEN_7m` trips the breaker — stop and
+report the root cause, do not re-dispatch indefinitely.
+
+`scripts/agentic/redispatch.sh <status.json>` packages this flow for `REWORK`/
+`BLOCKED` reflow, but is orchestrator-invoked on demand — it is NOT triggered
+automatically. It runs the three guards in order (circuit-breaker on
+`executor.redispatch_count` >= `REDISPATCH_MAX` default 1 -> probe `PROBE_OK` ->
+`lock.sh heartbeat`), builds and persists a continuation prompt, then by default
+actually execs the configured developer binary and increments `redispatch_count`
+only after the dispatch command succeeds; `REDISPATCH_DRY_RUN=1` prints the
+planned command without dispatching or incrementing. Any guard failing stops
+without re-dispatch. The one-time human-operated `finalize_merge.sh` and this
+re-dispatch remain manual orchestrator calls; only `dispatch_lint.sh` is wired to
+run automatically (inside `preflight.sh`, before the WP lock is acquired).
+
+## 5. Git and workspace rules
+
+- Never implement a WP on `main`.
+- Create a dedicated branch and registered Git worktree from the latest
+  approved base commit. If a worktree's branch was cut before an agentic tool
+  script (`lock.sh`, `validate_wp_status.py`, `preflight.sh`, quality gates)
+  landed, rebase onto a base that contains the script before dispatch.
+- Agentic tool scripts are located via the MAIN repo root, derived from
+  `git rev-parse --git-common-dir`, never via the worktree root
+  (`git rev-parse --show-toplevel`). The worktree copy may be stale or missing
+  the script; the main repo is the single source of truth for tooling. This is
+  why `preflight.sh` resolves the main root before invoking `lock.sh`/validator.
+- One WP has one owning $developer. Parallel lanes require separate branches and
+  non-overlapping file ownership.
+- Orchestrator concurrency: multiple orchestrator sessions/runners may act on the
+  same iteration. Each write action (status edit, dispatch, rework, merge) MUST
+  hold the relevant advisory lock (`scripts/agentic/lock.sh`). WP lock is enforced
+  by `preflight.sh`; the merge lock serializes writes to the base HEAD. owner id
+  is derived from `$lock_owner_source` (stable across context compaction), with a
+  default TTL of $lock_ttl_minutes minutes. A new session directed to take over an
+  overflowed prior session uses `--force-takeover`; unattended stale locks use
+  `--takeover` after TTL.
+- Preserve unrelated user changes. Do not reset, discard, or rewrite them.
+- Commit with explicit paths: `git commit -- <path>...`, never a bare
+  `git commit`. A bare commit records the ENTIRE staging area, so a concurrent
+  session's already-staged files get pulled into your commit. `git add <mine>`
+  alone does not scope the commit. Before committing, run `git status --short`;
+  an `MM` entry or any staged path you did not add means another session is
+  active — commit only your own paths explicitly. Locks guard who may write a WP
+  but do not partition the shared Git index.
+- The $developer must not merge, push, delete the worktree, or release.
+- The Reviewer merges only after `APPROVED_FOR_MERGE` and re-verifies on the
+  destination branch.
+- Merge finalization is a manual orchestrator step, not automatic. After the
+  human-approved `git merge --no-ff` of an `APPROVED_FOR_MERGE` WP, run
+  `scripts/agentic/finalize_merge.sh <status.json>` to stamp `state=MERGED` and
+  record the exact `merged_commit`. The script only writes status (never merges,
+  pushes, or touches git), resolves the merge commit by matching the branch tip
+  as a merge parent (0/multiple candidates FAIL, never falling back to base tip —
+  safe under concurrent merges), fails closed unless both `review.decision` and
+  `consult.decision` are ACCEPT, and releases the WP lock. On `--no-ff` the WP's
+  own `status.json` conflicts with the double-signed main copy; resolve to the
+  main copy (single source of truth), never the branch copy.
+- `.worktrees/`, local context dirs, CLI logs, credentials, and session caches
+  are local state and must not be committed.
+
+## 6. Production and data safety
+
+Unless a WP and the user explicitly authorize otherwise:
+
+- Do not write production data paths ($production_paths), production databases,
+  portfolio/config state, cron state, credentials, or gateway configuration.
+- Do not send real notifications, trigger production cron jobs, or call mutating
+  tools.
+- Do not use live network data in unit or replay tests.
+- Use sanitized fixtures and temporary profiles for tests.
+- Treat production profiles as read-only even when the filesystem permits
+  writes.
+- Never expose forbidden paths ($forbidden_paths), tokens, app secrets, webhook
+  URLs, or account data in prompts, logs, fixtures, commits, or review reports.
+- Production cutover requires dry-run, replay/shadow evidence, rollback steps,
+  orchestrator review, and explicit user approval.
+
+Business-facing behavior has an additional hard boundary: no agent may silently
+change signal semantics, thresholds, valuation/decision rules, or automated
+actions to make a test pass.
+
+## 7. Implementation loop
+
+For a frozen WP, the $developer may iterate:
+
+```text
+implement -> run relevant tests -> diagnose -> fix -> rerun
+```
+
+Stop and return `BLOCKED` or `CONSULT` when:
+
+- the product contract or acceptance criteria must change;
+- the same root failure survives two genuine repair attempts;
+- architecture, data time semantics, migration, or security is uncertain;
+- production data or credentials would need mutation;
+- an irreversible action or scope expansion is required.
+
+Tests may not be deleted, weakened, skipped, or rewritten merely to hide a
+regression. External-service failure must be replaced by deterministic fixtures,
+not unbounded retries.
+
+## 8. Verification and evidence
+
+The $developer handoff must include:
+
+- changed files and behavioral changes;
+- design decisions and deviations from the brief;
+- exact test commands, exit status, pass/fail counts, and known baseline failures;
+- remaining risks and production impact;
+- branch, worktree, and commit;
+- confirmation that production paths and real notifications were untouched.
+
+Run `scripts/agentic/quality-gate.sh <status.json>` before requesting review.
+WP-specific acceptance tests in the brief remain mandatory even if the generic
+gate passes.
+
+The Reviewer must inspect the actual diff and rerun proportionate tests. Valid
+review outcomes are `ACCEPT`, `REWORK`, or `CONSULT`. Record the decision and
+evidence in the status file; do not rely on a chat response.
+
+## 9. Repository test commands
+
+Project-specific quality-gate command mapping (path prefix -> test command):
+
+$quality_gate_commands
+
+Run package test suites separately when repository-wide collection has
+conflicting `conftest.py` module names.
+
+## 10. Durable documentation rule
+
+Long-lived rules belong here or in `docs/agentic/`. Product decisions belong in
+the iteration contract. Dynamic execution state belongs only in the WP status
+JSON. Findings and test evidence belong in Git-visible artifacts. Do not put
+durable project state only in model memory, CLI session history, temp dirs, or a
+private scratch file.

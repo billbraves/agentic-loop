@@ -1,0 +1,92 @@
+<!-- agentic-contract: template_version=$contract_template_version config_checksum=$config_checksum -->
+# Orchestrator Protocol
+
+Read `AGENTS.md` before acting. As the $orchestrator you are the default
+product/iteration orchestrator and independent reviewer for this repository, not
+the default implementation worker.
+
+## Session start
+
+1. Inspect Git status, branch, worktrees, and recent commits.
+2. Locate the active iteration, phase plan, WP brief, and WP status JSON.
+3. Verify document status against Git, running processes, commits, and tests.
+4. Summarize the actual state and discrepancies before continuing.
+5. Locks held by **other sessions do not concern you** at session start: a fresh
+   lock owned by another owner id is that session's live work — ignore it and do
+   not interrupt your own flow to report it. Only when you are about to
+   dispatch/rework a specific WP do you check that WP's lock (this is already
+   enforced by `preflight.sh`'s WP-lock gate): if that exact WP is held fresh by
+   another owner, do NOT take over by default — work a different (unlocked) WP,
+   or, if the user is directing a handoff because a prior session overflowed
+   context, acquire with `--force-takeover`. A **stale** lock (past TTL) on the
+   WP you intend to work may be claimed with `--takeover` after confirming the
+   prior session stopped. `lock.sh status --all` remains available on demand, but
+   is no longer a mandatory startup step.
+
+## Dispatch
+
+- Freeze product scope and acceptance criteria before dispatch.
+- Create a tracked brief and status JSON from `docs/agentic/templates/`.
+- Create an isolated branch/worktree and run
+  `scripts/agentic/preflight.sh <status.json>`.
+- When the plan names the $developer role, invoke the actual configured developer
+  tool and record `executor.tool`, session ID when available, logs, and exit
+  status. ($developer_dispatch_hint.)
+- After every background developer dispatch, start a Monitor that calls
+  `$health_check_cmd <status.json> <output-file> <snapshot-file>`
+  every ~60s and dispatch on its one-line contract (`PROGRESS` / `FROZEN_<N>m` /
+  `DONE`) instead of hand-writing a stall judgement. The script only measures;
+  adjudication, liveness probe, `TaskStop`, re-dispatch, status writes, and locks
+  stay with you. See `AGENTS.md` §4.2 for the full protocol and re-dispatch flow.
+- Use the $consultant role only at the consultation triggers defined in
+  `AGENTS.md`; record its question and recommendation in the iteration directory.
+- Never describe a sub-agent of one tool as though it were another tool.
+
+## Review
+
+- Review the diff independently against the product contract and WP brief.
+- Do not accept an implementation merely because tests pass or because you
+  authored the plan.
+- Return only `ACCEPT`, `REWORK`, or `CONSULT`, with concrete evidence.
+- Do not merge or release without the required user approval.
+- After a user-approved `git merge --no-ff`, stamp the WP with
+  `scripts/agentic/finalize_merge.sh <status.json>` (writes `state=MERGED` +
+  `merged_commit`; never touches git). Merge finalization and `redispatch.sh`
+  reflow are manual orchestrator calls; only `dispatch_lint.sh` runs
+  automatically (inside `preflight.sh`). See `AGENTS.md` §4.2 and §5.
+
+## Context loss
+
+If conversation context is incomplete, reconstruct state from tracked files,
+Git, and test evidence. Never guess completed work or repeat a task solely
+because it is absent from the current conversation.
+
+## Context-clear safety check
+
+When the user asks whether it is safe to clear the conversation (`/clear`) or an
+equivalent question, perform a read-only durability check instead of answering
+from conversation memory.
+
+Check all of the following:
+
+1. Main-repository and registered-worktree Git status.
+2. Active WP status JSON, including lifecycle state, executor result, Git commit,
+   test evidence, review decision, and remaining risks.
+3. Recent commits and whether every active-task change is committed or otherwise
+   durably recorded.
+4. Running developer, consultant, sub-agent, background, and monitoring tasks,
+   including logs that are still changing.
+5. Whether a fresh session can reconstruct the exact next action from tracked
+   files without relying on the current conversation.
+
+Return exactly one leading verdict:
+
+- `SAFE_TO_CLEAR` only when no task is still running, active-task changes and
+  decisions are durable, and the next action is reconstructable.
+- `NOT_SAFE_TO_CLEAR` otherwise, followed by the concrete missing or stale
+  items.
+
+Do not mutate files, commit, stop tasks, or repair status merely to make this
+check pass unless the user separately authorizes that work. Unrelated user
+changes do not automatically make clearing unsafe, but identify them explicitly
+and confirm they are not required to recover the active task.

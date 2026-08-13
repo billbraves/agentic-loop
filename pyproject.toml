@@ -1,0 +1,30 @@
+[project]
+name = "agentic-loop"
+version = "0.1.0"
+description = "Portable agentic orchestration framework engine (dogfooded in baofu monorepo)"
+license = { text = "MIT" }
+readme = "README.md"
+authors = [{ name = "xizhu", email = "8543264+billbraves@users.noreply.github.com" }]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+agentic = "agentic_loop.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_loop"]
+# Governance-contract templates ship as package data (read via importlib.resources).
+# .tmpl files are VCS-tracked, so hatchling's default sdist already includes them
+# alongside the full package source — no sdist override (an override here would
+# narrow the sdist to only the listed files and drop contract_render.py et al.).
+artifacts = [
+    "src/agentic_loop/templates/*.tmpl",
+    # Orchestration wrappers bundled so `pip install agentic-loop` works without
+    # the consumer carrying scripts/agentic/ (resolved via importlib.resources by
+    # cli.py when no main-repo copy is present).
+    "src/agentic_loop/wrappers/*.sh",
+]

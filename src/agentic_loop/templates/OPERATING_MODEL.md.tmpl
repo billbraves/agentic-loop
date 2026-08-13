@@ -1,0 +1,114 @@
+<!-- agentic-contract: template_version=$contract_template_version config_checksum=$config_checksum -->
+# Multi-Agent Operating Model
+
+## 1. Three nested loops
+
+### Product loop
+
+```text
+production evidence -> user/$orchestrator product decision -> product contract
+```
+
+The user owns value and business context. The $observer role may collect and
+summarize feedback, but it may not approve a product direction.
+
+### Engineering loop
+
+```text
+frozen WP -> $developer implementation -> tests -> repair -> $reviewer review
+```
+
+This loop may run autonomously only inside approved scope and risk boundaries.
+
+### Consultation loop
+
+```text
+architecture/incident question -> $consultant independent analysis -> $orchestrator decision
+```
+
+$consultant advice does not silently change the product contract. Material scope
+or behavior changes return to the user.
+
+## 2. Gates
+
+| Gate | Owner | Required evidence |
+|---|---|---|
+| Product Ready | User + $orchestrator | problem, value, scope, non-scope, measurable acceptance |
+| Architecture Ready | $orchestrator; $consultant when triggered | boundaries, data/time semantics, migration, rollback, test design |
+| WP Approved | $orchestrator; user for material risk | tracked brief/status, branch/worktree, frozen acceptance tests |
+| Ready for Review | $developer | diff, exact tests, commit, risks, no production mutation |
+| Approved for Merge | $orchestrator | independent diff review and rerun evidence |
+| Production Ready | User | replay/shadow evidence, rollback, release checklist |
+
+Passing a later gate never excuses missing evidence from an earlier gate.
+
+## 3. Consultation triggers
+
+Consult the $consultant role when any of the following applies:
+
+- cross-package architecture or dependency direction changes;
+- scoring, valuation, schema, migration, or point-in-time data semantics change;
+- concurrency, cron idempotency, duplicate delivery, security, or corruption risk;
+- two repair attempts fail for the same root cause;
+- tests pass while production behavior remains unexplained;
+- the $orchestrator has two materially different designs without decisive evidence.
+
+The consultation request must contain one bounded question, relevant files,
+constraints, and the required decision format. Record accepted and rejected
+recommendations with reasons.
+
+## 4. Autonomous-loop budget
+
+A $developer may continue without user input while all are true:
+
+- the WP remains within approved scope and allowed paths;
+- no production write, real notification, or irreversible action is needed;
+- failures are covered by the WP acceptance contract;
+- no signal semantics or test expectation must be changed.
+
+The default repair budget is two attempts per root cause. More attempts require
+the $orchestrator to explain what new evidence justifies continuing.
+
+## 5. Status ownership
+
+- The $orchestrator creates and transitions `DRAFT`, `APPROVED`, and `DISPATCHED`.
+- The actual $developer transitions `DISPATCHED -> IMPLEMENTING` and records
+  executor/session evidence.
+- The $developer may set `READY_FOR_REVIEW` or `BLOCKED`.
+- The $orchestrator alone sets `CHANGES_REQUESTED` or `APPROVED_FOR_MERGE`.
+- The merge owner sets `MERGED` after destination-branch verification.
+- The user-authorized release owner sets `RELEASED`.
+
+Every transition updates `timestamps.updated_at`. Claims unsupported by Git or
+test evidence must be corrected rather than propagated.
+
+## 6. Model handoff contract
+
+Each handoff answers:
+
+```text
+What is the frozen objective?
+What changed?
+What evidence proves it?
+What remains uncertain?
+What action is requested from the next role?
+```
+
+Do not transfer the entire conversation. Transfer the smallest self-contained
+artifact that allows the next role to act correctly.
+
+## 7. Production feedback evolution
+
+The target progression is:
+
+1. The $observer role collects runtime metrics and explicit feedback.
+2. The $observer role produces candidate issues with supporting evidence.
+3. The $orchestrator clusters and evaluates candidates against product value.
+4. The user authorizes an iteration.
+5. The engineering and consultation loops run.
+6. A shadow release compares old and new behavior.
+7. The user authorizes cutover; the $observer role measures the outcome.
+
+Do not collapse this into "the observer observed a problem, therefore it changed
+and deployed code." Observation, product decision, implementation, review, and
+release remain separate authorities.
