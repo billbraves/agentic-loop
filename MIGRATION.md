@@ -45,8 +45,10 @@ For the vendored path, record the adopted tag/commit in your own repo (e.g. a
 same way — copy the directory at that exact commit rather than from a moving
 `main`.
 
-The package targets Python **>= 3.9** and has **zero third-party dependencies**,
-so both paths work on older interpreters without pulling a dependency tree.
+The package targets Python **>= 3.9**. On Python **3.11+** it has **zero
+third-party dependencies** (uses the stdlib `tomllib`); on Python **3.9 / 3.10**
+it pulls a single conditional dependency, `tomli`, so config reading still works
+via the fallback path.
 
 ## 2. Scaffold the project
 

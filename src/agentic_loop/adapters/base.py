@@ -28,6 +28,52 @@ class AdapterCapabilities:
 
 
 @dataclass(frozen=True)
+class ReviewerAttestation:
+    """WP-07: 结构化 reviewer attestation(声明,非 engine 证明)。
+
+    在 bootstrap 路径下,reviewer 是编排者(无 adapter identity),engine 拿不到
+    其可观测 model id。此时 weak-attested 的评级依据不再是散在 reasons 里的
+    自由文本,而是这份带字段的结构化声明。它由编排者填(``attested_by`` 指明
+    声明来源),engine 只负责**校验结构完整 + 各条件为真**,校验不过就
+    fail-closed 到 none。
+
+    诚实边界:attestation 是声明,不是 engine-proven 信号,绝不据此评 strong;
+    ``weak-attested`` 的 "attested" 后缀即指本结构,而非 engine 观测证明。
+    """
+
+    reviewer_role: str
+    reviewer_tool: str
+    fresh_session: bool
+    adversarial_prompt: bool
+    attested_by: str
+    attested_at: str | None = None
+
+    def is_complete(self) -> bool:
+        """结构完整:必填字符串字段均非空(时间戳可选)。"""
+        return bool(
+            isinstance(self.reviewer_role, str)
+            and self.reviewer_role.strip()
+            and isinstance(self.reviewer_tool, str)
+            and self.reviewer_tool.strip()
+            and isinstance(self.attested_by, str)
+            and self.attested_by.strip()
+        )
+
+    def is_valid(self) -> bool:
+        """结构完整 + 各声明条件为真(fresh_session & adversarial_prompt)。
+
+        严格布尔判定:``fresh_session`` 与 ``adversarial_prompt`` 必须是 Python
+        真值 ``True``(JSON ``true``),字符串 ``"false"`` / ``"true"`` 或任何非
+        bool 类型一律判 invalid,避免 ``bool("false") == True`` 的隐性拐杖。
+        """
+        return (
+            self.is_complete()
+            and self.fresh_session is True
+            and self.adversarial_prompt is True
+        )
+
+
+@dataclass(frozen=True)
 class ReviewContract:
     """INV-2/INV-7: reviewer/consultant 执行契约。engine 按 role 构造并校验。"""
 

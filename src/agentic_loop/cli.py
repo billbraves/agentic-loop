@@ -27,6 +27,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import NamedTuple
+from typing import Optional
 
 # Package that holds the bundled wrapper copies (fallback for external installs).
 _WRAPPER_PACKAGE = "agentic_loop.wrappers"
@@ -82,6 +84,61 @@ def _main_root() -> Path:
     return common_dir.parent
 
 
+class ResolvedWrapper(NamedTuple):
+    """A wrapper's runnable location, as returned by :func:`resolve_wrapper`.
+
+    ``stack`` keeps a materialized bundled resource alive (see
+    :func:`resolve_wrapper`); it is ``None`` for the main-repo and missing
+    cases. Callers that actually run a bundled wrapper MUST hold the stack open
+    for the wrapper's whole child-process lifetime and close it afterwards.
+    """
+
+    path: Optional[Path]
+    source: str  # "main" | "bundled" | "missing"
+    stack: Optional[contextlib.ExitStack]
+
+
+def resolve_wrapper(name: str) -> ResolvedWrapper:
+    """Resolve wrapper ``name`` to a runnable path, main-repo first.
+
+    Priority mirrors the CLI forwarding contract:
+
+      (a) the main repository's ``scripts/agentic/<name>`` when this runs inside
+          the framework's own git tree — live edits (dogfood) win; else
+      (b) the wheel-bundled ``agentic_loop/wrappers/<name>`` — so a project that
+          merely ``pip install``\\ ed the package still runs the wrapper.
+
+    For the bundled copy the Python 3.9-safe ``importlib.resources.path()``
+    context manager may materialize a temp file (zip-imported packages), so the
+    returned ``ResolvedWrapper`` carries the *still-entered* ``ExitStack``. The
+    caller MUST keep it open while running the wrapper and close it afterwards;
+    closing the stack early would delete a temp-file-backed resource before the
+    wrapper executes. Main-repo and missing results carry ``stack=None``.
+
+    Returns ``ResolvedWrapper(None, "missing", None)`` when neither copy exists.
+    """
+    try:
+        candidate = _main_root() / "scripts" / "agentic" / name
+        if candidate.is_file():
+            return ResolvedWrapper(candidate, "main", None)
+    except RuntimeError:
+        # Not inside a git repo — fall through to the bundled copy.
+        pass
+
+    stack = contextlib.ExitStack()
+    try:
+        bundled = stack.enter_context(
+            _resources.path(_WRAPPER_PACKAGE, name)
+        )
+    except (FileNotFoundError, ModuleNotFoundError):
+        stack.close()
+        return ResolvedWrapper(None, "missing", None)
+    if not Path(bundled).is_file():
+        stack.close()
+        return ResolvedWrapper(None, "missing", None)
+    return ResolvedWrapper(Path(bundled), "bundled", stack)
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
 
@@ -106,47 +163,33 @@ def main(argv=None):
         print(_usage(), file=sys.stderr)
         return 2
 
-    # (a) Dogfood: a main-repo scripts/agentic/<wrapper>.sh wins when present, so
-    # live edits drive real WP flow with no reinstall. Absence of a git repo is
-    # NOT fatal here — it just means we fall through to the bundled copy.
-    main_repo_wrapper = None
+    resolved = resolve_wrapper(wrapper_name)
+    if resolved.path is None:
+        # Neither copy exists — clean error, never a traceback.
+        print(
+            "agentic: wrapper '{}' not found (no main-repo "
+            "scripts/agentic/ and none bundled in the package)".format(
+                wrapper_name
+            ),
+            file=sys.stderr,
+        )
+        return 2
+
     try:
-        candidate = _main_root() / "scripts" / "agentic" / wrapper_name
-        if candidate.is_file():
-            main_repo_wrapper = candidate
-    except RuntimeError:
-        main_repo_wrapper = None
+        if resolved.source == "main":
+            # A real filesystem path — replace the process for full transparency.
+            cmd = ["bash", str(resolved.path), *rest]
+            return _exec_or_run(cmd)
 
-    if main_repo_wrapper is not None:
-        # A real filesystem path — replace the process for full transparency.
-        cmd = ["bash", str(main_repo_wrapper), *rest]
-        return _exec_or_run(cmd)
-
-    # (b) Fallback: the copy bundled in the wheel, located via the Python
-    # 3.9-safe importlib.resources.path() context manager (NOT the 3.11+
-    # files()-only idiom). The context manager may materialize a temp file for
-    # zip-imported packages, so run the wrapper *inside* the `with` block via a
-    # child process (exec would abandon the cleanup) and keep the resource alive
-    # for the wrapper's whole lifetime.
-    with contextlib.ExitStack() as stack:
-        try:
-            bundled = stack.enter_context(
-                _resources.path(_WRAPPER_PACKAGE, wrapper_name)
-            )
-        except (FileNotFoundError, ModuleNotFoundError):
-            bundled = None
-        if bundled is None or not Path(bundled).is_file():
-            # (c) Neither copy exists — clean error, never a traceback.
-            print(
-                "agentic: wrapper '{}' not found (no main-repo "
-                "scripts/agentic/ and none bundled in the package)".format(
-                    wrapper_name
-                ),
-                file=sys.stderr,
-            )
-            return 2
-        completed = subprocess.run(["bash", str(bundled), *rest])
+        # (b) Fallback: the copy bundled in the wheel, resolved via the Python
+        # 3.9-safe importlib.resources.path() context manager. The wrapper runs
+        # *inside* the still-entered ExitStack so a zip-imported temp file stays
+        # alive for the wrapper's whole child-process lifetime.
+        completed = subprocess.run(["bash", str(resolved.path), *rest])
         return completed.returncode
+    finally:
+        if resolved.stack is not None:
+            resolved.stack.close()
 
 
 def _exec_or_run(cmd):

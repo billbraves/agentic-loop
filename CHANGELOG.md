@@ -6,7 +6,48 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-14
+
+Outcome of the `agentic-loop-hardening-v1` iteration (7 work packages), which
+fixed three classes of structural pain: external-adoption blockers, merge-gate
+false positives that made manual overrides routine, and dual-sign independence
+resting on implicit bootstrap crutches. All changes are backward compatible.
+
 ### Added
+
+- **Structured reviewer attestation (P3 / WP-07).** The merge gate now reads a
+  structured `review.attestation` (reviewer role, fresh-session, adversarial
+  prompt) and fails closed when it is missing, so independence is asserted by
+  explicit fields instead of implicit bootstrap state.
+- **Legal `consult.override` terminal state (P2 / WP-06).** `validate_wp_status`
+  recognizes a complete manual override (`approved` + `approver` +
+  `justification` + `reviewed_at`) as a legitimate path to MERGED when
+  `consult.decision=REWORK`; incomplete overrides still fail closed.
+
+### Changed
+
+- **Merge-gate diff scoped by `scope` (P2 / WP-04).** The reviewed diff is
+  filtered by `scope.allowed_paths` / `forbidden_paths`, eliminating three
+  classes of false positive at once (scaffold overreach, self-reference, stale
+  base carry-in).
+- **Diff-start `merge-base` fallback (P2 / WP-05).** The diff-start layer falls
+  back to `git merge-base --all` over the recorded `base_commit`, failing closed
+  on an ambiguous (criss-cross) fork point instead of guessing.
+- **De-baofu'd built-in defaults (P1 / WP-01).** `resolve_paths` ships neutral
+  `DEFAULT_SAFETY` / `QUALITY_GATE` / `REVIEW_POLICY` / `ADAPTERS`; project
+  behavior is layered in via `.agentic/config.toml`.
+- **Developer fallback chain repaired (P1 / WP-03).** The adapter registry
+  assembles the `claude` fallback, and `redispatch` resolves its wrapper via a
+  shared `resolve_wrapper()` instead of a hard-coded `lock.sh` path.
+
+### Distribution
+
+- Version bumped to **`0.2.0`**. On Python **3.11+** still zero third-party
+  dependencies (stdlib `tomllib`); on **3.9 / 3.10** pulls a single conditional
+  dependency `tomli` (P1 / WP-02), fixing the earlier zero-dependency
+  contradiction on older interpreters.
+
+### Added — carried from 0.1.0 post-release
 
 - **Bundled wrappers (P7 / WP-23).** The eight `scripts/agentic/*.sh`
   orchestration wrappers now ship inside the wheel under
@@ -14,9 +55,6 @@ All notable changes to `agentic-loop` are documented here. The format follows
   gate (`gate`, `preflight`, `finalize`, `dispatch-lint`, `redispatch`, `lock`,
   `health`, `quality-gate`) with **no** `scripts/agentic/` in the consuming
   project.
-
-### Changed
-
 - **Dual-copy wrapper resolution (P7 / WP-23).** `agentic <gate>` resolves the
   wrapper main-repo-first (`scripts/agentic/<wrapper>.sh` when inside the
   framework's own tree — dogfood, live edits without reinstall), else the

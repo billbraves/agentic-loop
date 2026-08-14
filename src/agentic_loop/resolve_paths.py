@@ -27,21 +27,16 @@ DEFAULT_ROLES = {
 }
 
 DEFAULT_QUALITY_GATE = {
-    "rule": [
-        {"match": "packages/engine/**", "run": ["uv run pytest packages/engine/tests -q"]},
-        {"match": "packages/data-app/**", "run": ["uv run pytest packages/data-app/tests -q"]},
-    ]
+    "rule": [],
 }
 
 DEFAULT_SAFETY = {
-    "forbidden_paths": ["profiles/", ".env", ".context/"],
-    "production_paths": ["~/.hermes/profiles/baofu-data"],
+    "forbidden_paths": [".env", ".context/"],
+    "production_paths": [],
 }
 
 DEFAULT_REVIEW_POLICY = {
-    "hard_rules": [
-        "禁止为通过测试而偷改信号语义、阈值、估值规则或自动交易行为。",
-    ],
+    "hard_rules": [],
     "min_independence": "strong",
 }
 
@@ -51,7 +46,7 @@ DEFAULT_LOCKS = {
 }
 
 DEFAULT_ADAPTERS = {
-    "names": ["claude", "codex", "kimi", "hermes"],
+    "names": ["claude", "codex", "kimi"],
 }
 
 DEFAULT_PROJECT = {

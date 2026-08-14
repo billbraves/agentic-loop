@@ -27,6 +27,8 @@ from agentic_loop.adapters.base import AdapterCapabilities
 from agentic_loop.adapters.base import AgentIdentity
 from agentic_loop.adapters.base import ImplementResult
 from agentic_loop.adapters.kimi import KimiAdapter
+from agentic_loop.adapters.claude import ClaudeAdapter
+from agentic_loop.cli import resolve_wrapper
 from agentic_loop.independence import evaluate
 from agentic_loop.resolve_paths import get_roles
 from agentic_loop.resolve_paths import iterations_dir
@@ -106,6 +108,9 @@ def _resolve_developer(
     if registry is None:
         registry = {
             "kimi": lambda: KimiAdapter(kimi_bin=os.environ.get("KIMI_BIN", "kimi")),
+            "claude": lambda: ClaudeAdapter(
+                claude_bin=os.environ.get("CLAUDE_BIN", "claude")
+            ),
         }
 
     reasons: list[str] = []
@@ -308,7 +313,6 @@ def main(argv: list[str]) -> int:
     iterations_dir_path = iterations_dir()
     # Sibling module inside the agentic_loop package (moved in WP-18).
     validator = Path(__file__).resolve().parent / "validate_wp_status.py"
-    lock_sh = repo_root / "scripts" / "agentic" / "lock.sh"
 
     if status_arg.startswith("/"):
         status_file = Path(status_arg)
@@ -408,20 +412,33 @@ def main(argv: list[str]) -> int:
             return 0
         print(f"REDISPATCH_PROBE: adapter={adapter.name}", file=sys.stderr)
 
-    # Step 5: Guard ② heartbeat (INV-5 owner贯通).
-    hb_proc = subprocess.run(
-        [
-            "bash",
-            str(lock_sh),
-            "heartbeat",
-            "--kind",
-            "wp",
-            "--key",
-            f"{iteration_id}__{work_package_id}",
-        ],
-        capture_output=True,
-        text=True,
-    )
+    # Step 5: Guard ② heartbeat (INV-5 owner贯通). Resolve lock.sh lazily right
+    # before use so a bundled copy's resource stack is only held across the
+    # heartbeat subprocess, never across the earlier fail-closed guards.
+    lock_resolution = resolve_wrapper("lock.sh")
+    if lock_resolution.path is None:
+        print(
+            "REDISPATCH_STOP: lock.sh not found (no main-repo scripts/agentic/ "
+            "and none bundled) — 不重派"
+        )
+        return 0
+    try:
+        hb_proc = subprocess.run(
+            [
+                "bash",
+                str(lock_resolution.path),
+                "heartbeat",
+                "--kind",
+                "wp",
+                "--key",
+                f"{iteration_id}__{work_package_id}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        if lock_resolution.stack is not None:
+            lock_resolution.stack.close()
     hb_out = (hb_proc.stdout or "") + (hb_proc.stderr or "")
     if not hb_out.strip().startswith("HEARTBEAT_OK"):
         print("REDISPATCH_STOP: heartbeat lost (被接管?) — 不重派")

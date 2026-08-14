@@ -33,6 +33,7 @@ sys.path.insert(0, str(_SCRIPT_DIR))
 
 from agentic_loop.adapters.base import AgentIdentity
 from agentic_loop.adapters.base import ReviewContract
+from agentic_loop.adapters.base import ReviewerAttestation
 from agentic_loop.adapters.base import Verdict
 from agentic_loop.adapters.codex import CodexAdapter
 from agentic_loop.independence import evaluate
@@ -124,6 +125,133 @@ def git_is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
     )
 
 
+# Sentinel returned by ``git_merge_base`` when ``git merge-base --all`` finds
+# more than one best common ancestor (criss-cross). A valid commit is hex-only,
+# so this value can never collide with a real fork point; the caller must treat
+# it as an ambiguity and fail closed instead of guessing.
+MERGE_BASE_AMBIGUOUS = "<ambiguous>"
+
+
+def git_merge_base(repo: Path, base: str, tip: str) -> str:
+    """Return the engine-computed fork point of ``base`` and ``tip``.
+
+    Uses ``git merge-base --all`` so a criss-cross topology (multiple best
+    common ancestors) is surfaced instead of silently picking one. Mirrors the
+    ``git_output`` style (``git -C <repo> ...``) but, unlike ``git_output``,
+    returns ``""`` on failure (e.g. ``base`` cannot be resolved) and
+    ``MERGE_BASE_AMBIGUOUS`` on ambiguity, instead of raising. This lets the
+    diff-start fallback decide whether to use the fork point, fail closed on
+    ambiguity, or fall through to ``base_commit``.
+    """
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "merge-base", "--all", base, tip],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return ""
+    lines = [line for line in proc.stdout.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    if len(lines) > 1:
+        gate_log(
+            f"merge-base ambiguous: {len(lines)} common ancestors between "
+            f"{base} and {tip}; refusing to guess"
+        )
+        return MERGE_BASE_AMBIGUOUS
+    return lines[0].strip()
+
+
+def scope_matches(path: str, prefix: str) -> bool:
+    """Prefix match verbatim-aligned with ``quality-gate.sh`` ``matches()``.
+
+    A file path is in scope for ``prefix`` when it equals the prefix or starts
+    with ``prefix + "/"``, after stripping any leading ``./`` and trailing ``/``
+    from the prefix. This is the exact predicate the quality gate uses for its
+    allowed/forbidden enforcement, so the merge gate can never diverge from it.
+    """
+    normalized = prefix.removeprefix("./")
+    return path == normalized.rstrip("/") or path.startswith(
+        normalized.rstrip("/") + "/"
+    )
+
+
+def _path_in_scope(
+    path: str, allowed_paths: list[str], forbidden_paths: list[str]
+) -> bool:
+    """Forbidden wins over allowed; empty ``allowed_paths`` = forbidden only."""
+    if any(scope_matches(path, prefix) for prefix in forbidden_paths):
+        return False
+    if not allowed_paths:
+        return True
+    return any(scope_matches(path, prefix) for prefix in allowed_paths)
+
+
+def _diff_path_from_header(block: str) -> str | None:
+    """Return the post-image path from a ``diff --git a/... b/...`` header.
+
+    Returns ``None`` when the block is not a diff header or the post-image path
+    cannot be parsed; callers keep such blocks verbatim so we never drop content
+    we cannot classify (fail-safe against false negatives)."""
+    first = block.splitlines()[0] if block else ""
+    if not first.startswith("diff --git "):
+        return None
+    rest = first[len("diff --git "):]
+    idx = rest.find(" b/")
+    if idx == -1:
+        return None
+    return rest[idx + 3:].strip()
+
+
+def filter_diff_by_scope(
+    diff_text: str,
+    allowed_paths: list[str],
+    forbidden_paths: list[str],
+) -> tuple[str, int, int]:
+    """Filter a multi-file unified diff to files within WP scope.
+
+    Splits on ``diff --git`` file boundaries and keeps a file when it matches at
+    least one allowed prefix and no forbidden prefix (forbidden wins). Empty
+    ``allowed_paths`` imposes no allowed restriction, mirroring quality-gate.sh.
+    Returns ``(filtered_diff, kept_count, excluded_count)``; kept blocks are
+    re-joined byte-for-byte so an all-in-scope diff is unchanged."""
+    if not diff_text:
+        return diff_text, 0, 0
+
+    blocks = re.split(r"(?m)^(?=diff --git )", diff_text)
+    kept_blocks: list[str] = []
+    kept_count = 0
+    excluded_count = 0
+
+    for block in blocks:
+        if not block:
+            continue
+        path = _diff_path_from_header(block)
+        if path is None:
+            # Not a file block or unparseable: keep verbatim (fail-safe).
+            kept_blocks.append(block)
+            kept_count += 1
+            continue
+        if _path_in_scope(path, allowed_paths, forbidden_paths):
+            kept_blocks.append(block)
+            kept_count += 1
+        else:
+            excluded_count += 1
+
+    return "".join(kept_blocks), kept_count, excluded_count
+
+
+def read_scope_paths(validator: Path, status_file: Path, dotted: str) -> list[str]:
+    """Read a ``scope.*_paths`` list field via the validator ``--field`` path."""
+    raw = read_field(validator, status_file, dotted)
+    if not raw:
+        return []
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list):
+        raise GateError(f"{dotted} must be a list, got {type(parsed).__name__}")
+    return [str(item) for item in parsed]
+
+
 def resolve_gate_effort(iteration_dir: Path, phase: str) -> str:
     """Fail-safe phase tier resolution: only ``architecture`` maps to ``high``."""
     tiers_file = iteration_dir / "phase-tiers.json"
@@ -156,6 +284,54 @@ def load_status_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise GateError(f"invalid JSON in status file: {exc}") from None
+
+
+def read_attestation(status_file: Path) -> ReviewerAttestation | None:
+    """Read the structured reviewer attestation from the auditable status record.
+
+    WP-07 REWORK: the bootstrap attestation must come from the persisted
+    ``review.attestation`` object in the status file, never from a code
+    constant. Missing block, non-object block, or missing/empty required string
+    fields resolve to ``None`` so ``evaluate()`` fail-closes to ``none``.
+
+    The boolean fields are passed through verbatim (including any non-bool
+    value) so ``ReviewerAttestation.is_valid()`` remains the single source of
+    truth for strict-bool validation: JSON ``true`` becomes Python ``True`` and
+    is the only accepted value; strings like ``"false"`` stay invalid.
+    """
+    data = load_status_json(status_file)
+    review = data.get("review")
+    if not isinstance(review, dict):
+        return None
+    att = review.get("attestation")
+    if not isinstance(att, dict):
+        return None
+
+    reviewer_role = att.get("reviewer_role")
+    reviewer_tool = att.get("reviewer_tool")
+    attested_by = att.get("attested_by")
+    if not (
+        isinstance(reviewer_role, str)
+        and reviewer_role.strip()
+        and isinstance(reviewer_tool, str)
+        and reviewer_tool.strip()
+        and isinstance(attested_by, str)
+        and attested_by.strip()
+    ):
+        return None
+
+    attested_at = att.get("attested_at")
+    if not isinstance(attested_at, str):
+        attested_at = None
+
+    return ReviewerAttestation(
+        reviewer_role=reviewer_role,
+        reviewer_tool=reviewer_tool,
+        fresh_session=att.get("fresh_session"),
+        adversarial_prompt=att.get("adversarial_prompt"),
+        attested_by=attested_by,
+        attested_at=attested_at,
+    )
 
 
 def build_notes(verdict: Verdict) -> str:
@@ -275,6 +451,7 @@ def main(argv: list[str]) -> int:
     base_commit = read_field(validator, status_file, "git.base_commit")
     head_commit = read_field(validator, status_file, "git.commit")
     branch = read_field(validator, status_file, "git.branch")
+    base_branch = read_field(validator, status_file, "git.base_branch") or "main"
 
     if not base_commit or not head_commit:
         raise GateError(
@@ -364,13 +541,63 @@ def main(argv: list[str]) -> int:
             f"(was base_commit {base_commit})"
         )
     else:
-        diff_start = base_commit
-        gate_log(f"diff start = base_commit {base_commit} ({fallback_reason})")
+        # Layer 2: engine-computed fork point. ``base_commit`` is a human-recorded
+        # field that can go stale; ``git merge-base --all <base_branch> <tip>`` is
+        # the git-truth fork point, so prefer it over the recorded base when the
+        # brief-introducing heuristic did not pin a start.
+        merge_base_commit = git_merge_base(repo_root, base_branch, tip_commit)
+        if merge_base_commit == MERGE_BASE_AMBIGUOUS:
+            raise GateError(
+                "merge-base ambiguous: multiple common ancestors between "
+                f"{base_branch} and {tip_commit}; refusing to guess "
+                "(fail-closed, brief stop condition)"
+            )
+        if merge_base_commit:
+            if not (
+                git_is_ancestor(repo_root, base_commit, merge_base_commit)
+                and git_is_ancestor(repo_root, merge_base_commit, tip_commit)
+            ):
+                raise GateError(
+                    f"merge-base diff start {merge_base_commit} is outside "
+                    f"{base_commit}..{tip_commit}; refusing to review an "
+                    "invalid diff range (fail-closed)"
+                )
+            diff_start = merge_base_commit
+            gate_log(
+                f"diff start = merge-base {merge_base_commit} "
+                f"(base_branch '{base_branch}', tip {tip_commit}; "
+                f"brief-introducing heuristic missed: {fallback_reason})"
+            )
+        else:
+            diff_start = base_commit
+            gate_log(
+                f"diff start = base_commit {base_commit} "
+                f"(brief-introducing heuristic missed: {fallback_reason}; "
+                f"merge-base unavailable for base_branch '{base_branch}')"
+            )
 
     gate_effort = resolve_gate_effort(iteration_dir, phase)
     gate_log(f"phase={phase} → model_reasoning_effort={gate_effort}")
 
     diff_text = git_output(repo_root, "diff", f"{diff_start}..{tip_commit}")
+
+    # WP-04: scope-filter the reviewed diff so only this WP's files are sent to
+    # the consultant. Forbidden wins over allowed; empty allowed = forbidden only
+    # (same semantics as quality-gate.sh). The filter only narrows the review
+    # scope and never alters the downstream empty-diff judgement.
+    allowed_paths = read_scope_paths(validator, status_file, "scope.allowed_paths")
+    forbidden_paths = read_scope_paths(
+        validator, status_file, "scope.forbidden_paths"
+    )
+    diff_text, kept_count, excluded_count = filter_diff_by_scope(
+        diff_text, allowed_paths, forbidden_paths
+    )
+    gate_log(
+        f"scope filter: retained {kept_count} file(s), "
+        f"excluded {excluded_count} file(s)"
+    )
+    if not diff_text:
+        gate_log("GATE: scope-filtered diff is empty")
 
     # ------------------------------------------------------------------
     # Consultant selection and contract construction (INV-3 / INV-7)
@@ -406,7 +633,7 @@ def main(argv: list[str]) -> int:
         )
 
     # ------------------------------------------------------------------
-    # Independence rating (WP-09) with bootstrap exception (P3-scope-freeze)
+    # Independence rating (WP-09/WP-07) with structured bootstrap attestation
     # ------------------------------------------------------------------
     min_independence = review_policy.get("min_independence", "strong")
     consultant_identity = adapter.identity()
@@ -416,24 +643,31 @@ def main(argv: list[str]) -> int:
         executor_tool = read_field(validator, status_file, "executor.tool")
         implementer_id = AgentIdentity(tool=executor_tool or "unassigned")
 
+    # True bootstrap path: review=ACCEPT and no implementer fallback. The
+    # reviewer is the orchestrator (no adapter identity), so its identity is
+    # declared as a structured attestation. WP-07 REWORK: that attestation is
+    # now READ from the auditable status record (``review.attestation``), never
+    # constructed in code. Missing/invalid -> None, so ``evaluate()``
+    # fail-closes to ``none`` instead of silently self-signing a valid
+    # declaration. The attestation never upgrades the rating to strong.
+    is_bootstrap_normal = review_decision == "ACCEPT" and implementer_id is None
+    attestation: ReviewerAttestation | None = None
+    if is_bootstrap_normal:
+        attestation = read_attestation(status_file)
+
     level, independence_reasons = evaluate(
         reviewer_id=None,
         consultant_id=consultant_identity,
         capabilities=capabilities,
         min_independence=min_independence,
         implementer_id=implementer_id,
+        attestation=attestation,
     )
 
-    # Bootstrap exception: one-sign path where the orchestrator (Claude) has no
-    # adapter identity. Per P3-scope-freeze we do not downgrade this to ``none``;
-    # when WP-09 signals are insufficient we record weak-attested and continue.
-    is_bootstrap_normal = review_decision == "ACCEPT" and implementer_id is None
-    if is_bootstrap_normal and level == "none" and capabilities.sandbox_enforced:
-        level = "weak"
-        independence_reasons.append(
-            "bootstrap exception: reviewer identity unavailable (orchestrator); "
-            "rated weak-attested, attested not engine-proven"
-        )
+    # WP-07: the structured attestation above replaces the former text-only
+    # none→weak override. With a valid attestation, ``evaluate()`` already
+    # returns weak-attested for the bootstrap path; with missing/invalid
+    # attestation it fail-closes to none and the gate rejects below.
 
     # 恒计算门限判据(单点可读),不再按分支跳过。
     threshold_met = meets_threshold(level, min_independence)

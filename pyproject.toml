@@ -1,12 +1,12 @@
 [project]
 name = "agentic-loop"
-version = "0.1.0"
+version = "0.2.0"
 description = "Portable agentic orchestration framework engine (dogfooded in baofu monorepo)"
 license = { text = "MIT" }
 readme = "README.md"
 authors = [{ name = "xizhu", email = "8543264+billbraves@users.noreply.github.com" }]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["tomli>=1.1.0; python_version < '3.11'"]
 
 [project.scripts]
 agentic = "agentic_loop.cli:main"

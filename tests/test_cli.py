@@ -12,6 +12,10 @@ from pathlib import Path
 import pytest
 
 SRC = Path(__file__).resolve().parents[1] / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from agentic_loop import cli  # noqa: E402
 
 
 def _run_cli(argv, cwd, extra_env=None):
@@ -502,3 +506,55 @@ def test_bundled_finalize_resolves_lock_sibling_in_external_project(tmp_path):
     # the pre-fix $repo_root/scripts/agentic/lock.sh missing-file path is gone.
     assert "No such file" not in r.stderr
     assert "scripts/agentic" not in r.stderr
+
+
+def test_bundled_resource_stays_alive_during_execution(tmp_path, monkeypatch):
+    """Bundled wrapper 资源在子进程执行期间必须存活,不被提前清理。
+
+    模拟 zip-import 形态:``importlib.resources.path`` 的 context 在退出时删除
+    材料化的临时文件。若 resolve_wrapper/main 在运行 wrapper 前就关闭了资源
+    context,临时文件会被删,子进程必然执行失败;本测试用 marker 文件证明 wrapper
+    确实执行了(资源在子进程生命周期内存在)。
+    """
+    marker = tmp_path / "ran.txt"
+
+    class _TempResource:
+        def __init__(self, name, content):
+            self._name = name
+            self._content = content
+            self._path = None
+
+        def __enter__(self):
+            p = tmp_path / self._name
+            p.write_text(self._content)
+            p.chmod(0o755)
+            self._path = p
+            return p
+
+        def __exit__(self, *exc):
+            if self._path is not None and self._path.exists():
+                self._path.unlink()
+            return False
+
+    def fake_path(package, name):
+        if name == "lock.sh":
+            content = (
+                "#!/usr/bin/env bash\n"
+                "printf 'ran\\n' > {!r}\n"
+                "exit 0\n".format(str(marker))
+            )
+            return _TempResource("lock.sh", content)
+        return cli._resources.path(package, name)
+
+    def _no_git_repo():
+        raise RuntimeError("no git repo")
+
+    monkeypatch.setattr(cli._resources, "path", fake_path)
+    monkeypatch.setattr(cli, "_main_root", _no_git_repo)
+
+    rc = cli.main(["lock", "heartbeat", "--kind", "wp", "--key", "x"])
+
+    assert rc == 0
+    assert marker.read_text() == "ran\n"
+    # main() 在子进程结束后关闭了资源 context,临时文件已清理。
+    assert not (tmp_path / "lock.sh").exists()

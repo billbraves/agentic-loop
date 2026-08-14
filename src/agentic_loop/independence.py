@@ -12,6 +12,7 @@ from typing import Tuple
 
 from agentic_loop.adapters.base import AdapterCapabilities
 from agentic_loop.adapters.base import AgentIdentity
+from agentic_loop.adapters.base import ReviewerAttestation
 
 
 # Ordered from strongest to weakest. ``none`` is the fail-closed floor.
@@ -41,10 +42,12 @@ def _different_model(a: AgentIdentity | None, b: AgentIdentity | None) -> bool:
 def _weak_engine_enforced(capabilities: AdapterCapabilities | None) -> Tuple[bool, List[str]]:
     """Check the engine-enforced weak conditions.
 
-    In WP-09 the adapter-attested conditions (fresh session/context,
-    adversarial prompt) are represented by the input parameters/capabilities
-    because no separate attestation structure exists yet. Missing required
-    capability flags therefore manifest as missing attestation in this WP.
+    WP-09 folded the adapter-attested conditions (fresh session/context,
+    adversarial prompt) into the input parameters/capabilities because no
+    separate attestation structure existed yet. WP-07 adds that separate
+    ``ReviewerAttestation`` structure; this helper therefore keeps checking only
+    the engine-enforced capability flags, while ``evaluate()`` validates the
+    attestation separately in the true bootstrap path.
     """
     reasons: List[str] = []
     ok = True
@@ -68,6 +71,7 @@ def evaluate(
     min_independence: str,
     *,
     implementer_id: AgentIdentity | None = None,
+    attestation: ReviewerAttestation | None = None,
 ) -> Tuple[str, List[str]]:
     """Rate the independence of the two signatures.
 
@@ -87,6 +91,12 @@ def evaluate(
         ``meets_threshold()``.
     implementer_id:
         Used in the degraded path when ``reviewer_id`` is ``None``.
+    attestation:
+        WP-07 structured reviewer attestation. Only consulted in the true
+        bootstrap path (``reviewer_id is None`` and no ``implementer_id``
+        fallback): a complete attestation with all conditions true rates
+        ``weak-attested``; missing/incomplete/false attestation fail-closes to
+        ``none``. Ignored for the degraded and non-bootstrap paths.
 
     Returns
     -------
@@ -134,6 +144,31 @@ def evaluate(
     # Same observed model and engine-enforced weak conditions are satisfied.
     weak_ok, weak_reasons = _weak_engine_enforced(capabilities)
     reasons.extend(weak_reasons)
+
+    # WP-07: true bootstrap path (reviewer is the orchestrator with no adapter
+    # identity and no implementer fallback). The only independence signal is the
+    # structured reviewer attestation, so the weak-attested rating is derived
+    # from it rather than a free-text override. A complete attestation with all
+    # conditions true rates ``weak``; missing/incomplete/false attestation
+    # fail-closes to ``none`` (stricter than the former text-only override).
+    if bootstrap and compare_against is None:
+        if weak_ok and attestation is not None and attestation.is_valid():
+            reasons.append(
+                "reviewer attestation present and complete "
+                f"(reviewer_role={attestation.reviewer_role}, "
+                f"reviewer_tool={attestation.reviewer_tool}, "
+                f"fresh_session={attestation.fresh_session}, "
+                f"adversarial_prompt={attestation.adversarial_prompt}, "
+                f"attested_by={attestation.attested_by})"
+            )
+            reasons.append(
+                "level=weak-attested: reviewer=orchestrator, attested not engine-proven"
+            )
+            return "weak", reasons
+        if attestation is None:
+            reasons.append("reviewer attestation missing")
+        else:
+            reasons.append("reviewer attestation incomplete or conditions false")
 
     if _same_model(consultant_id, compare_against) and weak_ok:
         if bootstrap:

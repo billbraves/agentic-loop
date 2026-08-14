@@ -66,13 +66,25 @@ iteration_id=$(field iteration_id)
 wp_id=$(field work_package_id)
 merged_commit_recorded=$(field git.merged_commit)
 
+# Read the optional consult.override fields for the honest-REWORK escape hatch.
+# Missing or incomplete override resolves to empty values and therefore fails
+# closed below; this mirrors validate_wp_status._override_is_legal exactly.
+override_approved=$(field consult.override.approved 2>/dev/null || true)
+override_approver=$(field consult.override.approver 2>/dev/null || true)
+override_justification=$(field consult.override.justification 2>/dev/null || true)
+override_reviewed_at=$(field consult.override.reviewed_at 2>/dev/null || true)
+override_legal="false"
+if [[ "$override_approved" == "True" && -n "$override_approver" && -n "$override_justification" && -n "$override_reviewed_at" ]]; then
+  override_legal="true"
+fi
+
 # Step 2: preconditions (any failure means do not mutate status).
 if [[ "$review_decision" != "ACCEPT" && "$review_decision" != "N/A" ]]; then
   echo "FINALIZE_FAIL: review.decision must be ACCEPT or N/A (got $review_decision)" >&2
   exit 2
 fi
 
-if [[ "$consult_decision" != "ACCEPT" ]]; then
+if [[ "$consult_decision" != "ACCEPT" && "$override_legal" != "true" ]]; then
   echo "FINALIZE_FAIL: consult.decision must be ACCEPT (got $consult_decision)" >&2
   exit 2
 fi

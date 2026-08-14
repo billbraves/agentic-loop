@@ -118,6 +118,34 @@ def fail(errors: list[str], message: str) -> None:
     errors.append(message)
 
 
+def _override_is_legal(consult: object) -> bool:
+    """Return True when ``consult.override`` is a complete, human-approved override.
+
+    A legal override relaxes *only* the terminal-state ``consult.decision ==
+    ACCEPT`` gate. It must be explicit and auditable: an active marker
+    (``approved == True``), a non-empty ``approver``, a non-empty
+    ``justification``, and a ``reviewed_at`` timestamp. An absent or incomplete
+    override resolves to ``False`` so the terminal gate stays fail-closed.
+    """
+    if not isinstance(consult, dict):
+        return False
+    override = consult.get("override")
+    if not isinstance(override, dict):
+        return False
+    if override.get("approved") is not True:
+        return False
+    approver = override.get("approver")
+    if not isinstance(approver, str) or not approver.strip():
+        return False
+    justification = override.get("justification")
+    if not isinstance(justification, str) or not justification.strip():
+        return False
+    reviewed_at = override.get("reviewed_at")
+    if not isinstance(reviewed_at, str) or not reviewed_at.strip():
+        return False
+    return True
+
+
 def load_status(path: Path) -> dict:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -228,11 +256,14 @@ def validate(data: dict) -> list[str]:
 
     if state in {"APPROVED_FOR_MERGE", "MERGED", "RELEASED"}:
         decision = data.get("review", {}).get("decision")
-        consult_decision = data.get("consult", {}).get("decision")
+        consult = data.get("consult")
+        consult_decision = consult.get("decision") if isinstance(consult, dict) else None
+        override_ok = _override_is_legal(consult)
         if decision == "N/A":
             # Implementer-is-reviewer degraded path: no independent Claude review,
             # so independence MUST be carried by an ACCEPT from consult (Codex),
-            # which is only representable in schema v2.
+            # which is only representable in schema v2. A legal override does NOT
+            # relax this path (independence is a separate, non-decision gate).
             if not is_v2:
                 fail(errors, f"review.decision=N/A requires schema v2 (consult block) in state {state}")
             elif consult_decision != "ACCEPT":
@@ -240,7 +271,14 @@ def validate(data: dict) -> list[str]:
         elif decision != "ACCEPT":
             fail(errors, f"review.decision must be ACCEPT or N/A in state {state}")
         elif is_v2 and consult_decision != "ACCEPT":
-            fail(errors, f"consult.decision must be ACCEPT in state {state}")
+            if not override_ok:
+                # No valid override: the honest-REWORK terminal gate stays
+                # fail-closed, exactly as before this WP.
+                fail(errors, f"consult.decision must be ACCEPT in state {state}")
+            elif consult_decision not in DECISIONS:
+                # A valid override relaxes "must equal ACCEPT" to "must be a
+                # present, valid decision"; it does not permit a missing consult.
+                fail(errors, f"consult.decision must be ACCEPT, REWORK, or CONSULT in state {state}")
     if state in {"MERGED", "RELEASED"} and not git.get("merged_commit"):
         fail(errors, f"git.merged_commit is required in state {state}")
 
