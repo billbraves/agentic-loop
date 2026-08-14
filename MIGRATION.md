@@ -8,42 +8,49 @@ migrated from calling `scripts/agentic/*.sh` directly to using the installed
 ## 1. Install
 
 `agentic-loop` is **not published to PyPI** (by design — see the project's
-distribution preference). Adopt it one of two ways:
+distribution preference). Adopt it via pip-from-git.
 
-**a. pip-from-git** (a tag or commit of the repo that hosts the package):
+### 1.1 Latest release (default)
+
+Every release lands on `main` and is tagged, so **`main` always points at the
+latest release**. To track it, install without a ref — a reinstall picks up
+whatever the newest release is:
 
 ```bash
-uv pip install "git+<repo-url>@<tag-or-commit>#subdirectory=packages/agentic-loop"
+uv pip install "git+https://github.com/billbraves/agentic-loop.git"
 ```
 
-**b. vendored** (copy `packages/agentic-loop/` into your tree and install editable):
+Re-run the same command (add `--force-reinstall`, or `--upgrade` under plain
+pip) to move up to a newer release later. The package lives at the **root** of
+the standalone repository, so no `#subdirectory=` fragment is needed.
+
+### 1.2 Pin an exact version (reproducible)
+
+For reproducible builds — CI, production lockfiles, or when you want a reinstall
+to yield byte-identical code — pin an immutable ref instead. Replace `<TAG>` /
+`<COMMIT_SHA>` with the version you are adopting (latest tag: **`v0.2.0`**):
+
+```bash
+# Pin a release tag:
+uv pip install "git+https://github.com/billbraves/agentic-loop.git@v0.2.0"
+
+# Pin an exact commit:
+uv pip install "git+https://github.com/billbraves/agentic-loop.git@<COMMIT_SHA>"
+```
+
+### 1.3 Vendored
+
+Alternatively, copy the package into your tree and install editable:
 
 ```bash
 uv pip install -e path/to/vendored/agentic-loop
 ```
 
-### 1.1 Pinning a version (tag vs commit)
-
-Both adoption paths should pin an **exact, immutable ref** rather than tracking a
-moving branch, so a reinstall reproduces the same code. Replace `<TAG>` /
-`<COMMIT_SHA>` with the version you intend to adopt. The package lives at the
-**root** of the standalone repository, so no `#subdirectory=` fragment is needed:
-
-```bash
-# Pin a git tag (preferred once a release tag exists):
-uv pip install "git+https://github.com/billbraves/agentic-loop.git@<TAG>"
-
-# Pin an exact commit (reproducible even before tags exist):
-uv pip install "git+https://github.com/billbraves/agentic-loop.git@<COMMIT_SHA>"
-```
+Record the adopted tag/commit in your own repo (e.g. a `VENDORED_COMMIT` file)
+and copy the directory at that exact commit for reproducibility.
 
 (If you instead install from the baofu monorepo, the package is under a
-subdirectory — append `#subdirectory=packages/agentic-loop` to the ref above.)
-
-For the vendored path, record the adopted tag/commit in your own repo (e.g. a
-`VENDORED_COMMIT` file or a comment next to the copied directory) and pin it the
-same way — copy the directory at that exact commit rather than from a moving
-`main`.
+subdirectory — append `#subdirectory=packages/agentic-loop` to any ref above.)
 
 The package targets Python **>= 3.9**. On Python **3.11+** it has **zero
 third-party dependencies** (uses the stdlib `tomllib`); on Python **3.9 / 3.10**

@@ -12,22 +12,23 @@ dispatch → implement → review → merge-gate workflow across coding agents
 - **governance-contract templates** rendered per project from a small config.
 
 It is compatible with Python **>= 3.9** so it can be vendored into external
-repositories running older interpreters, and declares **zero third-party
-dependencies** (`dependencies = []`).
+repositories running older interpreters. On Python **3.11+** it declares **zero
+third-party dependencies** (stdlib `tomllib`); on **3.9 / 3.10** it pulls a
+single conditional dependency, `tomli`.
 
-## Install (editable, independent of the root workspace)
+## Install (latest release)
+
+Every release lands on `main` and is tagged, so `main` always points at the
+newest release. Install without a ref to track it:
 
 ```bash
-uv pip install -e packages/agentic-loop
-uv run python3 -c "import agentic_loop; print(agentic_loop.__version__)"
+uv pip install "git+https://github.com/billbraves/agentic-loop.git"
+python3 -c "import agentic_loop; print(agentic_loop.__version__)"
 ```
 
-(Use `uv run python3`, not bare `python3`: the editable install lands in the uv
-venv, which the system interpreter does not see.)
-
-Note: this package is intentionally **not** a member of the root
-`[tool.uv.workspace]` (the workspace requires Python >= 3.13, which would
-conflict with this package's >= 3.9 portability declaration).
+Re-run with `--force-reinstall` (or `--upgrade` under plain pip) to move up to a
+later release. To pin an exact version for reproducible builds, append a tag
+(`@v0.2.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
 
 ## Adopting it in another project
 
