@@ -26,8 +26,35 @@ DEFAULT_ROLES = {
     "consultant": "codex",
 }
 
-DEFAULT_QUALITY_GATE = {
-    "rule": [],
+DEFAULT_GATE = {
+    "blocking": True,
+    "enabled": True,
+    "apply": "first_match",
+}
+
+# Frozen enum domains for the unified ``[[gate]]`` schema (brief Required 1).
+# ``kind``/``stage`` have no built-in safe default; an illegal value is dropped
+# by ``get_gates`` (see ``_gate_has_valid_enums``) rather than guessed. ``apply``
+# has a safe default (first_match), so an illegal value falls back to it.
+VALID_GATE_KINDS = {"command", "codex", "qoder_security", "qoder_judge"}
+VALID_GATE_STAGES = {"pre_review", "merge"}
+VALID_GATE_APPLY = {"first_match", "overlay"}
+
+DEFAULT_QODER_SECURITY_LEVEL = "L3"
+
+DEFAULT_AUTONOMY = {
+    "default_mode": "ask",
+    "ultra_auto": [
+        "local_edit", "test_run", "worktree_lifecycle",
+        "dispatch_developer", "review", "merge_gate",
+        "local_merge_no_ff", "finalize_merge",
+    ],
+    "always_stop": [
+        "push", "feishu_send", "production_write",
+        "cron_change", "release_deploy", "credential_rw",
+        "irreversible_git",
+    ],
+    "soft_limit_signals": ["frozen_hard", "rework_twice", "circuit_breaker"],
 }
 
 DEFAULT_SAFETY = {
@@ -57,7 +84,7 @@ DEFAULT_PROJECT = {
 CONFIG_SECTIONS: dict[str, dict[str, Any]] = {
     "project": DEFAULT_PROJECT,
     "roles": DEFAULT_ROLES,
-    "quality_gate": DEFAULT_QUALITY_GATE,
+    "autonomy": DEFAULT_AUTONOMY,
     "safety": DEFAULT_SAFETY,
     "review_policy": DEFAULT_REVIEW_POLICY,
     "locks": DEFAULT_LOCKS,
@@ -179,8 +206,77 @@ def get_roles(repo: Path | None = None) -> dict[str, Any]:
     return get_config_section(repo or main_repo(), "roles")
 
 
-def get_quality_gate(repo: Path | None = None) -> dict[str, Any]:
-    return get_config_section(repo or main_repo(), "quality_gate")
+def get_autonomy(repo: Path | None = None) -> dict[str, Any]:
+    return get_config_section(repo or main_repo(), "autonomy")
+
+
+def _normalize_gate(gate: dict[str, Any]) -> dict[str, Any]:
+    """Apply per-gate defaults (blocking/enabled/apply) and kind defaults.
+
+    The reader only reads; it enforces the enum constraint only for ``apply``,
+    the one gate field with a built-in safe default: a value outside
+    ``{first_match, overlay}`` falls back to ``first_match`` (fail-closed), just
+    like a missing/empty/type-mismatched value. ``kind``/``stage`` have no safe
+    default here, so their enum validation lives in ``get_gates`` (see
+    ``_gate_has_valid_enums``), which drops an illegal entry instead of guessing
+    a legal enum. ``rule`` (kind=command) is preserved verbatim.
+    """
+    out = dict(gate)
+    for key, default in DEFAULT_GATE.items():
+        if not _is_valid_config_value(key, out.get(key), default):
+            out[key] = default
+    # fail-closed: an illegal apply value must never silently relax the built-in
+    # safe default by being read through verbatim.
+    if out.get("apply") not in VALID_GATE_APPLY:
+        out["apply"] = DEFAULT_GATE["apply"]
+    if out.get("kind") == "qoder_security":
+        level = out.get("level")
+        if not _is_valid_config_value("level", level, DEFAULT_QODER_SECURITY_LEVEL):
+            out["level"] = DEFAULT_QODER_SECURITY_LEVEL
+    return out
+
+
+def _gate_has_valid_enums(gate: dict[str, Any]) -> bool:
+    """True when a gate entry's ``kind`` and ``stage`` are both valid enums.
+
+    Fail-closed semantics (chosen): an entry whose ``kind`` is not one of the
+    four frozen kinds, or whose ``stage`` is not one of ``{pre_review, merge}``,
+    is DROPPED from ``get_gates()``. Dropping (rather than marking unavailable)
+    keeps the normalized result a plain list of usable gates, so any caller that
+    filters on kind/stage — ``get_command_gate`` today, a future runner tomorrow
+    — can never mis-select an illegal entry. We never guess an illegal value into
+    a legal enum; an illegal entry simply does not exist in the normalized view.
+    """
+    return gate.get("kind") in VALID_GATE_KINDS and gate.get("stage") in VALID_GATE_STAGES
+
+
+def get_gates(repo: Path | None = None) -> list[dict[str, Any]]:
+    """Return the unified ``[[gate]]`` array (defaults + enum validation applied).
+
+    Entries whose ``kind`` or ``stage`` is not a valid enum value are dropped
+    (fail-closed), so an illegal gate can never reach ``get_command_gate`` or any
+    downstream runner. Returns ``[]`` when there is no config, no ``gate`` array,
+    or no usable entry.
+    """
+    data = _load_config(repo or main_repo()) or {}
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("gate")
+    if not isinstance(raw, list):
+        return []
+    return [
+        _normalize_gate(g)
+        for g in raw
+        if isinstance(g, dict) and _gate_has_valid_enums(g)
+    ]
+
+
+def get_command_gate(repo: Path | None = None) -> dict[str, Any] | None:
+    """Return the first command-kind gate for the pre_review stage, if any."""
+    for gate in get_gates(repo):
+        if gate.get("kind") == "command" and gate.get("stage") == "pre_review":
+            return gate
+    return None
 
 
 def get_safety(repo: Path | None = None) -> dict[str, Any]:
@@ -225,9 +321,14 @@ def main(argv: list[str]) -> int:
     if len(argv) == 2 and argv[0] == "--root" and argv[1] in ROOTS:
         print(ROOTS[argv[1]]())
         return 0
-    if len(argv) == 2 and argv[0] == "--config-section" and argv[1] in CONFIG_SECTIONS:
-        print(json.dumps(_read_config_section(main_repo(), argv[1]), ensure_ascii=False))
-        return 0
+    if len(argv) == 2 and argv[0] == "--config-section":
+        section = argv[1]
+        if section == "gate":
+            print(json.dumps(get_command_gate() or {"rule": []}, ensure_ascii=False))
+            return 0
+        if section in CONFIG_SECTIONS:
+            print(json.dumps(_read_config_section(main_repo(), section), ensure_ascii=False))
+            return 0
     # 任何其它 argv(含非法 --config-section 形态)一律回落 base 冻结 root usage(WP-04)。
     print(f"usage: {Path(sys.argv[0]).name} --root <{'|'.join(ROOTS)}>", file=sys.stderr)
     return 64

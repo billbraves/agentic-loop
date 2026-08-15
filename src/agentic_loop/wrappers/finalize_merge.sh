@@ -78,6 +78,20 @@ if [[ "$override_approved" == "True" && -n "$override_approver" && -n "$override
   override_legal="true"
 fi
 
+# Read the optional qoder_security third-signature fields. Missing or incomplete
+# values resolve to empty and therefore fail closed below; this mirrors
+# validate_wp_status._qoder_security_satisfied exactly. This block is read-only:
+# a FINDINGS/ERROR decision is never rewritten to PASS here.
+qoder_decision=$(field qoder_security.decision 2>/dev/null || true)
+qoder_override_approved=$(field qoder_security.override.approved 2>/dev/null || true)
+qoder_override_approver=$(field qoder_security.override.approver 2>/dev/null || true)
+qoder_override_justification=$(field qoder_security.override.justification 2>/dev/null || true)
+qoder_override_reviewed_at=$(field qoder_security.override.reviewed_at 2>/dev/null || true)
+qoder_override_legal="false"
+if [[ "$qoder_override_approved" == "True" && -n "$qoder_override_approver" && -n "$qoder_override_justification" && -n "$qoder_override_reviewed_at" ]]; then
+  qoder_override_legal="true"
+fi
+
 # Step 2: preconditions (any failure means do not mutate status).
 if [[ "$review_decision" != "ACCEPT" && "$review_decision" != "N/A" ]]; then
   echo "FINALIZE_FAIL: review.decision must be ACCEPT or N/A (got $review_decision)" >&2
@@ -87,6 +101,16 @@ fi
 if [[ "$consult_decision" != "ACCEPT" && "$override_legal" != "true" ]]; then
   echo "FINALIZE_FAIL: consult.decision must be ACCEPT (got $consult_decision)" >&2
   exit 2
+fi
+
+# v3-only third signature: qoder_security must be PASS or carry a complete,
+# approved override. v2 stays double-sign only (no qoder requirement), so this
+# branch is keyed on schema_version alone — never on block presence (INV-6).
+if [[ "$schema_version" == "agentic-wp-status/v3" ]]; then
+  if [[ "$qoder_decision" != "PASS" && "$qoder_override_legal" != "true" ]]; then
+    echo "FINALIZE_FAIL: qoder_security.decision must be PASS or carry a complete approved override (got $qoder_decision)" >&2
+    exit 2
+  fi
 fi
 
 if [[ -z "$git_commit" ]]; then

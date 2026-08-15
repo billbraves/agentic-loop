@@ -28,7 +28,7 @@ python3 -c "import agentic_loop; print(agentic_loop.__version__)"
 
 Re-run with `--force-reinstall` (or `--upgrade` under plain pip) to move up to a
 later release. To pin an exact version for reproducible builds, append a tag
-(`@v0.2.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
+(`@v0.3.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
 
 ## Adopting it in another project
 
@@ -74,7 +74,7 @@ streams and exit codes pass through unchanged):
 | `gate` | `codex_merge_gate.sh` — independent merge-gate second sign |
 | `redispatch` | `redispatch.sh` — rework re-dispatch reflow |
 | `preflight` | `preflight.sh` — status validation + branch/WP-lock gate |
-| `finalize` | `finalize_merge.sh` — stamp `state=MERGED` + `merged_commit` |
+| `finalize` | `finalize_merge.sh` — three-signature gate (reviewer + consult + Qoder for v3; v2 double-sign) then stamp `state=MERGED` + `merged_commit` |
 | `dispatch-lint` | `dispatch_lint.sh` — dispatch-time status lint |
 | `quality-gate` | `quality-gate.sh` — path-matched project test rules |
 | `lock` | `lock.sh` — WP / merge concurrency locks |

@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-push hook scaffolded by `agentic init`.
+#
+# This hook is a LOCAL gate trigger only: it runs the framework's unified gate
+# runner for stage=pre_review before a push, and exits non-zero to block the
+# push when a blocking gate fails. It does NOT re-implement any gate-decision
+# logic -- all gate scheduling/execution/verdicts live in the framework
+# runner/engine. It also never mutates git configuration (hooksPath is opted
+# into separately via install.sh), and it deliberately does not try to defeat
+# `git push --no-verify`: --no-verify is git's own explicit escape hatch, so
+# this hook simply does not run for it.
+
+# Resolve the repository root with --show-toplevel: the toplevel of the worktree
+# actually being pushed. In a normal repository this equals
+# dirname(git-common-dir); in a linked worktree it is the checked-out worktree
+# root (NOT the main repository), so the status discovery and runner path below
+# both resolve against the copy being pushed rather than the main repo. If we
+# are not inside a git repository there is nothing to guard, so skip quietly.
+if ! repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  echo "PRE_PUSH_SKIP: not inside a git repository" >&2
+  exit 0
+fi
+
+current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || {
+  echo "PRE_PUSH_SKIP: could not resolve current branch" >&2
+  exit 0
+}
+
+# Discover the active work-package status for the branch being pushed. A status
+# is active when its state is a lifecycle state where a pre_review gate is
+# meaningful and its git.branch matches the current branch. If zero or more
+# than one match, this is not an unambiguous WP gate event: skip (do not block
+# an ordinary push).
+discovery="$(
+  python3 - "$repo_root" "$current_branch" <<'PY'
+import json
+import pathlib
+import sys
+
+repo_root = pathlib.Path(sys.argv[1])
+current_branch = sys.argv[2]
+active_states = {
+    "APPROVED", "DISPATCHED", "IMPLEMENTING", "READY_FOR_REVIEW",
+    "CHANGES_REQUESTED", "APPROVED_FOR_MERGE", "BLOCKED",
+}
+
+# Respect the configured iterations_dir when the framework is importable
+# (pip-installed case); otherwise fall back to the frozen default.
+iterations_dir = repo_root / "docs" / "plans"
+try:
+    from agentic_loop.resolve_paths import iterations_dir as _iterations_dir
+    iterations_dir = _iterations_dir()
+except Exception:
+    pass
+
+matches = []
+if iterations_dir.is_dir():
+    for p in sorted(iterations_dir.glob("*/work-packages/*.status.json")):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        state = data.get("state")
+        branch = (data.get("git") or {}).get("branch")
+        if state in active_states and branch == current_branch:
+            matches.append(p)
+
+if len(matches) == 1:
+    status = matches[0]
+    base_branch = (
+        (json.loads(status.read_text(encoding="utf-8")).get("git") or {}).get("base_branch")
+        or "main"
+    )
+    print("{}\t{}".format(status, base_branch))
+PY
+)" || true
+
+if [[ -z "$discovery" ]]; then
+  echo "PRE_PUSH_SKIP: no active work-package status for branch $current_branch" >&2
+  exit 0
+fi
+
+status_file="$(printf '%s\n' "$discovery" | cut -f1)"
+base_branch="$(printf '%s\n' "$discovery" | cut -f2)"
+
+# Locate the unified gate runner. Prefer the repo-relative copy (the canonical
+# runner when the framework's scripts/agentic/ is vendored or checked out in
+# the project); otherwise fall back to the pip-installed Python engine (the
+# framework-installed equivalent entry).
+runner="$repo_root/scripts/agentic/gate-runner.sh"
+if [[ -x "$runner" ]]; then
+  exec "$runner" "$status_file" pre_review
+fi
+
+if ! python3 -c "import agentic_loop.runner.gate_runner" >/dev/null 2>&1; then
+  echo "PRE_PUSH_FAIL: active work-package $status_file requires the unified gate runner but neither scripts/agentic/gate-runner.sh nor agentic_loop.runner.gate_runner is available" >&2
+  exit 2
+fi
+
+base_ref="$base_branch"
+if ! git rev-parse --verify "$base_ref" >/dev/null 2>&1; then
+  echo "PRE_PUSH_FAIL: base ref not found: $base_ref" >&2
+  exit 2
+fi
+
+# Framework-installed equivalent entry: prepare the changed-path set with the
+# same thin computation the runner shell performs (base...HEAD + worktree +
+# cached + untracked), then delegate ALL gate logic to the engine. This is
+# input preparation only; it is not a second copy of any gate decision.
+changed_file="$(mktemp)"
+trap 'rm -f "$changed_file"' EXIT
+{
+  git diff --name-only --diff-filter=ACMR "$base_ref"...HEAD
+  git diff --name-only --diff-filter=ACMR
+  git diff --name-only --diff-filter=ACMR --cached
+  git ls-files --others --exclude-standard
+} | awk 'NF' | sort -u > "$changed_file"
+
+python3 -m agentic_loop.runner.gate_runner \
+  --stage pre_review --paths "$changed_file" --status "$status_file"

@@ -75,20 +75,21 @@ git diff --check
 git diff --cached --check
 
 # Path->test rules are project-specific, so they live in the project's
-# .agentic/config.toml [quality_gate] section (schema from WP-06), NOT hard-coded
-# here. This keeps the wrapper generic enough to bundle into the wheel.
+# .agentic/config.toml unified [[gate]] array (kind="command", stage="pre_review"),
+# NOT hard-coded here. This keeps the wrapper generic enough to bundle into the
+# wheel.
 #
 # Fail-closed: a quality gate that silently reports PASS because its rules are
-# undefined is not acceptable. `resolve_paths --config-section quality_gate`
-# always MERGES the requested section over its built-in defaults, so its output
-# can never signal "the project defined no rules" — it hides an absent section
-# behind the defaults. We therefore inspect the raw config file directly: when a
-# project ships an .agentic/config.toml that OMITS a usable [quality_gate] rule
-# list, refuse with a non-zero exit rather than passing on undefined rules. A
-# section that EXISTS with a non-empty rule list drives the plan normally — an
-# empty plan produced because the current changed set matches no rule is a
-# legitimate PASS. A repo with no .agentic/config.toml at all keeps the built-in
-# default behavior (bare bootstrap; no project config to betray).
+# undefined is not acceptable. `resolve_paths --config-section gate` returns the
+# command gate (or {"rule": []} when none exists), so it cannot by itself signal
+# "the project defined no rules" — an absent gate falls back to an empty rule
+# list. We therefore inspect the raw config file directly: when a project ships
+# an .agentic/config.toml that OMITS a usable command-gate rule list, refuse with
+# a non-zero exit rather than passing on undefined rules. A command gate that
+# EXISTS with a non-empty rule list drives the plan normally — an empty plan
+# produced because the current changed set matches no rule is a legitimate PASS.
+# A repo with no .agentic/config.toml at all keeps the built-in default behavior
+# (bare bootstrap; no project config to betray).
 # Resolve the config root the SAME way the plan read below does: the engine's
 # --config-section reads .agentic/config.toml from main_repo() (INV-4: config is
 # a main-repo/iteration concern, resolved in one place). Ask the engine for that
@@ -112,18 +113,27 @@ except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 with open(cfg, "rb") as fh:
     data = tomllib.load(fh)
-section = data.get("quality_gate")
-rules = section.get("rule") if isinstance(section, dict) else None
+gates = data.get("gate")
+rules = None
+if isinstance(gates, list):
+    for gate in gates:
+        if (
+            isinstance(gate, dict)
+            and gate.get("kind") == "command"
+            and gate.get("stage") == "pre_review"
+        ):
+            rules = gate.get("rule")
+            break
 print("OK" if isinstance(rules, list) and len(rules) > 0 else "MISSING_SECTION")
 PY
-) || { echo "QUALITY_GATE_FAIL: could not inspect [quality_gate] config" >&2; exit 2; }
+) || { echo "QUALITY_GATE_FAIL: could not inspect [[gate]] config" >&2; exit 2; }
 if [[ "$qg_section_status" == "MISSING_SECTION" ]]; then
-  echo "QUALITY_GATE_FAIL: [quality_gate] config section is absent or defines no rules; refusing to pass with undefined quality rules (fail-closed)" >&2
+  echo "QUALITY_GATE_FAIL: [[gate]] (kind=command, stage=pre_review) is absent or defines no rules; refusing to pass with undefined quality rules (fail-closed)" >&2
   exit 2
 fi
 
-qg_config=$(python3 -m agentic_loop.resolve_paths --config-section quality_gate) \
-  || { echo "QUALITY_GATE_FAIL: could not read [quality_gate] config" >&2; exit 2; }
+qg_config=$(python3 -m agentic_loop.resolve_paths --config-section gate) \
+  || { echo "QUALITY_GATE_FAIL: could not read [[gate]] config" >&2; exit 2; }
 
 # Expand the changed set into the ordered, de-duplicated list of test commands.
 # Matching semantics mirror the previous hard-coded bash `case`:

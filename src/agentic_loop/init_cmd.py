@@ -59,6 +59,35 @@ ttl_minutes  = 30
 
 GITIGNORE_LOCKS_LINE = ".agentic/locks/"
 
+# Optional local-gate trigger files. These are scaffolded as packaged templates
+# and are deliberately NOT part of the managed contract conflict check: a
+# pre-existing hook must never block governance scaffolding, and (unlike the
+# governed contracts) it must never be overwritten -- not even with --force.
+GITHOOKS_REL = ".githooks/pre-push"
+INSTALL_SH_REL = "install.sh"
+
+# (template filename, project-relative target, file mode)
+_HOOK_TEMPLATES = (
+    ("pre-push.tmpl", GITHOOKS_REL, 0o755),
+    ("install.sh.tmpl", INSTALL_SH_REL, 0o755),
+)
+
+
+def _write_hook_asset(root, tmpl_name, rel, mode):
+    """Write one packaged hook asset once; return ``"written"`` or ``"conflict"``.
+
+    The pre-push hook is user-customizable, so this is idempotent in the strict
+    sense: an existing file is never replaced, even when ``--force`` was given.
+    """
+    target = root / rel
+    if target.exists():
+        return "conflict"
+    text = contract_render.load_template(tmpl_name)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    target.chmod(mode)
+    return "written"
+
 
 def _ensure_gitignore_locks(root):
     """Append the locks-ignore line to ``.gitignore`` unless already present."""
@@ -141,6 +170,20 @@ def run_init(target_dir, *, force, non_interactive, config_path=None):
     (root / ".agentic" / "locks").mkdir(parents=True, exist_ok=True)
     gi_changed = _ensure_gitignore_locks(root)
 
+    # Scaffold the optional local pre-push hook + its opt-in installer. These
+    # are additive and never mutate git config: hooksPath is only enabled when
+    # the user explicitly runs install.sh. Existing hook/install files are kept
+    # untouched and reported as conflicts.
+    for tmpl, rel, mode in _HOOK_TEMPLATES:
+        outcome = _write_hook_asset(root, tmpl, rel, mode)
+        if outcome == "written":
+            print("INIT_WROTE: {}".format(rel))
+        else:
+            print(
+                "INIT_HOOK_CONFLICT: {} (exists; not overwritten)".format(rel),
+                file=sys.stderr,
+            )
+
     for label in written:
         print("INIT_WROTE: {}".format(label))
     print("INIT_SKELETON: docs/plans .agentic/locks")
@@ -151,7 +194,8 @@ def run_init(target_dir, *, force, non_interactive, config_path=None):
         "\nNext steps:\n"
         "  1. Edit {}/.agentic/config.toml (roles, paths, quality gates).\n"
         "  2. Run `agentic contract diff --apply` to re-render contracts.\n"
-        "  3. Run `agentic preflight <status.json>` before dispatching work.".format(
+        "  3. Run `agentic preflight <status.json>` before dispatching work.\n"
+        "  4. Run `./install.sh` to opt in to the local .githooks pre-push gate.".format(
             root
         )
     )

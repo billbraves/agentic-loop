@@ -6,6 +6,62 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-15
+
+Outcome of the `agentic-gate-unification-v1` iteration (7 work packages), which
+unified the gate declaration system, added an independent Qoder security gate as
+a third merge signature, and landed the ask/ultra autonomy model. All changes
+are backward compatible: v2 double-sign status files and existing
+`[quality_gate]` behavior are preserved, and the new security signature applies
+only to `agentic-wp-status/v3`.
+
+### Added
+
+- **Unified `[[gate]]` declaration system (P1 / WP-01).** A single `[[gate]]`
+  array (`kind` ∈ {command, codex, qoder_security, qoder_judge}, `stage` ∈
+  {pre_review, merge}, `apply` ∈ {first_match, overlay}) replaces the special
+  cased `[quality_gate]` section, which is migrated to one `kind=command`
+  `stage=pre_review` gate with its rule order preserved. Also adds the
+  `[autonomy]` section (default mode + ultra-auto / always-stop / soft-limit
+  categories).
+- **Gate runner engine with overlay + generic result model (P1 / WP-02).** A new
+  `agentic_loop.runner.gate_runner` schedules and executes the unified gates,
+  deduplicates shared commands at the execution level (not just the planner),
+  and enforces a canonical merge-stage order (codex signoff → qoder security →
+  qoder judge) so a blocking codex failure never burns Qoder credits.
+- **Qoder security gate engine (P1 / WP-03).** `agentic_loop.gate.qoder_security`
+  drives `qodercli … security scan` over the reviewed tip's changed paths,
+  reading a SARIF 2.1.0 report, taking the highest severity across all signals,
+  and failing closed on any high/medium finding, unknown value, external
+  reference, or version/cleanliness mismatch. The former single-file `gate.py`
+  becomes a `gate/` package.
+- **`agentic init` pre-push gate hook (P4 / WP-07).** `agentic init` scaffolds an
+  opt-in `.githooks/pre-push` (delegating to the unified runner) plus an
+  `install.sh` that sets `core.hooksPath`; idempotent, never runs `git config`
+  itself, and honors `--no-verify` as an escape hatch.
+
+### Changed
+
+- **`validate_wp_status` generalized for v3 (P3 / WP-04).** Recognizes the
+  top-level `qoder_security` block (required only for v3; v2 stays valid without
+  it), validates its decision / error-kind / findings / dataflow structure, and
+  gates the merge state on a Qoder PASS or a complete approved override
+  (same four-field shape as `consult.override`).
+- **`finalize_merge.sh` three-signature gate (P3 / WP-05).** Finalization now
+  requires reviewer + consult + Qoder signatures for v3 (PASS or a complete
+  approved override), read-only and with `schema_version` as the sole dividing
+  line; the v2 double-sign path is unchanged.
+
+### Distribution
+
+- Version bumped to **`0.3.0`** (minor: backward-compatible feature additions —
+  Qoder security gate, gate runner, init hook).
+- **Two more bundled wrappers.** `gate-runner.sh` (WP-02) and
+  `qoder_security_gate.sh` (WP-03) now ship inside the wheel under
+  `agentic_loop/wrappers/` alongside the existing eight, so `pip install
+  agentic-loop` runs the unified gate runner and Qoder security gate without a
+  `scripts/agentic/` in the consuming project (ten wrappers total).
+
 ## [0.2.0] — 2026-08-14
 
 Outcome of the `agentic-loop-hardening-v1` iteration (7 work packages), which

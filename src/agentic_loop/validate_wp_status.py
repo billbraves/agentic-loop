@@ -43,7 +43,15 @@ REQUIRED_TOP_LEVEL_V1 = {
 # v2 adds the independent Codex merge-gate block. See AGENTS.md double-sign rule:
 # entering a merge state requires both review.decision and consult.decision ACCEPT.
 REQUIRED_TOP_LEVEL_V2 = REQUIRED_TOP_LEVEL_V1 | {"consult"}
-SCHEMA_VERSIONS = {"agentic-wp-status/v1", "agentic-wp-status/v2"}
+# v3 adds the qoder security third signature as a required top-level block.
+# v2 stays frozen (no qoder_security required), so this iteration's own v2 WPs
+# and historical MERGED v2 statuses remain valid without backfill.
+REQUIRED_TOP_LEVEL_V3 = REQUIRED_TOP_LEVEL_V2 | {"qoder_security"}
+SCHEMA_VERSIONS = {"agentic-wp-status/v1", "agentic-wp-status/v2", "agentic-wp-status/v3"}
+# qoder_security is a legal top-level key in EVERY schema version (optional in
+# v1/v2, required in v3 via REQUIRED_TOP_LEVEL_V3). It must never be flagged as
+# an unknown extra key; the v3 *presence* requirement is enforced by `required`.
+OPTIONAL_TOP_LEVEL = {"qoder_security"}
 DECISIONS = {"ACCEPT", "REWORK", "CONSULT"}
 # review.decision may additionally be "N/A" ONLY to record the
 # implementer-is-reviewer conflict (e.g. Claude implemented because kimi was
@@ -51,6 +59,22 @@ DECISIONS = {"ACCEPT", "REWORK", "CONSULT"}
 # case independence is carried solely by consult (Codex). Not valid for consult.
 REVIEW_DECISIONS = DECISIONS | {"N/A"}
 INDEPENDENCE_LEVELS = {"strong", "weak", "none"}
+
+# qoder_security enums mirror the single source of truth in
+# agentic_loop/gate/qoder_security.py (DECISIONS / VALID_SEVERITIES /
+# ERROR_KINDS). They are copied here rather than imported because importing the
+# gate package pulls in adapters/independence/resolve_paths with import-time
+# side effects; keep these in sync with qoder_security.py on any change.
+QODER_DECISIONS = {"PASS", "FINDINGS", "ERROR"}
+QODER_SEVERITIES = {"high", "medium", "low"}
+QODER_ERROR_KINDS = {
+    "auth_expired",
+    "credits_exhausted",
+    "network_not_authorized",
+    "parse_failed",
+    "preflight_failed",
+    "timeout",
+}
 
 # Built-in tool identifiers that are independent of project config.
 # Note: these are *tool* identifiers (claude-code/codex-cli/kimi-cli), not
@@ -118,18 +142,15 @@ def fail(errors: list[str], message: str) -> None:
     errors.append(message)
 
 
-def _override_is_legal(consult: object) -> bool:
-    """Return True when ``consult.override`` is a complete, human-approved override.
+def _override_dict_is_legal(override: object) -> bool:
+    """Return True when ``override`` is a complete, human-approved override.
 
-    A legal override relaxes *only* the terminal-state ``consult.decision ==
-    ACCEPT`` gate. It must be explicit and auditable: an active marker
-    (``approved == True``), a non-empty ``approver``, a non-empty
-    ``justification``, and a ``reviewed_at`` timestamp. An absent or incomplete
-    override resolves to ``False`` so the terminal gate stays fail-closed.
+    This is the shared four-field override shape used by both the consult and
+    qoder_security gates: an active marker (``approved == True``), a non-empty
+    ``approver``, a non-empty ``justification``, and a non-empty ``reviewed_at``.
+    An absent or incomplete override resolves to ``False`` so both gates stay
+    fail-closed.
     """
-    if not isinstance(consult, dict):
-        return False
-    override = consult.get("override")
     if not isinstance(override, dict):
         return False
     if override.get("approved") is not True:
@@ -144,6 +165,143 @@ def _override_is_legal(consult: object) -> bool:
     if not isinstance(reviewed_at, str) or not reviewed_at.strip():
         return False
     return True
+
+
+def _override_is_legal(consult: object) -> bool:
+    """Return True when ``consult.override`` is a complete, human-approved override.
+
+    A legal override relaxes *only* the terminal-state ``consult.decision ==
+    ACCEPT`` gate. Delegates to :func:`_override_dict_is_legal` so the qoder
+    override shares the exact same strictness.
+    """
+    if not isinstance(consult, dict):
+        return False
+    return _override_dict_is_legal(consult.get("override"))
+
+
+def _qoder_security_satisfied(qoder: object) -> bool:
+    """True when the ``qoder_security`` block does not block the merge.
+
+    Mirrors ``agentic_loop.gate.qoder_security.blocking``: ``PASS`` never blocks;
+    ``FINDINGS`` / ``ERROR`` block unless a complete, approved override is
+    present. This is the validator-level predicate consumed by the merge-state
+    gate below for the v3 third signature (PASS or a complete approved override),
+    and by WP-05 (finalize_merge.sh) when advancing state.
+    """
+    if not isinstance(qoder, dict):
+        return False
+    if qoder.get("decision") == "PASS":
+        return True
+    return _override_dict_is_legal(qoder.get("override"))
+
+
+def _validate_qoder_security(data: dict, errors: list[str]) -> None:
+    """Validate the contents of the ``qoder_security`` block, when present.
+
+    Presence is enforced separately: the block is optional in v2 and required in
+    v3 via ``REQUIRED_TOP_LEVEL_V3``. This function only checks content legality,
+    for every schema version, so a malformed block never slips through.
+
+    Frozen validator scope (WP-04 brief §51): decision enum; a present ``error``
+    is always validated as a complete structure (kind in the six ERROR_KINDS +
+    non-empty message), and decision=ERROR additionally requires ``error`` to be
+    present; findings severities are {high, medium, low}; each finding's
+    ``category`` / ``file`` / ``summary`` must be a non-empty string and the
+    ``dataflow`` key must be present with a string or null value; block-level ``level``
+    must be a non-empty string; and a present ``override`` must be a complete
+    four-field override (fail-closed). Engine runtime fields such as ``scope`` /
+    ``suppressed`` / ``requested_level`` / ``detail`` /
+    ``scanner_reported_level`` are not hard-gated here (present or absent are
+    both accepted).
+    """
+    qoder = data.get("qoder_security")
+    if qoder is None:
+        return
+    if not isinstance(qoder, dict):
+        fail(errors, "qoder_security must be an object")
+        return
+
+    decision = qoder.get("decision")
+    if decision not in QODER_DECISIONS:
+        fail(errors, f"qoder_security.decision is invalid: {decision!r}")
+
+    findings = qoder.get("findings")
+    if not isinstance(findings, list):
+        fail(errors, "qoder_security.findings must be a list")
+    else:
+        for idx, finding in enumerate(findings):
+            if not isinstance(finding, dict):
+                fail(errors, f"qoder_security.findings[{idx}] must be an object")
+                continue
+
+            severity = finding.get("severity")
+            if severity not in QODER_SEVERITIES:
+                fail(
+                    errors,
+                    f"qoder_security.findings[{idx}].severity is invalid: {severity!r}",
+                )
+
+            category = finding.get("category")
+            if not isinstance(category, str) or not category.strip():
+                fail(
+                    errors,
+                    f"qoder_security.findings[{idx}].category must be a non-empty string",
+                )
+
+            file = finding.get("file")
+            if not isinstance(file, str) or not file.strip():
+                fail(
+                    errors,
+                    f"qoder_security.findings[{idx}].file must be a non-empty string",
+                )
+
+            summary = finding.get("summary")
+            if not isinstance(summary, str) or not summary.strip():
+                fail(
+                    errors,
+                    f"qoder_security.findings[{idx}].summary must be a non-empty string",
+                )
+
+            if "dataflow" not in finding:
+                fail(
+                    errors,
+                    f"qoder_security.findings[{idx}].dataflow must be a string or null",
+                )
+            elif finding["dataflow"] is not None and not isinstance(finding["dataflow"], str):
+                fail(
+                    errors,
+                    f"qoder_security.findings[{idx}].dataflow must be a string or null",
+                )
+
+    level = qoder.get("level")
+    if not isinstance(level, str) or not level.strip():
+        fail(errors, "qoder_security.level must be a non-empty string")
+
+    # brief §52: error is a structured field (kind enum + non-empty message),
+    # required when decision=ERROR. The structure is validated whenever error is
+    # present — not only under ERROR — so a non-ERROR decision cannot smuggle a
+    # malformed error past the schema. ERROR additionally requires it to exist.
+    error = qoder.get("error")
+    if decision == "ERROR" and not isinstance(error, dict):
+        fail(errors, "qoder_security.error must be an object when decision=ERROR")
+    elif error is not None:
+        if not isinstance(error, dict):
+            fail(errors, "qoder_security.error must be an object")
+        else:
+            kind = error.get("kind")
+            if kind not in QODER_ERROR_KINDS:
+                fail(errors, f"qoder_security.error.kind is invalid: {kind!r}")
+            message = error.get("message")
+            if not isinstance(message, str) or not message.strip():
+                fail(errors, "qoder_security.error.message must be a non-empty string")
+
+    override = qoder.get("override")
+    if override is not None and not _override_dict_is_legal(override):
+        fail(
+            errors,
+            "qoder_security.override must be a complete, approved override "
+            "(approved=true + approver/justification/reviewed_at non-empty)",
+        )
 
 
 def load_status(path: Path) -> dict:
@@ -163,9 +321,16 @@ def validate(data: dict) -> list[str]:
     allowed_tools = _load_allowed_tools()
     schema_version = data.get("schema_version")
     is_v2 = schema_version == "agentic-wp-status/v2"
-    required = REQUIRED_TOP_LEVEL_V2 if is_v2 else REQUIRED_TOP_LEVEL_V1
+    is_v3 = schema_version == "agentic-wp-status/v3"
+    if is_v3:
+        required = REQUIRED_TOP_LEVEL_V3
+    elif is_v2:
+        required = REQUIRED_TOP_LEVEL_V2
+    else:
+        required = REQUIRED_TOP_LEVEL_V1
+    allowed = required | OPTIONAL_TOP_LEVEL
     missing = sorted(required - data.keys())
-    extra = sorted(data.keys() - required)
+    extra = sorted(data.keys() - allowed)
     if missing:
         fail(errors, f"missing top-level fields: {', '.join(missing)}")
     if extra:
@@ -176,6 +341,11 @@ def validate(data: dict) -> list[str]:
         fail(errors, f"invalid state: {data.get('state')!r}")
     if data.get("role") not in ROLES:
         fail(errors, f"invalid role: {data.get('role')!r}")
+
+    # Content validation for the qoder_security block runs whenever the block is
+    # present (v2 optional, v3 required). The v3 presence requirement itself is
+    # enforced above via REQUIRED_TOP_LEVEL_V3.
+    _validate_qoder_security(data, errors)
 
     for name in ("executor", "orchestrator", "reviewer"):
         actor = data.get(name)
@@ -279,6 +449,17 @@ def validate(data: dict) -> list[str]:
                 # A valid override relaxes "must equal ACCEPT" to "must be a
                 # present, valid decision"; it does not permit a missing consult.
                 fail(errors, f"consult.decision must be ACCEPT, REWORK, or CONSULT in state {state}")
+        # v3 third signature: the qoder_security gate must be satisfied
+        # (decision == PASS, or a complete approved override) before a v3 status
+        # may enter a merge state. v2 has no third signature (double-sign only),
+        # so this branch is v3-only. finalize_merge.sh (WP-05) consumes this
+        # validator verdict; the fail-closed condition itself lives here.
+        if is_v3 and not _qoder_security_satisfied(data.get("qoder_security")):
+            fail(
+                errors,
+                f"qoder_security must be PASS or carry a complete approved "
+                f"override in state {state}",
+            )
     if state in {"MERGED", "RELEASED"} and not git.get("merged_commit"):
         fail(errors, f"git.merged_commit is required in state {state}")
 

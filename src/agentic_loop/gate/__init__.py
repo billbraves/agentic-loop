@@ -27,9 +27,12 @@ from datetime import timezone
 from pathlib import Path
 from typing import Any
 
-# Make ``adapters/`` and ``independence.py`` importable on the bare python3 path.
-_SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(_SCRIPT_DIR))
+# ``gate`` is now a package (``gate/``); ``adapters/``, ``independence.py``,
+# ``resolve_paths.py`` and ``validate_wp_status.py`` are its package siblings in
+# ``agentic_loop/``. Keep that directory on the bare-python3 path so the
+# historical sys.path contract of ``python3 -m agentic_loop.gate`` is preserved.
+_PACKAGE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_PACKAGE_DIR))
 
 from agentic_loop.adapters.base import AgentIdentity
 from agentic_loop.adapters.base import ReviewContract
@@ -398,71 +401,26 @@ def write_consult_block(
     )
 
 
-def main(argv: list[str]) -> int:
-    if len(argv) != 1:
-        print("usage: gate.py <work-package-status.json>", file=sys.stderr)
-        return 64
+def compute_wp_diff(
+    repo_root: Path,
+    validator: Path,
+    status_file: Path,
+    iterations_dir_path: Path,
+    *,
+    base_commit: str,
+    head_commit: str,
+    branch: str,
+    base_branch: str,
+    iteration_id: str,
+    wp_id: str,
+) -> tuple[str, str, str]:
+    """Compute the scope-filtered base→tip diff for a work package.
 
-    status_arg = argv[0]
-
-    repo_root = main_repo()
-    iterations_dir_path = iterations_dir()
-    # Sibling module inside the agentic_loop package (moved in WP-18).
-    validator = Path(__file__).resolve().parent / "validate_wp_status.py"
-
-    # Resolve status path against main repo root, not cwd (which may be a worktree).
-    if status_arg.startswith("/"):
-        status_file = Path(status_arg)
-    else:
-        status_file = repo_root / status_arg
-
-    if not status_file.is_file():
-        raise GateError(
-            f"status file not found at {status_file} "
-            f"(resolved against main repo root {repo_root})"
-        )
-
-    if "/.worktrees/" in str(status_file):
-        raise GateError(
-            f"status file resolves inside a worktree ({status_file}); "
-            "pass the main-repo copy (single source of truth)"
-        )
-
-    gate_log(f"using status file {status_file} (main repo root: {repo_root})")
-
-    run_validator(validator, status_file)
-
-    schema_version = read_field(validator, status_file, "schema_version")
-    if schema_version != "agentic-wp-status/v2":
-        raise GateError(
-            f"codex merge-gate requires schema v2, got {schema_version}"
-        )
-
-    review_decision = read_field(validator, status_file, "review.decision")
-    if review_decision not in ("ACCEPT", "N/A"):
-        raise GateError(
-            f"precondition unmet — review.decision is '{review_decision}', "
-            "expected ACCEPT or N/A"
-        )
-
-    wp_id = read_field(validator, status_file, "work_package_id")
-    iteration_id = read_field(validator, status_file, "iteration_id")
-    phase = read_field(validator, status_file, "phase")
-    base_commit = read_field(validator, status_file, "git.base_commit")
-    head_commit = read_field(validator, status_file, "git.commit")
-    branch = read_field(validator, status_file, "git.branch")
-    base_branch = read_field(validator, status_file, "git.base_branch") or "main"
-
-    if not base_commit or not head_commit:
-        raise GateError(
-            "git.base_commit and git.commit are required for the diff"
-        )
-
-    if not branch:
-        raise GateError(
-            "git.branch is required to resolve the diff endpoint (branch tip)"
-        )
-
+    Shared by the Codex merge gate and the qoder security gate: branch-tip
+    resolution, ancestor integrity, the brief-introducing diff-start fallback,
+    the engine-computed merge-base fallback, and scope filtering. Returns
+    ``(diff_text, diff_start, tip_commit)``.
+    """
     try:
         tip_commit = git_output(
             repo_root,
@@ -492,14 +450,6 @@ def main(argv: list[str]) -> int:
         f"diff endpoint = branch '{branch}' tip {tip_commit} "
         f"(git.commit={head_commit} recorded separately)"
     )
-
-    iteration_dir = iterations_dir_path / iteration_id
-    brief_path = iteration_dir / f"{wp_id}-brief.md"
-    if brief_path.is_file():
-        brief_text = brief_path.read_text(encoding="utf-8")
-    else:
-        gate_warn(f"brief not found at {brief_path}; proceeding with diff-only review")
-        brief_text = ""
 
     # Diff start: prefer the commit that introduced this WP brief, fail-closed.
     brief_rel = str(Path(iterations_dir_path.relative_to(repo_root)) / iteration_id / f"{wp_id}-brief.md")
@@ -576,15 +526,10 @@ def main(argv: list[str]) -> int:
                 f"merge-base unavailable for base_branch '{base_branch}')"
             )
 
-    gate_effort = resolve_gate_effort(iteration_dir, phase)
-    gate_log(f"phase={phase} → model_reasoning_effort={gate_effort}")
-
     diff_text = git_output(repo_root, "diff", f"{diff_start}..{tip_commit}")
 
-    # WP-04: scope-filter the reviewed diff so only this WP's files are sent to
-    # the consultant. Forbidden wins over allowed; empty allowed = forbidden only
-    # (same semantics as quality-gate.sh). The filter only narrows the review
-    # scope and never alters the downstream empty-diff judgement.
+    # Scope-filter the diff so only this WP's files are sent downstream. Forbidden
+    # wins over allowed; empty allowed = forbidden only (quality-gate.sh parity).
     allowed_paths = read_scope_paths(validator, status_file, "scope.allowed_paths")
     forbidden_paths = read_scope_paths(
         validator, status_file, "scope.forbidden_paths"
@@ -598,6 +543,98 @@ def main(argv: list[str]) -> int:
     )
     if not diff_text:
         gate_log("GATE: scope-filtered diff is empty")
+
+    return diff_text, diff_start, tip_commit
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1:
+        print("usage: gate.py <work-package-status.json>", file=sys.stderr)
+        return 64
+
+    status_arg = argv[0]
+
+    repo_root = main_repo()
+    iterations_dir_path = iterations_dir()
+    # Sibling module inside the agentic_loop package (moved in WP-18).
+    validator = _PACKAGE_DIR / "validate_wp_status.py"
+
+    # Resolve status path against main repo root, not cwd (which may be a worktree).
+    if status_arg.startswith("/"):
+        status_file = Path(status_arg)
+    else:
+        status_file = repo_root / status_arg
+
+    if not status_file.is_file():
+        raise GateError(
+            f"status file not found at {status_file} "
+            f"(resolved against main repo root {repo_root})"
+        )
+
+    if "/.worktrees/" in str(status_file):
+        raise GateError(
+            f"status file resolves inside a worktree ({status_file}); "
+            "pass the main-repo copy (single source of truth)"
+        )
+
+    gate_log(f"using status file {status_file} (main repo root: {repo_root})")
+
+    run_validator(validator, status_file)
+
+    schema_version = read_field(validator, status_file, "schema_version")
+    if schema_version != "agentic-wp-status/v2":
+        raise GateError(
+            f"codex merge-gate requires schema v2, got {schema_version}"
+        )
+
+    review_decision = read_field(validator, status_file, "review.decision")
+    if review_decision not in ("ACCEPT", "N/A"):
+        raise GateError(
+            f"precondition unmet — review.decision is '{review_decision}', "
+            "expected ACCEPT or N/A"
+        )
+
+    wp_id = read_field(validator, status_file, "work_package_id")
+    iteration_id = read_field(validator, status_file, "iteration_id")
+    phase = read_field(validator, status_file, "phase")
+    base_commit = read_field(validator, status_file, "git.base_commit")
+    head_commit = read_field(validator, status_file, "git.commit")
+    branch = read_field(validator, status_file, "git.branch")
+    base_branch = read_field(validator, status_file, "git.base_branch") or "main"
+
+    if not base_commit or not head_commit:
+        raise GateError(
+            "git.base_commit and git.commit are required for the diff"
+        )
+
+    if not branch:
+        raise GateError(
+            "git.branch is required to resolve the diff endpoint (branch tip)"
+        )
+
+    diff_text, diff_start, tip_commit = compute_wp_diff(
+        repo_root,
+        validator,
+        status_file,
+        iterations_dir_path,
+        base_commit=base_commit,
+        head_commit=head_commit,
+        branch=branch,
+        base_branch=base_branch,
+        iteration_id=iteration_id,
+        wp_id=wp_id,
+    )
+
+    iteration_dir = iterations_dir_path / iteration_id
+    brief_path = iteration_dir / f"{wp_id}-brief.md"
+    if brief_path.is_file():
+        brief_text = brief_path.read_text(encoding="utf-8")
+    else:
+        gate_warn(f"brief not found at {brief_path}; proceeding with diff-only review")
+        brief_text = ""
+
+    gate_effort = resolve_gate_effort(iteration_dir, phase)
+    gate_log(f"phase={phase} → model_reasoning_effort={gate_effort}")
 
     # ------------------------------------------------------------------
     # Consultant selection and contract construction (INV-3 / INV-7)
@@ -729,6 +766,3 @@ def main(argv: list[str]) -> int:
     )
     return 0
 
-
-if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))

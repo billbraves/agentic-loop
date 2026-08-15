@@ -1,5 +1,6 @@
-"""WP-23: quality-gate.sh reads its path->test rules from the project's
-.agentic/config.toml [quality_gate] section instead of hard-coding baofu paths.
+"""WP-01 + WP-23: quality-gate.sh reads its path->test rules from the project's
+.agentic/config.toml unified ``[[gate]]`` array (kind=command, stage=pre_review)
+instead of hard-coding baofu paths.
 
 These tests build a self-contained tmp git repo (which is therefore its own
 `main_repo`, so resolve_paths' --config-section reads the tmp config), drop in
@@ -17,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -30,37 +32,45 @@ QG = PKG_ROOT / "src" / "agentic_loop" / "wrappers" / "quality-gate.sh"
 RESOLVER = PKG_ROOT / "src" / "agentic_loop" / "resolve_paths.py"
 PKG_SRC = PKG_ROOT / "src"
 
-# baofu's full [quality_gate] rule set (mirrors .agentic/config.toml after WP-23).
+# Direct reader tests import resolve_paths from the package under test.
+if str(PKG_SRC) not in sys.path:
+    sys.path.insert(0, str(PKG_SRC))
+from agentic_loop import resolve_paths  # noqa: E402
+
+# baofu's full command gate rule set (mirrors .agentic/config.toml after WP-01).
 BAOFU_QG_CONFIG = """\
-[quality_gate]
-[[quality_gate.rule]]
+[[gate]]
+name  = "tests"
+kind  = "command"
+stage = "pre_review"
+[[gate.rule]]
 match = "packages/engine/**"
 run = [
   "uv run pytest packages/engine/tests -q",
   "uv run pytest tests/test_baseline_regression.py -q",
 ]
-[[quality_gate.rule]]
+[[gate.rule]]
 match = "packages/data-app/**"
 run = [
   "uv run pytest packages/data-app/tests -q",
   "uv run pytest tests/test_baseline_regression.py -q",
 ]
-[[quality_gate.rule]]
+[[gate.rule]]
 match = "packages/mcp-server/**"
 run = ["uv run pytest packages/mcp-server/tests -q"]
-[[quality_gate.rule]]
+[[gate.rule]]
 match = "packages/research-app/dashboard/frontend/**"
 run = ["npm --prefix packages/research-app/dashboard/frontend run build"]
-[[quality_gate.rule]]
+[[gate.rule]]
 match = "packages/research-app/**"
 run = [
   "uv run pytest packages/research-app/tests -q",
   "uv run pytest packages/research-app/dashboard/backend/tests -q",
 ]
-[[quality_gate.rule]]
+[[gate.rule]]
 match = "tests/**"
 run = ["uv run pytest tests/test_baseline_regression.py -q"]
-[[quality_gate.rule]]
+[[gate.rule]]
 match = "tools/baseline/**"
 run = ["uv run pytest tests/test_baseline_regression.py -q"]
 """
@@ -251,10 +261,18 @@ def test_docs_only_change_expands_to_no_targets(repo):
 # --------------------------------------------------------------------------
 
 def _write_config(repo: Path, run_cmds):
-    """Overwrite the repo's [quality_gate] config with a single catch-all rule
+    """Overwrite the repo's command-gate config with a single catch-all rule
     whose `run` list is exactly `run_cmds`, so we can drive arbitrary exit codes
     through the execution loop and observe the skip/fatal decision."""
-    lines = ["[quality_gate]", "[[quality_gate.rule]]", 'match = "src/**"', "run = ["]
+    lines = [
+        "[[gate]]",
+        'name = "tests"',
+        'kind = "command"',
+        'stage = "pre_review"',
+        "[[gate.rule]]",
+        'match = "src/**"',
+        "run = [",
+    ]
     for c in run_cmds:
         # TOML basic strings share JSON string escaping; json.dumps quotes with
         # double quotes and escapes correctly, leaving the command's inner single
@@ -308,26 +326,24 @@ def test_non_pytest_command_rc0_still_passes(repo):
 
 
 # --------------------------------------------------------------------------
-# WP-23 rework ROUND 2, finding ②: the gate must FAIL-CLOSED when a project's
-# .agentic/config.toml defines no usable [quality_gate] rule list, rather than
-# silently reporting PASS on an empty plan. The prior comment falsely claimed the
-# reader "fails closed to its built-in safe defaults" — it does not; it merges the
-# built-in defaults into resolve_paths' output, hiding an absent section, so the
-# script would announce QUALITY_GATE_RESULT=PASS with no project-defined rules.
+# WP-23 rework ROUND 2, finding ② (re-pointed at the unified [[gate]] by WP-01):
+# the gate must FAIL-CLOSED when a project's .agentic/config.toml defines no
+# usable command gate (kind=command, stage=pre_review) rule list, rather than
+# silently reporting PASS on an empty plan.
 #
 # Discriminator (verified against resolve_paths behavior):
-#   * config.toml present but [quality_gate] section / rule list absent -> FAIL
+#   * config.toml present but command gate / rule list absent -> FAIL
 #     (non-zero exit, QUALITY_GATE_FAIL), NEVER pass on undefined rules.
-#   * config.toml present, [quality_gate] rules defined, current changed set
+#   * config.toml present, command gate rules defined, current changed set
 #     matches none of them -> legitimate empty plan -> PASS.
 #   * no config.toml at all (bare bootstrap) -> keep built-in default behavior,
 #     no project config to betray -> PASS (this is the P0 test_quality_gate.py
 #     in_scope case, preserved verbatim).
 # --------------------------------------------------------------------------
 
-def test_missing_quality_gate_section_fails_closed(repo):
-    """finding ② core: a config.toml that OMITS [quality_gate] entirely makes the
-    gate refuse (non-zero exit + QUALITY_GATE_FAIL), NOT pass with undefined
+def test_missing_command_gate_fails_closed(repo):
+    """finding ② core: a config.toml that OMITS the command gate entirely makes
+    the gate refuse (non-zero exit + QUALITY_GATE_FAIL), NOT pass with undefined
     rules."""
     (repo / ".agentic" / "config.toml").write_text(
         '[project]\niterations_dir = "docs/plans"\n', encoding="utf-8"
@@ -342,11 +358,12 @@ def test_missing_quality_gate_section_fails_closed(repo):
                    for l in res.stdout.splitlines()), res.stdout
 
 
-def test_empty_quality_gate_rule_list_fails_closed(repo):
-    """finding ②: a [quality_gate] section present but with an empty rule list is
-    still 'no rules defined' -> fail-closed, not pass."""
+def test_empty_command_gate_rule_list_fails_closed(repo):
+    """finding ②: a command gate present but with an empty rule list is still
+    'no rules defined' -> fail-closed, not pass."""
     (repo / ".agentic" / "config.toml").write_text(
-        "[quality_gate]\nrule = []\n", encoding="utf-8"
+        '[[gate]]\nname = "tests"\nkind = "command"\nstage = "pre_review"\nrule = []\n',
+        encoding="utf-8",
     )
     _make_change(repo, "docs/a.md")
     status = _status(repo, allowed=["docs/", ".agentic/"])
@@ -357,10 +374,10 @@ def test_empty_quality_gate_rule_list_fails_closed(repo):
                    for l in res.stdout.splitlines()), res.stdout
 
 
-def test_section_present_but_unmatched_is_legitimate_pass(repo):
-    """finding ② distinction: a [quality_gate] section WITH rules whose matches
-    don't hit the current changed set is a legitimate empty plan -> PASS. The
-    fail-closed refusal must NOT fire here (only absent section / empty rules do)."""
+def test_command_gate_present_but_unmatched_is_legitimate_pass(repo):
+    """finding ② distinction: a command gate WITH rules whose matches don't hit
+    the current changed set is a legitimate empty plan -> PASS. The fail-closed
+    refusal must NOT fire here (only absent gate / empty rules do)."""
     _write_config(repo, ["uv run pytest packages/never/tests -q"])  # match src/**
     _make_change(repo, "docs/a.md")  # nothing under src/** changed
     status = _status(repo, allowed=["docs/", ".agentic/"])
@@ -426,11 +443,11 @@ def test_comment_no_longer_claims_safe_defaults():
 
 def test_guard_reads_main_repo_config_from_linked_worktree(tmp_path):
     """Round-3: run quality-gate.sh from a linked worktree whose branch-local
-    .agentic/config.toml has DIFFERENT [quality_gate] rules than main. The guard
+    .agentic/config.toml has a DIFFERENT command gate than main. The guard
     must resolve config the same way the plan does — main_repo() — not the
     worktree copy. Here main has a valid rule set and the worktree omits the
-    section entirely; because the guard reads MAIN (which is valid), it must NOT
-    fail-closed on the worktree's absent section."""
+    gate entirely; because the guard reads MAIN (which is valid), it must NOT
+    fail-closed on the worktree's absent gate."""
     main = tmp_path / "main"
     main.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=main, check=True)
@@ -440,7 +457,7 @@ def test_guard_reads_main_repo_config_from_linked_worktree(tmp_path):
     sd.mkdir(parents=True)
     (sd / "quality-gate.sh").write_bytes(QG.read_bytes())
     (sd / "quality-gate.sh").chmod(0o755)
-    # main carries a VALID [quality_gate] rule set.
+    # main carries a VALID command-gate rule set.
     (main / ".agentic").mkdir()
     (main / ".agentic" / "config.toml").write_text(BAOFU_QG_CONFIG, encoding="utf-8")
     (main / "seed.txt").write_text("s\n")
@@ -451,7 +468,7 @@ def test_guard_reads_main_repo_config_from_linked_worktree(tmp_path):
     # Create a linked worktree on a feature branch.
     wt = tmp_path / "wt"
     _git(main, "worktree", "add", "-q", "-b", "feat/x", str(wt), "main")
-    # The worktree's own config OMITS [quality_gate] entirely. If the guard read
+    # The worktree's own config OMITS the command gate entirely. If the guard read
     # the worktree (the bug), it would wrongly fail-closed; reading main (correct)
     # sees the valid rules and proceeds.
     (wt / ".agentic" / "config.toml").write_text(
@@ -476,3 +493,315 @@ def test_guard_reads_main_repo_config_from_linked_worktree(tmp_path):
     assert "QUALITY_GATE_FAIL" not in res.stderr, (res.stdout, res.stderr)
     assert any(l.strip() == "QUALITY_GATE_RESULT=PASS"
                for l in res.stdout.splitlines()), res.stdout
+
+# --------------------------------------------------------------------------
+# WP-01: reader reads the unified [[gate]] array + [autonomy] section directly
+# (resolve_paths.get_gates / get_command_gate / get_autonomy).
+# --------------------------------------------------------------------------
+
+def test_reader_reads_unified_gate_and_autonomy(repo):
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        BAOFU_QG_CONFIG
+        + '\n[[gate]]\nname = "qoder_security"\nkind = "qoder_security"\nstage = "merge"\n'
+        + '[autonomy]\ndefault_mode = "ask"\n',
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert len(gates) == 2
+
+    command_gate = resolve_paths.get_command_gate(repo)
+    assert command_gate is not None
+    assert command_gate["name"] == "tests"
+    assert command_gate["kind"] == "command"
+    assert command_gate["stage"] == "pre_review"
+    assert command_gate["blocking"] is True
+    assert command_gate["enabled"] is True
+    assert command_gate["apply"] == "first_match"
+    assert [r["match"] for r in command_gate["rule"]] == [
+        "packages/engine/**",
+        "packages/data-app/**",
+        "packages/mcp-server/**",
+        "packages/research-app/dashboard/frontend/**",
+        "packages/research-app/**",
+        "tests/**",
+        "tools/baseline/**",
+    ]
+
+    qoder = next(g for g in gates if g["kind"] == "qoder_security")
+    assert qoder["level"] == "L3"
+    assert qoder["stage"] == "merge"
+
+    autonomy = resolve_paths.get_autonomy(repo)
+    assert autonomy["default_mode"] == "ask"
+    assert autonomy["ultra_auto"] == [
+        "local_edit", "test_run", "worktree_lifecycle",
+        "dispatch_developer", "review", "merge_gate",
+        "local_merge_no_ff", "finalize_merge",
+    ]
+    assert autonomy["always_stop"] == [
+        "push", "feishu_send", "production_write",
+        "cron_change", "release_deploy", "credential_rw",
+        "irreversible_git",
+    ]
+    assert autonomy["soft_limit_signals"] == ["frozen_hard", "rework_twice", "circuit_breaker"]
+
+
+def test_reader_applies_gate_defaults_and_overlay(repo):
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "t"\nkind = "command"\nstage = "pre_review"\n'
+        'apply = "overlay"\nblocking = false\n'
+        '[[gate.rule]]\nmatch = "skills/**"\nrun = ["x"]\n',
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert len(gates) == 1
+    g = gates[0]
+    assert g["apply"] == "overlay"
+    assert g["blocking"] is False
+    assert g["enabled"] is True  # default
+
+
+def test_reader_no_command_gate_returns_none(repo):
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "codex"\nkind = "codex"\nstage = "merge"\neffort = "high"\n',
+        encoding="utf-8",
+    )
+    assert resolve_paths.get_command_gate(repo) is None
+    assert [g["kind"] for g in resolve_paths.get_gates(repo)] == ["codex"]
+
+
+def test_reader_qoder_security_level_default_and_codex_effort(repo):
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "qs"\nkind = "qoder_security"\nstage = "merge"\n'
+        '[[gate]]\nname = "cs"\nkind = "codex"\nstage = "merge"\neffort = "high"\n',
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    qs = next(g for g in gates if g["kind"] == "qoder_security")
+    assert qs["level"] == "L3"
+    cs = next(g for g in gates if g["kind"] == "codex")
+    assert cs["effort"] == "high"
+
+
+# --------------------------------------------------------------------------
+# WP-01 rework (Codex two-sign, enum fail-closed): brief Required 1 freezes
+# kind/stage/apply as enums. The reader must enforce them — illegal apply falls
+# back to first_match (fail-closed), and illegal kind/stage entries are DROPPED
+# from get_gates() so they can never reach get_command_gate() or a runner.
+# --------------------------------------------------------------------------
+
+def test_invalid_apply_falls_back_to_first_match(repo):
+    """apply = "bogus" (non-empty string passes the type check, so it would be
+    read through verbatim without the enum guard) must normalize to first_match."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "t"\nkind = "command"\nstage = "pre_review"\n'
+        'apply = "bogus"\n'
+        '[[gate.rule]]\nmatch = "src/**"\nrun = ["x"]\n',
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert len(gates) == 1
+    assert gates[0]["apply"] == "first_match"
+    # The (valid kind/stage) gate is still selectable, with the fail-closed apply.
+    cg = resolve_paths.get_command_gate(repo)
+    assert cg is not None
+    assert cg["apply"] == "first_match"
+
+
+def test_invalid_kind_entry_is_dropped(repo):
+    """An illegal kind is DROPPED (not guessed), so it never appears in
+    get_gates() nor get_command_gate()."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "bad"\nkind = "bogus"\nstage = "pre_review"\n'
+        '[[gate.rule]]\nmatch = "src/**"\nrun = ["x"]\n'
+        '[[gate]]\nname = "good"\nkind = "command"\nstage = "pre_review"\n'
+        '[[gate.rule]]\nmatch = "src/**"\nrun = ["y"]\n',
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert [g["name"] for g in gates] == ["good"]
+    assert [g["kind"] for g in gates] == ["command"]
+    cg = resolve_paths.get_command_gate(repo)
+    assert cg is not None
+    assert cg["name"] == "good"
+
+
+def test_invalid_stage_entry_is_dropped(repo):
+    """An illegal stage is DROPPED (not guessed), so it never appears in
+    get_gates() nor get_command_gate()."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "bad"\nkind = "command"\nstage = "bogus"\n'
+        '[[gate.rule]]\nmatch = "src/**"\nrun = ["x"]\n'
+        '[[gate]]\nname = "good"\nkind = "command"\nstage = "pre_review"\n'
+        '[[gate.rule]]\nmatch = "src/**"\nrun = ["y"]\n',
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert [g["name"] for g in gates] == ["good"]
+    cg = resolve_paths.get_command_gate(repo)
+    assert cg is not None
+    assert cg["name"] == "good"
+
+
+def test_only_invalid_kind_entry_dropped_no_command_gate(repo):
+    """A lone illegal-kind gate yields no usable gate and no command gate."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "bad"\nkind = "bogus"\nstage = "pre_review"\n',
+        encoding="utf-8",
+    )
+    assert resolve_paths.get_gates(repo) == []
+    assert resolve_paths.get_command_gate(repo) is None
+
+
+def test_only_invalid_stage_entry_dropped_no_command_gate(repo):
+    """A lone illegal-stage gate yields no usable gate and no command gate."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "bad"\nkind = "command"\nstage = "bogus"\n',
+        encoding="utf-8",
+    )
+    assert resolve_paths.get_gates(repo) == []
+    assert resolve_paths.get_command_gate(repo) is None
+
+
+@pytest.mark.parametrize("kind", ["command", "codex", "qoder_security", "qoder_judge"])
+def test_valid_kind_enum_is_preserved(repo, kind):
+    """All four legal kind values survive normalization verbatim."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "g"\nkind = "{kind}"\nstage = "merge"\n'.format(kind=kind),
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert [g["kind"] for g in gates] == [kind]
+
+
+@pytest.mark.parametrize("stage", ["pre_review", "merge"])
+def test_valid_stage_enum_is_preserved(repo, stage):
+    """Both legal stage values survive normalization verbatim."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "g"\nkind = "command"\nstage = "{stage}"\n'.format(stage=stage),
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert [g["stage"] for g in gates] == [stage]
+
+
+@pytest.mark.parametrize("apply", ["first_match", "overlay"])
+def test_valid_apply_enum_is_preserved(repo, apply):
+    """Both legal apply values survive normalization verbatim."""
+    cfg = repo / ".agentic" / "config.toml"
+    cfg.write_text(
+        '[[gate]]\nname = "g"\nkind = "command"\nstage = "pre_review"\n'
+        'apply = "{apply}"\n'.format(apply=apply),
+        encoding="utf-8",
+    )
+    gates = resolve_paths.get_gates(repo)
+    assert gates[0]["apply"] == apply
+
+
+# --------------------------------------------------------------------------
+# §10.1 ②: scope / forbidden-path check (quality-gate.sh).
+# --------------------------------------------------------------------------
+
+def test_forbidden_changed_path_fails(repo):
+    _make_change(repo, "profiles/secret.toml")
+    status = _status(repo, allowed=["profiles/"], forbidden=["profiles/"])
+    res = _run_qg(repo, status)
+    assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
+    assert "forbidden changed path: profiles/secret.toml" in res.stderr, res.stderr
+
+
+def test_changed_path_outside_allowed_scope_fails(repo):
+    _make_change(repo, "docs/note.md")
+    status = _status(repo, allowed=["packages/"], forbidden=[])
+    res = _run_qg(repo, status)
+    assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
+    assert "changed path outside allowed scope: docs/note.md" in res.stderr, res.stderr
+
+
+# --------------------------------------------------------------------------
+# §10.1 ③: `git diff --check` three-way (base...HEAD / worktree / cached).
+# --------------------------------------------------------------------------
+
+def _commit_tracked(repo: Path, rel: str, content: str):
+    p = repo / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "seed {}".format(rel))
+
+
+def test_diff_check_committed_whitespace_fails(repo):
+    _git(repo, "checkout", "-q", "-b", "feat/x")
+    p = repo / "packages" / "engine" / "w.py"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("x = 1  \n")  # trailing whitespace
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "bad ws")
+    status = _status(repo, allowed=["packages/", "docs/"])
+    res = _run_qg(repo, status)
+    assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
+    assert "trailing whitespace" in res.stdout, res.stdout
+
+
+def test_diff_check_worktree_whitespace_fails(repo):
+    _commit_tracked(repo, "packages/engine/w.py", "x = 1\n")
+    _git(repo, "checkout", "-q", "-b", "feat/x")
+    (repo / "packages" / "engine" / "w.py").write_text("x = 1  \n")
+    status = _status(repo, allowed=["packages/", "docs/"])
+    res = _run_qg(repo, status)
+    assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
+    assert "trailing whitespace" in res.stdout, res.stdout
+
+
+def test_diff_check_staged_whitespace_fails(repo):
+    _commit_tracked(repo, "packages/engine/w.py", "x = 1\n")
+    _git(repo, "checkout", "-q", "-b", "feat/x")
+    (repo / "packages" / "engine" / "w.py").write_text("x = 1  \n")
+    _git(repo, "add", "packages/engine/w.py")
+    status = _status(repo, allowed=["packages/", "docs/"])
+    res = _run_qg(repo, status)
+    assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
+    assert "trailing whitespace" in res.stdout, res.stdout
+
+
+# --------------------------------------------------------------------------
+# §10.1 ① (strengthened): a multi-path changed set expands in declaration order
+# with global first-occurrence de-dup, and the frontend path is routed to the npm
+# build rule (declared BEFORE the broader research rule) even though it lexically
+# sits under research-app — the order-sensitive first-match case.
+# --------------------------------------------------------------------------
+
+def test_multipath_changed_command_sequence_parity(repo):
+    rels = [
+        "packages/engine/e.py",
+        "packages/research-app/dashboard/frontend/a.tsx",
+        "packages/research-app/svc.py",
+        "tests/t.py",
+    ]
+    _git(repo, "checkout", "-q", "-b", "feat/x")
+    for rel in rels:
+        p = repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x\n")
+    status = _status(repo, allowed=["packages/", "tests/", "tools/", "docs/"])
+    res = _run_qg(repo, status)
+    plan = _plan(res.stdout)
+    expected = [
+        "uv run pytest packages/engine/tests -q",
+        "uv run pytest tests/test_baseline_regression.py -q",
+        "npm --prefix packages/research-app/dashboard/frontend run build",
+        "uv run pytest packages/research-app/tests -q",
+        "uv run pytest packages/research-app/dashboard/backend/tests -q",
+    ]
+    assert plan == expected, (plan, res.stdout, res.stderr)
