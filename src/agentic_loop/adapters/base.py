@@ -142,6 +142,8 @@ class Adapter(abc.ABC):
 
     name: str
 
+    _binding = None  # 子类构造时覆盖
+
     @abc.abstractmethod
     def identity(self) -> AgentIdentity:
         """上报底层身份，供 engine 做 INV-1 独立性校验。"""
@@ -187,3 +189,15 @@ class Adapter(abc.ABC):
     def probe(self) -> bool:
         """存活探测。"""
         raise NotImplementedError
+
+    def probe_injection(self) -> bool:
+        """真实注入探针：binding 非空跑注入路径 + sentinel；否则退回 probe()。
+
+        子类若有可注入的 completion 通道，应覆写此方法发最小请求验证 sentinel。
+        默认在无 binding 时等价于存活探测。
+        """
+        if getattr(self, "_binding", None) is None:
+            return self.probe()
+        raise NotImplementedError(
+            f"adapter {self.name} must implement probe_injection for binding path"
+        )

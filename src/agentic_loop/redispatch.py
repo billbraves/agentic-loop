@@ -30,9 +30,11 @@ from agentic_loop.adapters.kimi import KimiAdapter
 from agentic_loop.adapters.claude import ClaudeAdapter
 from agentic_loop.cli import resolve_wrapper
 from agentic_loop.independence import evaluate
+from agentic_loop.provider_binding import ProviderBinding
 from agentic_loop.resolve_paths import get_roles
 from agentic_loop.resolve_paths import iterations_dir
 from agentic_loop.resolve_paths import main_repo
+from agentic_loop.resolve_paths import resolve_role_binding
 
 
 def _err(message: str) -> None:
@@ -102,18 +104,20 @@ def _resolve_developer(
 ) -> tuple[Adapter, list[str]]:
     """Resolve the developer adapter from config, with optional fallback probing.
 
-    ``registry`` is a mapping from adapter name to a zero-argument factory. It is
-    exposed for injection in unit tests (e.g. a stub ``claude`` adapter).
+    ``registry`` is a mapping from adapter name to a factory taking an optional
+    ``ProviderBinding``. It is exposed for injection in unit tests (e.g. a stub
+    ``claude`` adapter).
     """
     if registry is None:
         registry = {
-            "kimi": lambda: KimiAdapter(kimi_bin=os.environ.get("KIMI_BIN", "kimi")),
-            "claude": lambda: ClaudeAdapter(
-                claude_bin=os.environ.get("CLAUDE_BIN", "claude")
-            ),
+            "kimi": lambda b: KimiAdapter(
+                kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=b),
+            "claude": lambda b: ClaudeAdapter(
+                claude_bin=os.environ.get("CLAUDE_BIN", "claude"), binding=b),
         }
 
     reasons: list[str] = []
+    binding: ProviderBinding | None = resolve_role_binding("developer")[1]
     value: Any = None
     if isinstance(roles_config, dict):
         value = roles_config.get("developer")
@@ -128,8 +132,8 @@ def _resolve_developer(
 
     if not candidates:
         reasons.append("config roles.developer unavailable; falling back to built-in kimi")
-        fallback = registry["kimi"]()
-        if probe and not fallback.probe():
+        fallback = registry["kimi"](binding)
+        if probe and not fallback.probe_injection():
             reasons.append("built-in kimi probe failed")
             raise ProbeFailedError("; ".join(reasons))
         return fallback, reasons
@@ -139,17 +143,17 @@ def _resolve_developer(
         if factory is None:
             reasons.append(f"unknown developer adapter '{candidate}'")
             continue
-        adapter = factory()
+        adapter = factory(binding)
         if probe:
-            if adapter.probe():
+            if adapter.probe_injection():
                 return adapter, reasons
             reasons.append(f"developer adapter '{candidate}' probe failed; falling back")
         else:
             return adapter, reasons
 
     reasons.append("all configured developer adapters failed probe; falling back to built-in kimi")
-    fallback = registry["kimi"]()
-    if probe and not fallback.probe():
+    fallback = registry["kimi"](binding)
+    if probe and not fallback.probe_injection():
         reasons.append("built-in kimi probe failed")
         raise ProbeFailedError("; ".join(reasons))
     return fallback, reasons

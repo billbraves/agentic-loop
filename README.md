@@ -28,7 +28,7 @@ python3 -c "import agentic_loop; print(agentic_loop.__version__)"
 
 Re-run with `--force-reinstall` (or `--upgrade` under plain pip) to move up to a
 later release. To pin an exact version for reproducible builds, append a tag
-(`@v0.3.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
+(`@v0.4.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
 
 ## Adopting it in another project
 
@@ -64,6 +64,7 @@ Project commands (Python, package-internal):
 | `init` | Scaffold `.agentic/config.toml` + governance contracts (AGENTS.md, CLAUDE.md, docs/agentic/OPERATING_MODEL.md) + `docs/plans/` & `.agentic/locks/` skeleton. Refuses to overwrite existing managed files without `--force`. |
 | `contract check` | Read-only drift report per contract: `IN_SYNC` / `TEMPLATE_OUTDATED` / `CONFIG_DRIFT` (exit 0 all in sync, 3 on any drift). |
 | `contract diff [--apply]` | Show the re-render diff; `--apply` writes it back and re-stamps. |
+| `bootstrap` | Detect/install claude+kimi+codex, verify `DEEPSEEK_API_KEY`, and run a real-injection probe per CLI (fails closed on an installed-but-incompatible CLI). `--dry-run` prints the plan without installing or spending DeepSeek quota; `--yes` skips the install confirmation. |
 
 Orchestration gates (forward verbatim to the wrapper — the main-repo
 `scripts/agentic/<wrapper>.sh` when present, else the wheel-bundled copy; argv,

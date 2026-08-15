@@ -49,6 +49,7 @@ _SUBCOMMANDS = {
 _PY_SUBCOMMANDS = {
     "init": "scaffold config + contracts + skeleton in a project",
     "contract": "check | diff — governance-contract drift detection",
+    "bootstrap": "detect/install claude+kimi+codex, verify DeepSeek key, real-injection probe",
 }
 
 
@@ -156,6 +157,9 @@ def main(argv=None):
         if sub == "contract":
             from . import contract_cmd
             return contract_cmd.main(rest)
+        if sub == "bootstrap":
+            from . import bootstrap_cmd
+            return bootstrap_cmd.main(rest)
 
     wrapper_name = _SUBCOMMANDS.get(sub)
     if wrapper_name is None:

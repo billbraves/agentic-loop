@@ -6,6 +6,54 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-16
+
+Outcome of the `agentic-deepseek-single-key-v1` iteration (4 work packages),
+which lets all coding-agent roles be driven from a **single DeepSeek key** —
+one provider injected into claude / kimi / codex, with an `agentic bootstrap`
+zero-config on-ramp and honest same-source-weak independence rating. All changes
+are backward compatible: with no `[providers]` section the config reader, every
+adapter, and the independence engine fall back verbatim to prior behavior (zero
+regression), and v2 double-sign status files are untouched.
+
+### Added
+
+- **Provider binding schema + roles-table reader (P1 / WP-01).** A generic
+  `[providers.<name>]` config section (canonical `identity_model`, per-adapter
+  `[selectors]`, two base URLs, `api_key_env`) resolves each role into an
+  immutable `ProviderBinding`. `[roles]` gains a table form (with `provider`)
+  while still accepting the legacy string / primary-fallback-array forms. A
+  missing `[providers]` section falls back verbatim to current behavior.
+- **Three-adapter DeepSeek injection + real-injection probe (P2 / WP-02).**
+  claude (env), codex (`-c` inline) and kimi (0600 temp config) each accept an
+  optional `ProviderBinding`, report identity by the canonical `identity_model`
+  (never a per-adapter selector, feeding INV-1), and gain a `probe_injection()`
+  that sends a sentinel request so only a truly-effective injection passes (a
+  `which` hit or `rc=0` does not). A unified secret-redaction layer keeps the key
+  out of argv and command output. `binding=None` falls back verbatim.
+- **`agentic bootstrap` subcommand (P2 / WP-03).** Detects whether
+  claude / kimi / codex are installed, installs missing ones from pinned sources
+  (confirmation or `--yes`), verifies `DEEPSEEK_API_KEY` is present (never
+  fills or persists it), runs the real-injection probe per CLI, and fails closed
+  with `CLI_INSTALLED_BUT_INCOMPATIBLE` (no auto-upgrade). `--dry-run` prints the
+  install/probe plan without installing or spending DeepSeek quota. Three
+  signatures, no Qoder.
+
+### Changed
+
+- **Same-source weak independence made explicit (P3 / WP-04).** When all three
+  signatures resolve to the same DeepSeek `identity_model`, the INV-1 dual-sign
+  engine rates independence `weak` natively (engine unchanged). Ships an explicit
+  `min_independence="weak"` single-deepseek profile example (with a cost note),
+  plus tests proving the engine rates `weak` at same-source and that the reasons
+  trail records it — no faked `strong`, no downgrade branch in `independence.py`.
+
+### Distribution
+
+- Version bumped to **`0.4.0`** (minor: backward-compatible feature additions —
+  provider binding, DeepSeek injection, `agentic bootstrap`, weak-independence
+  profile). No new dependencies; wrapper set unchanged (ten wrappers).
+
 ## [0.3.0] — 2026-08-15
 
 Outcome of the `agentic-gate-unification-v1` iteration (7 work packages), which

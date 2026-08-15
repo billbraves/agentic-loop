@@ -1,0 +1,27 @@
+# 单 DeepSeek Key profile 范本 —— 三签全指 DeepSeek。
+# 用法：把本文件拷成项目的 .agentic/config.toml，导出 DEEPSEEK_API_KEY，
+# 再跑 `agentic bootstrap`。
+
+[providers.deepseek]
+anthropic_base_url = "https://api.deepseek.com/anthropic"  # claude/kimi 用
+openai_base_url    = "https://api.deepseek.com/v1"         # codex 用
+api_key_env        = "DEEPSEEK_API_KEY"                    # 只存 env 名，绝不存 key 明文
+identity_model     = "deepseek-v4-pro"                     # canonical，INV-1 评级唯一依据
+[providers.deepseek.selectors]
+kimi   = "deepseek/v4-pro"
+codex  = "deepseek-v4-pro"
+claude = "deepseek-v4-pro"
+
+[roles]
+developer  = { adapter = "kimi",   provider = "deepseek" }
+reviewer   = { adapter = "claude", provider = "deepseek" }
+consultant = { adapter = "codex",  provider = "deepseek" }
+
+[review_policy]
+# 代价显式声明：三签全指同一 DeepSeek identity_model，双签独立性据实为 weak。
+# 这不是框架偷偷降阈值，而是本 profile 明确接受“同源弱独立”。绝不伪装 strong。
+# 若改回多 provider（不同 identity_model），把此处升回 "strong"。
+min_independence = "weak"
+
+[adapters]
+names = ["claude", "codex", "kimi"]

@@ -13,6 +13,8 @@ from agentic_loop.adapters.base import AdapterCapabilities
 from agentic_loop.adapters.base import AgentIdentity
 from agentic_loop.adapters.base import ReviewContract
 from agentic_loop.adapters.base import Verdict
+from agentic_loop.provider_binding import ProviderBinding
+from agentic_loop.secret_redaction import redact_env_value
 
 
 class CodexAdapter(Adapter):
@@ -28,8 +30,10 @@ class CodexAdapter(Adapter):
 
     name = "codex"
 
-    def __init__(self, codex_bin: str = "codex") -> None:
+    def __init__(self, codex_bin: str = "codex",
+                 binding: ProviderBinding | None = None) -> None:
         self._codex_bin = codex_bin
+        self._binding = binding
 
     def capabilities(self) -> AdapterCapabilities:
         return AdapterCapabilities(
@@ -40,15 +44,53 @@ class CodexAdapter(Adapter):
 
     def identity(self) -> AgentIdentity:
         """上报 engine 可观测信号；拿不到则填 None，不伪造。"""
+        model = self._binding.identity_model if self._binding else None
         return AgentIdentity(
             tool="codex",
-            model=None,
+            model=model,
             account=None,
             session=None,
         )
 
+    def _redact_output(self, text: str) -> str:
+        """Redact the bound key value from surfaced subprocess output.
+
+        No-op without a binding (matches the pre-redaction, no-key path).
+        """
+        if self._binding is None:
+            return text
+        return redact_env_value(text, self._binding.api_key_env)
+
+    def _build_injection_flags(self) -> list[str]:
+        """`-c` inline provider override + `-m`; key never in argv (env_key name)."""
+        if self._binding is None:
+            return []
+        b = self._binding
+        return [
+            "-c", f"model_provider={b.provider}",
+            "-c", f"model_providers.{b.provider}.base_url={b.openai_base_url}",
+            "-c", f"model_providers.{b.provider}.env_key={b.api_key_env}",
+            "-m", b.cli_selector,
+        ]
+
     def probe(self) -> bool:
         return shutil.which(self._codex_bin) is not None
+
+    _PROBE_PROMPT = "reply exactly: DEEPSEEK_PROBE_OK"
+    _SENTINEL = "DEEPSEEK_PROBE_OK"
+
+    def probe_injection(self) -> bool:
+        if self._binding is None:
+            return self.probe()
+        cmd = [self._codex_bin, "exec", *self._build_injection_flags(),
+               "--sandbox", "read-only", "--skip-git-repo-check", "-"]
+        try:
+            proc = subprocess.run(cmd, input=self._PROBE_PROMPT.encode("utf-8"),
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except OSError:
+            return False
+        out = proc.stdout.decode("utf-8", errors="replace")
+        return proc.returncode == 0 and self._SENTINEL in out
 
     def review(
         self,
@@ -76,6 +118,7 @@ class CodexAdapter(Adapter):
             cmd = [
                 self._codex_bin,
                 "exec",
+                *self._build_injection_flags(),
                 "--sandbox",
                 "read-only",
                 "--skip-git-repo-check",
@@ -97,6 +140,7 @@ class CodexAdapter(Adapter):
 
             if proc.returncode != 0:
                 err = proc.stderr.decode("utf-8", errors="replace").strip()
+                err = self._redact_output(err)
                 raise RuntimeError(
                     f"codex exec failed (exit {proc.returncode}): {err}"
                 )
@@ -112,6 +156,7 @@ class CodexAdapter(Adapter):
             if raw is None:
                 raise RuntimeError("codex produced no verdict output")
 
+            raw = self._redact_output(raw)
             obj = self._parse_verdict(raw)
             return Verdict(
                 decision=obj["decision"],

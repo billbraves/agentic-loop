@@ -309,6 +309,82 @@ def iterations_dir() -> Path:
     return p.resolve() if p.is_absolute() else (repo / rel).resolve()
 
 
+def get_providers(repo: Path | None = None) -> dict[str, Any]:
+    """Return the raw ``[providers]`` table (empty dict when absent)."""
+    data = _load_config(repo or main_repo()) or {}
+    if not isinstance(data, dict):
+        return {}
+    providers = data.get("providers")
+    return providers if isinstance(providers, dict) else {}
+
+
+def get_roles_raw(repo: Path | None = None) -> dict[str, Any]:
+    """Return the RAW ``[roles]`` table without safe-default merging.
+
+    Unlike ``get_roles()``, this preserves table-form role values (dict), which
+    the safe-default validator would otherwise reject and revert to a default.
+    """
+    data = _load_config(repo or main_repo()) or {}
+    if not isinstance(data, dict):
+        return {}
+    roles = data.get("roles")
+    return roles if isinstance(roles, dict) else {}
+
+
+def _first_candidate(value: Any) -> str | None:
+    """Extract the adapter name from a role value (str / list / table)."""
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            if isinstance(item, str) and item:
+                return item
+        return None
+    if isinstance(value, dict):
+        adapter = value.get("adapter")
+        return adapter if isinstance(adapter, str) and adapter else None
+    return None
+
+
+def resolve_role_binding(
+    role: str, repo: Path | None = None
+) -> tuple[str, "Any"]:
+    """Resolve a role to ``(adapter_name, ProviderBinding | None)``.
+
+    Falls back to DEFAULT_ROLES when the role is absent. Returns binding=None
+    (zero-regression) when the role value is legacy str/list, carries no
+    ``provider``, or the ``[providers]`` section is missing.
+    """
+    from agentic_loop.provider_binding import build_binding
+
+    repo = repo or main_repo()
+    raw_roles = get_roles_raw(repo)
+    value: Any = raw_roles.get(role, DEFAULT_ROLES.get(role))
+
+    adapter = _first_candidate(value)
+    if adapter is None:
+        # Nothing usable; degrade to the built-in default for this role.
+        adapter = _first_candidate(DEFAULT_ROLES.get(role)) or "claude"
+
+    provider_name: str | None = None
+    if isinstance(value, dict):
+        pn = value.get("provider")
+        provider_name = pn if isinstance(pn, str) and pn else None
+
+    if provider_name is None:
+        return adapter, None
+
+    providers = get_providers(repo)
+    provider_cfg = providers.get(provider_name)
+    if not isinstance(provider_cfg, dict):
+        return adapter, None
+
+    provider_cfg = dict(provider_cfg)
+    provider_cfg["_name"] = provider_name
+    binding = build_binding(adapter=adapter, provider_cfg=provider_cfg)
+    return adapter, binding
+
+
 ROOTS = {
     "main_repo": main_repo,
     "current_worktree": current_worktree,
