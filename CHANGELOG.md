@@ -4,6 +4,16 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.8] — 2026-08-16
+
+Promote the autonomy mode switch to a top-level `agentic mode` command.
+
+### Added
+
+- **`agentic mode [ask|ultra]`**: a top-level command to show/set the autonomy
+  mode (`agentic mode` prints it, `agentic mode ask|ultra` sets it). The
+  `agentic autonomy mode` spelling still works (same `_mode_main`).
+
 ## [0.8.7] — 2026-08-16
 
 Add `agentic autonomy mode` to show/switch the autonomy mode.

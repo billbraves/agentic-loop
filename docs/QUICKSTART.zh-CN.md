@@ -76,7 +76,7 @@ agentic --help
 agentic contract check --dir /path/to/project   # 未 init 前应报「no .agentic/config.toml」
 ```
 
-> 要锁版本（可复现）：`uv tool install "...@v0.8.7" --force`。
+> 要锁版本（可复现）：`uv tool install "...@v0.8.8" --force`。
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 
@@ -330,8 +330,8 @@ agentic contract check --dir "$TMP"                          # 应 rc 0 全 IN_S
 - `[autonomy]`：把"哪些动作自动、哪些必须问人"落成机器判定——`agentic autonomy <action>`
   输出 `AUTONOMY_AUTO`/`AUTONOMY_STOP`；`agentic preflight` 强制 `dispatch_developer`、
   `agentic finalize` 强制 `finalize_merge`，`always_stop`（push/生产写入/凭证…）即使
-  `ultra` 模式也硬停。查看/切换自主模式：`agentic autonomy mode`（显示）、
-  `agentic autonomy mode ultra|ask`（切换）；
+  `ultra` 模式也硬停。查看/切换自主模式：`agentic mode`（显示）、
+  `agentic mode ultra|ask`（切换）；
 - 终态三签（reviewer + consult + qoder_security）缺一不进 MERGED。
 
 在这些边界内，低风险派发/冻结自动进行；越过边界（生产写入、推送、通知、凭证、不可逆

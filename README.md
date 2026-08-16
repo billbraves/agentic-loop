@@ -36,7 +36,7 @@ uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 agentic update    # 等价上面那条，重新装最新
 ```
 
-要锁定精确版本做可复现构建，追加 tag（`@v0.8.7`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
+要锁定精确版本做可复现构建，追加 tag（`@v0.8.8`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
 > 手动跑 codex/kimi/claude 想切 provider（官方 ↔ DeepSeek，限额兜底）用
 > `agentic-provider`（或 `examples/agentic-provider.sh`），支持全切 + 独立切，见
@@ -72,7 +72,8 @@ agentic preflight docs/plans/<iteration>/WP-XX.status.json
 | `contract diff [--apply]` | 展示重渲染 diff；`--apply` 写回并重新盖章。 |
 | `bootstrap` | 检测/安装 claude+kimi+codex，校验 `DEEPSEEK_API_KEY`，并对每个 CLI 跑一次真实注入探测（装了但不兼容则失败即闭）。`--dry-run` 只打印计划、不安装也不花 DeepSeek 配额；`--yes` 跳过安装确认。 |
 | `migrate-status` | 把旧 `.wp/WP-<id>.status.json` 转成 `agentic-wp-status/v2`（`--iteration`，可选 `--merged-commit`）。 |
-| `autonomy` | 按 `[autonomy]` 策略校验一个编排动作 —— 打印 `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`；`autonomy signal <signal>` 分类软限制信号；`autonomy mode [ask\|ultra]` 显示/切换自主模式。 |
+| `autonomy` | 按 `[autonomy]` 策略校验一个编排动作 —— 打印 `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`；`autonomy signal <signal>` 分类软限制信号。 |
+| `mode` | 显示/切换自主模式 —— `agentic mode`（查当前）、`agentic mode ask\|ultra`（切）。 |
 
 编排门（逐字转发到 wrapper —— 主仓 `scripts/agentic/<wrapper>.sh` 存在则优先，否则用 wheel 内置副本；argv、流、退出码原样透传）：
 
