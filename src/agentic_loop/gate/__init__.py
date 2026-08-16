@@ -547,6 +547,30 @@ def compute_wp_diff(
     return diff_text, diff_start, tip_commit
 
 
+def _enforce_autonomy(repo_root: Path) -> None:
+    """Opt-in autonomy gate for ``merge_gate`` (fail-closed to STOP, exit 3).
+
+    Runs BEFORE any Codex quota is spent: if the project's ``[autonomy]`` policy
+    does not auto-approve ``merge_gate`` and no human-approved override is set,
+    the gate refuses with a distinct ``GATE_STOP`` line and exit 3 (the autonomy
+    STOP code), never burning credits on a step that should have been gated.
+    """
+    from agentic_loop.autonomy import STOP, configured, decide
+    from agentic_loop.resolve_paths import get_autonomy
+
+    if not configured(repo_root):
+        return
+    if decide("merge_gate", get_autonomy(repo_root)) == STOP and os.environ.get(
+        "AGENTIC_AUTONOMY_APPROVE", "0"
+    ) != "1":
+        print(
+            "GATE_STOP: autonomy requires human approval (merge_gate); "
+            "set AGENTIC_AUTONOMY_APPROVE=1 after human approval",
+            file=sys.stderr,
+        )
+        raise SystemExit(3)
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print("usage: gate.py <work-package-status.json>", file=sys.stderr)
@@ -593,6 +617,9 @@ def main(argv: list[str]) -> int:
             f"precondition unmet — review.decision is '{review_decision}', "
             "expected ACCEPT or N/A"
         )
+
+    # Autonomy gate: check BEFORE spending Codex quota (fail-closed to STOP).
+    _enforce_autonomy(repo_root)
 
     wp_id = read_field(validator, status_file, "work_package_id")
     iteration_id = read_field(validator, status_file, "iteration_id")

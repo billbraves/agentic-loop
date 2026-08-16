@@ -123,10 +123,11 @@ subscription weekly quota, not per-call cost.
 - The machine-checkable autonomy policy lives in the project's `[autonomy]`
   config. Query it before committing to a step: `agentic autonomy <action>`
   prints `AUTONOMY_AUTO` (proceed) or `AUTONOMY_STOP` (ask the user, then set
-  `AGENTIC_AUTONOMY_APPROVE=1` for that one step). `agentic preflight` enforces
-  it for `dispatch_developer` and `agentic finalize` enforces it for
-  `finalize_merge`; `always_stop` actions (push, production write, credentials,
-  release, …) are hard-stopped even in `ultra` mode.
+  `AGENTIC_AUTONOMY_APPROVE=1` for that one step). The gates enforce it
+  directly: `agentic preflight` for `dispatch_developer`, `agentic gate` for
+  `merge_gate`, and `agentic finalize` for `finalize_merge`; `always_stop`
+  actions (push, production write, credentials, release, …) are hard-stopped
+  even in `ultra` mode.
 
 ### 4.2 Post-dispatch health monitoring (default)
 

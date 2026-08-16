@@ -26,13 +26,13 @@ until they adopt the section.
 
 ### Changed
 
-- **`agentic finalize` and `agentic preflight` enforce autonomy.** `finalize_merge`
-  and `dispatch_developer` are checked against the policy before stamping MERGED /
-  acquiring the WP lock, with an explicit human-approval escape hatch
-  (`AGENTIC_AUTONOMY_APPROVE=1`). Opt-in: a project without `[autonomy]` is not
-  gated (backward compatible).
+- **`agentic preflight`, `agentic gate`, and `agentic finalize` enforce autonomy.**
+  `dispatch_developer`, `merge_gate`, and `finalize_merge` are checked against the
+  policy before acquiring the WP lock / spending Codex quota / stamping MERGED,
+  with an explicit human-approval escape hatch (`AGENTIC_AUTONOMY_APPROVE=1`).
+  Opt-in: a project without `[autonomy]` is not gated (backward compatible).
 - **AGENTS.md template documents the autonomy gate** (§4.1) and the contract
-  template version is bumped to 3.
+  template version is bumped to 4.
 
 ### Distribution
 

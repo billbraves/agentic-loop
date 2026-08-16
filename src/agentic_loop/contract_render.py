@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover - <3.9 not supported anyway
 
 # Bump when the template wording/structure changes in a way that should prompt
 # adopting projects to re-render (via `agentic contract diff`).
-CONTRACT_TEMPLATE_VERSION = "3"
+CONTRACT_TEMPLATE_VERSION = "4"
 
 _TEMPLATE_PACKAGE = "agentic_loop"
 _TEMPLATE_SUBDIR = "templates"

@@ -108,3 +108,44 @@ def test_cli_always_stop_wins_in_ultra(repo):
     res = _run(repo, "push")
     assert res.returncode == au.STOP_RC
     assert "AUTONOMY_STOP push" in res.stdout
+
+
+# --- gate engine hard-wire (merge_gate) -------------------------------------
+
+
+def test_gate_enforce_autonomy_opt_in(tmp_path, monkeypatch):
+    from agentic_loop.gate import _enforce_autonomy
+
+    cfg = tmp_path / ".agentic" / "config.toml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+
+    # no [autonomy] -> no-op (backward compatible)
+    _enforce_autonomy(tmp_path)
+
+    # ask mode -> STOP (SystemExit code 3)
+    cfg.write_text('[autonomy]\ndefault_mode = "ask"\n', encoding="utf-8")
+    with pytest.raises(SystemExit) as ei:
+        _enforce_autonomy(tmp_path)
+    assert ei.value.code == au.STOP_RC
+
+    # human-approved override -> proceeds
+    monkeypatch.setenv("AGENTIC_AUTONOMY_APPROVE", "1")
+    _enforce_autonomy(tmp_path)
+    monkeypatch.delenv("AGENTIC_AUTONOMY_APPROVE")
+
+    # ultra + merge_gate in ultra_auto -> proceeds
+    cfg.write_text(
+        '[autonomy]\ndefault_mode = "ultra"\nultra_auto = ["merge_gate"]\n',
+        encoding="utf-8",
+    )
+    _enforce_autonomy(tmp_path)
+
+    # ultra + merge_gate in always_stop -> hard STOP
+    cfg.write_text(
+        '[autonomy]\ndefault_mode = "ultra"\nultra_auto = ["merge_gate"]\n'
+        'always_stop = ["merge_gate"]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit) as ei:
+        _enforce_autonomy(tmp_path)
+    assert ei.value.code == au.STOP_RC
