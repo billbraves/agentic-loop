@@ -134,15 +134,16 @@ agentic 的 DeepSeek 是**运行时注入**，只在 agentic 派发（gate/redis
 DeepSeek 兜底**（写进 `~/.zshrc` 后）：
 
 ```bash
-agentic-provider deepseek    # codex/kimi 默认切到 DeepSeek
-agentic-provider official    # 切回官方（gpt-5.5 / kimi-code）
-agentic-provider status      # 看当前默认 provider
+agentic-provider deepseek         # 三个都切 DeepSeek
+agentic-provider official         # 三个都切回官方
+agentic-provider codex-deepseek   # 只切 codex（或 kimi-* / claude-*）
+agentic-provider status           # 看当前默认 provider
 ```
 
 不想写进 `~/.zshrc` 的话，直接跑框架仓库里的脚本即可（跨 macOS/GNU 的 sed）：
 
 ```bash
-./examples/agentic-provider.sh deepseek|official|status
+./examples/agentic-provider.sh <deepseek|official|codex-deepseek|kimi-deepseek|claude-deepseek|…|status>
 ```
 
 ---
