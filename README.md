@@ -16,6 +16,21 @@ repositories running older interpreters. On Python **3.11+** it declares **zero
 third-party dependencies** (stdlib `tomllib`); on **3.9 / 3.10** it pulls a
 single conditional dependency, `tomli`.
 
+## How it differs from coding SKILLs / agent harnesses
+
+These sit at different layers and compose rather than compete:
+
+| Tool | Layer | It answers |
+|------|-------|------------|
+| Claude Code **SKILL** | method | how *one* agent does a task correctly |
+| DeepSeek **Harness** | runtime | how *one* agent executes / fans out sub-tasks |
+| **agentic-loop** | governance | how *many* independent agents stay disciplined |
+
+One line: SKILLs and harnesses make a single agent **more capable**;
+`agentic-loop` makes a team of agents **more trustworthy** — the former solve
+**capability**, the latter solves **discipline** (machine-enforced scope,
+multi-sign review, merge/finalize traceability, per-action autonomy).
+
 ## Install (latest release)
 
 Every release lands on `main` and is tagged, so `main` always points at the

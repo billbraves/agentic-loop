@@ -12,6 +12,24 @@
 **验证工作包状态、跑质量门、做多签独立评审、锁并发、终态留痕**。所有门通过一个
 `agentic` 命令转发到内置的 bash wrapper（外部项目无需自带 `scripts/agentic/`）。
 
+### 0.1 它和 Claude Code SKILL / DeepSeek Harness 的区别
+
+三者不是竞争，是**不同层面、可叠加**：
+
+| 工具 | 层面 | 解决什么问题 |
+|------|------|-------------|
+| Claude Code **SKILL** | 方法 | 让**一个** agent 把某类任务做对 |
+| DeepSeek **Harness** | 运行时 | 让**一个** agent 执行、并行派子任务 |
+| **agentic-loop** | 治理 | 让**一群**独立 agent 协作时不失控 |
+
+**一句话**：SKILL / Harness 让单个 agent **更能干**；agentic-loop 让一群 agent
+协作时**更可信**——前者解决「能力」，后者解决「纪律」（谁改的、谁审的、出界没、
+怎么合并、怎么留底，机器强制记录和拦截）。
+
+**工地类比**：SKILL 是工人的工种手册，Harness 是工具箱+派工系统，agentic-loop
+是工地的**监理+验收制度**——独立工作区（worktree）、划死边界（allowed/forbidden）、
+多签验收（review+consult）、终态留底（MERGED+commit）。
+
 ---
 
 ## 1. 安装（锁版本，可复现）
