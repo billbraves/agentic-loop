@@ -45,6 +45,7 @@ from agentic_loop.resolve_paths import get_adapters
 from agentic_loop.resolve_paths import get_review_policy
 from agentic_loop.resolve_paths import iterations_dir
 from agentic_loop.resolve_paths import main_repo
+from agentic_loop.resolve_paths import resolve_role_binding
 
 
 VERDICT_SCHEMA: dict[str, Any] = {
@@ -686,7 +687,10 @@ def main(argv: list[str]) -> int:
     if contract.writes != ("consult",):
         raise GateError("consultant contract attempts to write outside consult block")
 
-    adapter = CodexAdapter()
+    # Resolve the consultant's provider binding (e.g. DeepSeek) so codex is
+    # actually injected with it — not its global default model.
+    _, consultant_binding = resolve_role_binding("consultant", repo=repo_root)
+    adapter = CodexAdapter(binding=consultant_binding)
 
     # INV-2: require self-attestable level-2 capabilities.
     capabilities = adapter.capabilities()

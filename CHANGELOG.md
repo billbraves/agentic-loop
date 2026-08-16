@@ -6,6 +6,20 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-08-16
+
+Fix: the merge gate now actually injects the consultant's provider binding.
+
+### Fixed
+
+- **`agentic gate` codex injection**: `gate/__init__.py` instantiated
+  `CodexAdapter()` without the consultant's provider binding, so codex ran on its
+  global default model (gpt-5.5) instead of DeepSeek even when
+  `[providers.deepseek]` was configured. It now resolves the binding via
+  `resolve_role_binding("consultant")` and passes it through. (The bootstrap
+  probe already passed the binding, which is why bootstrap looked green while the
+  real gate did not.)
+
 ## [0.8.1] — 2026-08-16
 
 Fix DeepSeek injection for newer CLI versions (kimi >= 1.49, codex 0.147).

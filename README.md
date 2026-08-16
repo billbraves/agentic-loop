@@ -36,7 +36,7 @@ uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 agentic-up     # 等价上面那条
 ```
 
-要锁定精确版本做可复现构建，追加 tag（`@v0.8.1`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
+要锁定精确版本做可复现构建，追加 tag（`@v0.8.2`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
 ## 在别的项目里落地
 
