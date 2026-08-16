@@ -4,6 +4,16 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.11] — 2026-08-16
+
+`agentic init` warns when an existing `.claude/settings.json` lacks the allowlist.
+
+### Added
+
+- **`INIT_WARN` for stale allowlist**: if `.claude/settings.json` already exists
+  but contains no `agentic` permission, `init` prints a warning instead of
+  failing silently (the orchestrator would otherwise prompt on every command).
+
 ## [0.8.10] — 2026-08-16
 
 `agentic init` now scaffolds a Claude Code allowlist for `agentic`.

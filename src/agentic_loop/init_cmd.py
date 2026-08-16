@@ -103,13 +103,34 @@ _HOOK_TEMPLATES = (
 # Per-WP reference skeletons scaffolded under docs/agentic/templates/ so the
 # adopting project has a starting point for a new brief + status file. Like the
 # hook assets, these are never overwritten once present.
+CLAUDE_SETTINGS_REL = ".claude/settings.json"
 _REFERENCE_TEMPLATES = (
     ("STATUS.json.tmpl", "docs/agentic/templates/STATUS.json", 0o644),
     ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
     # Claude Code allowlist so the orchestrator can run `agentic ...` without the
     # interactive permission hook. Project-level, never overwritten once present.
-    ("claude-settings.json.tmpl", ".claude/settings.json", 0o644),
+    ("claude-settings.json.tmpl", CLAUDE_SETTINGS_REL, 0o644),
 )
+
+
+def _warn_if_missing_agentic_allowlist(path) -> None:
+    """Warn when an existing .claude/settings.json lacks the `agentic` allowlist.
+
+    ``init`` never overwrites an existing file, so a stale settings.json full of
+    archived ``scripts/agentic/*`` paths would otherwise fail silently — the
+    orchestrator's Claude Code would prompt on every ``agentic`` command.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    if "agentic" not in text:
+        print(
+            "INIT_WARN: {} exists but lacks a 'Bash(agentic *)' allowlist; the "
+            "orchestrator's Claude Code will prompt on every `agentic` command. "
+            "Add it manually (see the scaffolded template).".format(CLAUDE_SETTINGS_REL),
+            file=sys.stderr,
+        )
 
 
 def _write_asset(root, tmpl_name, rel, mode):
@@ -236,6 +257,8 @@ def run_init(target_dir, *, force, non_interactive, config_path=None):
                 "INIT_REF_CONFLICT: {} (exists; not overwritten)".format(rel),
                 file=sys.stderr,
             )
+            if rel == CLAUDE_SETTINGS_REL:
+                _warn_if_missing_agentic_allowlist(root / rel)
 
     for label in written:
         print("INIT_WROTE: {}".format(label))
