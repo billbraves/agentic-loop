@@ -1,103 +1,82 @@
 # agentic-loop
 
-Portable agentic-orchestration framework, dogfooded in the baofu monorepo.
+可移植的 Agent 编排框架（在 baofu monorepo 中自用 dogfood）。
 
-`agentic-loop` packages the orchestration engine that drives a
-dispatch → implement → review → merge-gate workflow across coding agents
-(Claude / Codex / Kimi / …). It ships:
+`agentic-loop` 把「派发 → 实现 → 评审 → 合并门」这套跨编码 Agent（Claude / Codex / Kimi / …）的工作流打包成一个引擎。它提供：
 
-- a **pure engine** (drift/independence/status/render logic) — no business code,
-- the **`agentic` CLI** that forwards to the orchestration gates and adds two
-  project-facing commands (`init`, `contract`),
-- **governance-contract templates** rendered per project from a small config.
+- **纯引擎**（漂移 / 独立性 / 状态 / 渲染逻辑）——不含任何业务代码；
+- **`agentic` CLI** —— 把命令转发到各编排门，并额外提供面向项目的命令（`init`、`contract` 等）；
+- **治理契约模板** —— 从一份小配置按项目渲染生成。
 
-It is compatible with Python **>= 3.9** so it can be vendored into external
-repositories running older interpreters. On Python **3.11+** it declares **zero
-third-party dependencies** (stdlib `tomllib`); on **3.9 / 3.10** it pulls a
-single conditional dependency, `tomli`.
+兼容 Python **>= 3.9**，可 vendor 到使用旧解释器的外部仓库。Python **3.11+** 下**零三方依赖**（用标准库 `tomllib`）；**3.9 / 3.10** 只拉一个条件依赖 `tomli`。
 
-## How it differs from coding SKILLs / agent harnesses
+## 与 Claude Code SKILL / DeepSeek Harness 的区别
 
-These sit at different layers and compose rather than compete:
+三者是**不同层面、可叠加**，不是竞争：
 
-| Tool | Layer | It answers |
-|------|-------|------------|
-| Claude Code **SKILL** | method | how *one* agent does a task correctly |
-| DeepSeek **Harness** | runtime | how *one* agent executes / fans out sub-tasks |
-| **agentic-loop** | governance | how *many* independent agents stay disciplined |
+| 工具 | 层面 | 解决什么 |
+|------|------|----------|
+| Claude Code **SKILL** | 方法 | 让**一个** agent 把某类任务做对 |
+| DeepSeek **Harness** | 运行时 | 让**一个** agent 执行、并行派子任务 |
+| **agentic-loop** | 治理 | 让**一群**独立 agent 协作时不失控 |
 
-One line: SKILLs and harnesses make a single agent **more capable**;
-`agentic-loop` makes a team of agents **more trustworthy** — the former solve
-**capability**, the latter solves **discipline** (machine-enforced scope,
-multi-sign review, merge/finalize traceability, per-action autonomy).
+一句话：SKILL / Harness 让单个 agent **更能干**；agentic-loop 让一群 agent 协作时**更可信**——前者解决「能力」，后者解决「纪律」（范围机器强制、多签评审、合并/终态留痕、动作级审批）。
 
-## Install (latest release)
+## 安装（最新发布）
 
-Every release lands on `main` and is tagged, so `main` always points at the
-newest release. Install without a ref to track it:
+每个发布都会合入 `main` 并打 tag，因此 `main` 永远指向最新发布。不带 ref 安装即可跟踪它：
 
 ```bash
 uv pip install "git+https://github.com/billbraves/agentic-loop.git"
 python3 -c "import agentic_loop; print(agentic_loop.__version__)"
 ```
 
-Re-run with `--force-reinstall` (or `--upgrade` under plain pip) to move up to a
-later release. To pin an exact version for reproducible builds, append a tag
-(`@v0.7.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
+升到更高版本就重跑一次（加 `--force-reinstall`，或纯 pip 下用 `--upgrade`）。要锁定精确版本做可复现构建，追加 tag（`@v0.7.0`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
-## Adopting it in another project
+## 在别的项目里落地
 
 ```bash
-# 1. vendor / install the package (see MIGRATION.md for pip-from-git / vendored)
-# 2. scaffold config + governance contracts + skeleton
+# 1. vendor / 安装本包（pip-from-git / vendored 见 MIGRATION.md）
+# 2. 脚手架：配置 + 治理契约 + 骨架
 agentic init --dir /path/to/project
-# 3. edit /path/to/project/.agentic/config.toml (roles, quality gates, safety)
-# 4. re-render contracts to match the edited config
+# 3. 编辑 /path/to/project/.agentic/config.toml（角色、质量门、安全边界）
+# 4. 重渲染契约以匹配改后的配置
 agentic contract diff --apply --dir /path/to/project
-# 5. run the gates
+# 5. 跑门
 agentic preflight docs/plans/<iteration>/WP-XX.status.json
 ```
 
-The full adoption walkthrough — config sections, drift governance, and the
-in-repo-scripts → installed-CLI migration — lives in
-[`MIGRATION.md`](MIGRATION.md).
+完整落地走查（配置各段、漂移治理、从 in-repo 脚本到安装版 CLI 的迁移）见 [`MIGRATION.md`](MIGRATION.md)。
 
-Note: every subcommand works from a bare `pip install` — the wheel **bundles**
-the `scripts/agentic/*.sh` wrappers, so an external project needs **no**
-`scripts/agentic/` directory of its own. When a main-repo copy *is* present (the
-framework dogfooding itself) the CLI prefers it, so live wrapper edits take
-effect without a reinstall (see the [`MIGRATION.md`](MIGRATION.md) §5 note).
+注意：所有子命令都能在裸 `pip install` 后直接跑——wheel **内置**了 `scripts/agentic/*.sh` wrapper，所以外部项目**不需要**自己的 `scripts/agentic/` 目录。当框架自身仓库里有主仓副本时（框架 dogfood 自己），CLI 优先用主仓副本，这样改 wrapper 不用重装即可生效（见 [`MIGRATION.md`](MIGRATION.md) §5 说明）。
 
-## Command reference
+## 命令参考
 
-`agentic <subcommand> [args...]` — run `agentic --help` for the live listing.
+`agentic <subcommand> [args...]` —— 跑 `agentic --help` 看实时列表。
 
-Project commands (Python, package-internal):
+项目命令（Python，包内实现）：
 
-| Subcommand | What it does |
-|------------|--------------|
-| `init` | Scaffold `.agentic/config.toml` + governance contracts (AGENTS.md, CLAUDE.md, docs/agentic/OPERATING_MODEL.md) + per-WP templates (docs/agentic/templates/{STATUS.json,WORK_PACKAGE.md}) + `docs/plans/` & `.agentic/locks/` skeleton. Refuses to overwrite existing managed files without `--force`. |
-| `contract check` | Read-only drift report per contract: `IN_SYNC` / `TEMPLATE_OUTDATED` / `CONFIG_DRIFT` (exit 0 all in sync, 3 on any drift). |
-| `contract diff [--apply]` | Show the re-render diff; `--apply` writes it back and re-stamps. |
-| `bootstrap` | Detect/install claude+kimi+codex, verify `DEEPSEEK_API_KEY`, and run a real-injection probe per CLI (fails closed on an installed-but-incompatible CLI). `--dry-run` prints the plan without installing or spending DeepSeek quota; `--yes` skips the install confirmation. |
-| `migrate-status` | Convert a legacy `.wp/WP-<id>.status.json` to `agentic-wp-status/v2` (`--iteration`, optional `--merged-commit`). |
-| `autonomy` | Check an orchestration action against the `[autonomy]` policy — prints `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`; `autonomy signal <signal>` classifies a soft-limit signal. |
+| 子命令 | 作用 |
+|--------|------|
+| `init` | 脚手架 `.agentic/config.toml` + 治理契约（AGENTS.md、CLAUDE.md、docs/agentic/OPERATING_MODEL.md）+ 每 WP 模板（docs/agentic/templates/{STATUS.json,WORK_PACKAGE.md}）+ `docs/plans/` 与 `.agentic/locks/` 骨架。无 `--force` 时拒绝覆盖已存在的受管文件。 |
+| `contract check` | 逐契约只读漂移报告：`IN_SYNC` / `TEMPLATE_OUTDATED` / `CONFIG_DRIFT`（全同步 exit 0，有漂移 exit 3）。 |
+| `contract diff [--apply]` | 展示重渲染 diff；`--apply` 写回并重新盖章。 |
+| `bootstrap` | 检测/安装 claude+kimi+codex，校验 `DEEPSEEK_API_KEY`，并对每个 CLI 跑一次真实注入探测（装了但不兼容则失败即闭）。`--dry-run` 只打印计划、不安装也不花 DeepSeek 配额；`--yes` 跳过安装确认。 |
+| `migrate-status` | 把旧 `.wp/WP-<id>.status.json` 转成 `agentic-wp-status/v2`（`--iteration`，可选 `--merged-commit`）。 |
+| `autonomy` | 按 `[autonomy]` 策略校验一个编排动作 —— 打印 `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`；`autonomy signal <signal>` 分类一个软限制信号。 |
 
-Orchestration gates (forward verbatim to the wrapper — the main-repo
-`scripts/agentic/<wrapper>.sh` when present, else the wheel-bundled copy; argv,
-streams and exit codes pass through unchanged):
+编排门（逐字转发到 wrapper —— 主仓 `scripts/agentic/<wrapper>.sh` 存在则优先，否则用 wheel 内置副本；argv、流、退出码原样透传）：
 
-| Subcommand | Forwards to |
-|------------|-------------|
-| `gate` | `codex_merge_gate.sh` — independent merge-gate second sign |
-| `redispatch` | `redispatch.sh` — rework re-dispatch reflow |
-| `preflight` | `preflight.sh` — status validation + branch/WP-lock gate |
-| `finalize` | `finalize_merge.sh` — three-signature gate (reviewer + consult + Qoder for v3; v2 double-sign) then stamp `state=MERGED` + `merged_commit` |
-| `merge` | `merge.sh` — local no-ff merge of an APPROVED_FOR_MERGE WP (autonomy-gated) |
-| `dispatch-lint` | `dispatch_lint.sh` — dispatch-time status lint |
-| `quality-gate` | `quality-gate.sh` — path-matched project test rules |
-| `lock` | `lock.sh` — WP / merge concurrency locks |
-| `health` | `kimi-health.sh` — background-executor progress probe |
+| 子命令 | 转发到 |
+|--------|--------|
+| `gate` | `codex_merge_gate.sh` —— 独立合并门第二签名 |
+| `redispatch` | `redispatch.sh` —— 返工重派回流 |
+| `preflight` | `preflight.sh` —— 状态校验 + 分支/WP 锁门 |
+| `finalize` | `finalize_merge.sh` —— 三签门（reviewer + consult + Qoder，v3；v2 双签）后 stamp `state=MERGED` + `merged_commit` |
+| `merge` | `merge.sh` —— 对 APPROVED_FOR_MERGE 的 WP 做本地 no-ff 合并（autonomy 门控） |
+| `dispatch-lint` | `dispatch_lint.sh` —— 派发时状态 lint |
+| `quality-gate` | `quality-gate.sh` —— 按路径匹配的项目测试规则 |
+| `lock` | `lock.sh` —— WP / 合并并发锁 |
+| `health` | `kimi-health.sh` —— 后台执行器进度探测 |
 
-The wrappers hold the real orchestration glue; keeping them as bash is a frozen
-design decision (the CLI forwards, it does not reimplement them).
+wrapper 承载真正的编排胶水；保持 bash 是冻结的设计决策（CLI 只转发，不重实现它们）。
