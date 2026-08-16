@@ -27,6 +27,38 @@ agentic contract check --dir /path/to/project   # 未 init 前应报「no .agent
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 
+### 1.1 谁需要装、谁不用装
+
+`agentic` 是**用户级 CLI，装一次全局可用**（`~/.local/bin/agentic`），与仓库无关、
+不用每个项目装一遍。但只有**编排者角色**需要它：
+
+| 角色 | 需要装 `agentic` 吗 | 原因 |
+|------|:---:|------|
+| 编排者（claude，驱动闭环的人） | ✅ 必须 | 跑 `preflight`/`dispatch-lint`/`health`/`gate`/`finalize`/`lock` 等编排门 |
+| 执行者（kimi，被派发到 worktree 干活） | ❌ 不用 | 只读 brief、实现、跑测试、交证据，不碰编排门 |
+| 独立评审/顾问（codex / qoder） | ❌ 不用 | 评审在独立会话看 diff、给 verdict；门由编排者触发 |
+| 只读协作同事 | ❌ 不用 | 读 `AGENTS.md` + status 文件即可对齐 |
+
+> 团队若只有一个编排者（或由 CI runner 担任），那只有那一台机器/那个人装。
+
+**仓库内一键就绪脚本**（把"装"降到 clone 后跑一条命令）：
+
+```bash
+bash scripts/agentic-bootstrap.sh
+# 内部 = uv tool install ...@v0.5.0 + agentic --help 冒烟 + agentic bootstrap --dry-run
+```
+
+手动等价执行：
+
+```bash
+uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.5.0" --force
+agentic --help && agentic bootstrap --dry-run
+```
+
+> 注意：CI（`.gitlab-ci.yml`）已经在远端跑大部分质量门（formula/collision/reachability、
+> score.py 等）。本地 `agentic` 的独特价值是 CI 覆盖不到的部分——WP 并发锁、后台执行器
+> 冻结监控、多签独立评审 + 终态 stamp。别把本地 CLI 当成"再跑一遍 CI 测试"。
+
 ---
 
 ## 2. 环境自检（一次性）
