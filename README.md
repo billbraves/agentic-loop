@@ -36,7 +36,7 @@ uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 agentic update    # 等价上面那条，重新装最新
 ```
 
-要锁定精确版本做可复现构建，追加 tag（`@v0.8.9`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
+要锁定精确版本做可复现构建，追加 tag（`@v0.8.10`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
 > 手动跑 codex/kimi/claude 想切 provider（官方 ↔ DeepSeek，限额兜底）用
 > `agentic-provider`（或 `examples/agentic-provider.sh`），支持全切 + 独立切，见
@@ -67,7 +67,7 @@ agentic preflight docs/plans/<iteration>/WP-XX.status.json
 
 | 子命令 | 作用 |
 |--------|------|
-| `init` | 脚手架 `.agentic/config.toml` + 治理契约（AGENTS.md、CLAUDE.md、docs/agentic/OPERATING_MODEL.md）+ 每 WP 模板（docs/agentic/templates/{STATUS.json,WORK_PACKAGE.md}）+ `docs/plans/` 与 `.agentic/locks/` 骨架。无 `--force` 时拒绝覆盖已存在的受管文件。 |
+| `init` | 脚手架 `.agentic/config.toml` + 治理契约（AGENTS.md、CLAUDE.md、docs/agentic/OPERATING_MODEL.md）+ 每 WP 模板（docs/agentic/templates/{STATUS.json,WORK_PACKAGE.md}）+ `.claude/settings.json`（`Bash(agentic *)` allowlist，编排者免审批）+ `docs/plans/` 与 `.agentic/locks/` 骨架。无 `--force` 时拒绝覆盖已存在的受管文件。 |
 | `contract check` | 逐契约只读漂移报告：`IN_SYNC` / `TEMPLATE_OUTDATED` / `CONFIG_DRIFT`（全同步 exit 0，有漂移 exit 3）。 |
 | `contract diff [--apply]` | 展示重渲染 diff；`--apply` 写回并重新盖章。 |
 | `bootstrap` | 检测/安装 claude+kimi+codex，校验 `DEEPSEEK_API_KEY`，并对每个 CLI 跑一次真实注入探测（装了但不兼容则失败即闭）。`--dry-run` 只打印计划、不安装也不花 DeepSeek 配额；`--yes` 跳过安装确认。 |

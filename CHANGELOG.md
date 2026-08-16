@@ -4,6 +4,17 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.10] — 2026-08-16
+
+`agentic init` now scaffolds a Claude Code allowlist for `agentic`.
+
+### Added
+
+- **`.claude/settings.json` scaffold**: `agentic init` writes a minimal
+  `{"permissions":{"allow":["Bash(agentic *)"]}}` (never overwritten once
+  present) so the orchestrator's Claude Code runs `agentic ...` without the
+  interactive permission hook.
+
 ## [0.8.9] — 2026-08-16
 
 Promote the provider switch to a built-in `agentic provider` command.

@@ -106,6 +106,9 @@ _HOOK_TEMPLATES = (
 _REFERENCE_TEMPLATES = (
     ("STATUS.json.tmpl", "docs/agentic/templates/STATUS.json", 0o644),
     ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
+    # Claude Code allowlist so the orchestrator can run `agentic ...` without the
+    # interactive permission hook. Project-level, never overwritten once present.
+    ("claude-settings.json.tmpl", ".claude/settings.json", 0o644),
 )
 
 
