@@ -121,7 +121,14 @@ def main(argv=None) -> int:
     # key 不在场 → 报错停下，绝不代填/落盘。
     if plan.missing_key:
         for env in plan.missing_key:
-            print(f"BOOTSTRAP_ERROR: required env {env} not set", file=sys.stderr)
+            print(
+                f"BOOTSTRAP_ERROR: required env {env} not set. "
+                f"Set it once in your shell (e.g. `export {env}=sk-...`) and "
+                "re-run. The key is read from the env var named in "
+                ".agentic/config.toml [providers.<name>].api_key_env — it is "
+                "never written to disk or argv.",
+                file=sys.stderr,
+            )
         return 2
 
     # 安装缺失（逐个确认，除非 --yes）。信任确认任何档位保留。

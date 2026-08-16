@@ -32,8 +32,27 @@ DEFAULT_CONFIG = """\
 iterations_dir = "docs/plans"
 # default_output_language = "English"
 
+# ── 统一 DeepSeek API（可选）─────────────────────────────────────────
+# 让 claude/kimi/codex 三签统一走 DeepSeek：取消下面 [providers.deepseek]
+# 的注释，把 [roles] 改成 table 形式（见下），并导出环境变量：
+#     export DEEPSEEK_API_KEY=sk-...
+# 完整范本见 examples/config.single-deepseek.toml；bootstrap 会校验 key 并做真实注入探测。
+# [providers.deepseek]
+# anthropic_base_url = "https://api.deepseek.com/anthropic"   # claude/kimi 用
+# openai_base_url    = "https://api.deepseek.com/v1"          # codex 用
+# api_key_env        = "DEEPSEEK_API_KEY"                     # 只存 env 名，绝不存 key 明文
+# identity_model     = "deepseek-v4-pro"                      # canonical，独立性评级唯一依据
+# [providers.deepseek.selectors]
+# kimi   = "deepseek/v4-pro"
+# codex  = "deepseek-v4-pro"
+# claude = "deepseek-v4-pro"
+
 [roles]
 # role -> adapter name; an array means primary/fallback candidates.
+# 统一 DeepSeek 时把对应角色改成 table 形式绑 provider：
+#   developer   = { adapter = "kimi",   provider = "deepseek" }
+#   reviewer    = { adapter = "claude", provider = "deepseek" }
+#   consultant  = { adapter = "codex",  provider = "deepseek" }
 orchestrator = "claude"
 developer    = ["kimi", "claude"]
 reviewer     = "claude"

@@ -77,6 +77,42 @@ agentic --help && agentic bootstrap --dry-run
 > score.py 等）。本地 `agentic` 的独特价值是 CI 覆盖不到的部分——WP 并发锁、后台执行器
 > 冻结监控、多签独立评审 + 终态 stamp。别把本地 CLI 当成"再跑一遍 CI 测试"。
 
+### 1.2 配置 DeepSeek API key（统一几个 CLI 生效）
+
+让 claude / kimi / codex 三签统一走 DeepSeek，需要两步：
+
+**① 设环境变量（key 只存环境变量，绝不落盘/进 argv）**
+
+```bash
+export DEEPSEEK_API_KEY=sk-...
+```
+
+**② 在 `.agentic/config.toml` 配 `[providers.deepseek]` + roles 绑 provider**
+
+`agentic init` 生成的 config 里已带注释范本，取消注释即可（完整范本见
+`examples/config.single-deepseek.toml`）：
+
+```toml
+[providers.deepseek]
+anthropic_base_url = "https://api.deepseek.com/anthropic"   # claude/kimi 用
+openai_base_url    = "https://api.deepseek.com/v1"          # codex 用
+api_key_env        = "DEEPSEEK_API_KEY"                     # 只存 env 名
+identity_model     = "deepseek-v4-pro"
+[providers.deepseek.selectors]
+kimi   = "deepseek/v4-pro"
+codex  = "deepseek-v4-pro"
+claude = "deepseek-v4-pro"
+
+[roles]
+developer   = { adapter = "kimi",   provider = "deepseek" }
+reviewer    = { adapter = "claude", provider = "deepseek" }
+consultant  = { adapter = "codex",  provider = "deepseek" }
+```
+
+> 配好后再跑 `agentic bootstrap`，它会**真实注入探测**每个 CLI 是否真的走通了
+> DeepSeek（不是 `which` 命中就过，是发 sentinel 请求验证）；不配 `[providers]`
+> 则三签回退各 CLI 自己的默认 provider，不需要 DeepSeek key。
+
 ---
 
 ## 2. 环境自检（一次性）
