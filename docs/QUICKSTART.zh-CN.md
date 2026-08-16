@@ -32,16 +32,21 @@
 
 ---
 
-## 1. 安装（锁版本，可复现）
+## 1. 安装 / 更新（默认最新，一条命令）
 
 ```bash
-# 推荐：锁到某个 tag，重装结果字节级一致
-uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.8.1"
+# 默认装/更新到最新（不加 @tag = 跟踪 main，--force = 强制更新）
+uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
+
+# 或写进 ~/.zshrc 后一个短命令
+agentic-up
 
 # 冒烟验证
 agentic --help
 agentic contract check --dir /path/to/project   # 未 init 前应报「no .agentic/config.toml」
 ```
+
+> 要锁版本（可复现）：`uv tool install "...@v0.8.1" --force`。
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 
@@ -63,13 +68,13 @@ agentic contract check --dir /path/to/project   # 未 init 前应报「no .agent
 
 ```bash
 bash scripts/agentic-bootstrap.sh
-# 内部 = uv tool install ...@v0.8.1 + agentic --help 冒烟 + agentic bootstrap --dry-run
+# 内部 = uv tool install ... --force（默认跟踪 main=最新）+ agentic --help 冒烟 + bootstrap --dry-run
 ```
 
 手动等价执行：
 
 ```bash
-uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.8.1" --force
+uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 agentic --help && agentic bootstrap --dry-run
 ```
 

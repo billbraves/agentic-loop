@@ -24,14 +24,19 @@
 
 ## 安装（最新发布）
 
-每个发布都会合入 `main` 并打 tag，因此 `main` 永远指向最新发布。不带 ref 安装即可跟踪它：
+每个发布都会合入 `main` 并打 tag，因此 `main` 永远指向最新发布。**默认装/更新到最新，一条命令**（不加 `@tag` = 跟踪 `main`，`--force` = 强制更新）：
 
 ```bash
-uv pip install "git+https://github.com/billbraves/agentic-loop.git"
-python3 -c "import agentic_loop; print(agentic_loop.__version__)"
+uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 ```
 
-升到更高版本就重跑一次（加 `--force-reinstall`，或纯 pip 下用 `--upgrade`）。要锁定精确版本做可复现构建，追加 tag（`@v0.8.1`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
+写进 `~/.zshrc` 后一个短命令即可：
+
+```bash
+agentic-up     # 等价上面那条
+```
+
+要锁定精确版本做可复现构建，追加 tag（`@v0.8.1`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
 ## 在别的项目里落地
 
