@@ -6,11 +6,11 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [0.8.6] — 2026-08-16
 
-Add a built-in self-update command (no per-host shell alias needed).
+Add a built-in update command (no per-host shell alias needed).
 
 ### Added
 
-- **`agentic self-update`**: reinstalls the latest agentic-loop from `main`
+- **`agentic update`**: reinstalls the latest agentic-loop from `main`
   (`uv tool install --force`, no tag) so any machine can upgrade itself without
   the `~/.zshrc` `agentic-up` function. README/Quick-Start now point at this
   instead of the shell alias.

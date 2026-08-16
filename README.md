@@ -33,7 +33,7 @@ uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 内置命令升级（任何机器都可用，无需配置）：
 
 ```bash
-agentic self-update    # 等价上面那条，重新装最新
+agentic update    # 等价上面那条，重新装最新
 ```
 
 要锁定精确版本做可复现构建，追加 tag（`@v0.8.6`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。

@@ -14,7 +14,7 @@
 
 ```bash
 uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
-# 以后升级只需（内置命令，任何机器可用）：agentic self-update
+# 以后升级只需（内置命令，任何机器可用）：agentic update
 ```
 
 **第 2 步 · 配 DeepSeek key**（可选；不配则三签用各自官方 key）
@@ -69,7 +69,7 @@ agentic bootstrap
 uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 
 # 以后升级用内置命令（任何机器可用，无需配函数）
-agentic self-update
+agentic update
 
 # 冒烟验证
 agentic --help
