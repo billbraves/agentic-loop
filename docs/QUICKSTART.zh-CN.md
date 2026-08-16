@@ -117,6 +117,10 @@ consultant  = { adapter = "codex",  provider = "deepseek" }
 > 配好后再跑 `agentic bootstrap`，它会**真实注入探测**每个 CLI 是否真的走通了
 > DeepSeek（不是 `which` 命中就过，是发 sentinel 请求验证）；不配 `[providers]`
 > 则三签回退各 CLI 自己的默认 provider，不需要 DeepSeek key。
+>
+> 兼容性注记：DeepSeek 的 `/v1` **同时**挂了 `/v1/chat/completions` 和
+> `/v1/responses` 两个端点（已 curl 实测 HTTP 200）。codex ≥ 0.147 只走
+> Responses API（`/v1/responses`），DeepSeek 已支持，无需 workaround。
 
 ### 1.3 官方 key 可保留 + 一键切换兜底
 
