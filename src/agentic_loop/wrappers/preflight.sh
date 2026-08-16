@@ -82,6 +82,15 @@ if ! lint_reason=$("$here/dispatch_lint.sh" "$status_file" 2>&1 >/dev/null); the
   exit 2
 fi
 
+# Autonomy gate (opt-in): dispatch_developer requires approval unless [autonomy]
+# auto-approves it (ultra mode) or the human-approved env override is set.
+# AUTONOMY_NOT_CONFIGURED (no [autonomy] section) does not gate — backward compat.
+autonomy_out=$(python3 -m agentic_loop.autonomy dispatch_developer 2>/dev/null || true)
+if [[ "$autonomy_out" == AUTONOMY_STOP* ]] && [[ "${AGENTIC_AUTONOMY_APPROVE:-0}" != "1" ]]; then
+  echo "PREFLIGHT_STOP: autonomy requires human approval (dispatch_developer); set AGENTIC_AUTONOMY_APPROVE=1 after human approval" >&2
+  exit 3
+fi
+
 iter=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field iteration_id)
 wp=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field work_package_id)
 if ! lock_out=$("$here/lock.sh" acquire --kind wp --key "${iter}__${wp}"); then

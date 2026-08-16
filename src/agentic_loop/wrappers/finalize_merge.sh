@@ -123,6 +123,15 @@ if [[ -z "$tests_json" || "$tests_json" == "[]" ]]; then
   exit 2
 fi
 
+# Autonomy gate (opt-in): when the project defines [autonomy] and finalize_merge
+# is not auto-approved, require an explicit human approval before stamping MERGED.
+# AUTONOMY_NOT_CONFIGURED (no [autonomy] section) does not gate — backward compat.
+autonomy_out=$(python3 -m agentic_loop.autonomy finalize_merge 2>/dev/null || true)
+if [[ "$autonomy_out" == AUTONOMY_STOP* ]] && [[ "${AGENTIC_AUTONOMY_APPROVE:-0}" != "1" ]]; then
+  echo "FINALIZE_STOP: autonomy requires human approval (finalize_merge); set AGENTIC_AUTONOMY_APPROVE=1 after human approval" >&2
+  exit 3
+fi
+
 # Resolve branch tips in the main repo (read-only).
 wp_tip=$(git -C "$repo_root" rev-parse --verify --quiet "refs/heads/$branch^{commit}") || {
   echo "FINALIZE_FAIL: cannot resolve branch '$branch' tip" >&2

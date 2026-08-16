@@ -51,6 +51,7 @@ _PY_SUBCOMMANDS = {
     "contract": "check | diff — governance-contract drift detection",
     "bootstrap": "detect/install claude+kimi+codex, verify DeepSeek key, real-injection probe",
     "migrate-status": "convert a legacy .wp status file to agentic-wp-status/v2",
+    "autonomy": "check an orchestration action against the [autonomy] policy",
 }
 
 
@@ -164,6 +165,9 @@ def main(argv=None):
         if sub == "migrate-status":
             from . import migrate_status
             return migrate_status.main(rest)
+        if sub == "autonomy":
+            from . import autonomy
+            return autonomy.main(rest)
 
     wrapper_name = _SUBCOMMANDS.get(sub)
     if wrapper_name is None:

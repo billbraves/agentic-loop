@@ -52,6 +52,17 @@ production_paths = []
 [review_policy]
 min_independence = "strong"
 
+# Optional autonomy policy: machine-checkable AUTO/STOP per orchestration action.
+# Uncomment to opt in (absent = not gated). default_mode "ask" stops on every
+# action not explicitly auto-approved; "ultra" auto-runs ultra_auto actions,
+# but always_stop actions (push, production_write, credentials, …) stay hard-stopped.
+# [autonomy]
+# default_mode = "ask"
+# ultra_auto   = ["local_edit", "test_run", "worktree_lifecycle", "dispatch_developer",
+#                 "review", "merge_gate", "local_merge_no_ff", "finalize_merge"]
+# always_stop  = ["push", "feishu_send", "production_write", "cron_change",
+#                 "release_deploy", "credential_rw", "irreversible_git"]
+
 [locks]
 owner_source = "env:AGENTIC_SESSION_ID"
 ttl_minutes  = 30

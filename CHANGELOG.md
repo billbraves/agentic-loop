@@ -6,6 +6,39 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-16
+
+The `[autonomy]` section stops being inert config and becomes a machine-checkable
+gate. A new autonomy policy engine maps each orchestration action to `AUTO`/`STOP`
+(fail-closed: `always_stop` actions always stop, `ultra` mode auto-approves only
+`ultra_auto` actions, everything else stops), and the terminal/dispatch gates now
+enforce it — while staying opt-in so existing projects keep their current behavior
+until they adopt the section.
+
+### Added
+
+- **Autonomy policy engine + `agentic autonomy <action>`.** A pure `decide()`
+  predicate over the `[autonomy]` config (`default_mode` / `ultra_auto` /
+  `always_stop`), exposed as a CLI that prints `AUTONOMY_AUTO` (exit 0),
+  `AUTONOMY_STOP` (exit 3), or `AUTONOMY_NOT_CONFIGURED` (exit 0) when a project
+  has no `[autonomy]` section. Fail-closed: unknown actions and non-approved
+  actions resolve to STOP.
+
+### Changed
+
+- **`agentic finalize` and `agentic preflight` enforce autonomy.** `finalize_merge`
+  and `dispatch_developer` are checked against the policy before stamping MERGED /
+  acquiring the WP lock, with an explicit human-approval escape hatch
+  (`AGENTIC_AUTONOMY_APPROVE=1`). Opt-in: a project without `[autonomy]` is not
+  gated (backward compatible).
+- **AGENTS.md template documents the autonomy gate** (§4.1) and the contract
+  template version is bumped to 3.
+
+### Distribution
+
+- Version bumped to **`0.6.0`** (minor: backward-compatible feature — the gate is
+  opt-in). No new dependencies; wrapper set unchanged (ten wrappers).
+
 ## [0.5.0] — 2026-08-16
 
 Adoption hardening: the rendered contracts now teach the portable `agentic` CLI
