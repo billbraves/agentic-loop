@@ -6,6 +6,34 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-16
+
+Adoption polish + DeepSeek key onboarding. No engine/gate behavior change — this
+release makes the framework easier to adopt and to point at a single DeepSeek key.
+
+### Added
+
+- **DeepSeek key onboarding.** `agentic init` now scaffolds a commented
+  `[providers.deepseek]` example (base URLs, `api_key_env`, `identity_model`,
+  selectors) plus a `DEEPSEEK_API_KEY` env-var guide; `agentic bootstrap` prints a
+  concrete configuration hint instead of a bare "env not set"; Quick-Start gains
+  §1.2「配置 DeepSeek API key」. No key is ever persisted or placed in argv.
+
+### Changed
+
+- **`merge.sh` conflict detection + next-step hint.** A failed merge now lists the
+  conflicted files and prints `merge --continue` / `merge --abort`; a successful
+  merge prints `MERGE_NEXT: run agentic finalize …`.
+- **README defaults to Chinese** (commands/code blocks stay verbatim), and both
+  README + Quick-Start document the positioning vs Claude Code SKILL / DeepSeek
+  Harness (method / runtime / governance layers).
+- **`init` config comment** documents `soft_limit_signals`.
+
+### Distribution
+
+- Version bumped to **`0.8.0`** (minor: onboarding/docs polish). No new
+  dependencies; wrapper set unchanged (eleven).
+
 ## [0.7.0] — 2026-08-16
 
 Closes the last two autonomy gaps: the local merge (previously a bare
