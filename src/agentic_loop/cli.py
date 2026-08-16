@@ -54,6 +54,7 @@ _PY_SUBCOMMANDS = {
     "migrate-status": "convert a legacy .wp status file to agentic-wp-status/v2",
     "autonomy": "check an orchestration action against the [autonomy] policy",
     "mode": "show/set the autonomy mode (ask|ultra)",
+    "provider": "switch codex/kimi/claude default provider (deepseek|official)",
     "update": "reinstall the latest agentic-loop from main (uv tool install --force)",
 }
 
@@ -174,6 +175,9 @@ def main(argv=None):
         if sub == "mode":
             from . import autonomy
             return autonomy._mode_main(rest)
+        if sub == "provider":
+            from . import provider
+            return provider.main(rest)
         if sub == "update":
             from . import self_update
             return self_update.main(rest)

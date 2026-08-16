@@ -76,7 +76,7 @@ agentic --help
 agentic contract check --dir /path/to/project   # 未 init 前应报「no .agentic/config.toml」
 ```
 
-> 要锁版本（可复现）：`uv tool install "...@v0.8.8" --force`。
+> 要锁版本（可复现）：`uv tool install "...@v0.8.9" --force`。
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 
@@ -170,19 +170,14 @@ agentic 的 DeepSeek 是**运行时注入**，只在 agentic 派发（gate/redis
 | 手动跑 `claude`/`codex`/`kimi` | 各自官方 key（`~/.codex`、`~/.kimi` 等） |
 
 当 codex/kimi 官方 key 撞到限额（如 5 小时 / 星期限额）时，可**一键把手动 CLI 也切到
-DeepSeek 兜底**（写进 `~/.zshrc` 后）：
+DeepSeek 兜底**（内置命令，任何机器可用）：
 
 ```bash
-agentic-provider deepseek         # 三个都切 DeepSeek
-agentic-provider official         # 三个都切回官方
-agentic-provider codex-deepseek   # 只切 codex（或 kimi-* / claude-*）
-agentic-provider status           # 看当前默认 provider
+agentic provider                 # 看当前三个 CLI 的默认 provider
+agentic provider deepseek        # 三个都切 DeepSeek
+agentic provider official        # 三个都切回官方
+agentic provider codex-deepseek  # 只切 codex（或 kimi-* / claude-*）
 ```
-
-不想写进 `~/.zshrc` 的话，直接跑框架仓库里的脚本即可（跨 macOS/GNU 的 sed）：
-
-```bash
-./examples/agentic-provider.sh <deepseek|official|codex-deepseek|kimi-deepseek|claude-deepseek|…|status>
 ```
 
 ---

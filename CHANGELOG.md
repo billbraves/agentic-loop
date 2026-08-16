@@ -4,6 +4,16 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.9] — 2026-08-16
+
+Promote the provider switch to a built-in `agentic provider` command.
+
+### Added
+
+- **`agentic provider [deepseek|official|codex-deepseek|…|status]`**: switches the
+  manually-run codex/kimi/claude default provider (official ↔ DeepSeek quota
+  fallback). Replaces the former `examples/agentic-provider.sh` shell script.
+
 ## [0.8.8] — 2026-08-16
 
 Promote the autonomy mode switch to a top-level `agentic mode` command.
