@@ -23,6 +23,7 @@ behavior until they explicitly adopt the section. The CLI prints
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 
 from agentic_loop.resolve_paths import _load_config
@@ -115,11 +116,71 @@ def _signal_main(signal: str) -> int:
     return STOP_RC
 
 
+def _set_default_mode(config_path, mode: str) -> None:
+    """Set ``[autonomy].default_mode`` in the project config, preserving the rest.
+
+    Handles three shapes: replace an existing ``default_mode`` line; append one
+    right after an existing ``[autonomy]`` header that lacks it; or append a new
+    ``[autonomy]`` section when none exists.
+    """
+    text = config_path.read_text(encoding="utf-8")
+    if re.search(r"^[ \t]*default_mode[ \t]*=", text, re.MULTILINE):
+        text = re.sub(
+            r'^([ \t]*default_mode[ \t]*=[ \t]*")[^"]*(")',
+            r'\g<1>{}\g<2>'.format(mode),
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    elif re.search(r"^\[autonomy\]", text, re.MULTILINE):
+        text = re.sub(
+            r"^(\[autonomy\][^\n]*\n)",
+            r'\g<1>default_mode = "{}"\n'.format(mode),
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        text += '[autonomy]\ndefault_mode = "{}"\n'.format(mode)
+    config_path.write_text(text, encoding="utf-8")
+
+
+def _mode_main(argv: list) -> int:
+    """``agentic autonomy mode [ask|ultra]`` — show or set ``default_mode``."""
+    repo = main_repo()
+    config_path = repo / ".agentic" / "config.toml"
+
+    if len(argv) == 0:
+        mode = get_autonomy(repo).get("default_mode", "ask") if configured(repo) else "ask"
+        print("AUTONOMY_MODE {}".format(mode))
+        return 0
+
+    if len(argv) == 1 and argv[0] in ("ask", "ultra"):
+        mode = argv[0]
+        if not config_path.is_file():
+            print(
+                "autonomy mode: no .agentic/config.toml (run `agentic init` first)",
+                file=sys.stderr,
+            )
+            return 2
+        _set_default_mode(config_path, mode)
+        print("AUTONOMY_MODE_SET {}".format(mode))
+        return 0
+
+    print("usage: agentic autonomy mode [ask|ultra]", file=sys.stderr)
+    return 2
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
 
     if len(argv) >= 2 and argv[0] == "signal":
         return _signal_main(argv[1])
+
+    if len(argv) >= 1 and argv[0] == "mode":
+        return _mode_main(argv[1:])
 
     ap = argparse.ArgumentParser(prog="agentic autonomy")
     ap.add_argument("action", help="action category (or: signal <signal>)")

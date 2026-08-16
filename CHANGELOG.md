@@ -4,6 +4,17 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.7] — 2026-08-16
+
+Add `agentic autonomy mode` to show/switch the autonomy mode.
+
+### Added
+
+- **`agentic autonomy mode [ask|ultra]`**: with no argument prints the current
+  `default_mode`; with `ask`/`ultra` sets it in `.agentic/config.toml` (replaces
+  an existing line, appends after `[autonomy]`, or creates the section). No more
+  hand-editing TOML to flip ask/ultra.
+
 ## [0.8.6] — 2026-08-16
 
 Add a built-in update command (no per-host shell alias needed).

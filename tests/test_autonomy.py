@@ -215,3 +215,54 @@ def test_gate_enforce_autonomy_opt_in(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as ei:
         _enforce_autonomy(tmp_path)
     assert ei.value.code == au.STOP_RC
+
+
+def test_mode_show_and_switch(repo):
+    (repo / ".agentic" / "config.toml").write_text(
+        '[autonomy]\ndefault_mode = "ultra"\n', encoding="utf-8"
+    )
+    # 显示
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(SRC) + (
+        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+    )
+    res = subprocess.run(
+        [sys.executable, "-m", "agentic_loop.autonomy", "mode"],
+        cwd=str(repo), capture_output=True, text=True, env=env,
+    )
+    assert "AUTONOMY_MODE ultra" in res.stdout
+
+    # 切 ask
+    res = subprocess.run(
+        [sys.executable, "-m", "agentic_loop.autonomy", "mode", "ask"],
+        cwd=str(repo), capture_output=True, text=True, env=env,
+    )
+    assert res.returncode == 0
+    assert "AUTONOMY_MODE_SET ask" in res.stdout
+    assert 'default_mode = "ask"' in (repo / ".agentic" / "config.toml").read_text()
+
+    # 切回 ultra
+    subprocess.run(
+        [sys.executable, "-m", "agentic_loop.autonomy", "mode", "ultra"],
+        cwd=str(repo), capture_output=True, text=True, env=env,
+    )
+    assert 'default_mode = "ultra"' in (repo / ".agentic" / "config.toml").read_text()
+
+
+def test_mode_set_creates_section_if_absent(repo):
+    # 没有 [autonomy] 段时，mode 切换应追加该段
+    (repo / ".agentic" / "config.toml").write_text(
+        '[project]\niterations_dir = "docs/plans"\n', encoding="utf-8"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(SRC) + (
+        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+    )
+    res = subprocess.run(
+        [sys.executable, "-m", "agentic_loop.autonomy", "mode", "ultra"],
+        cwd=str(repo), capture_output=True, text=True, env=env,
+    )
+    assert res.returncode == 0
+    text = (repo / ".agentic" / "config.toml").read_text()
+    assert "[autonomy]" in text
+    assert 'default_mode = "ultra"' in text
