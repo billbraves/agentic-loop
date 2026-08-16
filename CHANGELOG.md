@@ -4,6 +4,18 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.5] — 2026-08-16
+
+Make DeepSeek onboarding visible by default in `agentic init`.
+
+### Changed
+
+- **`init` scaffolds an active `[providers.deepseek]`** (no longer commented out),
+  with roles bound to the `deepseek` provider by default. Users who don't want
+  DeepSeek delete the section and revert roles to the string form.
+- **contract render**: `_fmt_role` now renders table-form roles as
+  `adapter (provider: name)` instead of a raw dict repr.
+
 ## [0.8.4] — 2026-08-16
 
 Fix: wrappers no longer hit the system interpreter under external installs.

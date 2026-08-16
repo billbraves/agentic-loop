@@ -68,7 +68,14 @@ def _fmt_list(items):
 
 
 def _fmt_role(value):
-    """A role maps to one adapter name or a primary/fallback array."""
+    """A role maps to one adapter name, a primary/fallback array, or a table
+    (adapter + provider)."""
+    if isinstance(value, dict):
+        adapter = value.get("adapter")
+        provider = value.get("provider")
+        if provider:
+            return "{} (provider: {})".format(adapter, provider)
+        return str(adapter or value)
     if isinstance(value, (list, tuple)):
         names = [str(x) for x in value]
         if not names:

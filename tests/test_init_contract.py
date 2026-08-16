@@ -125,7 +125,7 @@ def test_check_config_drift(tmp_path):
     cfg = tmp_path / ".agentic" / "config.toml"
     cfg.write_text(
         cfg.read_text(encoding="utf-8").replace(
-            'consultant   = "codex"', 'consultant   = "gemini"'
+            'adapter = "codex"', 'adapter = "gemini"'
         ),
         encoding="utf-8",
     )
@@ -154,7 +154,7 @@ def test_diff_prints_then_apply_restores_in_sync(tmp_path):
     cfg = tmp_path / ".agentic" / "config.toml"
     cfg.write_text(
         cfg.read_text(encoding="utf-8").replace(
-            'consultant   = "codex"', 'consultant   = "gemini"'
+            'adapter = "codex"', 'adapter = "gemini"'
         ),
         encoding="utf-8",
     )

@@ -76,7 +76,7 @@ agentic --help
 agentic contract check --dir /path/to/project   # 未 init 前应报「no .agentic/config.toml」
 ```
 
-> 要锁版本（可复现）：`uv tool install "...@v0.8.4" --force`。
+> 要锁版本（可复现）：`uv tool install "...@v0.8.5" --force`。
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 
