@@ -118,6 +118,27 @@ consultant  = { adapter = "codex",  provider = "deepseek" }
 > DeepSeek（不是 `which` 命中就过，是发 sentinel 请求验证）；不配 `[providers]`
 > 则三签回退各 CLI 自己的默认 provider，不需要 DeepSeek key。
 
+### 1.3 官方 key 可保留 + 一键切换兜底
+
+agentic 的 DeepSeek 是**运行时注入**，只在 agentic 派发（gate/redispatch/评审）时生效，
+**不碰**各 CLI 自己的官方配置——你手动跑 `claude`/`codex`/`kimi` 时仍走各自官方 key。
+
+两者并存、互不干扰：
+
+| 场景 | 用什么 key |
+|------|-----------|
+| agentic 派发/评审 | DeepSeek（`[providers]` 注入） |
+| 手动跑 `claude`/`codex`/`kimi` | 各自官方 key（`~/.codex`、`~/.kimi` 等） |
+
+当 codex/kimi 官方 key 撞到限额（如 5 小时 / 星期限额）时，可**一键把手动 CLI 也切到
+DeepSeek 兜底**（写进 `~/.zshrc` 后）：
+
+```bash
+agentic-provider deepseek    # codex/kimi 默认切到 DeepSeek
+agentic-provider official    # 切回官方（gpt-5.5 / kimi-code）
+agentic-provider status      # 看当前默认 provider
+```
+
 ---
 
 ## 2. 环境自检（一次性）
