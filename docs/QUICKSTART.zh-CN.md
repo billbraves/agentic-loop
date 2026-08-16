@@ -139,6 +139,12 @@ agentic-provider official    # 切回官方（gpt-5.5 / kimi-code）
 agentic-provider status      # 看当前默认 provider
 ```
 
+不想写进 `~/.zshrc` 的话，直接跑框架仓库里的脚本即可（跨 macOS/GNU 的 sed）：
+
+```bash
+./examples/agentic-provider.sh deepseek|official|status
+```
+
 ---
 
 ## 2. 环境自检（一次性）
