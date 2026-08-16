@@ -22,15 +22,15 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-repo_root=$(python3 -m agentic_loop.resolve_paths --root current_worktree) || { echo "PREFLIGHT_FAIL: resolver failed to resolve current_worktree" >&2; exit 2; }
+repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root current_worktree) || { echo "PREFLIGHT_FAIL: resolver failed to resolve current_worktree" >&2; exit 2; }
 branch=$(git branch --show-current)
 primary_worktree=$(git worktree list --porcelain | awk '/^worktree / {print substr($0, 10); exit}')
 
-python3 -m agentic_loop.validate_wp_status "$status_file"
+"${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file"
 
-expected_branch=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field git.branch)
-expected_worktree=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field git.worktree)
-state=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field state)
+expected_branch=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field git.branch)
+expected_worktree=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field git.worktree)
+state=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field state)
 
 if [[ "$branch" == "main" || "$branch" == "master" ]]; then
   echo "PREFLIGHT_FAIL: implementation is forbidden on $branch" >&2
@@ -74,7 +74,7 @@ fi
 # 并发闸（concurrency lock）：实现/返工前必须持有本 WP 锁。
 # 见 docs/superpowers/specs/2026-08-01-agentic-concurrency-lock-design.md §5.1
 # 锁/lint 脚本只在主仓存在（唯一事实源），用 resolver 求主仓根定位它们（INV-4）。
-main_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) || { echo "PREFLIGHT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "PREFLIGHT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
 
 # 派发前只读硬门：校验不过不该占锁（lint 必须在锁 acquire 之前）。
 if ! lint_reason=$("$here/dispatch_lint.sh" "$status_file" 2>&1 >/dev/null); then
@@ -85,14 +85,14 @@ fi
 # Autonomy gate (opt-in): dispatch_developer requires approval unless [autonomy]
 # auto-approves it (ultra mode) or the human-approved env override is set.
 # AUTONOMY_NOT_CONFIGURED (no [autonomy] section) does not gate — backward compat.
-autonomy_out=$(python3 -m agentic_loop.autonomy dispatch_developer 2>/dev/null || true)
+autonomy_out=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.autonomy dispatch_developer 2>/dev/null || true)
 if [[ "$autonomy_out" == AUTONOMY_STOP* ]] && [[ "${AGENTIC_AUTONOMY_APPROVE:-0}" != "1" ]]; then
   echo "PREFLIGHT_STOP: autonomy requires human approval (dispatch_developer); set AGENTIC_AUTONOMY_APPROVE=1 after human approval" >&2
   exit 3
 fi
 
-iter=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field iteration_id)
-wp=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field work_package_id)
+iter=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field iteration_id)
+wp=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field work_package_id)
 if ! lock_out=$("$here/lock.sh" acquire --kind wp --key "${iter}__${wp}"); then
   echo "PREFLIGHT_FAIL: WP 锁未取得 —— $lock_out" >&2
   echo "  （另一个会话正在此 WP 上作业；确认其已停止后可 lock.sh acquire --force-takeover）" >&2

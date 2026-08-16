@@ -188,30 +188,39 @@ def main(argv=None):
         )
         return 2
 
+    # The bash wrappers hard-code a bare `python3`, which resolves to the system
+    # interpreter (no agentic_loop) when agentic was installed via `uv tool` into
+    # an isolated venv. Pass this process's interpreter via a LOCAL env dict (not
+    # os.environ, to avoid leaking into the parent process) so the wrappers can use
+    # "${AGENTIC_PYTHON:-python3}" — see docs/KNOWN-ISSUE-bare-python3.md.
+    wrapper_env = dict(os.environ)
+    wrapper_env["AGENTIC_PYTHON"] = sys.executable
+
     try:
         if resolved.source == "main":
             # A real filesystem path — replace the process for full transparency.
             cmd = ["bash", str(resolved.path), *rest]
-            return _exec_or_run(cmd)
+            return _exec_or_run(cmd, wrapper_env)
 
         # (b) Fallback: the copy bundled in the wheel, resolved via the Python
         # 3.9-safe importlib.resources.path() context manager. The wrapper runs
         # *inside* the still-entered ExitStack so a zip-imported temp file stays
         # alive for the wrapper's whole child-process lifetime.
-        completed = subprocess.run(["bash", str(resolved.path), *rest])
+        completed = subprocess.run(["bash", str(resolved.path), *rest], env=wrapper_env)
         return completed.returncode
     finally:
         if resolved.stack is not None:
             resolved.stack.close()
 
 
-def _exec_or_run(cmd):
+def _exec_or_run(cmd, env):
     """Replace the current process with ``cmd`` for full stream/exit-code
     transparency; fall back to a child process only if exec is unavailable."""
+    os.environ.update(env)  # execvp inherits os.environ
     try:
         os.execvp("bash", cmd)
     except OSError:
-        completed = subprocess.run(cmd)
+        completed = subprocess.run(cmd, env=env)
         return completed.returncode
 
 

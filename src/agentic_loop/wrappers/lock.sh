@@ -19,7 +19,7 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-repo_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) || die "LOCK_FAIL: resolver failed to resolve main_repo" 2
+repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || die "LOCK_FAIL: resolver failed to resolve main_repo" 2
 locks_root="$repo_root/.agentic/locks"
 
 cmd="${1:-}"; shift || true

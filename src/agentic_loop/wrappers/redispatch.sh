@@ -22,4 +22,4 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-exec python3 -m agentic_loop.redispatch "$@"
+exec "${AGENTIC_PYTHON:-python3}" -m agentic_loop.redispatch "$@"

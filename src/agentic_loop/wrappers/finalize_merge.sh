@@ -24,7 +24,7 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-repo_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) || { echo "FINALIZE_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "FINALIZE_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
 
 # Status file is the single source of truth in the main repo. Resolve relative
 # paths against main repo root, not cwd (which may be a worktree).
@@ -45,10 +45,10 @@ if [[ ! -f "$status_file" ]]; then
   exit 2
 fi
 
-field() { python3 -m agentic_loop.validate_wp_status "$status_file" --field "$1"; }
+field() { "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field "$1"; }
 
 # Step 1: schema/state-machine validation.
-if ! python3 -m agentic_loop.validate_wp_status "$status_file" >/dev/null; then
+if ! "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" >/dev/null; then
   echo "FINALIZE_FAIL: status validation failed" >&2
   exit 2
 fi
@@ -126,7 +126,7 @@ fi
 # Autonomy gate (opt-in): when the project defines [autonomy] and finalize_merge
 # is not auto-approved, require an explicit human approval before stamping MERGED.
 # AUTONOMY_NOT_CONFIGURED (no [autonomy] section) does not gate — backward compat.
-autonomy_out=$(python3 -m agentic_loop.autonomy finalize_merge 2>/dev/null || true)
+autonomy_out=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.autonomy finalize_merge 2>/dev/null || true)
 if [[ "$autonomy_out" == AUTONOMY_STOP* ]] && [[ "${AGENTIC_AUTONOMY_APPROVE:-0}" != "1" ]]; then
   echo "FINALIZE_STOP: autonomy requires human approval (finalize_merge); set AGENTIC_AUTONOMY_APPROVE=1 after human approval" >&2
   exit 3
@@ -205,7 +205,7 @@ with open(dst, "w", encoding="utf-8") as fh:
     fh.write("\n")
 PY
 
-if ! python3 -m agentic_loop.validate_wp_status "$tmp_status" >/dev/null; then
+if ! "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$tmp_status" >/dev/null; then
   echo "FINALIZE_FAIL: post-write validate failed" >&2
   exit 2
 fi

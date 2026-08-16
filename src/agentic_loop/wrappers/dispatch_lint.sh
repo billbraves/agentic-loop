@@ -20,8 +20,8 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-main_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) || { echo "DISPATCH_LINT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
-iterations_dir=$(python3 -m agentic_loop.resolve_paths --root iterations_dir) || { echo "DISPATCH_LINT_FAIL: resolver failed to resolve iterations_dir" >&2; exit 2; }
+main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "DISPATCH_LINT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+iterations_dir=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root iterations_dir) || { echo "DISPATCH_LINT_FAIL: resolver failed to resolve iterations_dir" >&2; exit 2; }
 
 case "$status_arg" in
   /*) status_file="$status_arg" ;;
@@ -34,7 +34,7 @@ fail() {
 }
 
 # 1. Run validate_wp_status first (read-only, reused).
-if ! lint_reason=$(python3 -m agentic_loop.validate_wp_status "$status_file" 2>&1 >/dev/null); then
+if ! lint_reason=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" 2>&1 >/dev/null); then
   [[ -n "$lint_reason" ]] || lint_reason="status validation failed"
   fail "$lint_reason"
 fi

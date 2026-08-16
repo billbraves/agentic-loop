@@ -23,12 +23,12 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-repo_root=$(python3 -m agentic_loop.resolve_paths --root current_worktree) || { echo "QUALITY_GATE_FAIL: resolver failed to resolve current_worktree" >&2; exit 2; }
-python3 -m agentic_loop.validate_wp_status "$status_file"
+repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root current_worktree) || { echo "QUALITY_GATE_FAIL: resolver failed to resolve current_worktree" >&2; exit 2; }
+"${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file"
 
-base_branch=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field git.base_branch)
-allowed_json=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field scope.allowed_paths)
-forbidden_json=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field scope.forbidden_paths)
+base_branch=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field git.base_branch)
+allowed_json=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field scope.allowed_paths)
+forbidden_json=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field scope.forbidden_paths)
 
 base_ref=$base_branch
 if ! git rev-parse --verify "$base_ref" >/dev/null 2>&1; then
@@ -96,7 +96,7 @@ git diff --cached --check
 # same root here so the fail-closed guard and the actual plan can never diverge
 # — do NOT open-code ${main_root:-$repo_root}, whose fallback could silently read
 # the worktree while the plan reads main_repo.
-qg_config_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) \
+qg_config_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) \
   || { echo "QUALITY_GATE_FAIL: resolver failed to resolve main_repo for config" >&2; exit 2; }
 qg_section_status=$(python3 - "$qg_config_root" <<'PY'
 import pathlib
@@ -132,7 +132,7 @@ if [[ "$qg_section_status" == "MISSING_SECTION" ]]; then
   exit 2
 fi
 
-qg_config=$(python3 -m agentic_loop.resolve_paths --config-section gate) \
+qg_config=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --config-section gate) \
   || { echo "QUALITY_GATE_FAIL: could not read [[gate]] config" >&2; exit 2; }
 
 # Expand the changed set into the ordered, de-duplicated list of test commands.

@@ -4,6 +4,18 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.4] — 2026-08-16
+
+Fix: wrappers no longer hit the system interpreter under external installs.
+
+### Fixed
+
+- **bare `python3` in wrappers**: the bash wrappers hard-coded `python3`, which
+  resolved to the system interpreter (no `agentic_loop`) when `agentic` was
+  installed via `uv tool` into an isolated venv. `cli.py` now passes
+  `AGENTIC_PYTHON=<sys.executable>` to the wrapper subprocess, and every wrapper
+  uses `"${AGENTIC_PYTHON:-python3}"`. See docs/KNOWN-ISSUE-bare-python3.md.
+
 ## [0.8.3] — 2026-08-16
 
 ### Fixed

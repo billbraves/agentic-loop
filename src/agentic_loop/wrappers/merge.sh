@@ -26,7 +26,7 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-repo_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) || { echo "MERGE_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "MERGE_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
 
 # Status file is the single source of truth in the main repo.
 case "$status_arg" in
@@ -43,9 +43,9 @@ if [[ ! -f "$status_file" ]]; then
   exit 2
 fi
 
-field() { python3 -m agentic_loop.validate_wp_status "$status_file" --field "$1"; }
+field() { "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field "$1"; }
 
-if ! python3 -m agentic_loop.validate_wp_status "$status_file" >/dev/null; then
+if ! "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" >/dev/null; then
   echo "MERGE_FAIL: status validation failed" >&2
   exit 2
 fi
@@ -57,7 +57,7 @@ git_commit=$(field git.commit)
 
 # Autonomy gate (opt-in): local_merge_no_ff requires approval unless [autonomy]
 # auto-approves it (ultra mode). AUTONOMY_NOT_CONFIGURED does not gate.
-autonomy_out=$(python3 -m agentic_loop.autonomy local_merge_no_ff 2>/dev/null || true)
+autonomy_out=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.autonomy local_merge_no_ff 2>/dev/null || true)
 if [[ "$autonomy_out" == AUTONOMY_STOP* ]] && [[ "${AGENTIC_AUTONOMY_APPROVE:-0}" != "1" ]]; then
   echo "MERGE_STOP: autonomy requires human approval (local_merge_no_ff); set AGENTIC_AUTONOMY_APPROVE=1 after human approval" >&2
   exit 3

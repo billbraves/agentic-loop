@@ -48,7 +48,7 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
-main_root=$(python3 -m agentic_loop.resolve_paths --root main_repo) || err "resolver failed to resolve main_repo" 66
+main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || err "resolver failed to resolve main_repo" 66
 
 tail_hash() {  # tail_hash <output-file> -> sha of last TAIL_LINES (empty if absent)
   local f="$1"

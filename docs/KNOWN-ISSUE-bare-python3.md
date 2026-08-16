@@ -1,6 +1,6 @@
 # 环境问题记录：wrapper 硬编码裸 `python3`（外部安装场景 ModuleNotFoundError）
 
-> 状态：已知 · 不在本迭代修复 · 影响面：外部 uv-tool 安装场景下的所有编排门
+> 状态：已修复（v0.8.4） · 修复方式见文末「修复落地」
 > 发现：baofu 项目迭代中实测命中，用「uv-tool bin 提到 PATH 前」绕过
 
 ## 现象
@@ -52,3 +52,11 @@ export PATH="$HOME/.local/bin:$PATH"
 
 所有 `scripts/agentic/wrappers/*.sh`（约 11 个）里的裸 `python3` 调用；纯函数式
 heredoc（`python3 - <<'PY'`）不受影响（不 import agentic_loop），但为一致性可一并换。
+
+## 修复落地（v0.8.4）
+
+- `cli.py`：转发 wrapper 前构造局部 env `wrapper_env["AGENTIC_PYTHON"]=sys.executable`，
+  `subprocess.run(..., env=wrapper_env)` / `_exec_or_run(cmd, wrapper_env)` ——
+  用局部 env 而非 `os.environ.setdefault`，避免泄漏污染父进程（曾导致测试串扰）。
+- 11 个 wrapper：裸 `python3 -m agentic_loop...` 统一换成
+  `"${AGENTIC_PYTHON:-python3}" -m agentic_loop...`。

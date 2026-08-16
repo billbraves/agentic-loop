@@ -33,8 +33,8 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
 
-python3 -m agentic_loop.validate_wp_status "$status_file"
-base_branch=$(python3 -m agentic_loop.validate_wp_status "$status_file" --field git.base_branch)
+"${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file"
+base_branch=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field git.base_branch)
 
 base_ref=$base_branch
 if ! git rev-parse --verify "$base_ref" >/dev/null 2>&1; then
@@ -51,5 +51,5 @@ trap 'rm -f "$changed_file"' EXIT
   git ls-files --others --exclude-standard
 } | awk 'NF' | sort -u > "$changed_file"
 
-python3 -m agentic_loop.runner.gate_runner \
+"${AGENTIC_PYTHON:-python3}" -m agentic_loop.runner.gate_runner \
   --stage "$stage" --paths "$changed_file" --status "$status_file"
