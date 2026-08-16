@@ -112,6 +112,7 @@ def test_codex_review_cmd_has_provider_flags_no_key(monkeypatch):
     assert "model_provider=deepseek" in joined
     assert "model_providers.deepseek.base_url=https://api.deepseek.com/v1" in joined
     assert "model_providers.deepseek.env_key=DEEPSEEK_API_KEY" in joined
+    assert "model_providers.deepseek.wire_api=responses" in joined
     assert "-m" in cmd and "deepseek-v4-pro" in cmd
     assert "sk-CANARY" not in joined                      # env_key name only
 

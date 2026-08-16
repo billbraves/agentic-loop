@@ -46,7 +46,7 @@ agentic --help
 agentic contract check --dir /path/to/project   # 未 init 前应报「no .agentic/config.toml」
 ```
 
-> 要锁版本（可复现）：`uv tool install "...@v0.8.2" --force`。
+> 要锁版本（可复现）：`uv tool install "...@v0.8.3" --force`。
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 
@@ -119,8 +119,13 @@ consultant  = { adapter = "codex",  provider = "deepseek" }
 > 则三签回退各 CLI 自己的默认 provider，不需要 DeepSeek key。
 >
 > 兼容性注记：DeepSeek 的 `/v1` **同时**挂了 `/v1/chat/completions` 和
-> `/v1/responses` 两个端点（已 curl 实测 HTTP 200）。codex ≥ 0.147 只走
-> Responses API（`/v1/responses`），DeepSeek 已支持，无需 workaround。
+> `/v1/responses` 两个端点（已 curl 实测 HTTP 200）。codex ≥ 0.147 走 Responses
+> API（`/v1/responses`），DeepSeek 的端点确实存在——但 **codex 对 inline/自定义
+> provider 不会自动选 responses 协议**，必须显式声明 `wire_api = "responses"`
+> （独立 profile 在 config 里写；agentic 注入时用
+> `-c model_providers.<name>.wire_api=responses`，已内置）。另外 responses 档
+> 官方优先保证 `deepseek-v4-flash`，`-pro` 可用（curl 实测 HTTP 200）但官方
+> 承诺优先级较低。
 
 ### 1.3 官方 key 可保留 + 一键切换兜底
 

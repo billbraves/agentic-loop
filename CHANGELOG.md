@@ -4,7 +4,16 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.8.3] — 2026-08-16
+
+### Fixed
+
+- **codex injection**: `_build_injection_flags` now also injects
+  `model_providers.<name>.wire_api=responses`. codex ≥ 0.147 does not auto-select
+  the responses protocol for an inline/custom provider, so DeepSeek (whose `/v1`
+  serves the Responses API) could error or behave non-deterministically without
+  it — mirroring what the standalone `~/.codex` profile declares explicitly.
+  Corrected the Quick-Start §1.2 note that claimed no workaround was needed.
 
 ## [0.8.2] — 2026-08-16
 

@@ -71,6 +71,9 @@ class CodexAdapter(Adapter):
             "-c", f"model_providers.{b.provider}.name={b.provider}",
             "-c", f"model_providers.{b.provider}.base_url={b.openai_base_url}",
             "-c", f"model_providers.{b.provider}.env_key={b.api_key_env}",
+            # codex 对 inline/自定义 provider 不会自动选 responses 协议；DeepSeek
+            # 的 /v1 走 Responses API，必须显式声明，否则 codex 0.147 报错或行为不定。
+            "-c", f"model_providers.{b.provider}.wire_api=responses",
             "-m", b.cli_selector,
         ]
 
