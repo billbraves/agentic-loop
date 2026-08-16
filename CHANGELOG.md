@@ -6,6 +6,18 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-08-16
+
+Fix DeepSeek injection for newer CLI versions (kimi >= 1.49, codex 0.147).
+
+### Fixed
+
+- **kimi injection**: temp config now includes `type = "anthropic"` and
+  `max_context_size` (both required by kimi >= 1.49 validation); the real-
+  injection probe passes.
+- **codex injection**: adds `model_providers.<name>.name` (codex 0.147 requires a
+  non-empty provider name); the real-injection probe passes.
+
 ## [0.8.0] — 2026-08-16
 
 Adoption polish + DeepSeek key onboarding. No engine/gate behavior change — this

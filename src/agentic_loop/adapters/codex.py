@@ -68,6 +68,7 @@ class CodexAdapter(Adapter):
         b = self._binding
         return [
             "-c", f"model_provider={b.provider}",
+            "-c", f"model_providers.{b.provider}.name={b.provider}",
             "-c", f"model_providers.{b.provider}.base_url={b.openai_base_url}",
             "-c", f"model_providers.{b.provider}.env_key={b.api_key_env}",
             "-m", b.cli_selector,

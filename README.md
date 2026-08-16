@@ -31,7 +31,7 @@ uv pip install "git+https://github.com/billbraves/agentic-loop.git"
 python3 -c "import agentic_loop; print(agentic_loop.__version__)"
 ```
 
-升到更高版本就重跑一次（加 `--force-reinstall`，或纯 pip 下用 `--upgrade`）。要锁定精确版本做可复现构建，追加 tag（`@v0.8.0`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
+升到更高版本就重跑一次（加 `--force-reinstall`，或纯 pip 下用 `--upgrade`）。要锁定精确版本做可复现构建，追加 tag（`@v0.8.1`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
 ## 在别的项目里落地
 

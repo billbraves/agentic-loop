@@ -54,11 +54,13 @@ class KimiAdapter(Adapter):
         # provider name is fixed per DeepSeek anthropic-compat endpoint.
         text = (
             f'[providers."{b.provider}-anthropic"]\n'
+            f'type     = "anthropic"\n'
             f'base_url = "{b.anthropic_base_url}"\n'
             f'api_key  = "{key}"\n\n'
             f'[models."{b.cli_selector}"]\n'
             f'provider = "{b.provider}-anthropic"\n'
             f'model    = "{b.identity_model}"\n'
+            f'max_context_size = 786432\n'
         )
         fd, path = tempfile.mkstemp(suffix=".toml", prefix="agentic-kimi-")
         try:
