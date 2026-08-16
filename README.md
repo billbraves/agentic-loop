@@ -30,13 +30,13 @@
 uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 ```
 
-写进 `~/.zshrc` 后一个短命令即可：
+内置命令升级（任何机器都可用，无需配置）：
 
 ```bash
-agentic-up     # 等价上面那条
+agentic self-update    # 等价上面那条，重新装最新
 ```
 
-要锁定精确版本做可复现构建，追加 tag（`@v0.8.5`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
+要锁定精确版本做可复现构建，追加 tag（`@v0.8.6`）或 commit —— 见 [`MIGRATION.md`](MIGRATION.md) §1。
 
 > 手动跑 codex/kimi/claude 想切 provider（官方 ↔ DeepSeek，限额兜底）用
 > `agentic-provider`（或 `examples/agentic-provider.sh`），支持全切 + 独立切，见

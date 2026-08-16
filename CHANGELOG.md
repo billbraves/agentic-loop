@@ -4,6 +4,17 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.6] — 2026-08-16
+
+Add a built-in self-update command (no per-host shell alias needed).
+
+### Added
+
+- **`agentic self-update`**: reinstalls the latest agentic-loop from `main`
+  (`uv tool install --force`, no tag) so any machine can upgrade itself without
+  the `~/.zshrc` `agentic-up` function. README/Quick-Start now point at this
+  instead of the shell alias.
+
 ## [0.8.5] — 2026-08-16
 
 Make DeepSeek onboarding visible by default in `agentic init`.

@@ -14,7 +14,7 @@
 
 ```bash
 uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
-# 写进 ~/.zshrc 后，以后升级只需：agentic-up
+# 以后升级只需（内置命令，任何机器可用）：agentic self-update
 ```
 
 **第 2 步 · 配 DeepSeek key**（可选；不配则三签用各自官方 key）
@@ -68,15 +68,15 @@ agentic bootstrap
 # 默认装/更新到最新（不加 @tag = 跟踪 main，--force = 强制更新）
 uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
 
-# 或写进 ~/.zshrc 后一个短命令
-agentic-up
+# 以后升级用内置命令（任何机器可用，无需配函数）
+agentic self-update
 
 # 冒烟验证
 agentic --help
 agentic contract check --dir /path/to/project   # 未 init 前应报「no .agentic/config.toml」
 ```
 
-> 要锁版本（可复现）：`uv tool install "...@v0.8.5" --force`。
+> 要锁版本（可复现）：`uv tool install "...@v0.8.6" --force`。
 
 > Python >= 3.9 即可；3.11+ 零第三方依赖，3.9/3.10 会自动拉一个 `tomli`。
 

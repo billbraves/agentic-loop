@@ -28,11 +28,11 @@ the standalone repository, so no `#subdirectory=` fragment is needed.
 
 For reproducible builds — CI, production lockfiles, or when you want a reinstall
 to yield byte-identical code — pin an immutable ref instead. Replace `<TAG>` /
-`<COMMIT_SHA>` with the version you are adopting (latest tag: **`v0.8.5`**):
+`<COMMIT_SHA>` with the version you are adopting (latest tag: **`v0.8.6`**):
 
 ```bash
 # Pin a release tag:
-uv pip install "git+https://github.com/billbraves/agentic-loop.git@v0.8.5"
+uv pip install "git+https://github.com/billbraves/agentic-loop.git@v0.8.6"
 
 # Pin an exact commit:
 uv pip install "git+https://github.com/billbraves/agentic-loop.git@<COMMIT_SHA>"

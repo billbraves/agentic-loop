@@ -53,6 +53,7 @@ _PY_SUBCOMMANDS = {
     "bootstrap": "detect/install claude+kimi+codex, verify DeepSeek key, real-injection probe",
     "migrate-status": "convert a legacy .wp status file to agentic-wp-status/v2",
     "autonomy": "check an orchestration action against the [autonomy] policy",
+    "self-update": "reinstall the latest agentic-loop from main (uv tool install --force)",
 }
 
 
@@ -169,6 +170,9 @@ def main(argv=None):
         if sub == "autonomy":
             from . import autonomy
             return autonomy.main(rest)
+        if sub == "self-update":
+            from . import self_update
+            return self_update.main(rest)
 
     wrapper_name = _SUBCOMMANDS.get(sub)
     if wrapper_name is None:
