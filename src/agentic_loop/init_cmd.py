@@ -56,12 +56,16 @@ min_independence = "strong"
 # Uncomment to opt in (absent = not gated). default_mode "ask" stops on every
 # action not explicitly auto-approved; "ultra" auto-runs ultra_auto actions,
 # but always_stop actions (push, production_write, credentials, …) stay hard-stopped.
+# soft_limit_signals are the "stop-and-escalate" events the executor reports
+# (frozen_hard / rework_twice / circuit_breaker), classified via
+# `agentic autonomy signal <signal>`.
 # [autonomy]
 # default_mode = "ask"
 # ultra_auto   = ["local_edit", "test_run", "worktree_lifecycle", "dispatch_developer",
 #                 "review", "merge_gate", "local_merge_no_ff", "finalize_merge"]
 # always_stop  = ["push", "feishu_send", "production_write", "cron_change",
 #                 "release_deploy", "credential_rw", "irreversible_git"]
+# soft_limit_signals = ["frozen_hard", "rework_twice", "circuit_breaker"]
 
 [locks]
 owner_source = "env:AGENTIC_SESSION_ID"

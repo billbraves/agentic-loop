@@ -102,9 +102,19 @@ fi
 
 # Execute the local no-ff merge, preserving the WP branch history.
 if ! git -C "$repo_root" merge --no-ff --no-edit "$branch"; then
-  echo "MERGE_FAIL: git merge --no-ff $branch failed (conflicts? resolve then rerun, or abort with: git -C $repo_root merge --abort)" >&2
+  conflicted=$(git -C "$repo_root" diff --name-only --diff-filter=U 2>/dev/null || true)
+  if [[ -n "$conflicted" ]]; then
+    echo "MERGE_FAIL: merge conflicts in:" >&2
+    while IFS= read -r f; do
+      [[ -n "$f" ]] && echo "    - $f" >&2
+    done <<< "$conflicted"
+    echo "  resolve then: git -C $repo_root merge --continue   (or abort: git -C $repo_root merge --abort)" >&2
+  else
+    echo "MERGE_FAIL: git merge --no-ff $branch failed" >&2
+  fi
   exit 2
 fi
 
 merged_commit=$(git -C "$repo_root" rev-parse HEAD)
 echo "MERGE_OK merged_commit=$merged_commit branch=$branch into=$base_branch"
+echo "MERGE_NEXT: run 'agentic finalize $status_arg' to stamp state=MERGED"
