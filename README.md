@@ -28,7 +28,7 @@ python3 -c "import agentic_loop; print(agentic_loop.__version__)"
 
 Re-run with `--force-reinstall` (or `--upgrade` under plain pip) to move up to a
 later release. To pin an exact version for reproducible builds, append a tag
-(`@v0.6.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
+(`@v0.7.0`) or commit — see [`MIGRATION.md`](MIGRATION.md) §1.
 
 ## Adopting it in another project
 
@@ -66,7 +66,7 @@ Project commands (Python, package-internal):
 | `contract diff [--apply]` | Show the re-render diff; `--apply` writes it back and re-stamps. |
 | `bootstrap` | Detect/install claude+kimi+codex, verify `DEEPSEEK_API_KEY`, and run a real-injection probe per CLI (fails closed on an installed-but-incompatible CLI). `--dry-run` prints the plan without installing or spending DeepSeek quota; `--yes` skips the install confirmation. |
 | `migrate-status` | Convert a legacy `.wp/WP-<id>.status.json` to `agentic-wp-status/v2` (`--iteration`, optional `--merged-commit`). |
-| `autonomy` | Check an orchestration action against the `[autonomy]` policy — prints `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`. |
+| `autonomy` | Check an orchestration action against the `[autonomy]` policy — prints `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`; `autonomy signal <signal>` classifies a soft-limit signal. |
 
 Orchestration gates (forward verbatim to the wrapper — the main-repo
 `scripts/agentic/<wrapper>.sh` when present, else the wheel-bundled copy; argv,
@@ -78,6 +78,7 @@ streams and exit codes pass through unchanged):
 | `redispatch` | `redispatch.sh` — rework re-dispatch reflow |
 | `preflight` | `preflight.sh` — status validation + branch/WP-lock gate |
 | `finalize` | `finalize_merge.sh` — three-signature gate (reviewer + consult + Qoder for v3; v2 double-sign) then stamp `state=MERGED` + `merged_commit` |
+| `merge` | `merge.sh` — local no-ff merge of an APPROVED_FOR_MERGE WP (autonomy-gated) |
 | `dispatch-lint` | `dispatch_lint.sh` — dispatch-time status lint |
 | `quality-gate` | `quality-gate.sh` — path-matched project test rules |
 | `lock` | `lock.sh` — WP / merge concurrency locks |

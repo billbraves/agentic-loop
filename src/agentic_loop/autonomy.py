@@ -91,10 +91,39 @@ def decide(action: str, autonomy: dict) -> str:
     return STOP
 
 
+def is_soft_limit_signal(signal: str, autonomy: dict) -> bool:
+    """True when ``signal`` is declared in ``[autonomy].soft_limit_signals``.
+
+    Soft-limit signals (frozen_hard / rework_twice / circuit_breaker) are the
+    "stop and escalate" events an executor already detects; this predicate lets
+    the orchestrator classify a reported signal against the policy instead of
+    hard-coding the list.
+    """
+    return signal in autonomy.get("soft_limit_signals", [])
+
+
+def _signal_main(signal: str) -> int:
+    """``agentic autonomy signal <signal>`` — classify one soft-limit signal."""
+    repo = main_repo()
+    if not configured(repo):
+        print("SOFT_LIMIT_NOT_CONFIGURED {}".format(signal))
+        return 0
+    if is_soft_limit_signal(signal, get_autonomy(repo)):
+        print("SOFT_LIMIT_ENABLED {}".format(signal))
+        return 0
+    print("SOFT_LIMIT_DISABLED {}".format(signal))
+    return STOP_RC
+
+
 def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    if len(argv) >= 2 and argv[0] == "signal":
+        return _signal_main(argv[1])
+
     ap = argparse.ArgumentParser(prog="agentic autonomy")
-    ap.add_argument("action", help="action category to check, e.g. finalize_merge")
-    args = ap.parse_args(list(sys.argv[1:] if argv is None else argv))
+    ap.add_argument("action", help="action category (or: signal <signal>)")
+    args = ap.parse_args(argv)
 
     repo = main_repo()
     if not configured(repo):

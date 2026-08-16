@@ -64,7 +64,7 @@ def test_no_args_prints_usage_rc0(fake_repo):
     r = _run_cli([], fake_repo)
     assert r.returncode == 0
     assert "usage: agentic" in r.stdout
-    for sub in ("gate", "redispatch", "preflight", "finalize",
+    for sub in ("gate", "redispatch", "preflight", "finalize", "merge",
                 "dispatch-lint", "quality-gate", "lock", "health"):
         assert sub in r.stdout
 
@@ -151,12 +151,12 @@ def test_locates_main_repo_from_linked_worktree(fake_repo):
 BUNDLED_WRAPPERS = SRC / "agentic_loop" / "wrappers"
 
 
-def test_all_eight_wrappers_are_bundled():
+def test_all_forwarding_wrappers_are_bundled():
     """Every forwarding subcommand has a bundled .sh fallback (external case)."""
     for wrapper in (
         "codex_merge_gate.sh", "redispatch.sh", "preflight.sh",
-        "finalize_merge.sh", "dispatch_lint.sh", "kimi-health.sh",
-        "lock.sh", "quality-gate.sh",
+        "finalize_merge.sh", "merge.sh", "dispatch_lint.sh",
+        "kimi-health.sh", "lock.sh", "quality-gate.sh",
     ):
         assert (BUNDLED_WRAPPERS / wrapper).is_file(), wrapper
 

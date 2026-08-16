@@ -6,6 +6,39 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-16
+
+Closes the last two autonomy gaps: the local merge (previously a bare
+`git merge --no-ff` typed by hand) becomes a gated `agentic merge` command, and
+the soft-limit signals (`frozen_hard` / `rework_twice` / `circuit_breaker`) are
+now classified against the `[autonomy]` policy instead of being an inert list.
+
+### Added
+
+- **`agentic merge <status.json>` (merge.sh).** A local no-ff merge gate with the
+  `local_merge_no_ff` autonomy check plus integrity preconditions (state must be
+  `APPROVED_FOR_MERGE`, run on the base branch, `git.commit` is an ancestor of
+  the branch tip, branch != base). Replaces the hand-typed merge; never pushes.
+- **`agentic autonomy signal <signal>`.** Classifies a soft-limit signal as
+  `SOFT_LIMIT_ENABLED` / `SOFT_LIMIT_DISABLED` / `SOFT_LIMIT_NOT_CONFIGURED`
+  (new `is_soft_limit_signal()` predicate).
+
+### Changed
+
+- **`agentic redispatch` tags its circuit-breaker** with
+  `soft_limit=circuit_breaker:<enabled|disabled|not-configured>` so the detected
+  signal is classified against `[autonomy].soft_limit_signals`.
+- **`agentic health` reports `soft_limit=frozen_hard`** on hard freeze (still
+  pure measurement — classification is the orchestrator's job via
+  `agentic autonomy signal`).
+- **AGENTS.md template** documents the merge gate and soft-limit classification;
+  contract template version bumped to 5.
+
+### Distribution
+
+- Version bumped to **`0.7.0`** (minor: backward-compatible features). No new
+  dependencies; one new bundled wrapper (`merge.sh`, eleven total).
+
 ## [0.6.0] — 2026-08-16
 
 The `[autonomy]` section stops being inert config and becomes a machine-checkable

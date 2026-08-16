@@ -125,9 +125,13 @@ subscription weekly quota, not per-call cost.
   prints `AUTONOMY_AUTO` (proceed) or `AUTONOMY_STOP` (ask the user, then set
   `AGENTIC_AUTONOMY_APPROVE=1` for that one step). The gates enforce it
   directly: `agentic preflight` for `dispatch_developer`, `agentic gate` for
-  `merge_gate`, and `agentic finalize` for `finalize_merge`; `always_stop`
-  actions (push, production write, credentials, release, …) are hard-stopped
-  even in `ultra` mode.
+  `merge_gate`, `agentic merge` for `local_merge_no_ff`, and `agentic finalize`
+  for `finalize_merge`; `always_stop` actions (push, production write,
+  credentials, release, …) are hard-stopped even in `ultra` mode. Soft-limit
+  signals (`frozen_hard`, `rework_twice`, `circuit_breaker`) are classified with
+  `agentic autonomy signal <signal>`; `agentic health` reports
+  `soft_limit=frozen_hard` and `agentic redispatch` tags its circuit-breaker with
+  `soft_limit=circuit_breaker`.
 
 ### 4.2 Post-dispatch health monitoring (default)
 

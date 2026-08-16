@@ -97,6 +97,30 @@ class ProbeFailedError(Exception):
     """Raised when no developer adapter passes the probe guard."""
 
 
+def _soft_limit_note(signal: str, repo=None) -> str:
+    """Classify a soft-limit signal against ``[autonomy]`` (best-effort, non-fatal).
+
+    Returns ``enabled`` / ``disabled`` / ``not-configured``. The redispatch engine
+    already detects the signal; this note lets the orchestrator see how the
+    detected signal relates to the declared ``soft_limit_signals`` policy without
+    hard-coding the list here.
+    """
+    try:
+        from agentic_loop.autonomy import configured, is_soft_limit_signal
+        from agentic_loop.resolve_paths import get_autonomy
+
+        repo = repo or main_repo()
+        if not configured(repo):
+            return "not-configured"
+        return (
+            "enabled"
+            if is_soft_limit_signal(signal, get_autonomy(repo))
+            else "disabled"
+        )
+    except Exception:
+        return "not-configured"
+
+
 def _resolve_developer(
     roles_config: dict[str, Any] | list[str] | str | None,
     registry: dict[str, Any] | None = None,
@@ -381,7 +405,8 @@ def main(argv: list[str]) -> int:
 
     if count >= redispatch_max:
         print(
-            f"REDISPATCH_STOP: circuit-breaker (count={count} >= max={redispatch_max})"
+            f"REDISPATCH_STOP: circuit-breaker (count={count} >= max={redispatch_max}; "
+            f"soft_limit=circuit_breaker:{_soft_limit_note('circuit_breaker')})"
         )
         return 0
 

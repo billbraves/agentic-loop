@@ -40,6 +40,61 @@ def test_known_actions_and_soft_limit_signals_disjoint():
     assert au.known_actions().isdisjoint(au.SOFT_LIMIT_SIGNALS)
 
 
+def test_is_soft_limit_signal_pure():
+    cfg = {"soft_limit_signals": ["frozen_hard", "rework_twice", "circuit_breaker"]}
+    assert au.is_soft_limit_signal("frozen_hard", cfg) is True
+    assert au.is_soft_limit_signal("circuit_breaker", cfg) is True
+    assert au.is_soft_limit_signal("bogus", cfg) is False
+    assert au.is_soft_limit_signal("frozen_hard", {}) is False
+
+
+def test_cli_signal_not_configured(repo):
+    res = _run_signal(repo, "circuit_breaker")
+    assert res.returncode == 0
+    assert "SOFT_LIMIT_NOT_CONFIGURED circuit_breaker" in res.stdout
+
+
+def test_cli_signal_enabled_by_default_soft_limit_signals(repo):
+    # [autonomy] present but soft_limit_signals omitted -> merges DEFAULT_AUTONOMY's
+    # default list, which declares circuit_breaker.
+    (repo / ".agentic" / "config.toml").write_text(
+        '[autonomy]\ndefault_mode = "ask"\n', encoding="utf-8"
+    )
+    res = _run_signal(repo, "circuit_breaker")
+    assert res.returncode == 0
+    assert "SOFT_LIMIT_ENABLED circuit_breaker" in res.stdout
+
+
+def test_cli_signal_disabled_when_not_declared(repo):
+    (repo / ".agentic" / "config.toml").write_text(
+        '[autonomy]\ndefault_mode = "ask"\nsoft_limit_signals = ["frozen_hard"]\n',
+        encoding="utf-8",
+    )
+    res = _run_signal(repo, "circuit_breaker")
+    assert res.returncode == au.STOP_RC
+    assert "SOFT_LIMIT_DISABLED circuit_breaker" in res.stdout
+
+
+def test_redispatch_soft_limit_note(repo):
+    from agentic_loop.redispatch import _soft_limit_note
+
+    # no [autonomy] -> not-configured
+    assert _soft_limit_note("circuit_breaker", repo) == "not-configured"
+
+    # [autonomy] with default soft_limit_signals -> enabled
+    (repo / ".agentic" / "config.toml").write_text(
+        '[autonomy]\ndefault_mode = "ask"\n', encoding="utf-8"
+    )
+    assert _soft_limit_note("circuit_breaker", repo) == "enabled"
+
+    # [autonomy] excluding circuit_breaker -> disabled
+    (repo / ".agentic" / "config.toml").write_text(
+        '[autonomy]\ndefault_mode = "ask"\nsoft_limit_signals = ["frozen_hard"]\n',
+        encoding="utf-8",
+    )
+    assert _soft_limit_note("circuit_breaker", repo) == "disabled"
+
+
 # --- CLI over a tmp git repo -------------------------------------------------
 
 
@@ -71,6 +126,17 @@ def _run(repo: Path, action: str):
     )
     return subprocess.run(
         [sys.executable, "-m", "agentic_loop.autonomy", action],
+        cwd=str(repo), capture_output=True, text=True, env=env,
+    )
+
+
+def _run_signal(repo: Path, signal: str):
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(SRC) + (
+        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "agentic_loop.autonomy", "signal", signal],
         cwd=str(repo), capture_output=True, text=True, env=env,
     )
 

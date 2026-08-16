@@ -18,7 +18,7 @@
 
 ```bash
 # 推荐：锁到某个 tag，重装结果字节级一致
-uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.6.0"
+uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.7.0"
 
 # 冒烟验证
 agentic --help
@@ -45,13 +45,13 @@ agentic contract check --dir /path/to/project   # 未 init 前应报「no .agent
 
 ```bash
 bash scripts/agentic-bootstrap.sh
-# 内部 = uv tool install ...@v0.6.0 + agentic --help 冒烟 + agentic bootstrap --dry-run
+# 内部 = uv tool install ...@v0.7.0 + agentic --help 冒烟 + agentic bootstrap --dry-run
 ```
 
 手动等价执行：
 
 ```bash
-uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.6.0" --force
+uv tool install "git+https://github.com/billbraves/agentic-loop.git@v0.7.0" --force
 agentic --help && agentic bootstrap --dry-run
 ```
 

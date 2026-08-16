@@ -39,6 +39,7 @@ _SUBCOMMANDS = {
     "redispatch": "redispatch.sh",
     "preflight": "preflight.sh",
     "finalize": "finalize_merge.sh",
+    "merge": "merge.sh",
     "dispatch-lint": "dispatch_lint.sh",
     "quality-gate": "quality-gate.sh",
     "lock": "lock.sh",

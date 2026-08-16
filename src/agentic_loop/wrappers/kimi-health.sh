@@ -141,8 +141,14 @@ tail_excerpt() {
 
 # Emit exactly one contract line.
 if [[ "$frozen" -ge "$FROZEN_STALL_TICKS" ]]; then
-  if [[ "$frozen" -ge "$FROZEN_HARD_TICKS" ]]; then mins=7; else mins="$frozen"; fi
-  echo "FROZEN_${mins}m tail=\"$(tail_excerpt)\""
+  if [[ "$frozen" -ge "$FROZEN_HARD_TICKS" ]]; then
+    # Hard freeze = the frozen_hard soft-limit signal. Health only REPORTS the
+    # signal name; the orchestrator classifies it via
+    # `agentic autonomy signal frozen_hard`.
+    echo "FROZEN_7m soft_limit=frozen_hard tail=\"$(tail_excerpt)\""
+  else
+    echo "FROZEN_${frozen}m tail=\"$(tail_excerpt)\""
+  fi
 else
   echo "PROGRESS ${changed%,}"
 fi
