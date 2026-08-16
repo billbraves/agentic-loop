@@ -72,12 +72,21 @@ _HOOK_TEMPLATES = (
     ("install.sh.tmpl", INSTALL_SH_REL, 0o755),
 )
 
+# Per-WP reference skeletons scaffolded under docs/agentic/templates/ so the
+# adopting project has a starting point for a new brief + status file. Like the
+# hook assets, these are never overwritten once present.
+_REFERENCE_TEMPLATES = (
+    ("STATUS.json.tmpl", "docs/agentic/templates/STATUS.json", 0o644),
+    ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
+)
 
-def _write_hook_asset(root, tmpl_name, rel, mode):
-    """Write one packaged hook asset once; return ``"written"`` or ``"conflict"``.
 
-    The pre-push hook is user-customizable, so this is idempotent in the strict
-    sense: an existing file is never replaced, even when ``--force`` was given.
+def _write_asset(root, tmpl_name, rel, mode):
+    """Write one packaged asset once; return ``"written"`` or ``"conflict"``.
+
+    Hook and reference-template assets are user-customizable, so this is
+    idempotent in the strict sense: an existing file is never replaced, even
+    when ``--force`` was given.
     """
     target = root / rel
     if target.exists():
@@ -175,7 +184,7 @@ def run_init(target_dir, *, force, non_interactive, config_path=None):
     # the user explicitly runs install.sh. Existing hook/install files are kept
     # untouched and reported as conflicts.
     for tmpl, rel, mode in _HOOK_TEMPLATES:
-        outcome = _write_hook_asset(root, tmpl, rel, mode)
+        outcome = _write_asset(root, tmpl, rel, mode)
         if outcome == "written":
             print("INIT_WROTE: {}".format(rel))
         else:
@@ -184,9 +193,22 @@ def run_init(target_dir, *, force, non_interactive, config_path=None):
                 file=sys.stderr,
             )
 
+    # Reference skeletons for new WPs (brief + status). Scaffolded like the hook
+    # assets: written once, never overwritten, not part of the managed-contract
+    # conflict check.
+    for tmpl, rel, mode in _REFERENCE_TEMPLATES:
+        outcome = _write_asset(root, tmpl, rel, mode)
+        if outcome == "written":
+            print("INIT_WROTE: {}".format(rel))
+        else:
+            print(
+                "INIT_REF_CONFLICT: {} (exists; not overwritten)".format(rel),
+                file=sys.stderr,
+            )
+
     for label in written:
         print("INIT_WROTE: {}".format(label))
-    print("INIT_SKELETON: docs/plans .agentic/locks")
+    print("INIT_SKELETON: docs/plans .agentic/locks docs/agentic/templates")
     if gi_changed:
         print("INIT_GITIGNORE: added {}".format(GITIGNORE_LOCKS_LINE))
 

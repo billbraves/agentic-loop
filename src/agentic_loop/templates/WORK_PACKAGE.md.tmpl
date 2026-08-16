@@ -1,0 +1,42 @@
+# WP-N: <标题>
+
+> 冻结日期 <YYYY-MM-DD> | 编排者 <orchestrator> | 执行者 <developer>。
+> 冻结后执行期间不得修改；需修订走 re-freeze（新建 rev2 并重派）。
+
+## 目标（一句话）
+<这个 WP 要交付什么>
+
+## 范围
+- **allowed_paths**（白名单，只能改这些）：
+  - `<path>`
+- **forbidden_paths**（黑名单，绝不能碰）：
+  - `<path>`
+- **owner 边界**：对齐 CODEOWNERS，不跨 owner 写入。
+
+## 输入
+- 依赖的上游 WP 产出：<… / 无>
+- 参考文档：<PLAN §x / 口径权威源路径>
+
+## 交付物清单
+- [ ] `<path>` — <说明>
+
+## 完成定义（DoD）
+- [ ] 交付物逐项就绪
+- [ ] `agentic quality-gate <status.json>` 全绿
+- [ ] 无 forbidden_paths / 跨 owner 写入
+- [ ] 无生产写入、无网络、无通知、无推送
+- [ ] commit message 符合规范
+
+## 风险声明
+| 维度 | 值 |
+|------|-----|
+| production_writes | FORBIDDEN |
+| network | FORBIDDEN |
+| notifications | FORBIDDEN |
+| data_access | READ_ONLY |
+
+> 若需偏离默认（如生产写入），须编排者 + 独立顾问双重审核并在此记录授权原因。
+
+## 附注
+- 已知陷阱：<…>
+- 口径权威源引用：<唯一权威公式的文件:行>

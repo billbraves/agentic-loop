@@ -1,6 +1,6 @@
 [project]
 name = "agentic-loop"
-version = "0.4.0"
+version = "0.5.0"
 description = "Portable agentic orchestration framework engine (dogfooded in baofu monorepo)"
 license = { text = "MIT" }
 readme = "README.md"

@@ -170,40 +170,40 @@ work so the new developer continues idempotently; prepend continuation context t
 the re-dispatch prompt (current `git status --porcelain` + `git diff --stat`
 summary + old output tail + a hard requirement to inspect existing changes,
 continue the fix, not restart from an empty tree, and not re-edit existing
-fixtures/status); take a `lock.sh heartbeat` before any status write
+fixtures/status); take a `agentic lock heartbeat` before any status write
 (`HEARTBEAT_LOST` -> stop); a second `FROZEN_7m` trips the breaker — stop and
 report the root cause, do not re-dispatch indefinitely.
 
-`scripts/agentic/redispatch.sh <status.json>` packages this flow for `REWORK`/
+`agentic redispatch <status.json>` packages this flow for `REWORK`/
 `BLOCKED` reflow, but is orchestrator-invoked on demand — it is NOT triggered
 automatically. It runs the three guards in order (circuit-breaker on
 `executor.redispatch_count` >= `REDISPATCH_MAX` default 1 -> probe `PROBE_OK` ->
-`lock.sh heartbeat`), builds and persists a continuation prompt, then by default
+`agentic lock heartbeat`), builds and persists a continuation prompt, then by default
 actually execs the configured developer binary and increments `redispatch_count`
 only after the dispatch command succeeds; `REDISPATCH_DRY_RUN=1` prints the
 planned command without dispatching or incrementing. Any guard failing stops
-without re-dispatch. The one-time human-operated `finalize_merge.sh` and this
-re-dispatch remain manual orchestrator calls; only `dispatch_lint.sh` is wired to
-run automatically (inside `preflight.sh`, before the WP lock is acquired).
+without re-dispatch. The one-time human-operated `agentic finalize` and this
+re-dispatch remain manual orchestrator calls; only `agentic dispatch-lint` is wired to
+run automatically (inside `agentic preflight`, before the WP lock is acquired).
 
 ## 5. Git and workspace rules
 
 - Never implement a WP on `main`.
 - Create a dedicated branch and registered Git worktree from the latest
   approved base commit. If a worktree's branch was cut before an agentic tool
-  script (`lock.sh`, `validate_wp_status.py`, `preflight.sh`, quality gates)
-  landed, rebase onto a base that contains the script before dispatch.
-- Agentic tool scripts are located via the MAIN repo root, derived from
-  `git rev-parse --git-common-dir`, never via the worktree root
-  (`git rev-parse --show-toplevel`). The worktree copy may be stale or missing
-  the script; the main repo is the single source of truth for tooling. This is
-  why `preflight.sh` resolves the main root before invoking `lock.sh`/validator.
+  command (`agentic lock`, `agentic preflight`, `agentic quality-gate`)
+  landed, rebase onto a base that contains the CLI before dispatch.
+- The `agentic` CLI locates its gate wrappers itself (a main-repo copy when
+  present, else the copy bundled with the installed package), so run gates from
+  the main repo checkout, not a possibly-stale worktree copy. This is why
+  `agentic preflight` resolves the main root before invoking the lock and status
+  validator.
 - One WP has one owning $developer. Parallel lanes require separate branches and
   non-overlapping file ownership.
 - Orchestrator concurrency: multiple orchestrator sessions/runners may act on the
   same iteration. Each write action (status edit, dispatch, rework, merge) MUST
-  hold the relevant advisory lock (`scripts/agentic/lock.sh`). WP lock is enforced
-  by `preflight.sh`; the merge lock serializes writes to the base HEAD. owner id
+  hold the relevant advisory lock (`agentic lock`). WP lock is enforced
+  by `agentic preflight`; the merge lock serializes writes to the base HEAD. owner id
   is derived from `$lock_owner_source` (stable across context compaction), with a
   default TTL of $lock_ttl_minutes minutes. A new session directed to take over an
   overflowed prior session uses `--force-takeover`; unattended stale locks use
@@ -221,7 +221,7 @@ run automatically (inside `preflight.sh`, before the WP lock is acquired).
   destination branch.
 - Merge finalization is a manual orchestrator step, not automatic. After the
   human-approved `git merge --no-ff` of an `APPROVED_FOR_MERGE` WP, run
-  `scripts/agentic/finalize_merge.sh <status.json>` to stamp `state=MERGED` and
+  `agentic finalize <status.json>` to stamp `state=MERGED` and
   record the exact `merged_commit`. The script only writes status (never merges,
   pushes, or touches git), resolves the merge commit by matching the branch tip
   as a merge parent (0/multiple candidates FAIL, never falling back to base tip —
@@ -284,7 +284,7 @@ The $developer handoff must include:
 - branch, worktree, and commit;
 - confirmation that production paths and real notifications were untouched.
 
-Run `scripts/agentic/quality-gate.sh <status.json>` before requesting review.
+Run `agentic quality-gate <status.json>` before requesting review.
 WP-specific acceptance tests in the brief remain mandatory even if the generic
 gate passes.
 

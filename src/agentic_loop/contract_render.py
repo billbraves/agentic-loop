@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover - <3.9 not supported anyway
 
 # Bump when the template wording/structure changes in a way that should prompt
 # adopting projects to re-render (via `agentic contract diff`).
-CONTRACT_TEMPLATE_VERSION = "1"
+CONTRACT_TEMPLATE_VERSION = "2"
 
 _TEMPLATE_PACKAGE = "agentic_loop"
 _TEMPLATE_SUBDIR = "templates"
@@ -79,11 +79,37 @@ def _fmt_role(value):
     return str(value)
 
 
-def _fmt_quality_gate(quality_gate):
-    """Render [[quality_gate.rule]] match->run mapping as readable lines."""
-    rules = []
-    if isinstance(quality_gate, dict):
-        rules = quality_gate.get("rule", []) or []
+def _command_gate_rules(config):
+    """Return the command-gate rule list from the unified ``[[gate]]`` array.
+
+    The execution engine (quality-gate.sh) reads ``[[gate]]`` (kind="command",
+    stage="pre_review"); this mirrors it so the rendered §9 lists exactly what
+    the gate will run. Falls back to the legacy ``[quality_gate]`` section for
+    pre-0.3.0 configs.
+    """
+    if not isinstance(config, dict):
+        return []
+    gates = config.get("gate")
+    if isinstance(gates, list):
+        for gate in gates:
+            if (
+                isinstance(gate, dict)
+                and gate.get("kind") == "command"
+                and gate.get("stage") == "pre_review"
+            ):
+                rules = gate.get("rule")
+                if isinstance(rules, list):
+                    return rules
+    qg = config.get("quality_gate")
+    if isinstance(qg, dict):
+        rules = qg.get("rule")
+        if isinstance(rules, list):
+            return rules
+    return []
+
+
+def _fmt_quality_gate(rules):
+    """Render a rule (match->run) list as readable lines for the §9 section."""
     if not rules:
         return "(no project-specific quality-gate rules configured)"
     lines = []
@@ -107,7 +133,6 @@ def build_values(config, *, project_name):
     safety = config.get("safety", {}) if isinstance(config, dict) else {}
     review_policy = config.get("review_policy", {}) if isinstance(config, dict) else {}
     locks = config.get("locks", {}) if isinstance(config, dict) else {}
-    quality_gate = config.get("quality_gate", {}) if isinstance(config, dict) else {}
     scripts = config.get("scripts", {}) if isinstance(config, dict) else {}
 
     developer = roles.get("developer", "Developer")
@@ -126,7 +151,7 @@ def build_values(config, *, project_name):
         # Neutral framework default; a project sets [project].default_output_language
         # in its config to render a different communication default (e.g. "Chinese").
         "default_output_language": str(project.get("default_output_language", "English")),
-        "quality_gate_commands": _fmt_quality_gate(quality_gate),
+        "quality_gate_commands": _fmt_quality_gate(_command_gate_rules(config)),
         "forbidden_paths": _fmt_list(safety.get("forbidden_paths", [])),
         "production_paths": _fmt_list(safety.get("production_paths", [])),
         "min_independence": str(review_policy.get("min_independence", "strong")),
@@ -137,11 +162,11 @@ def build_values(config, *, project_name):
             "dispatch the developer role (configured tool: {}) into an isolated "
             "worktree; record the actual executor tool and session id".format(primary_developer)
         ),
-        # Merge-gate and health-check command references. Defaults keep the repo's
-        # current tool-named script paths (no rename implied — file rename is a
-        # separate concern); a project overrides via [scripts] to render its own.
-        "merge_gate_cmd": str(scripts.get("merge_gate", "scripts/agentic/codex_merge_gate.sh")),
-        "health_check_cmd": str(scripts.get("health_check", "scripts/agentic/kimi-health.sh")),
+        # Merge-gate and health-check command references. Default to the portable
+        # `agentic` CLI entry point (which resolves the real wrapper, main-repo or
+        # wheel-bundled); a project overrides via [scripts] to render its own.
+        "merge_gate_cmd": str(scripts.get("merge_gate", "agentic gate")),
+        "health_check_cmd": str(scripts.get("health_check", "agentic health")),
     }
     return values
 

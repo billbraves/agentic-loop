@@ -50,6 +50,7 @@ _PY_SUBCOMMANDS = {
     "init": "scaffold config + contracts + skeleton in a project",
     "contract": "check | diff — governance-contract drift detection",
     "bootstrap": "detect/install claude+kimi+codex, verify DeepSeek key, real-injection probe",
+    "migrate-status": "convert a legacy .wp status file to agentic-wp-status/v2",
 }
 
 
@@ -160,6 +161,9 @@ def main(argv=None):
         if sub == "bootstrap":
             from . import bootstrap_cmd
             return bootstrap_cmd.main(rest)
+        if sub == "migrate-status":
+            from . import migrate_status
+            return migrate_status.main(rest)
 
     wrapper_name = _SUBCOMMANDS.get(sub)
     if wrapper_name is None:

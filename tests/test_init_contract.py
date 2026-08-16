@@ -56,6 +56,22 @@ def test_init_writes_config_contracts_skeleton_and_stamp(tmp_path):
     assert init_cmd.GITIGNORE_LOCKS_LINE in gi.splitlines()
 
 
+def test_init_scaffolds_reference_templates(tmp_path):
+    assert _init(tmp_path)[0] == 0
+    status = tmp_path / "docs" / "agentic" / "templates" / "STATUS.json"
+    brief = tmp_path / "docs" / "agentic" / "templates" / "WORK_PACKAGE.md"
+    assert status.is_file()
+    assert brief.is_file()
+
+    import json
+    data = json.loads(status.read_text(encoding="utf-8"))
+    # the skeleton is a valid v2 DRAFT starting point (schema_version + state + role)
+    assert data["schema_version"] == "agentic-wp-status/v2"
+    assert data["state"] == "DRAFT"
+    assert data["role"] == "Developer"
+    assert "consult" in data
+
+
 def test_init_rerun_refuses_without_force(tmp_path):
     assert _init(tmp_path)[0] == 0
     rc, _out, err = _init(tmp_path)

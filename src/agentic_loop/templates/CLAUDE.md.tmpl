@@ -15,12 +15,12 @@ the default implementation worker.
    lock owned by another owner id is that session's live work — ignore it and do
    not interrupt your own flow to report it. Only when you are about to
    dispatch/rework a specific WP do you check that WP's lock (this is already
-   enforced by `preflight.sh`'s WP-lock gate): if that exact WP is held fresh by
+   enforced by `agentic preflight`'s WP-lock gate): if that exact WP is held fresh by
    another owner, do NOT take over by default — work a different (unlocked) WP,
    or, if the user is directing a handoff because a prior session overflowed
    context, acquire with `--force-takeover`. A **stale** lock (past TTL) on the
    WP you intend to work may be claimed with `--takeover` after confirming the
-   prior session stopped. `lock.sh status --all` remains available on demand, but
+   prior session stopped. `agentic lock status --all` remains available on demand, but
    is no longer a mandatory startup step.
 
 ## Dispatch
@@ -28,7 +28,7 @@ the default implementation worker.
 - Freeze product scope and acceptance criteria before dispatch.
 - Create a tracked brief and status JSON from `docs/agentic/templates/`.
 - Create an isolated branch/worktree and run
-  `scripts/agentic/preflight.sh <status.json>`.
+  `agentic preflight <status.json>`.
 - When the plan names the $developer role, invoke the actual configured developer
   tool and record `executor.tool`, session ID when available, logs, and exit
   status. ($developer_dispatch_hint.)
@@ -50,10 +50,10 @@ the default implementation worker.
 - Return only `ACCEPT`, `REWORK`, or `CONSULT`, with concrete evidence.
 - Do not merge or release without the required user approval.
 - After a user-approved `git merge --no-ff`, stamp the WP with
-  `scripts/agentic/finalize_merge.sh <status.json>` (writes `state=MERGED` +
-  `merged_commit`; never touches git). Merge finalization and `redispatch.sh`
-  reflow are manual orchestrator calls; only `dispatch_lint.sh` runs
-  automatically (inside `preflight.sh`). See `AGENTS.md` §4.2 and §5.
+  `agentic finalize <status.json>` (writes `state=MERGED` +
+  `merged_commit`; never touches git). Merge finalization and `agentic redispatch`
+  reflow are manual orchestrator calls; only `agentic dispatch-lint` runs
+  automatically (inside `agentic preflight`). See `AGENTS.md` §4.2 and §5.
 
 ## Context loss
 

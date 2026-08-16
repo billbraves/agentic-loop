@@ -6,6 +6,44 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-16
+
+Adoption hardening: the rendered contracts now teach the portable `agentic` CLI
+(instead of in-repo `scripts/agentic/*.sh` paths that don't exist in an external
+project), the framework ships the previously-missing per-WP brief/status
+templates so a new work package can actually start, and a legacy-status
+converter bridges projects coming from the older `.wp/*.status.json` workflow.
+The contract render engine now reads the unified `[[gate]]` array (matching
+`quality-gate.sh`) instead of the superseded `[quality_gate]` section.
+
+### Added
+
+- **Per-WP reference templates (STATUS.json / WORK_PACKAGE.md).** `agentic init`
+  now scaffolds `docs/agentic/templates/STATUS.json` (a valid v2 DRAFT skeleton)
+  and `WORK_PACKAGE.md` (a brief skeleton), so an adopting project has a
+  starting point for a new work package. Scaffolded once, never overwritten.
+- **`agentic migrate-status` subcommand.** Converts a legacy
+  `.wp/WP-<id>.status.json` (states `DISPATCHED/IMPLEMENTING/DONE/BLOCKED`) to a
+  valid `agentic-wp-status/v2` status, preserving every mechanical field and
+  warning on dropped fields and merge-state fields that must be filled by a
+  human (no fabricated evidence).
+
+### Changed
+
+- **Rendered contracts teach the CLI, not `scripts/agentic/`.** AGENTS.md /
+  CLAUDE.md templates now reference `agentic preflight|gate|finalize|lock|health|…`
+  (config-driven `$merge_gate_cmd` / `$health_check_cmd` default to
+  `agentic gate` / `agentic health`). Contract template version bumped to 2.
+- **Contract render engine reads the unified `[[gate]]` array.** §9 quality-gate
+  commands now come from `[[gate]]` (kind="command", stage="pre_review") with a
+  legacy `[quality_gate]` fallback, so the rendered contract matches what
+  `quality-gate.sh` actually runs.
+
+### Distribution
+
+- Version bumped to **`0.5.0`** (minor: backward-compatible features + template
+  wording fix). No new dependencies; wrapper set unchanged.
+
 ## [0.4.0] — 2026-08-16
 
 Outcome of the `agentic-deepseek-single-key-v1` iteration (4 work packages),

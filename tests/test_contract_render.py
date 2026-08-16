@@ -80,12 +80,36 @@ def test_default_output_language_from_config():
     assert v["default_output_language"] == "Chinese"
 
 
-def test_script_cmd_placeholders_default_to_current_paths():
+def test_command_gate_reads_unified_gate_array():
+    cfg = {
+        "gate": [
+            {
+                "name": "tests",
+                "kind": "command",
+                "stage": "pre_review",
+                "rule": [{"match": "skills/**", "run": ["python3 .ci/formula_gate.py"]}],
+            }
+        ]
+    }
+    v = cr.build_values(cfg, project_name="proj")
+    assert "skills/**" in v["quality_gate_commands"]
+    assert "python3 .ci/formula_gate.py" in v["quality_gate_commands"]
+
+
+def test_command_gate_falls_back_to_legacy_quality_gate():
+    cfg = {"quality_gate": {"rule": [{"match": "src/**", "run": ["pytest"]}]}}
+    v = cr.build_values(cfg, project_name="proj")
+    assert "src/**" in v["quality_gate_commands"]
+    assert "pytest" in v["quality_gate_commands"]
+
+
+def test_script_cmd_placeholders_default_to_cli():
     # de-tooled templates reference $merge_gate_cmd / $health_check_cmd; the
-    # engine default keeps this repo's current script paths (no rename implied)
+    # engine default is the portable `agentic` CLI entry point (which resolves
+    # the real wrapper, main-repo or wheel-bundled).
     v = cr.build_values({}, project_name="proj")
-    assert v["merge_gate_cmd"] == "scripts/agentic/codex_merge_gate.sh"
-    assert v["health_check_cmd"] == "scripts/agentic/kimi-health.sh"
+    assert v["merge_gate_cmd"] == "agentic gate"
+    assert v["health_check_cmd"] == "agentic health"
 
 
 def test_script_cmd_placeholders_overridable():
@@ -107,6 +131,8 @@ def test_rendered_templates_have_no_tool_proper_names_by_default_config():
         out = cr.render_template(name, tool_agnostic, project_name="proj")
         assert "codex_merge_gate.sh" not in out
         assert "kimi-health.sh" not in out
+        # templates teach the portable CLI, never the in-repo scripts/agentic path
+        assert "scripts/agentic/" not in out
 
 
 def test_config_checksum_deterministic_and_sensitive():
@@ -148,7 +174,7 @@ def test_render_template_official_flow_no_unfilled():
     # WITHOUT hand-injecting stamp fields into values.
     for name in ("AGENTS.md.tmpl", "CLAUDE.md.tmpl", "OPERATING_MODEL.md.tmpl"):
         out = cr.render_template(name, _SAMPLE_CFG, project_name="baofu")
-        assert "agentic-contract: template_version=1" in out
+        assert "agentic-contract: template_version={}".format(cr.CONTRACT_TEMPLATE_VERSION) in out
         # no unfilled placeholder tokens remain (after $$ collapses to $)
         collapsed = out.replace("$$", "")
         assert "${" not in collapsed
