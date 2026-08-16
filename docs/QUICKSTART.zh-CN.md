@@ -6,13 +6,43 @@
 
 ---
 
+## 最小上手（照顺序，3 步）
+
+只想快速跑起来？按这个顺序，3 步就绪：
+
+**第 1 步 · 安装**（一条命令，装/更新到最新，不用记版本）
+
+```bash
+uv tool install "git+https://github.com/billbraves/agentic-loop.git" --force
+# 写进 ~/.zshrc 后，以后升级只需：agentic-up
+```
+
+**第 2 步 · 配 DeepSeek key**（可选；不配则三签用各自官方 key）
+
+```bash
+export DEEPSEEK_API_KEY=sk-...        # 写进 ~/.zshrc
+# 并在项目 .agentic/config.toml 加 [providers.deepseek]（详见 §1.2）
+```
+
+**第 3 步 · 自检**（验证 claude/kimi/codex 都真走通了）
+
+```bash
+cd /path/to/project
+agentic bootstrap
+```
+
+三步走完，就能开始派工作包了（见 §4）。下面 §0～§3 是每一步的详细展开；
+§0.1 是背景知识，可跳过。
+
+---
+
 ## 0. 一句话
 
 `agentic` 是一个"派发→实现→评审→合并门"的编排引擎：它不写业务代码，只负责
 **验证工作包状态、跑质量门、做多签独立评审、锁并发、终态留痕**。所有门通过一个
 `agentic` 命令转发到内置的 bash wrapper（外部项目无需自带 `scripts/agentic/`）。
 
-### 0.1 它和 Claude Code SKILL / DeepSeek Harness 的区别
+### 0.1 背景：它和 Claude Code SKILL / DeepSeek Harness 的区别（可跳过）
 
 三者不是竞争，是**不同层面、可叠加**：
 
