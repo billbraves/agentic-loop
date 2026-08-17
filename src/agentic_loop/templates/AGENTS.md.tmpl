@@ -95,9 +95,11 @@ the gate is a second, independent signature on an already-ACCEPTed WP reviewing
 a bounded diff, so routine work does not need the most expensive reasoning
 effort. When freezing the phase plan, you may declare a per-phase tier in an
 optional `$iterations_dir/<iteration_id>/phase-tiers.json` (template:
-`docs/agentic/templates/phase-tiers.json`): map architecture/contract-level
-phases to `"architecture"` (spends high effort, where a wrong ACCEPT means
-rework); everything else stays medium. This is set once per phase and every WP
+`docs/agentic/templates/phase-tiers.json`) with shape
+`{"phases": {"P0": "medium", "P2": "architecture"}, "default": "medium"}`:
+map architecture/contract-level phases (e.g. `P2`) to `"architecture"` (spends
+high effort, where a wrong ACCEPT means rework); everything else stays medium.
+This is set once per phase and every WP
 in it inherits the tier — no per-WP status field. Fail-safe toward the cheap
 tier: a missing file, missing phase, or unknown value resolves to medium; only
 an explicit `"architecture"` mapping spends high. This optimizes the CLI
