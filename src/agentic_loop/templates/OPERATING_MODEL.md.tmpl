@@ -38,9 +38,16 @@ or behavior changes return to the user.
 | WP Approved | $orchestrator; user for material risk | tracked brief/status, branch/worktree, frozen acceptance tests |
 | Ready for Review | $developer | diff, exact tests, commit, risks, no production mutation |
 | Approved for Merge | $orchestrator | independent diff review and rerun evidence |
+| Plan Ready to Merge | $orchestrator | every WP in the plan is MERGED into the integration branch |
+| Plan Merged | $orchestrator | single plan merge commit recorded via `agentic plan finalize` |
 | Production Ready | User | replay/shadow evidence, rollback, release checklist |
 
 Passing a later gate never excuses missing evidence from an earlier gate.
+
+One plan converges into one merge commit: WPs merge (no-ff) into the plan's
+integration branch; `agentic plan merge` + `agentic plan finalize` collapse the
+whole plan into a single merge commit on the target branch, and push happens
+exactly once afterwards. See `AGENTS.md` §4.3.
 
 ## 3. Consultation triggers
 

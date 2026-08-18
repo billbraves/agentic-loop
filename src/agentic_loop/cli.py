@@ -55,6 +55,7 @@ _PY_SUBCOMMANDS = {
     "autonomy": "check an orchestration action against the [autonomy] policy",
     "mode": "show/set the autonomy mode (ask|ultra)",
     "provider": "switch codex/kimi/claude default provider (deepseek|official)",
+    "plan": "check | lint | merge | finalize — converge a plan into one merged commit",
     "update": "reinstall the latest agentic-loop from main (uv tool install --force)",
 }
 
@@ -178,6 +179,9 @@ def main(argv=None):
         if sub == "provider":
             from . import provider
             return provider.main(rest)
+        if sub == "plan":
+            from . import plan_cmd
+            return plan_cmd.main(rest)
         if sub == "update":
             from . import self_update
             return self_update.main(rest)

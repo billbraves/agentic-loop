@@ -75,6 +75,7 @@ agentic preflight docs/plans/<iteration>/WP-XX.status.json
 | `autonomy` | 按 `[autonomy]` 策略校验一个编排动作 —— 打印 `AUTONOMY_AUTO` / `AUTONOMY_STOP` / `AUTONOMY_NOT_CONFIGURED`；`autonomy signal <signal>` 分类软限制信号。 |
 | `mode` | 显示/切换自主模式 —— `agentic mode`（查当前）、`agentic mode ask\|ultra`（切）。 |
 | `provider` | 切换手动 CLI 的 provider（官方↔DeepSeek 限额兜底）—— `agentic provider`（查）、`agentic provider deepseek\|official\|codex-deepseek\|…`（切）。 |
+| `plan` | Plan 收敛 —— `agentic plan check\|lint\|merge\|finalize <plan.status.json>`：把 N 个 WP 收敛成一次合并提交（一个 Plan 一个分支，集成分支 → 单次 no-ff 合入 main → stamp MERGED；`lint` 强制每个 WP 的 status 恰好 freeze+finalize 两次提交，拒绝 review/codex/override 中间同步提交）。 |
 
 编排门（逐字转发到 wrapper —— 主仓 `scripts/agentic/<wrapper>.sh` 存在则优先，否则用 wheel 内置副本；argv、流、退出码原样透传）：
 

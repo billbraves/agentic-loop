@@ -51,7 +51,7 @@ SCHEMA_VERSIONS = {"agentic-wp-status/v1", "agentic-wp-status/v2", "agentic-wp-s
 # qoder_security is a legal top-level key in EVERY schema version (optional in
 # v1/v2, required in v3 via REQUIRED_TOP_LEVEL_V3). It must never be flagged as
 # an unknown extra key; the v3 *presence* requirement is enforced by `required`.
-OPTIONAL_TOP_LEVEL = {"qoder_security"}
+OPTIONAL_TOP_LEVEL = {"qoder_security", "plan_id"}
 DECISIONS = {"ACCEPT", "REWORK", "CONSULT"}
 # review.decision may additionally be "N/A" ONLY to record the
 # implementer-is-reviewer conflict (e.g. Claude implemented because kimi was

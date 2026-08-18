@@ -4,6 +4,43 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.12] — 2026-08-18
+
+Add a first-class **Plan** entity so a plan split into N work packages converges
+into **one** merge commit + **one** push, instead of N independent commits/pushes
+leaking onto the protected branch.
+
+### Added
+
+- **`agentic plan check|lint|merge|finalize <plan.status.json>`**: plan-level
+  convergence. A plan groups WPs under one integration branch (`git.base_branch`);
+  WPs keep merging (no-ff) into that branch while `git.target_branch` (normally
+  `main`) stays frozen. `plan merge` does the single `git merge --no-ff` onto the
+  target (autonomy-gated as `local_merge_no_ff`), and `plan finalize` stamps
+  `state=MERGED` + `git.merged_commit` (status-only, idempotent). Both fail closed
+  unless every declared WP is `MERGED` and the integration branch tip is actually
+  merged into the target.
+- **`agentic plan lint <plan.status.json>`**: read-only commit-discipline gate.
+  Enforces that each WP's status file is committed exactly twice on the
+  integration branch — `freeze` (status add) and `finalize` (`state=MERGED` with
+  all signatures folded in; the implementation commits land on the branch in
+  between) — and rejects any intermediate "review 同步 / codex 同步 / override
+  同步" status-only commit. `plan merge` runs this lint fail-closed, so a plan
+  with sync commits cannot converge.
+- **`PLAN.json` template** (`docs/agentic/templates/PLAN.json`,
+  schema `agentic-plan-status/v1`) scaffolded by `agentic init`, with lifecycle
+  `DRAFT → ACTIVE → READY_TO_MERGE → MERGED` (+ `ABANDONED`/`BLOCKED`).
+- **Optional `plan_id`** on the WP status (`agentic-wp-status/*`) for cross-checking
+  a WP against its plan; also present in the `STATUS.json` and `WORK_PACKAGE.md`
+  templates.
+- **`AGENTS.md` §4.3** and **`OPERATING_MODEL.md`** document the single-merge rule;
+  `QUICKSTART.zh-CN.md` §4.5 walks the convergence flow.
+
+### Changed
+
+- Contract template version bumped to `6` (re-render via `agentic contract diff
+  --apply` to adopt the new §4.3).
+
 ## [0.8.11] — 2026-08-16
 
 `agentic init` warns when an existing `.claude/settings.json` lacks the allowlist.

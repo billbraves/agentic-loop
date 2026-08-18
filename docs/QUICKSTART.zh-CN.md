@@ -266,6 +266,42 @@ agentic gate <status.json>             # 合并门第二签名（独立 reviewer
 agentic finalize <status.json>         # 三签门通过后 stamp state=MERGED + merged_commit
 ```
 
+### 4.5 Plan 收敛：一次 Plan = 一次合并提交 + 一次 push
+
+把迭代拆成 N 个 WP 后，**不要**让 N 个 WP 各自 commit/push 进 main。用 **Plan**
+把它们收敛成一次合并提交：
+
+1. 从 `docs/agentic/templates/PLAN.json` 复制出 plan status，填
+   `plan_id / iteration_id / git.base_branch / git.target_branch / work_packages`，
+   状态 `ACTIVE`。`git.base_branch` 填集成分支（如 `plan/<iteration-id>`），
+   `git.target_branch` 填 `main`。
+2. 从 main 切出集成分支，并让该 Plan 下**每个 WP 的 `git.base_branch` 都指向这个
+   集成分支**（WP 可选加 `plan_id` 做交叉校验）。
+3. WP 闭环照旧（§4.1–§4.4），**一个 Plan 一个分支**：顺序 WP 直接在这条集成分支上
+   freeze → 实现 → finalize（不为每个 WP 单独开分支）；只有需要并行的「lane」才开
+   独立分支。main 冻结。
+4. 全部 WP 都 `MERGED` 后，把 plan 状态改为 `READY_TO_MERGE`，然后：
+
+```bash
+agentic plan check    docs/plans/<iteration>/<plan-id>.status.json   # 只读：看收敛状态
+agentic plan lint     docs/plans/<iteration>/<plan-id>.status.json   # 只读：校验提交纪律
+agentic plan merge    docs/plans/<iteration>/<plan-id>.status.json   # 单次 no-ff 合入 main
+agentic plan finalize docs/plans/<iteration>/<plan-id>.status.json   # stamp MERGED + merged_commit
+```
+
+5. 之后**只 push 一次**（`push` 仍是 `always_stop` 硬停，需人工批准）。main 上每个
+   Plan 只新增一个 merge commit，全程只推一次。
+
+提交纪律（`plan lint` / `plan merge` 强制）：每个 WP 的 **status 文件**在集成分支上
+恰好被提交两次——`freeze`（新增，签名留空）与 `finalize`（`state=MERGED`，把
+review/consult/override/qoder 的签名一次性收进去）；实现提交夹在中间、不碰 status。
+**不要在每个签名后单独 commit**；把决定攒在工作区，只在 finalize 里一次性提交，从而
+消除 "review 同步 / codex 同步 / override 同步" 这类中间提交。存在这类中间提交时
+`plan merge` 会失败关闭。
+
+`plan merge/finalize` 都会重新核对证据（每个声明的 WP 确为 `MERGED`、集成分支确实
+已合入 target），不轻信 plan 状态。
+
 ---
 
 ## 5. 历史状态迁移（legacy → v2）
@@ -296,6 +332,7 @@ agentic migrate-status .wp/WP-22.status.json --iteration <iteration-id> [--merge
 | `agentic quality-gate <status>` | 路径匹配的项目测试规则 |
 | `agentic gate <status>` | 合并门第二签名 |
 | `agentic finalize <status>` | 三签门 + stamp MERGED |
+| `agentic plan check/lint/merge/finalize <plan>` | Plan 收敛：一次 Plan = 一次合并提交 |
 | `agentic lock …` | WP/合并并发锁 |
 | `agentic health …` | 后台执行器进度测量 |
 | `agentic redispatch <status>` | REWORK/BLOCKED 重派回流 |

@@ -200,6 +200,74 @@ without re-dispatch. The one-time human-operated `agentic finalize` and this
 re-dispatch remain manual orchestrator calls; only `agentic dispatch-lint` is wired to
 run automatically (inside `agentic preflight`, before the WP lock is acquired).
 
+### 4.3 Plan-level convergence (one plan = one merged commit)
+
+Splitting an iteration into WPs must NOT produce N independent commits/pushes on
+the protected branch. A **plan** groups N WPs under one integration branch — **one
+plan (iteration) = one branch**. Sequential WPs work on that one branch; only
+"parallel lanes" (WPs that must run concurrently, §5) get separate branches. The
+whole plan converges into a single merge commit on `main` and a single push.
+
+A plan is a tracked status file created from
+`docs/agentic/templates/PLAN.json` (schema `agentic-plan-status/v1`) and lives at
+`$iterations_dir/<iteration_id>/<plan_id>.status.json`. Its shape:
+
+- `git.base_branch` — the plan's **integration branch** (e.g. `plan/<iteration-id>`),
+  the single branch every WP in the plan works on / merges into, never `main`.
+- `git.target_branch` — where the plan's single merge commit lands (normally `main`).
+- `work_packages` — the authoritative list of WP IDs in this plan (every listed WP
+  must reach `MERGED` before the plan can converge). A WP may also carry an optional
+  top-level `plan_id` for cross-checking; if present it must equal the plan's id.
+
+Plan state machine:
+
+```text
+DRAFT -> ACTIVE -> READY_TO_MERGE -> MERGED
+DRAFT -> ABANDONED
+ACTIVE -> BLOCKED -> ACTIVE
+```
+
+Flow:
+
+1. `DRAFT -> ACTIVE`: freeze the plan, cut the integration branch from the latest
+   `main`, and point every WP's `git.base_branch` at it.
+2. Run the WP loop (§4.1–§4.2) unchanged on the integration branch. Sequential
+   WPs freeze → implement → finalize directly on that one branch (no per-WP
+   branch); a WP only gets its own branch when it is a parallel lane. `main`
+   stays frozen throughout.
+3. When all WPs are `MERGED`, set the plan state to `READY_TO_MERGE`, then run the
+   single convergence:
+   - `agentic plan check <plan.status.json>` — read-only; reports every WP's state
+     and whether the integration branch is already merged into the target.
+   - `agentic plan lint <plan.status.json>` — read-only; enforces the per-WP
+     commit discipline (below): exactly one freeze commit (the add) and one
+     finalize commit (`state=MERGED`) on the integration branch, with no
+     intermediate "review/codex/override sync" commits.
+   - `agentic plan merge <plan.status.json>` — the one `git merge --no-ff` of the
+     integration branch onto `git.target_branch` (autonomy-gated as
+     `local_merge_no_ff`; fails closed unless every declared WP is `MERGED` AND
+     the commit-discipline lint is clean).
+   - `agentic plan finalize <plan.status.json>` — stamps `state=MERGED` +
+     `git.merged_commit` (status-only, never touches git; idempotent).
+4. Push exactly once, after human approval. `push` stays a hard `always_stop`
+   action; there is deliberately no `agentic plan push`. The single plan merge
+   commit is what `main` receives — not N WP merge commits.
+
+Commit discipline (enforced by `plan lint` and `plan merge`): each WP's **status
+file** is committed exactly twice on the integration branch — `freeze` (the add,
+signatures empty) and `finalize` (`state=MERGED`, with all
+review/consult/override/qoder decisions folded in). The implementation commits
+land on the branch in between and do not touch the status file. Do NOT commit the
+status file after each signature; accumulate the decisions in the working tree
+and commit them once, inside the finalize commit. This removes the
+"review 同步 / codex 同步 / override 同步" intermediate commits that used to
+pollute the branch.
+
+`agentic plan merge`/`finalize` re-verify the evidence (all WPs `MERGED`; the
+integration branch tip actually merged into the target), never trusting the plan
+state alone. Run them from the main repo, on the target branch, against the
+main-repo plan status copy (single source of truth), just like the WP gates.
+
 ## 5. Git and workspace rules
 
 - Never implement a WP on `main`.

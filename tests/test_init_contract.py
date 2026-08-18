@@ -72,6 +72,20 @@ def test_init_scaffolds_reference_templates(tmp_path):
     assert "consult" in data
 
 
+def test_init_scaffolds_plan_template(tmp_path):
+    assert _init(tmp_path)[0] == 0
+    plan = tmp_path / "docs" / "agentic" / "templates" / "PLAN.json"
+    assert plan.is_file()
+
+    import json
+    data = json.loads(plan.read_text(encoding="utf-8"))
+    assert data["schema_version"] == "agentic-plan-status/v1"
+    assert data["state"] == "DRAFT"
+    assert data["git"]["base_branch"]
+    assert data["git"]["target_branch"]
+    assert isinstance(data["work_packages"], list)
+
+
 def test_init_rerun_refuses_without_force(tmp_path):
     assert _init(tmp_path)[0] == 0
     rc, _out, err = _init(tmp_path)
