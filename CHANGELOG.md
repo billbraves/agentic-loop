@@ -4,6 +4,16 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.13] — 2026-08-18
+
+### Fixed
+
+- **`agentic provider`** no longer fails silently when the codex official model
+  has been upgraded upstream (e.g. `gpt-5.5` → `gpt-5.6-sol`). The codex/kimi
+  switches now match any current model, back up the official model to
+  `.official.bak` (mirroring the claude switch), and `main` reports `未修改` when
+  nothing actually changed instead of printing a false success message.
+
 ## [0.8.12] — 2026-08-18
 
 Add a first-class **Plan** entity so a plan split into N work packages converges
