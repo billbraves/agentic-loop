@@ -19,6 +19,8 @@ CODEX_CFG = Path(os.environ.get("CODEX_CFG", os.path.expanduser("~/.codex/config
 KIMI_CFG = Path(os.environ.get("KIMI_CFG", os.path.expanduser("~/.kimi/config.toml")))
 CLAUDE_CFG = Path(os.environ.get("CLAUDE_CFG", os.path.expanduser("~/.claude/settings.json")))
 CLAUDE_BAK = Path(str(CLAUDE_CFG) + ".official.bak")
+CODEX_BAK = Path(str(CODEX_CFG) + ".official.bak")
+KIMI_BAK = Path(str(KIMI_CFG) + ".official.bak")
 
 
 def _deepseek_key() -> str:
@@ -33,37 +35,72 @@ def _deepseek_key() -> str:
     return ""
 
 
-def _replace(path: Path, pattern: str, repl: str) -> None:
+def _replace(path: Path, pattern: str, repl: str) -> bool:
+    """替换首个匹配；返回是否真正发生了改动（文件不存在返回 False）。"""
     if not path.is_file():
-        return
+        return False
     text = path.read_text(encoding="utf-8")
-    path.write_text(
-        re.sub(pattern, repl, text, count=1, flags=re.MULTILINE),
-        encoding="utf-8",
-    )
+    new_text, n = re.subn(pattern, repl, text, count=1, flags=re.MULTILINE)
+    if n == 0:
+        return False
+    path.write_text(new_text, encoding="utf-8")
+    return True
 
 
-def _switch_codex_deepseek():
-    _replace(CODEX_CFG, r'^model = "gpt-5.5"', 'model = "deepseek-v4-pro"')
+def _find_model(path: Path, key: str) -> str:
+    """返回 config 里 `key = "..."` 的当前值；找不到返回空串。"""
+    if not path.is_file():
+        return ""
+    pattern = re.compile(r'^{} = "([^"]*)"'.format(re.escape(key)))
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = pattern.match(line)
+        if m:
+            return m.group(1)
+    return ""
 
 
-def _switch_codex_official():
-    _replace(CODEX_CFG, r'^model = "deepseek-v4-pro"', 'model = "gpt-5.5"')
+# Codex/Kimi 的官方 model 名会随上游升级而变（如 gpt-5.5 -> gpt-5.6-sol），
+# 因此不硬编码：切 DeepSeek 时把当前 model 备份到 .official.bak，切回时从备份还原。
+
+def _switch_codex_deepseek() -> bool:
+    cur = _find_model(CODEX_CFG, "model")
+    if not cur or cur == "deepseek-v4-pro":
+        return False
+    CODEX_BAK.write_text(cur + "\n", encoding="utf-8")
+    return _replace(CODEX_CFG, r'^model = ".*"', 'model = "deepseek-v4-pro"')
 
 
-def _switch_kimi_deepseek():
-    _replace(KIMI_CFG, r'^default_model = "kimi-code/kimi-for-coding"',
-             'default_model = "deepseek/v4-pro"')
+def _switch_codex_official() -> bool:
+    if not CODEX_BAK.exists():
+        return False
+    official = CODEX_BAK.read_text(encoding="utf-8").strip()
+    if not official:
+        return False
+    return _replace(CODEX_CFG, r'^model = ".*"', 'model = "{}"'.format(official))
 
 
-def _switch_kimi_official():
-    _replace(KIMI_CFG, r'^default_model = "deepseek/v4-pro"',
-             'default_model = "kimi-code/kimi-for-coding"')
+def _switch_kimi_deepseek() -> bool:
+    cur = _find_model(KIMI_CFG, "default_model")
+    if not cur or cur == "deepseek/v4-pro":
+        return False
+    KIMI_BAK.write_text(cur + "\n", encoding="utf-8")
+    return _replace(KIMI_CFG, r'^default_model = ".*"',
+                    'default_model = "deepseek/v4-pro"')
 
 
-def _switch_claude_deepseek():
+def _switch_kimi_official() -> bool:
+    if not KIMI_BAK.exists():
+        return False
+    official = KIMI_BAK.read_text(encoding="utf-8").strip()
+    if not official:
+        return False
+    return _replace(KIMI_CFG, r'^default_model = ".*"',
+                    'default_model = "{}"'.format(official))
+
+
+def _switch_claude_deepseek() -> bool:
     if not CLAUDE_CFG.is_file():
-        return
+        return False
     if not CLAUDE_BAK.exists():
         shutil.copy(CLAUDE_CFG, CLAUDE_BAK)  # 备份官方/中转配置，供切回
     data = json.loads(CLAUDE_CFG.read_text(encoding="utf-8"))
@@ -73,11 +110,14 @@ def _switch_claude_deepseek():
     env["ANTHROPIC_MODEL"] = "deepseek-v4-pro"
     env.pop("ANTHROPIC_API_KEY", None)  # DeepSeek 走 AUTH_TOKEN
     CLAUDE_CFG.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return True
 
 
-def _switch_claude_official():
+def _switch_claude_official() -> bool:
     if CLAUDE_BAK.exists():
         shutil.copy(CLAUDE_BAK, CLAUDE_CFG)
+        return True
+    return False
 
 
 def _grep_line(path: Path, prefix: str) -> str:
@@ -141,9 +181,12 @@ def main(argv=None) -> int:
 
     if target in _SWITCHES:
         callables, msg = _SWITCHES[target]
-        for fn in callables:
-            fn()
-        print(msg)
+        changed = any(fn() for fn in callables)
+        if changed:
+            print(msg)
+        else:
+            print(msg, file=sys.stderr)
+            print("provider: 未修改（已处于目标状态，或未找到匹配的 model 行）", file=sys.stderr)
         return 0
 
     print(
