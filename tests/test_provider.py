@@ -108,3 +108,44 @@ def test_main_kimi_switch_no_warn_when_kimi_not_running(kimi, capsys, monkeypatc
     out, err = capsys.readouterr()
     assert "kimi → DeepSeek" in out
     assert "正在运行的 kimi" not in err
+
+
+@pytest.fixture
+def claude(tmp_path, monkeypatch):
+    """隔离 ~/.claude/settings.json，避免组合开关测试触碰真实文件。"""
+    cfg = tmp_path / ".claude" / "settings.json"
+    cfg.parent.mkdir(parents=True)
+    monkeypatch.setattr(provider, "CLAUDE_CFG", cfg)
+    monkeypatch.setattr(provider, "CLAUDE_BAK", Path(str(cfg) + ".official.bak"))
+    return cfg
+
+
+def test_main_official_executes_all_targets(codex, kimi, claude, capsys, monkeypatch):
+    """回归：any(fn() for ...) 短路曾导致 codex 成功后 kimi/claude 从未执行。"""
+    monkeypatch.setattr(provider, "_running_kimi_processes", list)
+    _write(codex, 'model = "deepseek-v4-pro"\n')
+    Path(str(codex) + ".official.bak").write_text("gpt-5.6-sol\n", encoding="utf-8")
+    _write(kimi, 'default_model = "deepseek/v4-pro"\n')
+    Path(str(kimi) + ".official.bak").write_text("kimi-code/k3\n", encoding="utf-8")
+    _write(claude, "{}\n")
+    assert provider.main(["official"]) == 0
+    assert 'model = "gpt-5.6-sol"' in codex.read_text(encoding="utf-8")
+    assert 'default_model = "kimi-code/k3"' in kimi.read_text(encoding="utf-8")
+
+
+def test_main_official_reports_targets_without_backup(codex, kimi, claude, capsys,
+                                                      monkeypatch):
+    """部分成功时，未切换的 target 必须在 stderr 逐项列出并给出手动恢复指引。"""
+    monkeypatch.setattr(provider, "_running_kimi_processes", list)
+    _write(codex, 'model = "deepseek-v4-pro"\n')
+    Path(str(codex) + ".official.bak").write_text("gpt-5.6-sol\n", encoding="utf-8")
+    _write(kimi, 'default_model = "deepseek/v4-pro"\n')  # 旧版本硬编码切的，无 .bak
+    _write(claude, "{}\n")  # claude 也无 .bak
+    assert provider.main(["official"]) == 0
+    out, err = capsys.readouterr()
+    assert "已切回官方" in out  # codex 部分成功
+    assert 'model = "gpt-5.6-sol"' in codex.read_text(encoding="utf-8")
+    assert 'default_model = "deepseek/v4-pro"' in kimi.read_text(encoding="utf-8")
+    assert "kimi 未切换" in err
+    assert "claude 未切换" in err
+    assert ".official.bak" in err

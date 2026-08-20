@@ -6,6 +6,16 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **`agentic provider` combo switches no longer short-circuit**: `deepseek`/
+  `official` used `any(fn() for fn in ...)`, which stops at the first
+  successful switch — e.g. once codex succeeded, kimi/claude were never
+  executed despite the "已切回官方" message. All targets now always run, and
+  each target that did not switch is listed on stderr with manual recovery
+  guidance (old ≤0.8.11 hardcoded switches left no `.official.bak`, so the
+  backup-restore path cannot recover them).
+
 ### Added
 
 - **`agentic provider` warns about live kimi sessions**: kimi 切换（含

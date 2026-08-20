@@ -220,12 +220,27 @@ def main(argv=None) -> int:
 
     if target in _SWITCHES:
         callables, msg = _SWITCHES[target]
-        changed = any(fn() for fn in callables)
-        if changed:
+        # 必须全部执行完再汇总：any(fn() for fn in ...) 会在首个 True 处短路，
+        # 跳过排在后面的切换（曾导致 codex 成功后 kimi/claude 从未执行）。
+        results = [fn() for fn in callables]
+        failed = [fn for fn, ok in zip(callables, results) if not ok]
+        if not failed:
             print(msg)
         else:
-            print(msg, file=sys.stderr)
-            print("provider: 未修改（已处于目标状态，或未找到匹配的 model 行）", file=sys.stderr)
+            if any(results):
+                print(msg)  # 部分成功：仍提示，但下面逐项列出未切换的
+            else:
+                print(msg, file=sys.stderr)
+                print("provider: 未修改（已处于目标状态，或未找到匹配的 model 行）", file=sys.stderr)
+            for fn in failed:
+                tool = fn.__name__.split("_")[2]  # _switch_<tool>_<direction>
+                print(
+                    f"provider: {tool} 未切换；若 DeepSeek 是被旧版本（≤0.8.11）硬编码切过去的，\n"
+                    "  则没有 .official.bak 备份，请手动恢复官方配置\n"
+                    "  （kimi 在会话里 /model 选官方模型；codex 编辑 ~/.codex/config.toml；\n"
+                    "  claude 检查 ~/.claude/settings.json）",
+                    file=sys.stderr,
+                )
         if any("kimi" in fn.__name__ for fn in callables):
             _warn_if_kimi_running()
         return 0
