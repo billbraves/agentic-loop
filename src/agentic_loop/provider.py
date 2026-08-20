@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -152,6 +153,44 @@ def _status() -> str:
     )
 
 
+def _running_kimi_processes() -> list[str]:
+    """Best-effort 检测运行中的 kimi 进程（ps 不可用时返回空）。
+
+    用 ``ps`` 而非 ``pgrep``：macOS 的 pgrep 匹配不到 comm 带空格的进程
+    （如 kimi CLI 的 ``Kimi Code``）。命令行里带 "agentic" 的（即本命令自身）
+    会被排除。
+    """
+    try:
+        proc = subprocess.run(
+            ["ps", "-axo", "pid=,args="],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+    except OSError:
+        return []
+    hits = []
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        low = line.lower()
+        if "kimi" in low and "agentic" not in low:
+            hits.append(line)
+    return hits
+
+
+def _warn_if_kimi_running() -> None:
+    """运行中的 kimi 会话持有启动时的内存配置，/model、登录刷新等时机会整盘
+    回写 ~/.kimi/config.toml，覆盖刚才的切换；且其本身也不会读到新配置。"""
+    hits = _running_kimi_processes()
+    if not hits:
+        return
+    print(
+        "⚠️ 检测到正在运行的 kimi 进程：\n  " + "\n  ".join(hits) + "\n"
+        "运行中的 kimi 会话会在 /model、登录刷新等时机用内存配置整盘回写 "
+        f"{KIMI_CFG}，可能覆盖刚才的切换；该会话本身也不会读到新配置。\n"
+        "请先退出所有 kimi 会话再执行本命令，或在每个会话里用 /model 切换。",
+        file=sys.stderr,
+    )
+
+
 # target -> (callables, message)
 _SWITCHES = {
     "deepseek": (
@@ -187,6 +226,8 @@ def main(argv=None) -> int:
         else:
             print(msg, file=sys.stderr)
             print("provider: 未修改（已处于目标状态，或未找到匹配的 model 行）", file=sys.stderr)
+        if any("kimi" in fn.__name__ for fn in callables):
+            _warn_if_kimi_running()
         return 0
 
     print(

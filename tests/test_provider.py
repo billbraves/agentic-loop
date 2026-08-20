@@ -72,3 +72,39 @@ def test_main_reports_unchanged_when_noop(codex, capsys):
     assert provider.main(["codex-deepseek"]) == 0
     out, err = capsys.readouterr()
     assert "未修改" in err
+
+
+def test_warn_if_kimi_running(capsys, monkeypatch):
+    monkeypatch.setattr(
+        provider, "_running_kimi_processes", lambda: ["12345 Kimi Code"]
+    )
+    provider._warn_if_kimi_running()
+    err = capsys.readouterr().err
+    assert "kimi" in err.lower()
+    assert "/model" in err
+
+
+def test_no_warn_when_kimi_not_running(capsys, monkeypatch):
+    monkeypatch.setattr(provider, "_running_kimi_processes", list)
+    provider._warn_if_kimi_running()
+    assert capsys.readouterr().err == ""
+
+
+def test_main_kimi_switch_warns_when_kimi_running(kimi, capsys, monkeypatch):
+    _write(kimi, 'default_model = "kimi-code/k3"\n')
+    monkeypatch.setattr(
+        provider, "_running_kimi_processes", lambda: ["12345 Kimi Code"]
+    )
+    assert provider.main(["kimi-deepseek"]) == 0
+    out, err = capsys.readouterr()
+    assert "kimi → DeepSeek" in out
+    assert "正在运行的 kimi" in err
+
+
+def test_main_kimi_switch_no_warn_when_kimi_not_running(kimi, capsys, monkeypatch):
+    _write(kimi, 'default_model = "kimi-code/k3"\n')
+    monkeypatch.setattr(provider, "_running_kimi_processes", list)
+    assert provider.main(["kimi-deepseek"]) == 0
+    out, err = capsys.readouterr()
+    assert "kimi → DeepSeek" in out
+    assert "正在运行的 kimi" not in err

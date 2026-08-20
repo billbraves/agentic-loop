@@ -4,6 +4,17 @@ All notable changes to `agentic-loop` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`agentic provider` warns about live kimi sessions**: kimi 切换（含
+  `deepseek`/`official` 组合目标）后若检测到运行中的 kimi 进程，在 stderr
+  打印告警。运行中的 kimi 会话持有启动时的内存配置，/model、登录刷新等
+  时机会整盘回写 `~/.kimi/config.toml`，静默覆盖刚才的切换；该会话本身
+  也不会读到新配置。检测用 `ps`（macOS pgrep 匹配不到 comm 带空格的
+  `Kimi Code` 进程）。
+
 ## [0.8.13] — 2026-08-18
 
 ### Fixed
