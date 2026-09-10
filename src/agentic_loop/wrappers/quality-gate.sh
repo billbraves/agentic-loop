@@ -54,9 +54,22 @@ changed = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
 allowed = json.loads(sys.argv[2])
 forbidden = json.loads(sys.argv[3])
 
+# Keep verbatim-aligned with agentic_loop.gate.scope_matches / scope_prefix
+# (tests/test_gate_scope_filter.py asserts parity). Trailing /** and /* are
+# stripped: authors write `skills/**` because [[gate]] rule.match accepts it,
+# and a literal startswith would match nothing, so such a forbidden entry
+# silently forbade nothing. An entry reducing to empty matches nothing here;
+# validate_wp_status rejects those plus any non-trailing wildcard.
 def matches(path: str, prefix: str) -> bool:
-    normalized = prefix.removeprefix("./")
-    return path == normalized.rstrip("/") or path.startswith(normalized.rstrip("/") + "/")
+    normalized = prefix.strip().removeprefix("./")
+    for suffix in ("/**", "/*"):
+        if normalized.endswith(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+    normalized = normalized.rstrip("/")
+    if not normalized:
+        return False
+    return path == normalized or path.startswith(normalized + "/")
 
 errors = []
 for path in changed:

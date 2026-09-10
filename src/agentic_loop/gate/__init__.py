@@ -166,18 +166,47 @@ def git_merge_base(repo: Path, base: str, tip: str) -> str:
     return lines[0].strip()
 
 
+def scope_prefix(pattern: str) -> str:
+    """Reduce a scope pattern to the literal directory prefix it denotes.
+
+    Scope entries are prefixes, not globs, but authors write ``skills/**`` and
+    ``dir/*`` because every other path-matching surface in this tool accepts
+    them (``[[gate]] rule.match`` strips exactly these two suffixes). A literal
+    ``startswith`` never matches such an entry: no real path contains ``**``.
+    A ``forbidden_paths`` entry of ``skills/**`` therefore forbade **nothing**
+    while looking active in the status JSON — the worst possible failure mode
+    for a fail-closed guard.
+
+    Trailing ``/**`` and ``/*`` are stripped so those spellings mean what their
+    author intended. Any *other* wildcard (``a/*/b``, ``*.env``, ``a*b``) is
+    NOT reducible to a prefix; it is rejected upstream by
+    ``validate_wp_status`` rather than silently mis-handled here.
+    """
+    normalized = pattern.strip().removeprefix("./")
+    for suffix in ("/**", "/*"):
+        if normalized.endswith(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+    return normalized.rstrip("/")
+
+
 def scope_matches(path: str, prefix: str) -> bool:
     """Prefix match verbatim-aligned with ``quality-gate.sh`` ``matches()``.
 
     A file path is in scope for ``prefix`` when it equals the prefix or starts
-    with ``prefix + "/"``, after stripping any leading ``./`` and trailing ``/``
-    from the prefix. This is the exact predicate the quality gate uses for its
-    allowed/forbidden enforcement, so the merge gate can never diverge from it.
+    with ``prefix + "/"``, after reducing the pattern via ``scope_prefix``.
+    This is the exact predicate the quality gate uses for its allowed/forbidden
+    enforcement, so the merge gate can never diverge from it.
     """
-    normalized = prefix.removeprefix("./")
-    return path == normalized.rstrip("/") or path.startswith(
-        normalized.rstrip("/") + "/"
-    )
+    normalized = scope_prefix(prefix)
+    # An entry that reduces to empty (``/``, ``./``, ``**``, whitespace) would
+    # match every path. For forbidden that blocks the whole WP; for allowed it
+    # silently disables scope enforcement. Refuse to interpret it — the
+    # validator rejects such entries, so reaching here means an unvalidated
+    # caller, and matching nothing is the fail-closed side for allowed_paths.
+    if not normalized:
+        return False
+    return path == normalized or path.startswith(normalized + "/")
 
 
 def _path_in_scope(

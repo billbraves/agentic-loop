@@ -172,16 +172,39 @@ def test_unparseable_leading_block_kept_failsafe():
 # ---------------------------------------------------------------------------
 # Property 4: prefix predicate parity with quality-gate.sh matches().
 # ---------------------------------------------------------------------------
+BUNDLED_QUALITY_GATE = (
+    Path(__file__).resolve().parents[1]
+    / "src" / "agentic_loop" / "wrappers" / "quality-gate.sh"
+)
+
+
+def _shell_matches_source() -> str:
+    """Extract the real ``matches()`` definition from the shipped shell script.
+
+    Previously this test inlined a hand-copied snippet, which meant it kept
+    passing while the shell source drifted — exactly the drift it exists to
+    catch. Read the shipped file instead, so parity is asserted against what
+    actually runs.
+    """
+    text = BUNDLED_QUALITY_GATE.read_text(encoding="utf-8")
+    start = text.index("def matches(")
+    # The definition ends at the first line that is neither blank nor indented.
+    lines = text[start:].splitlines()
+    body = [lines[0]]
+    for line in lines[1:]:
+        if line and not line[0].isspace():
+            break
+        body.append(line)
+    return "\n".join(body)
+
+
 def _bash_matches(path: str, prefix: str) -> bool:
     """Invoke the exact python predicate embedded in quality-gate.sh so the
     parity test cannot drift from the shipped shell source."""
     snippet = (
         "import sys\n"
-        "def matches(path, prefix):\n"
-        "    normalized = prefix.removeprefix('./')\n"
-        "    return path == normalized.rstrip('/') or "
-        "path.startswith(normalized.rstrip('/') + '/')\n"
-        "print('1' if matches(sys.argv[1], sys.argv[2]) else '0')\n"
+        + _shell_matches_source()
+        + "\nprint('1' if matches(sys.argv[1], sys.argv[2]) else '0')\n"
     )
     out = subprocess.run(
         [sys.executable, "-c", snippet, path, prefix],
@@ -206,10 +229,72 @@ def _bash_matches(path: str, prefix: str) -> bool:
          "docs/plans/it/WP-04.status.json"),
         ("a/b/c", "a/b"),
         ("ab/c", "a"),
+        # glob spellings must behave identically on both sides
+        ("skills/prod/run.py", "skills/**"),
+        ("skills/prod/run.py", "skills/*"),
+        ("skills", "skills/**"),
+        ("skills_other/x.py", "skills/**"),
+        ("docs/plans/ha/a.md", "docs/plans/ha/**"),
+        ("a/b.py", "a/*"),
+        # degenerate entries match nothing on both sides
+        ("anything/at/all", "**"),
+        ("anything/at/all", "/"),
+        ("anything/at/all", "./"),
     ],
 )
 def test_scope_matches_parity_with_quality_gate(path, prefix):
     assert scope_matches(path, prefix) == _bash_matches(path, prefix)
+
+
+# ---------------------------------------------------------------------------
+# Regression: glob-suffixed entries used to enforce nothing.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "pattern", ["skills/**", "skills/*", "skills/", "skills", "./skills/**"]
+)
+def test_forbidden_glob_suffix_actually_forbids(pattern):
+    """``forbidden_paths: ['skills/**']`` must forbid ``skills/...``.
+
+    Before the fix ``scope_matches`` was a literal ``startswith``, so no real
+    path could ever match an entry containing ``**``: the entry forbade nothing
+    while looking active in the status JSON. All five spellings of "the skills
+    directory" must now agree.
+    """
+    assert scope_matches("skills/prod/run.py", pattern) is True
+    assert _path_in_scope("skills/prod/run.py", [], [pattern]) is False
+    filtered, kept, excluded = filter_diff_by_scope(
+        _block("skills/prod/run.py"), [], [pattern]
+    )
+    assert "skills/prod/run.py" not in filtered
+    assert (kept, excluded) == (0, 1)
+
+
+def test_glob_suffix_does_not_over_match_sibling_dirs():
+    """Stripping ``/**`` must not turn ``skills`` into a bare substring match:
+    ``skills_other/`` is a different directory."""
+    assert scope_matches("skills_other/x.py", "skills/**") is False
+    assert scope_matches("skills", "skills/**") is True
+
+
+def test_allowed_glob_suffix_keeps_in_scope_files():
+    """The same bug hit allowed_paths from the other side: an allowed entry of
+    ``dir/**`` matched nothing, so every real file fell outside scope."""
+    allowed = ["qoder_agent/harness/**"]
+    keep = _block("qoder_agent/harness/loader/core.py")
+    drop = _block("qoder_agent/other/thing.py")
+    filtered, kept, excluded = filter_diff_by_scope(keep + drop, allowed, [])
+    assert "qoder_agent/harness/loader/core.py" in filtered
+    assert "qoder_agent/other/thing.py" not in filtered
+    assert (kept, excluded) == (1, 1)
+
+
+@pytest.mark.parametrize("pattern", ["**", "/", "./", "   ", ""])
+def test_degenerate_entry_matches_nothing(pattern):
+    """An entry reducing to empty must not become "match everything": under
+    forbidden that would block the whole WP, under allowed it would silently
+    disable scope enforcement. The validator rejects these; the matcher stays
+    fail-closed if one arrives anyway."""
+    assert scope_matches("any/path.py", pattern) is False
 
 
 def test_path_in_scope_forbidden_precedence_unit():
