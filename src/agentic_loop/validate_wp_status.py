@@ -142,6 +142,52 @@ def fail(errors: list[str], message: str) -> None:
     errors.append(message)
 
 
+def _check_scope_patterns(errors: list[str], field: str, patterns: list[str]) -> None:
+    """Reject scope entries the prefix matcher cannot honor.
+
+    ``scope_matches`` is a prefix predicate: it accepts a literal path prefix,
+    plus the two conventional directory spellings ``dir/**`` and ``dir/*``
+    (stripped, matching ``[[gate]] rule.match``). Any other wildcard cannot be
+    reduced to a prefix, so a literal match would silently never fire — a
+    ``forbidden_paths`` entry that forbids nothing while looking active is
+    strictly worse than a rejected status file. Fail closed at authoring time
+    instead, and say what to write.
+
+    Also rejected: entries that reduce to nothing (``/``, ``**``, ``./``,
+    blank), which would otherwise match every path — blocking an entire WP
+    under forbidden, or disabling scope enforcement under allowed.
+    """
+    for item in patterns:
+        stripped = item.strip()
+        if not stripped:
+            fail(errors, f"{field} contains a blank entry")
+            continue
+        # Strip the two supported trailing forms, then no wildcard may remain.
+        body = stripped.removeprefix("./")
+        for suffix in ("/**", "/*"):
+            if body.endswith(suffix):
+                body = body[: -len(suffix)]
+                break
+        # A bare '*' / '**' (with or without a './' prefix or trailing slash)
+        # denotes the whole repository just as '/' does; say so, rather than
+        # falling through to the generic wildcard message below.
+        if body.rstrip("/") in ("", "*", "**"):
+            fail(
+                errors,
+                f"{field} entry {item!r} reduces to the whole repository; "
+                "list the actual directories instead",
+            )
+            continue
+        if "*" in body or "?" in body or "[" in body:
+            fail(
+                errors,
+                f"{field} entry {item!r} is not a path prefix: scope matching is "
+                "prefix-based and only a trailing '/**' or '/*' is recognized, so "
+                "this pattern would match nothing. Write the directory prefix "
+                "(e.g. 'skills' or 'skills/**') instead",
+            )
+
+
 def _override_dict_is_legal(override: object) -> bool:
     """Return True when ``override`` is a complete, human-approved override.
 
@@ -401,8 +447,12 @@ def validate(data: dict) -> list[str]:
     forbidden = scope.get("forbidden_paths")
     if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
         fail(errors, "scope.allowed_paths must be a list of strings")
+    else:
+        _check_scope_patterns(errors, "scope.allowed_paths", allowed)
     if not isinstance(forbidden, list) or not all(isinstance(item, str) for item in forbidden):
         fail(errors, "scope.forbidden_paths must be a list of strings")
+    else:
+        _check_scope_patterns(errors, "scope.forbidden_paths", forbidden)
 
     state = data.get("state")
     active_states = STATES - {"DRAFT", "APPROVED"}

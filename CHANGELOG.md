@@ -8,6 +8,29 @@ All notable changes to `agentic-loop` are documented here. The format follows
 
 ### Fixed
 
+- **scope 匹配不再把 `/**`、`/*` 当字面前缀**：`scope_matches()`（merge gate）
+  与 `quality-gate.sh` 的 `matches()`（quality gate）都是纯 `startswith` 前缀
+  匹配，而没有任何真实路径含 `**`，所以任何带 glob 尾缀的 scope 条目**恒不
+  匹配**。两个方向的后果不对称：
+  - `allowed_paths: ["dir/**"]` → 每个改动文件都被判越界（响声大，早在
+    v1.7-M2-M5 F-01 被发现并按 WP 人工绕过）；
+  - `forbidden_paths: ["dir/**"]` → **该条目什么都不禁**，却在 status JSON
+    里看着生效——fail-closed 守卫最坏的失效形态，此前一直没被发现。
+    实测 52 份在册 status 文件中有 41 个 distinct 条目属此类（`skills/**`、
+    `catalog/**`、`mcp/**`、`qoder_agent/**` 等），此前全部形同虚设。
+
+  现按同文件既有 `_prefix()`（`[[gate]] rule.match` 用）的语义剥掉尾缀
+  `/**`、`/*`，三处 matcher 语义统一。归约为空的条目（`/`、`**`、`./`）匹配
+  **不到任何路径**（fail-closed：allowed 侧不因此静默放开 scope 管控）。
+  F-01 当初的就地补丁打在已安装的 uv tool 副本上，已被 `agentic update`
+  覆盖掉；此次修在源码仓，可持续。
+
+- **`validate_wp_status` 在授权期拒收无法归约为前缀的 scope 条目**：scope 匹配
+  是前缀语义，只认尾缀 `/**`、`/*`；`*.env`、`a/*/b`、`src/?.py` 这类既无法
+  归约又永不匹配的写法，此前静默地什么都不管。现直接报错并给出应写法。
+  空白条目、以及归约为整仓（`/`、`**`、`./**`）的条目同样拒收。
+  52 份在册 status 文件全部通过，无兼容性回归。
+
 - **`agentic provider` combo switches no longer short-circuit**: `deepseek`/
   `official` used `any(fn() for fn in ...)`, which stops at the first
   successful switch — e.g. once codex succeeded, kimi/claude were never

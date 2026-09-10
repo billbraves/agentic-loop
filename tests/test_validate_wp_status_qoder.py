@@ -548,3 +548,67 @@ def test_historical_v2_statuses_valid(wp: str) -> None:
         pytest.skip(f"{wp}.status.json not present")
     data = json.loads(path.read_text(encoding="utf-8"))
     assert validate(data) == []
+
+
+# ---------------------------------------------------------------------------
+# scope.allowed_paths / scope.forbidden_paths must be prefix-reducible.
+#
+# Scope matching is a prefix predicate. An entry containing a wildcard that is
+# not a trailing '/**' or '/*' can never match a real path, so a forbidden
+# entry like '*.env' forbids nothing while looking active in the status file.
+# Reject at authoring time rather than enforce nothing at gate time.
+# ---------------------------------------------------------------------------
+def _scope_errors(**scope: object) -> list[str]:
+    base = {"allowed_paths": [], "forbidden_paths": []}
+    base.update(scope)
+    return validate(make_status(scope=base))
+
+
+@pytest.mark.parametrize("field", ["allowed_paths", "forbidden_paths"])
+@pytest.mark.parametrize(
+    "pattern",
+    ["*.env", "a/*/b", "a*b", "docs/**/plans", "src/?.py", "src/[ab]/x.py"],
+)
+def test_non_prefix_wildcard_rejected(field: str, pattern: str) -> None:
+    errors = _scope_errors(**{field: [pattern]})
+    assert any(
+        f"scope.{field} entry" in e and "not a path prefix" in e for e in errors
+    ), errors
+
+
+@pytest.mark.parametrize("field", ["allowed_paths", "forbidden_paths"])
+@pytest.mark.parametrize("pattern", ["/", "**", "./", "/**", "./**"])
+def test_whole_repo_entry_rejected(field: str, pattern: str) -> None:
+    errors = _scope_errors(**{field: [pattern]})
+    assert any(
+        f"scope.{field} entry" in e and "whole repository" in e for e in errors
+    ), errors
+
+
+@pytest.mark.parametrize("field", ["allowed_paths", "forbidden_paths"])
+@pytest.mark.parametrize("pattern", ["", "   "])
+def test_blank_entry_rejected(field: str, pattern: str) -> None:
+    errors = _scope_errors(**{field: [pattern]})
+    assert any(f"scope.{field} contains a blank entry" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("field", ["allowed_paths", "forbidden_paths"])
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "skills",
+        "skills/",
+        "skills/**",
+        "skills/*",
+        "./skills/**",
+        "qoder_agent/harness/ontology",
+        ".env",
+        "docs/plans/harness-architecture/**",
+    ],
+)
+def test_prefix_reducible_entries_accepted(field: str, pattern: str) -> None:
+    """The supported spellings must pass: bare prefix, trailing slash, './'
+    prefix, and the two glob suffixes. A dotfile is a legal prefix too — the
+    '[' / '?' / '*' rejection must not catch a plain '.env'."""
+    errors = _scope_errors(**{field: [pattern]})
+    assert not any(f"scope.{field}" in e for e in errors), errors
