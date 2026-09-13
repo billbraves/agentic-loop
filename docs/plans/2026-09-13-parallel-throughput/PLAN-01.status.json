@@ -10,16 +10,99 @@
     "merged_commit": ""
   },
   "work_packages": [
-    "WP-01",
-    "WP-02",
-    "WP-03",
-    "WP-04",
-    "WP-05",
-    "WP-06",
-    "WP-07"
+    {
+      "id": "WP-01",
+      "lane": "lane-gate",
+      "depends_on": []
+    },
+    {
+      "id": "WP-02",
+      "lane": "lane-gate",
+      "depends_on": [
+        "WP-01"
+      ]
+    },
+    {
+      "id": "WP-03",
+      "lane": "lane-plan",
+      "depends_on": []
+    },
+    {
+      "id": "WP-04",
+      "lane": "lane-gate",
+      "depends_on": [
+        "WP-02"
+      ]
+    },
+    {
+      "id": "WP-05",
+      "lane": "lane-plan",
+      "depends_on": [
+        "WP-03"
+      ]
+    },
+    {
+      "id": "WP-06",
+      "lane": "lane-plan",
+      "depends_on": [
+        "WP-03"
+      ]
+    },
+    {
+      "id": "WP-07",
+      "lane": "lane-docs",
+      "depends_on": [
+        "WP-04",
+        "WP-05",
+        "WP-06"
+      ]
+    },
+    {
+      "id": "WP-08",
+      "lane": "lane-gate-fix",
+      "depends_on": []
+    },
+    {
+      "id": "WP-09",
+      "lane": "lane-config",
+      "depends_on": []
+    },
+    {
+      "id": "WP-10",
+      "lane": "lane-template",
+      "depends_on": []
+    },
+    {
+      "id": "WP-11",
+      "lane": "lane-gate",
+      "depends_on": [
+        "WP-04"
+      ]
+    },
+    {
+      "id": "WP-12",
+      "lane": "lane-gate",
+      "depends_on": [
+        "WP-11"
+      ]
+    },
+    {
+      "id": "WP-13",
+      "lane": "lane-gate",
+      "depends_on": [
+        "WP-12"
+      ]
+    },
+    {
+      "id": "WP-14",
+      "lane": "lane-template",
+      "depends_on": [
+        "WP-10"
+      ]
+    }
   ],
   "timestamps": {
     "created_at": "2026-09-13T00:00:00Z",
-    "updated_at": "2026-09-13T00:00:00Z"
+    "updated_at": "2026-09-13T11:55:00Z"
   }
 }

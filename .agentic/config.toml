@@ -27,19 +27,27 @@ developer    = { adapter = "kimi",   provider = "deepseek" }
 reviewer     = { adapter = "claude", provider = "deepseek" }
 consultant   = { adapter = "codex",  provider = "deepseek" }
 
-[quality_gate]
-# path-prefix -> test command mapping (project-specific rules only).
-
+# 路径→测试命令规则。正式形式是 [[gate]]（kind="command", stage="pre_review"），
+# 见 docs/QUICKSTART.zh-CN.md §「配置」。注意 `agentic init` 的模板生成的是
+# [[quality_gate.rule]]，那个形式 quality-gate.sh 读不到，会 fail-closed 拒绝
+# ——init 出来的默认配置过不了自己的质量门，属框架缺陷（候选 WP-08）。
+#
 # 本仓测试总量小，任何 src/ 或 tests/ 改动都跑全量 pytest。
-# 注意规则匹配是「首条命中者胜」，所以不要在 src/agentic_loop/** 之后再写
-# src/agentic_loop/wrappers/** —— 那条永远不会被选中（形同虚设）。
-[[quality_gate.rule]]
-match = "src/agentic_loop/**"
-run   = ["python3 -m pytest tests -q"]
+# 命令写 python3.11：本机 python3 是 3.14 且没装 pytest，只有 3.11 装了。
+# 注意 AGENTIC_PYTHON 只管 wrapper 自己的调用，管不到 rule.run 里的命令。
+# 规则匹配是「首条命中者胜」（apply=first_match），所以不要在
+# src/agentic_loop/** 之后再写 src/agentic_loop/wrappers/** —— 那条永不命中。
+[[gate]]
+kind  = "command"
+stage = "pre_review"
 
-[[quality_gate.rule]]
+[[gate.rule]]
+match = "src/agentic_loop/**"
+run   = ["python3.11 -m pytest tests -q"]
+
+[[gate.rule]]
 match = "tests/**"
-run   = ["python3 -m pytest tests -q"]
+run   = ["python3.11 -m pytest tests -q"]
 
 [safety]
 forbidden_paths  = [".env", ".context/"]
