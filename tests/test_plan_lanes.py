@@ -70,6 +70,14 @@ def test_validate_rejects_empty_string_entry():
     assert any("non-empty strings or objects" in e for e in errors)
 
 
+def test_validate_rejects_type_error_entry():
+    # Regression guard: a non-str / non-dict entry must be cleanly rejected
+    # (PLAN_INVALID / RC_FAIL), not crash the topology block with an
+    # AttributeError (an int/None has no `.get`).
+    errors = plan_cmd.validate(_plan([123]))
+    assert any("work_packages entries must be strings or objects" in e for e in errors)
+
+
 def test_validate_rejects_duplicate_ids():
     errors = plan_cmd.validate(_plan(["WP-1", "WP-1"]))
     assert any("duplicate work_packages id" in e for e in errors)
@@ -306,6 +314,17 @@ def test_cmd_lanes_rejects_missing_dependency(lanes_repo, capsys):
         plan_cmd.cmd_lanes(str(plan_path))
     assert ei.value.code == plan_cmd.RC_FAIL
     assert "depends_on missing WP" in capsys.readouterr().err
+
+
+def test_cmd_lanes_rejects_type_error_entry(lanes_repo, capsys):
+    repo, plan_dir = lanes_repo
+    plan_path = plan_dir / "PLAN-1.status.json"
+    plan_path.write_text(json.dumps(_plan([123])))
+
+    with pytest.raises(SystemExit) as ei:
+        plan_cmd.cmd_lanes(str(plan_path))
+    assert ei.value.code == plan_cmd.RC_FAIL
+    assert "work_packages entries must be strings or objects" in capsys.readouterr().err
 
 
 def test_cli_help_mentions_lanes():

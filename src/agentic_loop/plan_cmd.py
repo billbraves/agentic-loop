@@ -246,7 +246,7 @@ def _normalize_work_packages(work_packages: list) -> list:
             out.append(
                 {"id": item, "lane": DEFAULT_LANE, "depends_on": []}
             )
-        else:
+        elif isinstance(item, dict):
             dep = item.get("depends_on")
             out.append(
                 {
@@ -255,6 +255,9 @@ def _normalize_work_packages(work_packages: list) -> list:
                     "depends_on": list(dep) if isinstance(dep, list) else [],
                 }
             )
+        # Non-str, non-dict entries are invalid per the per-entry schema loop in
+        # validate(); skip them here so callers (topology block, _wp_ids,
+        # _dependency_graph, _lanes_ready) never crash on a type-error entry.
     return out
 
 
