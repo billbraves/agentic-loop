@@ -1,0 +1,33 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-<N>",
+  "iteration_id": "<iteration-id>",
+  "plan_id": "<plan-id>",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor":     { "tool": "unassigned" },
+  "orchestrator": { "tool": "claude-code", "session": "" },
+  "reviewer":     { "tool": "claude-code", "session": "" },
+  "git": {
+    "base_branch": "main",
+    "base_commit": "",
+    "branch": "",
+    "worktree": "",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [],
+    "forbidden_paths": []
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": { "tests": [] },
+  "review": {},
+  "consult": {},
+  "timestamps": { "dispatched_at": "" }
+}

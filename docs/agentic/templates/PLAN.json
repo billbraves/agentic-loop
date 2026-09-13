@@ -1,0 +1,17 @@
+{
+  "schema_version": "agentic-plan-status/v1",
+  "plan_id": "PLAN-<N>",
+  "iteration_id": "<iteration-id>",
+  "state": "DRAFT",
+  "title": "",
+  "git": {
+    "base_branch": "plan/<iteration-id>",
+    "target_branch": "main",
+    "merged_commit": ""
+  },
+  "work_packages": [],
+  "timestamps": {
+    "created_at": "",
+    "updated_at": ""
+  }
+}

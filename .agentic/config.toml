@@ -1,0 +1,75 @@
+# .agentic/config.toml — project adaptation layer.
+# Role mappings, path conventions, quality gates and safety rules specific to
+# this project. Edit the values below, then run `agentic contract diff --apply`
+# to re-render the governance contracts.
+
+[project]
+iterations_dir = "docs/plans"
+# default_output_language = "English"
+
+# ── DeepSeek API（默认启用；不用 DeepSeek 就整段删掉 + roles 改回 string）──
+# 让 claude/kimi/codex 三签统一走 DeepSeek。key 存环境变量（不落盘明文）：
+#     export DEEPSEEK_API_KEY=sk-...        # 写进 ~/.zshrc
+[providers.deepseek]
+anthropic_base_url = "https://api.deepseek.com/anthropic"   # claude/kimi 用
+openai_base_url    = "https://api.deepseek.com/v1"          # codex 用
+api_key_env        = "DEEPSEEK_API_KEY"                     # 只存 env 名，绝不存 key 明文
+identity_model     = "deepseek-v4-pro"                      # canonical，独立性评级唯一依据
+[providers.deepseek.selectors]
+kimi   = "deepseek/v4-pro"
+codex  = "deepseek-v4-pro"
+claude = "deepseek-v4-pro"
+
+[roles]
+# 三签绑 DeepSeek。不用 DeepSeek 时改回 string 形式（如 developer = ["kimi","claude"]）。
+orchestrator = "claude"
+developer    = { adapter = "kimi",   provider = "deepseek" }
+reviewer     = { adapter = "claude", provider = "deepseek" }
+consultant   = { adapter = "codex",  provider = "deepseek" }
+
+[quality_gate]
+# path-prefix -> test command mapping (project-specific rules only).
+
+# 本仓测试总量小，任何 src/ 或 tests/ 改动都跑全量 pytest。
+# 注意规则匹配是「首条命中者胜」，所以不要在 src/agentic_loop/** 之后再写
+# src/agentic_loop/wrappers/** —— 那条永远不会被选中（形同虚设）。
+[[quality_gate.rule]]
+match = "src/agentic_loop/**"
+run   = ["python3 -m pytest tests -q"]
+
+[[quality_gate.rule]]
+match = "tests/**"
+run   = ["python3 -m pytest tests -q"]
+
+[safety]
+forbidden_paths  = [".env", ".context/"]
+production_paths = []
+
+[review_policy]
+# 代价显式声明：上面 [roles] 三签全指同一 DeepSeek identity_model
+# （deepseek-v4-pro），independence.evaluate() 因此最高只能评到 weak。
+# 若这里留 "strong"，合并门会永久拒绝——不是框架有 bug，是配置自相矛盾。
+# 本仓明确接受「同源弱独立」；改回多 provider（不同 identity_model）后升回 strong。
+min_independence = "weak"
+
+# Optional autonomy policy: machine-checkable AUTO/STOP per orchestration action.
+# Uncomment to opt in (absent = not gated). default_mode "ask" stops on every
+# action not explicitly auto-approved; "ultra" auto-runs ultra_auto actions,
+# but always_stop actions (push, production_write, credentials, …) stay hard-stopped.
+# soft_limit_signals are the "stop-and-escalate" events the executor reports
+# (frozen_hard / rework_twice / circuit_breaker), classified via
+# `agentic autonomy signal <signal>`.
+# 本迭代的目标就是多 Agent 并行，若每次派发都要人工点头，并行度等于 1。
+# 因此开 ultra：派发/实现/测试/评审/本地 no-ff 合并全自动，
+# 但 push、生产写、凭据等 always_stop 动作依旧硬停（ultra 也不放行）。
+[autonomy]
+default_mode = "ultra"
+ultra_auto   = ["local_edit", "test_run", "worktree_lifecycle", "dispatch_developer",
+                "review", "merge_gate", "local_merge_no_ff", "finalize_merge"]
+always_stop  = ["push", "feishu_send", "production_write", "cron_change",
+                "release_deploy", "credential_rw", "irreversible_git"]
+soft_limit_signals = ["frozen_hard", "rework_twice", "circuit_breaker"]
+
+[locks]
+owner_source = "env:AGENTIC_SESSION_ID"
+ttl_minutes  = 30

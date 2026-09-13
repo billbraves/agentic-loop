@@ -1,0 +1,393 @@
+<!-- agentic-contract: template_version=6 config_checksum=68cc903945171dee -->
+# agentic_loop Agent Operating Contract
+
+This file is the durable, cross-agent operating contract for this repository.
+It applies to every configured agent tool, human developers, and any sub-agent
+they launch. Chat history is not a source of truth.
+
+## 1. Authority and precedence
+
+When instructions conflict, use this order:
+
+1. The user's latest explicit decision.
+2. Production safety and data-integrity rules in this file.
+3. This repository operating contract.
+4. The active iteration product contract.
+5. The active phase plan.
+6. The active work-package brief and status file.
+7. Agent messages, summaries, or assumptions.
+
+Stop and escalate when a lower-level document would violate a higher-level
+rule. Never silently resolve a material conflict.
+
+## 1.1 Communication defaults
+
+- Default to English output unless the user explicitly asks
+  for another language.
+- Start with the goal the current step serves, so priority is obvious before
+  command lists or implementation detail.
+- For read-only diagnostics, branch/worktree inspection, and status checks,
+  keep approvals narrow and deterministic; do not widen them into state-changing
+  operations.
+
+## 2. Roles
+
+- **User / Product Owner**: owns product value, business semantics, scope
+  changes, and production release approval.
+- **claude / Orchestrator and Reviewer**: clarifies requirements,
+  maintains the product contract and phase plans, dispatches work, reviews
+  evidence, and returns product decisions to the user.
+- **codex (provider: deepseek) / Architecture and Incident Consultant**: independently reviews
+  architecture, time/data semantics, migrations, security, and difficult root
+  causes. Does not own routine implementation.
+- **kimi (provider: deepseek) / Developer**: implements a frozen work package, writes and runs
+  tests, records evidence, and stops when the package requires a specification
+  change.
+- **Observer / Runtime Observer**: serves the product and collects production
+  metrics and feedback. It must not modify or deploy source code by itself.
+
+Always record both the role and the actual execution tool. A role name is not
+equivalent to a specific CLI; a consultation requires an actual consultant
+session or a clearly identified human-authored note.
+
+## 3. Required context recovery
+
+At the start of every new or compacted session:
+
+1. Read this file and the orchestrator protocol file when acting as the
+   orchestrator.
+2. Inspect `git status`, current branch, worktrees, and recent commits.
+3. Locate the active iteration under `docs/plans`.
+4. Read only its product contract, active phase plan, active WP brief, and
+   machine status file.
+5. Verify status claims against Git and test evidence before continuing.
+6. Report discrepancies before mutating files.
+
+Do not ask an agent to recover state from chat history alone.
+
+## 4. Work-package lifecycle
+
+The only valid states are:
+
+```text
+DRAFT -> APPROVED -> DISPATCHED -> IMPLEMENTING -> READY_FOR_REVIEW
+READY_FOR_REVIEW -> CHANGES_REQUESTED -> IMPLEMENTING
+READY_FOR_REVIEW -> APPROVED_FOR_MERGE -> MERGED -> RELEASED
+any active state -> BLOCKED
+```
+
+`APPROVED` means scope and acceptance criteria are frozen. `READY_FOR_REVIEW`
+means only that the kimi (provider: deepseek) supplied evidence; it is not approval.
+
+Every WP must have:
+
+- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
+- a tracked JSON status file created from
+  `docs/agentic/templates/STATUS.json`;
+- one branch and one isolated worktree;
+- explicit allowed and forbidden paths;
+- exact acceptance tests and completion criteria;
+- actual executor, session ID when available, test evidence, and commit.
+
+**Merge-gate effort tier (optional, per-phase).** The independent merge gate
+(`agentic gate`) defaults to a medium reasoning effort —
+the gate is a second, independent signature on an already-ACCEPTed WP reviewing
+a bounded diff, so routine work does not need the most expensive reasoning
+effort. When freezing the phase plan, you may declare a per-phase tier in an
+optional `docs/plans/<iteration_id>/phase-tiers.json` (template:
+`docs/agentic/templates/phase-tiers.json`) with shape
+`{"phases": {"P0": "medium", "P2": "architecture"}, "default": "medium"}`:
+map architecture/contract-level phases (e.g. `P2`) to `"architecture"` (spends
+high effort, where a wrong ACCEPT means rework); everything else stays medium.
+This is set once per phase and every WP
+in it inherits the tier — no per-WP status field. Fail-safe toward the cheap
+tier: a missing file, missing phase, or unknown value resolves to medium; only
+an explicit `"architecture"` mapping spends high. This optimizes the CLI
+subscription weekly quota, not per-call cost.
+
+### 4.1 Dispatch command form and approval boundary
+
+- Dispatch the kimi (provider: deepseek) role with a command whose prefix matches the
+  configured developer tool's allowlist so it skips the interactive permission
+  hook. Use the tool's work-dir flag, not a `cd` prefix: a `cd <worktree> && ...`
+  compound form has prefix `cd`, misses the allowlist, and is sent to human
+  review. (dispatch the developer role (configured tool: {'adapter': 'kimi', 'provider': 'deepseek'}) into an isolated worktree; record the actual executor tool and session id.)
+- Background developer dispatch and low-risk `DRAFT -> APPROVED` scope freezes
+  proceed without human approval. Low-risk means engine-side additive change,
+  pure test/fixture, or docs, with every `risk.*` flag false and
+  product/business semantics untouched.
+- Human approval is still mandatory (never auto-dispatch/auto-freeze) when the WP
+  changes product or business semantics, touches action gating, has any
+  `risk.production_writes/network/real_notifications/irreversible` authorized, or
+  has an ambiguous brief. These are additionally caught by the permission hook's
+  mandatory-human patterns (production paths, merge/push, release/deploy, cron,
+  notifications, credentials) even if a command reaches it.
+- The machine-checkable autonomy policy lives in the project's `[autonomy]`
+  config. Query it before committing to a step: `agentic autonomy <action>`
+  prints `AUTONOMY_AUTO` (proceed) or `AUTONOMY_STOP` (ask the user, then set
+  `AGENTIC_AUTONOMY_APPROVE=1` for that one step). The gates enforce it
+  directly: `agentic preflight` for `dispatch_developer`, `agentic gate` for
+  `merge_gate`, `agentic merge` for `local_merge_no_ff`, and `agentic finalize`
+  for `finalize_merge`; `always_stop` actions (push, production write,
+  credentials, release, …) are hard-stopped even in `ultra` mode. Soft-limit
+  signals (`frozen_hard`, `rework_twice`, `circuit_breaker`) are classified with
+  `agentic autonomy signal <signal>`; `agentic health` reports
+  `soft_limit=frozen_hard` and `agentic redispatch` tags its circuit-breaker with
+  `soft_limit=circuit_breaker`.
+
+### 4.2 Post-dispatch health monitoring (default)
+
+After every background developer dispatch, the orchestrator must start a Monitor
+that calls the objective-measurement script once every ~60s, instead of
+hand-writing a `tail -n40 <log>` stall judgement each time:
+
+```text
+agentic health <status.json> <output-file> <snapshot-file>
+  (snapshot lives OUTSIDE the worktree, e.g. a temp dir)
+```
+
+The script does single-shot pure measurement only (reads `status.state` + output
+tail hash + git dirty; accumulates a frozen counter across calls via the snapshot
+file) and prints exactly one contract line to stdout; first token is one of
+`PROGRESS` / `FROZEN_<N>m` / `DONE`. Exit code `0` = measurement succeeded,
+non-zero = script self-error only (`64` usage / `65` status unreadable / `66` git
+failed). It never launches the developer tool, writes status, kills processes,
+touches locks, or hits the network — adjudication, liveness probe, `TaskStop`,
+re-dispatch, status writes, and locks all remain the orchestrator's job.
+
+Dispatch on the stdout first token:
+
+- `PROGRESS ...` -> keep waiting, no action.
+- `FROZEN_3m tail="..."` (reached `FROZEN_STALL_TICKS`, default 3 samples) ->
+  alarm level; read the tail to see where it is stuck, do not re-dispatch yet.
+- `FROZEN_7m tail="..."` (reached `FROZEN_HARD_TICKS`, default 7 samples) -> read
+  the tail and adjudicate: stuck on a thinking sentence / "Let me make the
+  changes"-type line -> judged truly dead -> run the re-dispatch flow; stuck on a
+  long operation like "running pytest" -> wait one more round.
+- `DONE READY_FOR_REVIEW` -> enter independent review (the dual-sign line).
+- `DONE BLOCKED` -> report, hand to human.
+- Non-zero exit (`HEALTH_ERROR:` on stderr) -> the measurement itself failed
+  (path/JSON/git); fix the call, do not infer developer liveness from it.
+
+The freeze criterion is: output tail content hash unchanged **and** git dirty
+unchanged. Bare mtime does not count (avoids cache/log churn keeping a dead
+worker alive forever); a long thinking phase whose tail keeps changing is not
+frozen (removes false-positive kills). Thresholds are counted in **sample ticks**,
+not wall-clock, and are env-overridable (`FROZEN_STALL_TICKS` / `FROZEN_HARD_TICKS`
+/ `TAIL_LINES`).
+
+Re-dispatch flow (orchestrator-run, at most one circuit-breaker retry): `TaskStop`
+the old task; probe liveness (a `reply PROBE_OK` probe — failure usually means
+expired auth (401) / broken env, so stop and find the root cause, do not
+re-dispatch); check worktree cleanliness and by default keep the half-finished
+work so the new developer continues idempotently; prepend continuation context to
+the re-dispatch prompt (current `git status --porcelain` + `git diff --stat`
+summary + old output tail + a hard requirement to inspect existing changes,
+continue the fix, not restart from an empty tree, and not re-edit existing
+fixtures/status); take a `agentic lock heartbeat` before any status write
+(`HEARTBEAT_LOST` -> stop); a second `FROZEN_7m` trips the breaker — stop and
+report the root cause, do not re-dispatch indefinitely.
+
+`agentic redispatch <status.json>` packages this flow for `REWORK`/
+`BLOCKED` reflow, but is orchestrator-invoked on demand — it is NOT triggered
+automatically. It runs the three guards in order (circuit-breaker on
+`executor.redispatch_count` >= `REDISPATCH_MAX` default 1 -> probe `PROBE_OK` ->
+`agentic lock heartbeat`), builds and persists a continuation prompt, then by default
+actually execs the configured developer binary and increments `redispatch_count`
+only after the dispatch command succeeds; `REDISPATCH_DRY_RUN=1` prints the
+planned command without dispatching or incrementing. Any guard failing stops
+without re-dispatch. The one-time human-operated `agentic finalize` and this
+re-dispatch remain manual orchestrator calls; only `agentic dispatch-lint` is wired to
+run automatically (inside `agentic preflight`, before the WP lock is acquired).
+
+### 4.3 Plan-level convergence (one plan = one merged commit)
+
+Splitting an iteration into WPs must NOT produce N independent commits/pushes on
+the protected branch. A **plan** groups N WPs under one integration branch — **one
+plan (iteration) = one branch**. Sequential WPs work on that one branch; only
+"parallel lanes" (WPs that must run concurrently, §5) get separate branches. The
+whole plan converges into a single merge commit on `main` and a single push.
+
+A plan is a tracked status file created from
+`docs/agentic/templates/PLAN.json` (schema `agentic-plan-status/v1`) and lives at
+`docs/plans/<iteration_id>/<plan_id>.status.json`. Its shape:
+
+- `git.base_branch` — the plan's **integration branch** (e.g. `plan/<iteration-id>`),
+  the single branch every WP in the plan works on / merges into, never `main`.
+- `git.target_branch` — where the plan's single merge commit lands (normally `main`).
+- `work_packages` — the authoritative list of WP IDs in this plan (every listed WP
+  must reach `MERGED` before the plan can converge). A WP may also carry an optional
+  top-level `plan_id` for cross-checking; if present it must equal the plan's id.
+
+Plan state machine:
+
+```text
+DRAFT -> ACTIVE -> READY_TO_MERGE -> MERGED
+DRAFT -> ABANDONED
+ACTIVE -> BLOCKED -> ACTIVE
+```
+
+Flow:
+
+1. `DRAFT -> ACTIVE`: freeze the plan, cut the integration branch from the latest
+   `main`, and point every WP's `git.base_branch` at it.
+2. Run the WP loop (§4.1–§4.2) unchanged on the integration branch. Sequential
+   WPs freeze → implement → finalize directly on that one branch (no per-WP
+   branch); a WP only gets its own branch when it is a parallel lane. `main`
+   stays frozen throughout.
+3. When all WPs are `MERGED`, set the plan state to `READY_TO_MERGE`, then run the
+   single convergence:
+   - `agentic plan check <plan.status.json>` — read-only; reports every WP's state
+     and whether the integration branch is already merged into the target.
+   - `agentic plan lint <plan.status.json>` — read-only; enforces the per-WP
+     commit discipline (below): exactly one freeze commit (the add) and one
+     finalize commit (`state=MERGED`) on the integration branch, with no
+     intermediate "review/codex/override sync" commits.
+   - `agentic plan merge <plan.status.json>` — the one `git merge --no-ff` of the
+     integration branch onto `git.target_branch` (autonomy-gated as
+     `local_merge_no_ff`; fails closed unless every declared WP is `MERGED` AND
+     the commit-discipline lint is clean).
+   - `agentic plan finalize <plan.status.json>` — stamps `state=MERGED` +
+     `git.merged_commit` (status-only, never touches git; idempotent).
+4. Push exactly once, after human approval. `push` stays a hard `always_stop`
+   action; there is deliberately no `agentic plan push`. The single plan merge
+   commit is what `main` receives — not N WP merge commits.
+
+Commit discipline (enforced by `plan lint` and `plan merge`): each WP's **status
+file** is committed exactly twice on the integration branch — `freeze` (the add,
+signatures empty) and `finalize` (`state=MERGED`, with all
+review/consult/override/qoder decisions folded in). The implementation commits
+land on the branch in between and do not touch the status file. Do NOT commit the
+status file after each signature; accumulate the decisions in the working tree
+and commit them once, inside the finalize commit. This removes the
+"review 同步 / codex 同步 / override 同步" intermediate commits that used to
+pollute the branch.
+
+`agentic plan merge`/`finalize` re-verify the evidence (all WPs `MERGED`; the
+integration branch tip actually merged into the target), never trusting the plan
+state alone. Run them from the main repo, on the target branch, against the
+main-repo plan status copy (single source of truth), just like the WP gates.
+
+## 5. Git and workspace rules
+
+- Never implement a WP on `main`.
+- Create a dedicated branch and registered Git worktree from the latest
+  approved base commit. If a worktree's branch was cut before an agentic tool
+  command (`agentic lock`, `agentic preflight`, `agentic quality-gate`)
+  landed, rebase onto a base that contains the CLI before dispatch.
+- The `agentic` CLI locates its gate wrappers itself (a main-repo copy when
+  present, else the copy bundled with the installed package), so run gates from
+  the main repo checkout, not a possibly-stale worktree copy. This is why
+  `agentic preflight` resolves the main root before invoking the lock and status
+  validator.
+- One WP has one owning kimi (provider: deepseek). Parallel lanes require separate branches and
+  non-overlapping file ownership.
+- Orchestrator concurrency: multiple orchestrator sessions/runners may act on the
+  same iteration. Each write action (status edit, dispatch, rework, merge) MUST
+  hold the relevant advisory lock (`agentic lock`). WP lock is enforced
+  by `agentic preflight`; the merge lock serializes writes to the base HEAD. owner id
+  is derived from `env:AGENTIC_SESSION_ID` (stable across context compaction), with a
+  default TTL of 30 minutes. A new session directed to take over an
+  overflowed prior session uses `--force-takeover`; unattended stale locks use
+  `--takeover` after TTL.
+- Preserve unrelated user changes. Do not reset, discard, or rewrite them.
+- Commit with explicit paths: `git commit -- <path>...`, never a bare
+  `git commit`. A bare commit records the ENTIRE staging area, so a concurrent
+  session's already-staged files get pulled into your commit. `git add <mine>`
+  alone does not scope the commit. Before committing, run `git status --short`;
+  an `MM` entry or any staged path you did not add means another session is
+  active — commit only your own paths explicitly. Locks guard who may write a WP
+  but do not partition the shared Git index.
+- The kimi (provider: deepseek) must not merge, push, delete the worktree, or release.
+- The Reviewer merges only after `APPROVED_FOR_MERGE` and re-verifies on the
+  destination branch.
+- Merge finalization is a manual orchestrator step, not automatic. After the
+  human-approved `git merge --no-ff` of an `APPROVED_FOR_MERGE` WP, run
+  `agentic finalize <status.json>` to stamp `state=MERGED` and
+  record the exact `merged_commit`. The script only writes status (never merges,
+  pushes, or touches git), resolves the merge commit by matching the branch tip
+  as a merge parent (0/multiple candidates FAIL, never falling back to base tip —
+  safe under concurrent merges), fails closed unless both `review.decision` and
+  `consult.decision` are ACCEPT, and releases the WP lock. On `--no-ff` the WP's
+  own `status.json` conflicts with the double-signed main copy; resolve to the
+  main copy (single source of truth), never the branch copy.
+- `.worktrees/`, local context dirs, CLI logs, credentials, and session caches
+  are local state and must not be committed.
+
+## 6. Production and data safety
+
+Unless a WP and the user explicitly authorize otherwise:
+
+- Do not write production data paths ((none)), production databases,
+  portfolio/config state, cron state, credentials, or gateway configuration.
+- Do not send real notifications, trigger production cron jobs, or call mutating
+  tools.
+- Do not use live network data in unit or replay tests.
+- Use sanitized fixtures and temporary profiles for tests.
+- Treat production profiles as read-only even when the filesystem permits
+  writes.
+- Never expose forbidden paths (.env, .context/), tokens, app secrets, webhook
+  URLs, or account data in prompts, logs, fixtures, commits, or review reports.
+- Production cutover requires dry-run, replay/shadow evidence, rollback steps,
+  orchestrator review, and explicit user approval.
+
+Business-facing behavior has an additional hard boundary: no agent may silently
+change signal semantics, thresholds, valuation/decision rules, or automated
+actions to make a test pass.
+
+## 7. Implementation loop
+
+For a frozen WP, the kimi (provider: deepseek) may iterate:
+
+```text
+implement -> run relevant tests -> diagnose -> fix -> rerun
+```
+
+Stop and return `BLOCKED` or `CONSULT` when:
+
+- the product contract or acceptance criteria must change;
+- the same root failure survives two genuine repair attempts;
+- architecture, data time semantics, migration, or security is uncertain;
+- production data or credentials would need mutation;
+- an irreversible action or scope expansion is required.
+
+Tests may not be deleted, weakened, skipped, or rewritten merely to hide a
+regression. External-service failure must be replaced by deterministic fixtures,
+not unbounded retries.
+
+## 8. Verification and evidence
+
+The kimi (provider: deepseek) handoff must include:
+
+- changed files and behavioral changes;
+- design decisions and deviations from the brief;
+- exact test commands, exit status, pass/fail counts, and known baseline failures;
+- remaining risks and production impact;
+- branch, worktree, and commit;
+- confirmation that production paths and real notifications were untouched.
+
+Run `agentic quality-gate <status.json>` before requesting review.
+WP-specific acceptance tests in the brief remain mandatory even if the generic
+gate passes.
+
+The Reviewer must inspect the actual diff and rerun proportionate tests. Valid
+review outcomes are `ACCEPT`, `REWORK`, or `CONSULT`. Record the decision and
+evidence in the status file; do not rely on a chat response.
+
+## 9. Repository test commands
+
+Project-specific quality-gate command mapping (path prefix -> test command):
+
+  - src/agentic_loop/** -> python3 -m pytest tests -q
+  - tests/** -> python3 -m pytest tests -q
+
+Run package test suites separately when repository-wide collection has
+conflicting `conftest.py` module names.
+
+## 10. Durable documentation rule
+
+Long-lived rules belong here or in `docs/agentic/`. Product decisions belong in
+the iteration contract. Dynamic execution state belongs only in the WP status
+JSON. Findings and test evidence belong in Git-visible artifacts. Do not put
+durable project state only in model memory, CLI session history, temp dirs, or a
+private scratch file.
