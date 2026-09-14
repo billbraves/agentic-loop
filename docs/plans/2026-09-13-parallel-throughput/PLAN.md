@@ -144,7 +144,14 @@ WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
 > 本轮已核实 `dispatch_lint.sh` / `validate_wp_status.py` / `resolve_paths.py`
 > 两侧逐字节一致，所以**已出的判定（含 WP-15 的 `DISPATCH_LINT_PASS`）仍然有效**；
 > 但这是巧合而非保证。任一侧继续改动即刻恶化为假绿。
-> 详见 `WP-08-candidate.md` §B7，修 B7 的优先级应高于其余 B 类。
+> 详见 `WP-08-candidate.md` §B7。
+>
+> **✅ B7 已修（2026-09-14）**：`uv tool install --force --editable` 指向本仓，
+> 独立快照副本消失，`agentic_loop.__file__` 现为本仓 `src/`。行为一致性已复核
+> （`dispatch-lint` 仍 PASS、`merge` 仍卡同一条 consult 门、pytest 一致）。
+> 两处原判断已纠正：装载源是**本仓停在 `main` 的副 worktree**（非另一个仓）；
+> `resolve_wrapper()` 的 dogfood 分支是**死代码**（找 `scripts/agentic/`，
+> 两个目录都没有）。残留清理并入 A4/A7 那个 WP。详见 §B7 处置记录。
 >
 > **WP-17 的三个设计点已裁定**（2026-09-14）：复用 `weak` 不新增级别；
 > 要求 `capabilities.sandbox_enforced` 并复用 `_weak_engine_enforced()`；

@@ -391,6 +391,47 @@ evaluate() -> none
 - 归 B 类而非 A 类：不阻塞任何单个 WP 的判定正确性（判据文件当前两边一致），
   但会让整轮 dogfood 的验证证据链失去意义，且随任一侧继续改动即刻恶化为假绿。
 
+### B7 处置记录（2026-09-14，已修，含对原判断的两处纠正）
+
+**修法**：`uv tool install --force --editable /Users/admin/vibe/agentic_loop`（用户执行）。
+
+修后核验：
+
+```
+direct_url.json = {"url":"file:///Users/admin/vibe/agentic_loop","dir_info":{"editable":true}}
+site-packages/agentic_loop/            -> 已不存在（独立快照副本消失）
+site-packages/_editable_impl_*.pth     -> 指向本仓 src/
+agentic_loop.__file__                  -> /Users/admin/vibe/agentic_loop/src/agentic_loop/__init__.py
+```
+
+行为一致性（证明修的是装载源，没顺手改门禁语义）：
+`dispatch-lint WP-17` 仍 `DISPATCH_LINT_PASS`；`merge WP-01` 仍卡同一条
+`consult.decision must be ACCEPT`；主区 `pytest` 4 failed + 492 passed
+（plan 分支基线，不含 WP-17 代码，符合预期）。
+
+**纠正 1：装载源不是「另一个仓」。** 原记录说 `agentic` 跑的是
+`/Users/admin/vibe/agentic-loop-main-codex-merge` 这个「另一个仓」。实际三者
+`git rev-parse --git-common-dir` 全部指向 `/Users/admin/vibe/agentic_loop/.git`
+——它和 `agentic-loop-codex-verdict` 都是**本仓的副 worktree**，只是停在 `main`
+分支（已并 WP-16，故 `adapters/codex.py` 比本迭代分支新）。性质是「跑了本仓另一
+个分支的工作树」，不是跨仓。
+
+**纠正 2：dogfood 通道不是「落不到地」，是从来没有过。** 原记录归因为
+「本仓没有 `scripts/agentic/` 所以 dogfood 通道落不到地」，暗示别处有。实际
+`cli.py:129` 的 `resolve_wrapper()` 找 `_main_root()/"scripts"/"agentic"/<name>`，
+而**两个目录都没有** `scripts/`——wrappers 早已搬到 `src/agentic_loop/wrappers/`。
+这条分支是**死代码**，任何布局下都不会命中。
+
+**残留（低优先，可并入 A4/A7 那个 WP）**：`resolve_wrapper()` 的
+main-repo 优先分支应当删除，或改为识别 `src/agentic_loop/wrappers/` 这一实际
+布局。editable 装载已让整包指向本仓 src/，故此残留不再影响正确性，
+但留着会继续误导下一个读 docstring 的人（docstring 明确承诺
+「live edits (dogfood) win」，而实际不会）。
+
+**对已出判定的影响**：无。修前已核实 `merge.sh`/`preflight.sh`/`quality-gate.sh`/
+`dispatch_lint.sh` 与 `validate_wp_status.py`/`resolve_paths.py`/`independence.py`/
+`cli.py` 两侧逐字节一致，故本迭代此前所有门禁结论仍然有效；修后复跑亦一致。
+
 ## C 类
 
 ### C1. scope 是前缀匹配，不是 glob——但 PLAN/brief 里用 glob 写法不会报错
