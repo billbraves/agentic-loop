@@ -1083,3 +1083,10 @@ VERDICT: REWORK
 > 修法 1 须注意：不能因为「文本里出现 ACCEPT」就放行 —— 只认行首锚定的
 > `VERDICT:`/`DECISION:` 标签，且全文出现多个不同判定时 fail-closed 取最严
 > （REWORK > CONSULT > ACCEPT），防止把 rationale 里引用的词误当裁决。
+
+> **A9 顺序风险已实证**（编排者，2026-09-14，纯内存构造未改 config）：
+> `developer` 无 binding 时 `evaluate()` 返 `none`（A0 现场）；一旦 binding
+> 带上 `identity_model`，同一调用直接返 `strong` 且 `meets_threshold(strong,"strong")=True`。
+> 即 **A5 一解开，A9 立刻由理论缺陷变成每次 gate 都走的实际路径**。
+> 故 A9 的 strong 上限必须先落地（WP-20 第一步），否则中间态是
+> 「双签门放行、但放行依据是语义上不成立的 strong」—— 比 A0 锁死更坏。
