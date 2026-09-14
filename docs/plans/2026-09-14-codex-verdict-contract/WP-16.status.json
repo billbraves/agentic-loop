@@ -4,11 +4,11 @@
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "plan_id": "PLAN-CODEX",
   "phase": "P2",
-  "state": "APPROVED",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "5773c3a5-e0c8-47c8-94c8-00edd499f757"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -24,7 +24,8 @@
     "base_commit": "0ef592e",
     "branch": "plan/2026-09-14-codex-verdict-contract",
     "worktree": "/Users/admin/vibe/agentic-loop-codex-verdict",
-    "commit": ""
+    "commit": "36df3ee",
+    "merged_commit": "36df3ee"
   },
   "scope": {
     "allowed_paths": [
@@ -47,12 +48,113 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
-    "incident": "Consumer gate rc=2 twice on unchanged tip: empty output, then non-schema Chinese no-blocker text. No consumer ACCEPT inferred."
+    "tests": [
+      {
+        "name": "targeted after rework",
+        "command": "python3.11 -m pytest tests/test_codex_verdict_recovery.py tests/test_adapter_injection.py tests/test_injection_probe.py -q",
+        "exit_code": 0,
+        "note": "49 passed independently; includes delimiter breakout, redaction, wrong roots, precedence, whitespace fallback, stale output, AST killer"
+      },
+      {
+        "name": "full suite after rework",
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "521 passed, 4 skipped, same 4 pre-existing tests/test_finalize_merge_triple_sign.py failures; frozen base was 492 passed, 4 skipped, same 4 failed"
+      },
+      {
+        "name": "compile and diff",
+        "command": "python3.11 -m compileall -q src/agentic_loop tests/test_codex_verdict_recovery.py && git diff --check 05dbe75..HEAD",
+        "exit_code": 0,
+        "note": "PASS"
+      },
+      {
+        "name": "collision probe",
+        "command": "construct adversarial normalization prompt and Base64 decode payload",
+        "exit_code": 0,
+        "note": "PASS: exactly one terminator, no raw instruction/secret, decoded payload equals redacted original"
+      },
+      {
+        "name": "first independent review",
+        "command": "fresh subagent review c18f908",
+        "exit_code": 1,
+        "note": "REWORK: fixed delimiter breakout and weak static killer"
+      },
+      {
+        "name": "independent re-review",
+        "command": "fresh subagent review 36df3ee",
+        "exit_code": 0,
+        "note": "ACCEPT: both blockers closed; focused 49 passed"
+      }
+    ],
+    "incident": "Consumer gate rc=2 twice on unchanged tip: empty output, then non-schema Chinese no-blocker text. No consumer ACCEPT inferred.",
+    "native_gate_retry": {
+      "authorized_by": "user",
+      "instruction": "Use agentic loop Codex CLI with configured kirogateway URL",
+      "provider": "kirogpt",
+      "base_url": "http://127.0.0.1:18090/v1",
+      "at": "2026-09-14T03:40:00Z"
+    },
+    "native_gate_attempt_1": {
+      "exit_code": 2,
+      "result": "preflight fail-closed before Codex invocation",
+      "reason": "review.attestation missing; independence none below weak",
+      "diff_tip": "36df3ee",
+      "scope_files": 2,
+      "effort": "high"
+    },
+    "native_gate_resolution": {
+      "status": "RESOLVED",
+      "user_instruction": "Use agentic loop Codex CLI with configured kirogateway URL",
+      "provider": "kirogpt",
+      "base_url": "http://127.0.0.1:18090/v1",
+      "gate_decision": "ACCEPT",
+      "reviewed_tip": "36df3ee",
+      "scope_files": 2,
+      "effort": "high",
+      "answer_artifact": "WP-16-codex-merge-gate.answer.md",
+      "historical_precheck": {
+        "kind": "missing_runtime_credential",
+        "reason": "Native P2 merge gate reads main checkout config, whose consultant is codex/kirogpt with api_key_env=OPENAI_API_KEY. OPENAI_API_KEY is absent in this session; no consultant invocation or signature was fabricated.",
+        "config_discrepancy": "Integration branch config binds consultant to deepseek/DEEPSEEK_API_KEY, but main checkout was concurrently changed to kirogpt/OPENAI_API_KEY. Gate resolves main_repo by design.",
+        "evidence": [
+          "agentic bootstrap --dry-run reported BOOTSTRAP_MISSING_KEY: ANTHROPIC_API_KEY, OPENAI_API_KEY",
+          "Boolean env check: OPENAI_API_KEY_PRESENT=False, ANTHROPIC_API_KEY_PRESENT=False, DEEPSEEK_API_KEY_PRESENT=False"
+        ],
+        "next_action": "Set OPENAI_API_KEY in the supervising process environment without pasting it into chat, then rerun native high-effort agentic gate against WP-16 using integration source. Do not relax provider binding or synthesize consult."
+      }
+    }
   },
-  "review": {},
-  "consult": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "fresh subagent bdca4f9c-1e0f-49cc-8af0-866d41c2f34c",
+    "reviewed_commit": "36df3ee",
+    "evidence": "ACCEPT after REWORK. UTF-8 Base64 framing makes fixed underscore terminator collision-proof; adversarial terminator/instruction/secret test proves one terminator and exact redacted decode. AST killer meaningfully rejects regex/dict phrase mapping and confines decision literals. Focused offline suite 49 passed; scope limited to allowed files.",
+    "prior_rework_commit": "c18f908",
+    "attestation": {
+      "reviewer_role": "independent architecture and incident reviewer",
+      "reviewer_tool": "fresh-subagent",
+      "fresh_session": true,
+      "adversarial_prompt": true,
+      "attested_by": "Kiro orchestrator current-dsh-session",
+      "attested_at": "2026-09-14T04:04:18Z",
+      "session_id": "bdca4f9c-1e0f-49cc-8af0-866d41c2f34c",
+      "developer_session": "kimi 5773c3a5-e0c8-47c8-94c8-00edd499f757",
+      "audit_note": "Fresh reviewer first returned REWORK for delimiter breakout and weak static killer, then ACCEPT only after commit 36df3ee closed both blockers."
+    }
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "reviewed_by": "codex-cli",
+    "reviewed_at": "2026-09-14T04:05:54Z",
+    "notes": "该 diff 满足 WP-16 的有界恢复与 fail-closed 契约。首次有效结果立即返回；首次非零退出不重试且脱敏；空输出仅完整重试一次；非空非法输出仅进行一次 structure-only normalization；所有二次结果仍通过既有严格 `_parse_verdict()` 白名单，且不存在第三次调用路径。归一化输入先脱敏、限制为 16 KiB、使用独立 answer 文件，并保持 provider、sandbox、schema 与 reasoning effort 一致。未引入自然语言到决策的映射，也未修改 forbidden paths、测试或信号语义。\n\nIndependence: weak\n- reviewer identity unavailable (orchestrator, attested not engine-proven)\n- no implementer fallback available\n- reviewer attestation present and complete (reviewer_role=independent architecture and incident reviewer, reviewer_tool=fresh-subagent, fresh_session=True, adversarial_prompt=True, attested_by=Kiro orchestrator current-dsh-session)\n- level=weak-attested: reviewer=orchestrator, attested not engine-proven",
+    "independence": "weak"
+  },
   "timestamps": {
-    "dispatched_at": ""
+    "dispatched_at": "2026-09-14T02:59:55Z",
+    "reviewed_at": "2026-09-14T03:14:21Z",
+    "ready_for_review_at": "2026-09-14T03:25:45Z",
+    "blocked_at": "2026-09-14T03:27:59Z",
+    "native_gate_accepted_at": "2026-09-14T04:05:54Z",
+    "finalized_at": "2026-09-14T04:07:11Z"
   }
 }
