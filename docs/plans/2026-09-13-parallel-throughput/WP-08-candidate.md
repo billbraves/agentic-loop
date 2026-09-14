@@ -1090,3 +1090,41 @@ VERDICT: REWORK
 > 即 **A5 一解开，A9 立刻由理论缺陷变成每次 gate 都走的实际路径**。
 > 故 A9 的 strong 上限必须先落地（WP-20 第一步），否则中间态是
 > 「双签门放行、但放行依据是语义上不成立的 strong」—— 比 A0 锁死更坏。
+
+### A18. schema 无顶层 `brief` 字段，全局规范要求的 `brief.sha256` 冻结锚定无处落地
+
+> 编排者创建 WP-19 状态文件时发现（2026-09-14），实证复现。
+
+全局规范 §4.1 的状态文件结构示例明确含：
+
+```json
+"brief": { "path": "docs/wp/WP-N.brief.md", "sha256": "" }
+```
+
+并在紧随其后的说明里写明用途 ——「`brief.sha256` 锚定冻结版 Brief，
+执行报告据此证明『执行的确是冻结版』」。§6.C 的执行报告模板也依赖这条。
+
+**实证**：按规范写入顶层 `brief` 字段后校验直接失败：
+
+```
+STATUS_INVALID: unknown top-level fields: brief
+```
+
+`REQUIRED_TOP_LEVEL_V1/V2/V3` 与 `OPTIONAL_TOP_LEVEL`（`{"qoder_security", "plan_id"}`）
+均无 `brief`。核查本迭代既有 WP（WP-01/08/18）顶层键，**全部没有** `brief`，
+`docs/agentic/templates/STATUS.json` 模板同样没有 —— 即这条审计链从未落地过。
+
+**影响**：冻结版 Brief 与实际执行之间没有任何机器可核对的锚点。当前只能靠
+「brief 文件已提交、执行期不改」这条流程约定，而 §4.1 允许 re-freeze 走 rev2，
+一旦发生就无法从 status 判断执行者当时读的是哪一版。这与 A15（`BLOCKED` 无处
+记录 `blocker`）同型：**规范定义了字段，实现不接受该字段**。
+
+**候选修法**：把 `brief` 加入 `OPTIONAL_TOP_LEVEL`，并校验其内部结构
+（`path` 非空字符串 + `sha256` 为 64 位十六进制或空串）；模板
+`docs/agentic/templates/STATUS.json` 同步补上该字段。进一步可在 `preflight`
+里比对 `brief.sha256` 与实际文件摘要，不符即拒绝派发（fail-closed），
+把「执行的确是冻结版」从口头约定变成门禁。
+
+> A18 与 A15（`blocker`）、A14（`executor` 块字段无白名单）同属
+> `validate_wp_status.py` 的 schema 面。三者可并入同一个 WP。
+> 注意本轮 WP-19/WP-20 均把该文件列为 forbidden_paths，故这三条须另立 WP。

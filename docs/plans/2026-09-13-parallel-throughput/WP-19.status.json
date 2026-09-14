@@ -1,0 +1,63 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-19",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "APPROVED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "claude-8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "fd6bcd4",
+    "branch": "feature/wp19-wrapper-seams",
+    "worktree": "../wp19-wrapper-seams",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_preflight_branch_binding.py",
+      "tests/test_finalize_merge_first_call.py",
+      "tests/test_worktree_detection.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "docs/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": []
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": {
+    "dispatched_at": ""
+  }
+}
