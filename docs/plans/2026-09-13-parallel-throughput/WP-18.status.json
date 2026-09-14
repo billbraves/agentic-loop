@@ -20,7 +20,7 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "fa90397",
+    "base_commit": "2577a01",
     "branch": "feature/wp18-dispatch-proof",
     "worktree": "../wp18-dispatch-proof",
     "commit": ""
