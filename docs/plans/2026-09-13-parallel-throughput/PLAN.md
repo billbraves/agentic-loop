@@ -71,6 +71,45 @@
 `WP-08-candidate.md`。用户 2026-09-13 裁定：立 WP-08 并按下表拆分纳入本迭代。
 C1 并入 WP-04（见 §5 的 scope 纪律说明），其余各成一 WP。
 
+派发 WP-08 时又踩出第 13 个（**A4**：冻结期 `git.branch`/`worktree` 必须留空，
+但 `preflight.sh:45` 要求非空，而补字段的三条路——另起 sync 提交 / 只改工作区 /
+把 status 加进 `allowed_paths`——分别被 `plan lint`、`quality-gate.sh` 和
+隔离纪律堵死）。本轮经用户授权 `--amend` 冻结提交绕过（`a556c26` → `802b667`）。
+**A4 尚未拆包**，候选修法见 `WP-08-candidate.md` §A4，其中一条会把「状态文件提交
+两次」改成三次，属文档级契约变更，待用户裁定后再定归属。
+
+WP-08 验收（ACCEPT）之后踩出第 14 个（**A5**：`.agentic/config.toml` 于
+2026-09-13 23:37 被会话外手工改动，`developer` 由
+`{ adapter = "kimi", provider = "deepseek" }` 改为裸字符串 `"kimi"`；
+没有 provider 绑定，`_resolve_implementer_identity()` 如实 fail-closed 返回
+`None`，degraded 路径因此不进入，A0 逐字复现）。**WP-08 的代码没有回归**——
+在有绑定时实测解锁 A0，fail-closed 亦正确；这是配置与代码的耦合未被文档化：
+该次改动的注释「绑了也不影响评级」按的是 WP-08 之前的语义。
+`min_independence` 仍为 `weak`，未被放宽。
+
+**A5 的定性经用户澄清后已修正**（`WP-08-candidate.md` §A5 修正节）：kimi 实际跑
+codingplan/k3、不经框架 provider 层（只有 claude/codex 走 kiro 代理），
+所以这不是「配置漏了绑定」，而是**判据设计与本仓实际拓扑不匹配**——
+strong/degraded/bootstrap 三条路径在当前拓扑下全部不可达。
+
+**用户 2026-09-14 裁定：A5 走修法 2**（立新 WP 扩展评级判据）。
+裁定依据是 codex 对 WP-15 的独立审核（`WP-15-consult-codex.md`，`REWORK`），
+它推翻了原首选修法 1（给 `developer` 绑 provider）的前提：`identity_model`
+直接来自可手改的 TOML，注入探针只验 sentinel 不验模型，**任何人都能声明一个
+与真实路由不符的模型来伪造 degraded 独立性**，现有代码无任何防线。
+那条路本质是让合并门去读一个用户可手改的字符串，与 WP-08 存在的理由
+（不许自证）属同一类问题。另有两项 P1 阻断（`--config-file` 替换整份 kimi 配置、
+模板硬编码 `type="anthropic"` 与本机 K3 的 `type="kimi"`+OAuth 不符），
+均见 §A5 裁定节。
+
+修法 2 的 WP 待起草。**改配置仍属用户决策，编排者不自行改**；
+WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
+
+派发 A6 修复时立第 15 个 WP（**A6**：`adapters/kimi.py:63` 把
+`max_context_size` 硬编码为 DeepSeek 的 768K，绑定路径绕不开，
+会把 k3 的 1M 窗口静默压掉约 25%）。已出 `WP-15-brief.md` rev2，
+经 codex 审核后**收窄为独立的 context-size 透传修复**，不再承担 A5 解锁责任。
+
 | WP | 标题 | 交付物 | 性质 |
 |----|------|--------|------|
 | WP-08 | 解开双签合并门的独立性死锁（A0） | `independence.py` + `gate/__init__.py` 准入条件 | **优先级最高**，挡住整条流水线最后一步 |
@@ -80,6 +119,40 @@ C1 并入 WP-04（见 §5 的 scope 纪律说明），其余各成一 WP。
 | WP-12 | 缺信号≠冻结，退出码≠成功（B2+B6+B3） | `kimi-health.sh` `UNKNOWN_NO_OUTPUT` + `dispatched` 语义 | 仪表可信度 |
 | WP-13 | 门拒绝跑错目录并标注读取来源（B5+C3） | `quality-gate.sh` 前置校验 + 输出层标注 | 假阳性治理 |
 | WP-14 | `evidence.tests` 结构写进模板与文档（C2） | 模板示例 + QUICKSTART | 纯文档/模板 |
+| WP-15 | `max_context_size` 随 provider 配置走（A6） | `provider_binding.py` 增 `max_context_size: int \| None` + `adapters/kimi.py` 模板读 binding | 静默降级，独立修复（rev2 已与 A5 解耦） |
+| WP-17 | 补一条 engine-verifiable 的独立性判据（A5 修法 2） | `independence.py` + `adapters/base.py` 新增 `IsolationEvidence` + `gate/__init__.py` 读 git 事实 | **合并门准入语义变更**，已冻结待派发，基线 `feature/wp08-independence-degraded` |
+
+> **A4 尚未拆包**，待用户裁定归属（涉及「状态文件提交两次」的契约变更）。
+>
+> **WP-16 不属本迭代**：归 `docs/plans/2026-09-14-codex-verdict-contract/`，
+> 由另一会话执行中（`state=IMPLEMENTING`），与本迭代无路径冲突。
+> 但它**已经 merge 进本机 `agentic` 实际运行的那份代码**（装载源
+> `/Users/admin/vibe/agentic-loop-main-codex-merge` 的 `main`，HEAD `600c2f1`），
+> 而本仓工作树的 `adapters/codex.py` 仍是旧版——见新增缺陷 B7。
+>
+> **⚠️ B7（新增，2026-09-14）：本迭代所有门禁结论的证据链有机制性缺口。**
+> `agentic *` 跑的是 uv 非 editable 安装的**另一个仓的快照**，不是本仓 `src/`；
+> 本仓也没有 `scripts/agentic/`，故 `cli.py` 的 dogfood 通道落不到地。
+> 本轮已核实 `dispatch_lint.sh` / `validate_wp_status.py` / `resolve_paths.py`
+> 两侧逐字节一致，所以**已出的判定（含 WP-15 的 `DISPATCH_LINT_PASS`）仍然有效**；
+> 但这是巧合而非保证。任一侧继续改动即刻恶化为假绿。
+> 详见 `WP-08-candidate.md` §B7，修 B7 的优先级应高于其余 B 类。
+>
+> **WP-17 的三个设计点已裁定**（2026-09-14）：复用 `weak` 不新增级别；
+> 要求 `capabilities.sandbox_enforced` 并复用 `_weak_engine_enforced()`；
+> git 事实由 `gate/` 读好后以 `IsolationEvidence` 传入以保 `evaluate()` 纯函数。
+>
+> **WP-17 的自举与顺序约束已裁定**（2026-09-14，用户选 A）：WP-17 基于
+> `feature/wp08-independence-degraded` @ `a46578c` 开分支，WP-08 作上游依赖，
+> **合并序固定 WP-08 → WP-17**，不动用例外合并授权。已冻结，`DISPATCH_LINT_PASS`。
+> 合并期须把 WP-17 的 `base_branch` re-freeze 回 plan 分支（`merge.sh:82`
+> 要求站在 base_branch 上，而那时 WP-08 分支已被并掉）——详见 brief
+> 「⚠️ 合并操作序」一节，此时序矛盾与 A4 同源。
+>
+> 以下为裁定前的原始记录，保留备查：它改的
+> `gate/__init__.py` 与 `independence.py` 正是 WP-08 的范围，而 WP-08 的合并
+> 本身卡在 A0——即 WP-17 要解的那个问题。基线分支（基于 WP-08 分支开，
+> 还是先例外合并 WP-08）是冻结前唯一待定项。
 
 ## §5 工作包拆分
 

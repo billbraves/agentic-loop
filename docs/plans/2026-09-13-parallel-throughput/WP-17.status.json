@@ -1,0 +1,57 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-17",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "DISPATCHED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "feature/wp08-independence-degraded",
+    "base_commit": "a46578c",
+    "branch": "feature/wp17-isolation-evidence",
+    "worktree": "../wp17-isolation-evidence",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/base.py",
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_independence_isolated.py",
+      "tests/test_gate_independence_isolated.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/provider_binding.py",
+      "src/agentic_loop/adapters/kimi.py",
+      "src/agentic_loop/wrappers/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": []
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": {}
+}

@@ -10,6 +10,10 @@
 **B 类 = 误导性错误信息**（信息不足导致误诊，浪费一轮排查），
 **C 类 = 契约与模板不一致**（模板默认值与生命周期约束互相打脸）。
 
+> ⚠️ **B7 是 B 类里的异类**：它不只是信息误导，而是「门禁跑的根本不是本仓的代码」。
+> 之所以仍归 B 而非 A，是因为它不改变任何单个 WP 的判定正确性（判据文件当前两边一致），
+> 但它使整轮 dogfood 的验证证据链失去机制保证。**修 B7 的优先级应高于其余 B 类。**
+
 ## A 类
 
 ### A0. 双签合并门在「编排者即审核者」的正常路径下无法通过，除非编排者自证一个可能为假的声明
@@ -87,6 +91,53 @@
   **不是**把警告写进注释就算了：默认值本身必须自洽。
 - 归属：并入 WP-09（与 A1 同文件同区域）。
 
+### A4. 冻结期填不了 `git.branch`/`worktree`，但 preflight 又要求它——冻结与派发的字段时序冲突
+
+**现象**（本轮实跑，`a556c26`）：七个 WP 冻结时 `git.branch`/`git.worktree` 留空
+（模板 `STATUS.json.tmpl` 默认即为空串），派发时 `agentic preflight` 直接拒绝：
+
+```
+PREFLIGHT_FAIL: current branch feature/wp08-independence-degraded != status branch
+```
+
+`preflight.sh:45` 拿活分支比 `git.branch`，空串永不相等，七个 WP 全部无法派发。
+
+**为什么不能在派发时补**：三条路都堵着——
+
+1. **另起一个提交补字段**：`_wp_commit_discipline`（`plan_cmd.py:355-367`）把
+   非 freeze、非 `state=MERGED` 的提交一律归为 `sync`，于是 `plan lint` 对该 WP
+   永久 DIRTY，`plan merge` fail-closed。正是 §4.3 要消灭的「review 同步 / codex 同步」污染。
+2. **只改工作区不提交**：`quality-gate.sh` 的改动集含 `git diff`（未提交改动），
+   status 文件不在 `allowed_paths` 里，于是实测报
+   `QUALITY_GATE_FAIL: changed path outside allowed scope: ...WP-08.status.json`
+   ——执行者必跑的门被自己的协调文件打挂。
+3. **把 status 路径加进 `allowed_paths`**：等于把状态写入面交给执行者，
+   违反全局规范 §4.1「仅编排者维护 status」与 §5.7 隔离。
+
+**本轮的处置**：用户授权 `git commit --amend` 改写未推送的 `a556c26`
+（→ `802b667`），把七个 WP 的 branch/worktree 补进**同一个** freeze 提交，
+保持「每 WP 恰好一次 freeze」。事后 `plan lint` 对 WP-08..14 只剩
+`finalize commit x0`，无 sync 提交。
+
+**这是缺陷而非操作失误的理由**：冻结（`APPROVED`，scope 与验收标准定稿）
+天然发生在开 worktree 之前，此时 branch/worktree **尚不存在**；
+而 `validate_wp_status.py:462-464` 只在 `active_states`（不含 `APPROVED`）
+才要求这三个字段非空——**校验器认为冻结期留空是合法的**，
+`preflight.sh` 却要求它非空。两者对同一状态的要求不一致。
+
+**候选修法**（择一，需评估）：
+
+- `preflight.sh`：`git.branch` 为空时视为「尚未绑定」，
+  用活分支回填并提示，而不是失败；绑定后再比对（要防止绑错分支）。
+- 或：承认 `APPROVED -> DISPATCHED` 的状态跃迁本身就该带一次合法的状态写入，
+  在 `_wp_commit_discipline` 里把「freeze 之后、`state=DISPATCHED` 的第一个提交」
+  也算合法（freeze/dispatch/finalize 三次提交纪律），而非一律判 sync。
+- 或：`agentic preflight` 增一个 `--bind-branch` 子动作，由编排者显式在
+  freeze 提交里 amend/补齐，把本轮的人工操作变成有据可循的一等命令。
+
+> 注意第二条会把「两次提交」纪律改成「三次」，是文档级契约变更，
+> 需要用户裁定，不能由执行者顺手改。
+
 ## B 类
 
 ### B1. `preflight.sh` 的 tracked 检查吞掉 stderr，把「路径不在本 worktree 内」误报成「未跟踪」
@@ -111,6 +162,25 @@
   `UNKNOWN_NO_OUTPUT` 而不是并入 frozen 判定（缺信号 ≠ 冻结）；
   并在 AGENTS.md §4.2 写明派发必须是 `| tee <log>` 的流式形态，
   buffered 捕获不满足 health 前置条件。
+
+**2026-09-13 WP-08 派发期二次实测复现**（不再是推演，是完整跑了一遍的观测）：
+
+- 派发 3 分钟后 monitor 报 `FROZEN_3m tail=""`——`tail` 就是空串，B2 描述的
+  「一个信号从一开始就是死的」在实盘上原样出现。
+- 同一时刻的独立核查：`.out` 文件 0 字节；health snapshot 里
+  `tail_hash=da39a3ee5e6b4b0d3255bfef95601890afd80709`（空串的 SHA-1）；
+  而 `ps` 显示派发 wrapper 与 `Kimi Code` 进程都活着，其子进程正在跑
+  `python3.11 -m pytest tests -q`，worktree 里三个目标文件已就位
+  （`gate/__init__.py` 已改，两个测试文件各 220 / 123 行）。
+  **执行者完全健康，告警纯属虚报。**
+- 附带确认了 §B2 修法里「空串哈希」这一判据的可用性：`tail_hash` 恒等于
+  `da39a3ee…` 正是 `UNKNOWN_NO_OUTPUT` 该识别的特征值。
+  （注意与 §B2 原记的 `d41d8cd9…` 区分：那个是 `tail_hash()` 在**文件缺失**
+  分支返回的 MD5-of-empty，此处是文件存在但为空时 `shasum` 的 SHA-1。
+  两个空态走两条不同的哈希算法，本身也是 B2 该一并收敛的口径不一致。）
+- 编排者的临时对策（不属任何 WP，仅本轮操作）：monitor 改用
+  「health 输出 + 派发进程是否存活」双判据，`FROZEN_*` 不再单独作为终止条件。
+  这恰好印证 B2 的修法方向——**缺信号必须与冻结区分开**。
 
 ### B3. `AGENTIC_PYTHON` 覆盖会打穿测试自带的 `python3` stub，制造假失败
 
@@ -159,6 +229,57 @@
   且 [STATUS] 为 DONE/DONE_WITH_CONCERNS」+「worktree 里 commit 确实存在」，
   由编排者独立核验。rc 只作为辅助信号记录，不用于分支决策。
   `ImplementResult.dispatched` 的语义应改为「进程已启动」而非「执行成功」。
+
+### B7. dogfood 改的是 `src/`，但 `agentic` 跑的是 uv 装的另一个仓的快照——本仓的框架改动在门禁运行中完全不生效
+
+- 触发：给 WP-15 跑 `dispatch-lint` 时，直接
+  `bash src/agentic_loop/wrappers/dispatch_lint.sh` 报
+  `ModuleNotFoundError: No module named 'agentic_loop'`（真实退出码 2，fail-closed 正确），
+  只有 `PYTHONPATH=src` 或走 `agentic dispatch-lint` 才通。顺着查出下面整条链。
+- 证据（三段，全部实测）：
+  1. **wrapper 的 preamble 路径不存在**。11 个 wrapper 全都 export
+     `PYTHONPATH="…:$main_root/packages/agentic-loop/src"`
+     （`dispatch_lint.sh:21` 等），但本仓 `ls -d packages/agentic-loop/src` →
+     No such file or directory。本仓源码在 `src/`。这句 export 从头到尾是空操作。
+  2. **CLI 的 dogfood 通道在本仓落不到地**。`cli.py` 的 `resolve_wrapper()`
+     优先取 `_main_root()/scripts/agentic/<name>`（注释写明 "live edits (dogfood) win"），
+     否则退回 wheel 内置 `agentic_loop/wrappers/<name>`。本仓
+     `ls -d scripts` → 不存在，wrapper 全在 `src/agentic_loop/wrappers/`。
+     故 `agentic dispatch-lint` 实际跑的是 **wheel 内置副本**，不是工作树那份。
+  3. **Python 模块也来自另一个仓的快照**。`agentic` 的 shebang 指向
+     `~/.local/share/uv/tools/agentic-loop/bin/python`（3.12.7），
+     其 `dist-info/direct_url.json` = `file:///Users/admin/vibe/agentic-loop-main-codex-merge`，
+     **非 editable**（无 `.pth` 指向本仓）。装载源那个仓的 HEAD 是 `600c2f1`
+     `✅ chore(plan): finalize Codex verdict recovery merge`（分支 `main`，已 merge WP-16）。
+     `diff -rq -x __pycache__` 已装副本 vs 本仓 `src/agentic_loop`：唯一差异是
+     `adapters/codex.py`——**已装副本比本仓工作树新**，含 WP-16 的有界恢复实现
+     （`grep -c _NORMALIZATION_INPUT_MAX_BYTES`：已装 4，工作树 0）。
+- 后果（这是本条的要害，不是"少配了个环境变量"）：
+  - 本仓对 `src/agentic_loop/**` 的任何改动，**在 `agentic *` 的门禁运行里一律不生效**，
+    要等 `agentic update` 重装才进副本。dogfood 的核心假设——"改框架、立刻用改后的框架验自己"
+    ——在本仓不成立，且**没有任何一处提示**（不像 C3 至少两边都"对"，
+    这里是跑了完全另一个仓的代码却显示 PASS）。
+  - 反向也成立：我给 WP-15 拿到的 `DISPATCH_LINT_PASS`，是**另一个仓的
+    `dispatch_lint.sh` + `validate_wp_status.py`** 判的。判据本身没差异（该文件两边一致），
+    所以这次结论仍然有效；但这是运气，不是机制保证。
+  - 版本号相同（两边都 `0.8.13`）无法暴露漂移：装载源与本仓同版本号但不同内容。
+- 与已有条目的关系：不是 B3 的重复。B3 说 `AGENTIC_PYTHON` 覆盖会打穿测试的
+  `python3` stub；本条说的是**模块本体来源错仓**，`AGENTIC_PYTHON`
+  在这里恰好是让它能跑起来的那一半（`cli.py:213` 把 `sys.executable` 注入 wrapper env，
+  见 `docs/KNOWN-ISSUE-bare-python3.md`）。
+- 修法（三处，按优先级）：
+  1. `resolve_wrapper()` 的 dogfood 分支要认本仓的实际布局：
+     除 `scripts/agentic/<name>` 外，也探 `src/agentic_loop/wrappers/<name>`
+     （或反过来，把本仓 wrapper 迁到 `scripts/agentic/` 以对齐 CLI 契约）。
+     二者选一，但必须让"框架自己的仓"命中 main 分支而非 bundled。
+  2. wrapper preamble 的 `packages/agentic-loop/src` 改成本仓真实源码根，
+     并在解析失败时明确报"framework source root not found"，
+     而不是靠 `python3 -m` 的 `ModuleNotFoundError` 间接暴露。
+  3. dogfood 场景应 editable 安装（`uv tool install -e .` 或等价），
+     否则 `agentic` 与工作树永久脱钩。至少要有一条 gate 或 `agentic --version`
+     输出装载来源路径 + 是否 editable，让"我跑的是哪份代码"可见。
+- 归 B 类而非 A 类：不阻塞任何单个 WP 的判定正确性（判据文件当前两边一致），
+  但会让整轮 dogfood 的验证证据链失去意义，且随任一侧继续改动即刻恶化为假绿。
 
 ## C 类
 
@@ -229,3 +350,207 @@ A1 与 A2 是「新用户第一次用就撞」的开箱缺陷，建议优先，�
 B1/B4 是纯错误信息与范式文档，成本低。B2/B3 需要碰测试与 health 脚本，
 建议与 WP-02（wrapper 输出层）同 lane 串行以免撞 `wrappers/`。
 C1 与 WP-04（派发前 scope 交叉检查）天然同域，建议并入 WP-04 而不是单列。
+
+### A5 `developer` 角色不绑 provider 会让 WP-08 的 A0 解锁静默失效
+
+**发现时间**：2026-09-13 23:46（WP-08 已 ACCEPT 之后）
+**触发**：`.agentic/config.toml` 于 23:37 被会话外手工改动（reviewer/consultant
+重指向本机 kiro 网关），其中 `developer` 从
+`{ adapter = "kimi", provider = "deepseek" }` 改为裸字符串 `"kimi"`。
+
+**现象**：A0 完全复现，reasons 与原缺陷逐字相同：
+
+```
+level='none'  meets_threshold(none,'weak')=False
+  - reviewer identity unavailable (orchestrator, attested not engine-proven)
+  - no implementer fallback available
+  - reviewer attestation missing
+  - fail-closed: independence level none
+```
+
+**机理**：WP-08 的修复把 degraded 路径的准入条件放宽到 `ACCEPT` 之后，
+`implementer_id` 由 `_resolve_implementer_identity(executor_tool, binding)` 解析，
+而该函数在 `binding is None` 时返回 `None`（这是刻意的 fail-closed：
+拿不到 engine 观测的 model 就不假装有身份）。于是：
+
+- `implementer_id = None` → `is_bootstrap_normal = True`
+- degraded 路径根本不进入，退回 bootstrap
+- bootstrap 唯一信号是 `review.attestation`，而 `fresh_session` 为假
+
+即回到「要过门就得伪造审计记录」的死锁。
+
+**config 注释与实况不符**：该次改动在 `[roles]` 写下
+「developer 不绑 provider…绑了也不影响评级——只有 `review.decision == "N/A"`
+时才用 `executor.tool` 构造 `implementer_id`」。这句话在 WP-08 之前成立，
+在 WP-08 之后不成立：`_should_populate_implementer` 已含 `ACCEPT`，
+`developer` 的 provider 绑定自此成为 degraded 路径的**必要输入**。
+注释是按旧语义写的。
+
+**这不是 WP-08 的缺陷**：`a46578c` 的代码在有绑定时正确解锁 A0（已实测），
+fail-closed 行为也正确。这是一处**配置—代码耦合未被文档化**的问题。
+
+**候选修复（未指派，需用户裁决）**
+
+1. `developer` 恢复 provider 绑定（任一有 `identity_model` 的 provider 即可，
+   不必与 consultant 同源——degraded 只要求两边都被 engine 观测）。
+   最小改动，但 `.agentic/config.toml` 是 WP-08 的 forbidden path，
+   且改配置属用户决策，编排者不得自行改。
+2. `gate` 在 `_should_populate_implementer(review_decision)` 为真却拿不到
+   implementer 绑定时，输出一条明确诊断（如
+   `developer role has no provider binding; degraded independence path unavailable`），
+   而非现在这样并入通用的 `no implementer fallback available`。
+   属新 WP，可与 A4 同批。
+3. 在 `[roles]` 的注释里记录该耦合，防止下次再按旧语义解绑。
+
+**另一处观察（非缺陷）**：新配置下 reviewer=`claude-opus-5` 与
+consultant=`gpt-5.6-sol` 确为异源，但 `gate/__init__.py:795` 仍硬编码
+`reviewer_id=None`，故 strong 在 gate 路径上依旧不可达。
+该配置的 `[review_policy]` 注释已如实说明这一点，与代码一致。
+
+#### A5 定性修正（2026-09-14，用户澄清后）
+
+上文把 A5 记为「配置与代码耦合未文档化，补上 developer 的 provider 绑定即可」，
+**该定性错误，作废**。用户澄清：kimi 实际跑在 codingplan 的 k3，只有 claude/codex
+走 kiro 代理。因此 `developer = "kimi"` 不绑 provider 是**如实反映现状**，
+不是疏漏。
+
+编排者原建议「给 developer 绑 kirogpt」是错的，撤回。两处危害：
+
+1. `identity_model` 会记成 `gpt-5.6-sol`——给 implementer 挂一个它没在使用的
+   模型身份，**属伪造审计记录换合并许可**，与写 `fresh_session = true` 同类。
+   WP-08 存在的意义正是禁止此类操作。
+2. 并非只改 identity。`provider_binding.build_binding()` 对 `kimi`
+   （属 `_ANTHROPIC_ADAPTERS`）强制要求 `anthropic_base_url`，且
+   `adapters/kimi.py:58` 将其写入配置、`:95` 以 `--model <cli_selector>` 覆盖模型。
+   即**不存在「只声明 identity_model 而不改路由」的写法**，绑定必然把 kimi 的
+   实际流量改指到代理上，改变执行环境。
+
+**A5 的真实性质**：不是配置错误，而是**判据设计与本仓实际拓扑不匹配**。
+degraded 要求 implementer 身份 engine 可观测，而本仓 implementer 不经框架
+provider 层，架构上就观测不到。三条路径因此全部落空：
+
+| 路径 | 阻塞点 | 可达 |
+|------|--------|------|
+| strong | `gate/__init__.py:795` 硬编码 `reviewer_id=None` | 否 |
+| degraded | k3 不经 provider 层，implementer 身份观测不到 | 否 |
+| bootstrap | 唯一信号 `fresh_session` 本轮为假，如实写必不过 | 否 |
+
+WP-08 的代码正确、配置也正确，A0 仍锁死。这比原记录的严重。
+
+**修正后的候选修法（待用户裁决，编排者不自行选）**
+
+1. **让 kimi 真实身份可观测**：`[providers]` 增一条如实描述 codingplan/k3 的条目
+   （`identity_model` 填 k3 真实模型 id，`anthropic_base_url` 填其实际端点）。
+   degraded 由此成立且无任何伪造。**前提：kimi 确有 anthropic 兼容端点**，未确认。
+2. **扩judgment判据**：立新 WP，在 degraded 之外补一条「实现者身份不可观测」下的
+   合法替代证据（如 commit 作者 + 隔离 worktree）。最重，但对得上本仓拓扑。
+3. **本轮显式记账放行**：承认三路径在当前拓扑下均不可达，作为一次有完整记录的
+   例外合并 WP-01/03/08，修判据留给后续 WP。需用户明确授权，理由须完整写入 status。
+
+三条都不涉及放宽 `min_independence`（仍为 `weak`），也都不伪造任何字段。
+
+#### A5 裁定（2026-09-14，用户选定修法 2）
+
+**用户裁定：走修法 2**——立新 WP 扩展评级判据。修法 1 不再是首选。
+
+裁定前的关键输入是 codex 对 WP-15 的独立审核
+（`WP-15-consult-codex.md`，`[VERDICT] REWORK`），它推翻了修法 1 的前提。
+修法 1 的三项阻断条件：
+
+| 阻断条件 | 依据 | 严重性 |
+|---------|------|--------|
+| `identity_model` 直接来自可手改的 TOML，`build_binding()` 原样读、`identity()` 原样返回，注入探针只验 sentinel 不验模型——**任何人都能把真实路由指向模型 A 却声明模型 B，凭此伪造 degraded 独立性** | `provider_binding.py` `build_binding()`；`adapters/kimi.py:45-47` | P0 |
+| `--config-file` **独立加载**，不与 `~/.kimi/config.toml` 合并；`_temp_config()` 只输出 provider/model，绑定即丢 `default_thinking`、模型 `capabilities`、`[loop_control]`、`[background]`、`[notifications]`、`[mcp.client]` 与 13 个 `[[hooks]]` | `adapters/kimi.py:49-64`；`~/.kimi/config.toml:2,50,79+` | P1 |
+| 模板硬编码 `type = "anthropic"` 且要求 `anthropic_base_url`，但本机 K3 实为 `type = "kimi"` managed provider + OAuth（A5 原记录已自注「anthropic 兼容端点未确认」） | `adapters/kimi.py:56-63`；`~/.kimi/config.toml:70-75` | P1 |
+
+其中 **P0 是方向性的**：修法 1 本质上是让合并门去读一个用户可手改的字符串，
+与 WP-08 存在的理由（不许自证）属同一类问题，只换了个字段。
+`identity_model` 的可信性没有任何代码防线——这是 codex 对
+「有人能否借这条路填假 model 伪造 degraded」一问的直接回答。
+
+**编排者已核实的事实**（不依赖 codex 报告，直读 `~/.kimi/config.toml`）：
+`default_thinking = true`（`:2`）；`[models."kimi-code/k3"]` 的
+`max_context_size = 1048576`（`:49`）与
+`capabilities = ["thinking", "video_in", "image_in"]`（`:50`）；
+K3 provider 是 `type = "kimi"`（`:70-71`）走 OAuth（`:75`）。
+**未能独立验证**：「`--config-file` 不与全局配置合并」这一机制，
+目前仅有 codex 的核实为依据（`kimi --version` / `--help` 当时被 auto mode
+安全分类器拦下）。
+
+**修法 2 的目标**：让 orchestrator-as-reviewer 的诚实 `ACCEPT`
+有一条通路，既不靠自证 attestation（A0 的死结），也不靠可伪造的
+`identity_model`（修法 1 的 P0）。
+
+**已起草 `WP-17-brief.md`（草案，未冻结）**。核心设计判断：新判据的证据必须是
+**engine 能用 `git` 自行核对的事实**（commit author 与编排者不同、branch 与
+base_branch 不同、tree 与 base_commit 不同、改动全在 `allowed_paths` 内），
+不能是任何来自 status 文件的自填字段——否则就是把 bootstrap 的自证换个字段名，
+重犯修法 1 被否掉的同一错误。该判据只证明「改动由他方产生、经隔离、范围受限」，
+**不证明模型差异，故只能评 `weak`，永不评 `strong`**。
+
+**三个设计点用户已于 2026-09-14 裁定**：
+(1) **复用 `weak`**，`INDEPENDENCE_LEVELS` / `_LEVEL_RANK` 一处不改，
+靠 `reasons` 标 `level=weak-isolated` 区分来源（新增级别会让现有
+`min_independence = "weak"` 拒绝更低的新级别，A0 依然锁死，还要连带改配置）；
+(2) **要求** `capabilities.sandbox_enforced`，直接复用
+`_weak_engine_enforced()` 的 `weak_ok`，不另写并行判断；
+(3) **git 事实由 `gate/` 读好后以 `IsolationEvidence` 传入**，
+`evaluate()` 内不得有任何 I/O，保住纯函数性质。
+
+**另有一项起草时核实出的顺序约束**：主区 `gate/__init__.py` 不含
+`_should_populate_implementer`（`grep -c` 为 0，该函数只在未合并的
+`feature/wp08-independence-degraded` 上），而 WP-17 改的正是同两个文件。
+更要紧的是 WP-08 的合并本身卡在 A0，而 WP-17 就是去解 A0 的——**存在自举问题**。
+编排者倾向让 WP-17 基于 `feature/wp08-independence-degraded` 开分支
+（把 WP-08 当上游依赖），而非动用一次例外合并先把 WP-08 落地。
+
+修法 1 不作废、只是不作首选；其三项阻断条件记录在案，供日后重启该路线时参考。
+WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
+
+### A6 `kimi.py` 把 `max_context_size` 硬编码为 DeepSeek 的 768K
+
+**发现时间**：2026-09-14（为 A5 修法 1 评估代价时）
+
+`adapters/kimi.py:63` 在临时配置模板里写死：
+
+```python
+f'max_context_size = 786432\n'
+```
+
+无参数、无配置项、不读 provider 配置。786432 = 768K 是当初为 DeepSeek 端点选的值
+（同一函数 docstring `:51` 与注释 `:54` 至今仍写 DeepSeek）。
+
+**后果**：kimi 的实际后端是 codingplan/k3，真实窗口 1048576（1M）。一旦
+`developer` 绑上任何 provider，`kimi.py:107` 便以该临时配置启动 kimi，
+768K 覆盖 1M —— **k3 静默损失约 25% 可用上下文，无任何告警**。
+
+**绕不开**：绑定路径上 `:107`（派发）与 `:171`（注入探针）都只经
+`_temp_config()`，不存在「绑定但不套用该模板」的路径。
+
+**定性**：这是缺陷，不是绑定应付的代价。该值本应随 provider 配置走
+（如 `[providers.X].max_context_size`，缺省时保留现值），却被钉死成某一个
+provider 的数值。编排者先前把它表述为「需用户接受的风险」措辞不当，已更正。
+
+**顺带**：同一模板不产出 `CLAUDE_CODE_EFFORT_LEVEL` 等字段，框架派发路径下丢失；
+`_PROBE_PROMPT`/`_SENTINEL`（`:165-166`）也仍写 `DEEPSEEK_PROBE_OK`，
+与实际 provider 无关，属同一处未随 provider 泛化的遗留。
+
+**候选修法**：`max_context_size` 提为 provider 配置项，`build_binding()` 透传，
+模板改为读 binding；未声明时回退 786432 以零回归。
+
+**已立 WP-15**（`WP-15-brief.md`，rev2）。
+
+**rev2 的两处修正**（依 codex 咨询 `WP-15-consult-codex.md`）：
+
+1. **A6 与 A5 解耦**。上文「与 A5 修法 1 同批（A5 修法 1 落地前 A6 必须先修）」
+   的因果**已作废**：修法 1 另有三项独立阻断条件（见 §A5 裁定节的表），
+   修完 A6 一条也不解决；且用户已裁定 A5 走修法 2。WP-15 现为**独立修复**。
+2. **回退值的落点**。原设想「`ProviderBinding.max_context_size = 786432`
+   作 dataclass 默认值」被 codex 否掉：`max_context_size` 是 Kimi 的 model 属性
+   而非 provider 身份属性，把 768K 放进默认值会让「provider 未声明」与
+   「provider 声明了 768K」在 binding 上无法区分。改为
+   `int | None = None` + renderer 侧命名常量 `_LEGACY_MAX_CONTEXT_SIZE`。
+   模板那一行不能省略——Kimi 配置模型的 `LLMModel.max_context_size` 是必填项。
+
+**A6 的定性经 codex 确认成立**：「硬编码 768K 应改为可配置，并保留旧配置的
+兼容回退」。编排者先前把它表述为「需用户接受的风险」确属措辞不当。
