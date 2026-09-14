@@ -141,3 +141,69 @@ A13 换判据实现。没有任何两条改写同一个条件表达式。
 - worktree 判定：本 WP 建立的唯一权威点（A13 交付物），两个调用方都引用它
 - 主仓根解析：`resolve_paths --root main_repo`（既有唯一权威，不另造）
 - 范围校验：`quality-gate.sh` 的 `_path_in_scope`（既有唯一权威，不另造）
+
+---
+
+> 以下三节为 `dispatch-lint` 要求的英文锚点（`## ` 精确匹配），
+> 内容与上文中文章节同义，非另一份口径。
+
+## Allowed and forbidden paths
+
+**allowed_paths**
+
+- `src/agentic_loop/wrappers/preflight.sh` — A4 (branch/worktree binding), A7 (main-repo index lookup)
+- `src/agentic_loop/wrappers/finalize_merge.sh` — A12 (missing guard), A13 (worktree predicate)
+- `src/agentic_loop/gate/__init__.py` — **A13 predicate only**; do not touch independence logic
+- `tests/test_preflight_branch_binding.py` (new)
+- `tests/test_finalize_merge_first_call.py` (new)
+- `tests/test_worktree_detection.py` (new)
+
+**forbidden_paths**
+
+- `src/agentic_loop/validate_wp_status.py` — A14/A15/A18 surface, separate WP
+- `src/agentic_loop/independence.py` — A9/A5 surface, separate WP (WP-20)
+- `src/agentic_loop/adapters/`
+- `src/agentic_loop/redispatch.py`
+- `docs/` — brief and status are orchestrator-maintained
+- `.agentic/config.toml`, `.agentic/locks/`, `.env`, `.context/`
+
+## Acceptance tests
+
+Run with `PYTHONPATH=src python3.11 -m pytest` directly against the worktree.
+Do **not** use `agentic quality-gate` to self-certify (defect B7: it runs
+another repository's snapshot).
+
+- `tests/test_finalize_merge_first_call.py` — A12: a status at
+  `state=APPROVED_FOR_MERGE` **without** a `git.merged_commit` key must reach
+  `FINALIZE_OK` on the first call, and be idempotent on the second.
+- `tests/test_worktree_detection.py` — A13: real temporary repo plus
+  `git worktree add`; main-repo path is False, worktree path is True, and the
+  verdict must **not** depend on the directory name (worktrees here are created
+  as sibling `../wpN-x`, never `.worktrees/`). Unresolvable paths fail closed
+  without raising.
+- `tests/test_preflight_branch_binding.py` — A4 and A7:
+  - empty `git.branch` → back-filled from the live branch, with a warning
+  - non-empty and equal → pass
+  - **non-empty and different → still fails** (regression guard, must not be relaxed)
+  - status committed on a sibling branch only → passes when run from another
+    worktree, because the main-repo index has it (A7)
+  - status never committed → still fails
+- Whole suite: `PYTHONPATH=src python3.11 -m pytest tests -q`, zero regression
+  against the baseline. The baseline carries 4 pre-existing failures in
+  `tests/test_finalize_merge_triple_sign.py` (its fixture runs `git checkout main`
+  in a temporary repo that has no `main` branch). These are unrelated to this
+  WP — **do not fix them**.
+
+## Completion definition
+
+- [ ] Every deliverable in place; each of the four defects has one
+      failing-to-passing test
+- [ ] Zero regression relative to the baseline (4 known pre-existing failures
+      stay exactly as they are)
+- [ ] No writes to forbidden_paths, no cross-owner writes
+- [ ] No production writes, no network, no notifications, no pushes
+- [ ] No merge, no push, no switching to a production branch
+- [ ] A13's predicate exists in exactly **one** place, referenced by both
+      call sites (single authoritative definition, global rule §5.3)
+- [ ] A4's relaxation applies **only** to the empty-string case
+- [ ] Commit message follows the repository convention
