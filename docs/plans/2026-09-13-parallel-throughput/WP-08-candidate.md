@@ -952,3 +952,31 @@ if "/.worktrees/" in str(status_file):
 校验，并把 `dispatch_proof` 标记为 engine-only —— 校验时比对其
 `orchestrator_session` 是否等于当前锁 owner，不等则视为伪造落 fail-closed。
 与 A9 的 strong 上限同属 `independence`/`validate` 加严面，可评估并入同一 WP。
+
+### A15. schema 无顶层 `blocker` 字段，`BLOCKED` 状态无处记录阻塞原因
+
+> 编排者废弃 WP-17 时发现（2026-09-14），实证复现。
+
+`validate_wp_status.py` 的 `STATES` 含 `BLOCKED`，全局规范 §4 的状态流转图
+把 `BLOCKED` 列为四个状态之一、§6.C 的执行报告模板有 `[BLOCKER]` 字段，
+但 `REQUIRED_TOP_LEVEL_V1/V2/V3` 与 `OPTIONAL_TOP_LEVEL`
+（`{"qoder_security", "plan_id"}`）**都没有 `blocker`**。
+
+**实证**：给 WP-17 写入顶层 `blocker` 字段后校验直接失败：
+
+```
+STATUS_INVALID: unknown top-level fields: blocker
+```
+
+即：状态机允许进入 `BLOCKED`，但 schema 不允许记录**为什么**被阻塞。规范
+（§4.1 状态文件结构示例中确有 `concerns`/`blocker`）与实现不一致。
+
+**当前绕法**：把废弃说明并入 `review.evidence`，保留原审核记录在后。可行但
+语义错位 —— 阻塞原因不是审核证据，且这样写会让 `review.decision=REWORK` 与
+一段「已废弃、不返工」的说明混在同一字段里，机器无法区分。
+
+**候选修法**：把 `blocker` 与 `concerns` 加入 `OPTIONAL_TOP_LEVEL`
+（与 §4.1 的结构示例对齐），并在 `state == "BLOCKED"` 时要求 `blocker` 非空
+（fail-closed：进 BLOCKED 必须说明原因）。改动落在
+`src/agentic_loop/validate_wp_status.py` —— 与 A14 的 `executor` 块字段校验、
+A9 的 strong 上限同属 validate/independence 加严面，可评估并入同一 WP。
