@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -23,7 +23,8 @@
     "base_commit": "c873e50",
     "branch": "feature/wp03-plan-lanes",
     "worktree": "../wp03-plan-lanes",
-    "commit": "78b33f27c3204b8e5ace66d64a6d5e0b4ab40b4d"
+    "commit": "78b33f27c3204b8e5ace66d64a6d5e0b4ab40b4d",
+    "merged_commit": "97141dbef861e1c48b32beddb9ab344d43e163af"
   },
   "scope": {
     "allowed_paths": [
@@ -91,6 +92,7 @@
   "timestamps": {
     "dispatched_at": "2026-09-13T09:50:33Z",
     "approved_for_merge_at": "2026-09-14T19:00Z",
-    "consulted_at": "2026-09-14T20:10Z"
+    "consulted_at": "2026-09-14T20:10Z",
+    "updated_at": "2026-09-14T14:03:57Z"
   }
 }

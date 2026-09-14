@@ -862,6 +862,25 @@ override_approved=$(field consult.override.approved 2>/dev/null || true)
 > ⚠️ 修法 1 落在 `src/agentic_loop/wrappers/finalize_merge.sh`，与 A4/A7 的
 > preflight 侧修法同属 wrappers 目录，可并入同一个 WP。
 
+**修法 1 已验证成立**（编排者在沙箱副本上验证，未改动仓内 wrappers —— 那是
+A4/A7 WP 的范围）：把 `finalize_merge.sh` 复制到 job tmp、只改第 67 行补上守卫，
+对 WP-01/03/08 三个 `APPROVED_FOR_MERGE` 状态各跑一次，全部
+
+```
+FINALIZE_OK merged_commit=<hash>
+```
+
+且写入的 `merged_commit` 经编排者用 `git rev-list --merges --parents` 独立复核
+逐个一致（WP-01 -> 6e67f0a、WP-03 -> 97141db、WP-08 -> ee74473，均为对应
+`--no-ff` merge commit，唯一解析）。三个 WP 已借此进入 `state=MERGED`。
+
+> 副本运行时报 `FINALIZE_WARN: WP lock release failed ... lock.sh: No such file`
+> —— 脚本按自身目录定位兄弟 wrapper（`here="$(cd "$(dirname "$0")" && pwd)"`），
+> 副本不在 wrappers 目录故找不到同级 `lock.sh`。这是设计的预期结果，不是缺陷；
+> 锁已由编排者单独 `agentic lock release` 释放。
+
+即：A12 的唯一障碍就是那一处缺失的守卫，一行改动即可修复，行为无其他变化。
+
 ### A13. worktree 拒收判据用路径字面量 `/.worktrees/`，本仓拓扑下完全不生效
 
 > 编排者验收 WP-18 时核实执行者申报的防线而发现（2026-09-14）。

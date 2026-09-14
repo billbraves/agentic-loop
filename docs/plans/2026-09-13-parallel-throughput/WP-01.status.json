@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -23,7 +23,8 @@
     "base_commit": "c873e50",
     "branch": "feature/wp01-gate-report-compact",
     "worktree": "../wp01-gate-report",
-    "commit": "4a6f5d0c3c50386ab60afe6770231570f31dcc06"
+    "commit": "4a6f5d0c3c50386ab60afe6770231570f31dcc06",
+    "merged_commit": "6e67f0aeaa421ed2de6e960fa459decd39a6fd2d"
   },
   "scope": {
     "allowed_paths": [
@@ -90,6 +91,7 @@
   "timestamps": {
     "dispatched_at": "2026-09-13T09:43:23Z",
     "approved_for_merge_at": "2026-09-14T19:00Z",
-    "consulted_at": "2026-09-14T20:10Z"
+    "consulted_at": "2026-09-14T20:10Z",
+    "updated_at": "2026-09-14T14:02:31Z"
   }
 }

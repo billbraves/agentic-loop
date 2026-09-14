@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -23,7 +23,8 @@
     "base_commit": "802b667",
     "branch": "feature/wp08-independence-degraded",
     "worktree": "../wp08-independence-degraded",
-    "commit": "a46578cf630080943da9bc2d00ff9eefec4a7fb5"
+    "commit": "a46578cf630080943da9bc2d00ff9eefec4a7fb5",
+    "merged_commit": "ee74473322360507b722703e937211af46887458"
   },
   "scope": {
     "allowed_paths": [
@@ -99,6 +100,7 @@
   "timestamps": {
     "dispatched_at": "2026-09-13T14:53:23Z",
     "approved_for_merge_at": "2026-09-14T19:00Z",
-    "consulted_at": "2026-09-14T20:10Z"
+    "consulted_at": "2026-09-14T20:10Z",
+    "updated_at": "2026-09-14T14:03:59Z"
   }
 }
