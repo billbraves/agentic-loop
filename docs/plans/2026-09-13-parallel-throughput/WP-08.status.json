@@ -4,11 +4,11 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "0d3b63ca-c5d2-4dde-ba5c-1af29f7e4bab (probe); dispatch session id not surfaced by --print"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -20,10 +20,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "",
+    "base_commit": "802b667",
     "branch": "feature/wp08-independence-degraded",
     "worktree": "../wp08-independence-degraded",
-    "commit": ""
+    "commit": "a46578cf630080943da9bc2d00ff9eefec4a7fb5"
   },
   "scope": {
     "allowed_paths": [
@@ -46,9 +46,47 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": []
+    "tests": [
+      {
+        "name": "tests/test_independence_degraded.py + tests/test_gate_independence_degraded.py",
+        "command": "python3.11 -m pytest tests/test_independence_degraded.py tests/test_gate_independence_degraded.py -q",
+        "exit_code": 0,
+        "note": "27 passed (13 + 14). Characterization of evaluate()'s strong/weak/weak-attested/none branches plus the reverse tests required by the brief."
+      },
+      {
+        "name": "full suite (WP-08 worktree)",
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "4 failed, 519 passed, 4 skipped. The 4 are the pre-existing tests/test_finalize_merge_triple_sign.py baseline (fixture runs `git checkout -q main` in a temp repo with no main branch); orchestrator reproduced the identical 4 on base 802b667 with WP-08 absent (4 failed, 492 passed). +27 over base matches the new tests exactly."
+      },
+      {
+        "name": "quality-gate (from WP-08 worktree)",
+        "command": "PATH=python3.11-first bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/.../WP-08.status.json",
+        "exit_code": 1,
+        "note": "STATUS_VALID, scope enforcement PASSES. Non-zero is only the 4 baseline failures. Two extra failures seen on a first run were orchestrator-induced, not WP-08: one was defect B3 (AGENTIC_PYTHON=python3.11 punching through the tests' python3 stub — reproduced A/B), the other (test_init_githooks pre-push) did not reproduce on a clean re-run (4 failed / 519 passed) and was caused by a concurrent probe worktree."
+      },
+      {
+        "name": "orchestrator independent A0 unblock probe",
+        "command": "simulate gate main()'s independence sequence for review.decision=ACCEPT against this repo's real bindings",
+        "exit_code": 0,
+        "note": "Decisive check, not taken from the report. Verified at review time against the then-current config (developer bound to provider deepseek): with review=ACCEPT, implementer_id resolved to kimi/deepseek-v4-pro and consultant to codex/deepseek-v4-pro, so is_bootstrap_normal=False and evaluate() returned weak via the degraded path with attestation=None; meets_threshold(weak, weak)=True. A0 was unblocked with NO self-attestation, which is the honest exit the brief demanded. STALE AS OF 2026-09-13T23:46Z, and NOT a code regression: .agentic/config.toml was edited outside this session at 23:37, changing developer from {adapter=kimi, provider=deepseek} to the bare string \"kimi\". With no developer binding, _resolve_implementer_identity() correctly fail-closes to None, so is_bootstrap_normal is True again and evaluate() returns none with the original A0 reasons verbatim (re-probed with capabilities=None and all-True; both none). The WP-08 code is correct in both configs; the degraded path simply requires the developer role to carry an engine-observed identity_model. Recorded as defect A5 in WP-08-candidate.md. Merge of WP-01/WP-03/WP-08 stays blocked until the config question is adjudicated by the user — the fix must NOT be a min_independence relaxation (still \"weak\", unchanged by that edit)."
+      },
+      {
+        "name": "orchestrator reverse-property probe",
+        "command": "direct evaluate()/is_valid() calls for the four fail-closed properties",
+        "exit_code": 0,
+        "note": "Verified independently of the executor's tests: (1) same-model consultant/implementer still cannot reach strong (meets_threshold(weak,'strong')=False); (2) capabilities false fail-closes to none even inside degraded; (3) is_valid() strict `is True` still rejects 1 and 'true'; (4) adversarial_prompt=False fail-closes the attested path to none."
+      }
+    ]
   },
-  "review": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code (orchestrator)",
+    "evidence": "ACCEPT. Reviewed the diff independently against the WP-08 brief rather than accepting the report.\n\nHard requirement met, and the executor correctly found the brief insufficient. The brief asked only to widen the implementer_id populate condition from N/A to N/A-or-ACCEPT. I verified by direct call that this literal change alone would NOT have unblocked A0: the old code built AgentIdentity(tool=executor_tool) with no model, so the degraded path was entered with an unobserved implementer model and evaluate() fail-closed to none ('implementer model not observed by engine'). Kimi added _resolve_implementer_identity(), which resolves the implementer's model from the developer role binding, symmetrically with how the consultant's model comes from its own binding. That is a necessary correction to my brief, not scope creep — without it the WP would have shipped a fix that changed nothing.\n\nA0 unblock verified end-to-end by simulating main()'s own sequence against this repo's real config: review=ACCEPT yields implementer kimi/deepseek-v4-pro vs consultant codex/deepseek-v4-pro, is_bootstrap_normal=False, level=weak with attestation=None, meets_threshold(weak, weak)=True. The honest ACCEPT now passes the gate while signing nothing self-attested, which was the whole point.\n\nAnti-bypass properties verified independently (not trusting the new tests): same-model still cannot reach strong; capabilities false fail-closes to none inside degraded; adversarial_prompt false fail-closes; is_valid()'s strict `is True` still rejects 1 and 'true'. independence.py was not touched at all, and min_independence in .agentic/config.toml was not touched — the two things the brief most wanted protected.\n\nBrief deliverable 2 (demote fresh_session to a recording-only field) was declined, which the brief explicitly permitted. Kimi's reasoning is correct and I agree: demoting it would weaken exactly the audit property min_independence exists to protect, and deliverable 1 already resolves the deadlock via the strongest of the three signals. Declining it was the better judgement.\n\nOne undisclosed behavior change found, verified non-reachable: on the pre-existing N/A path in a repo with no provider binding, implementer_id changes from AgentIdentity(tool=..., model=None) to None, which routes N/A into the bootstrap branch instead of degraded. Both spellings rate none today, so no verdict changes. I checked whether a valid attestation could turn that into a weak pass and found it cannot: gate/__init__.py:790 gates is_bootstrap_normal on review_decision == 'ACCEPT', so the N/A path never reads an attestation and attestation stays None. Non-blocking; recorded because the report should have named it.\n\nTwo test-quality nits, non-blocking. test_accept_with_model_is_degraded_not_bootstrap and test_accept_without_model_falls_back_to_bootstrap re-implement the production predicate inline (is_bootstrap_normal = \"ACCEPT\" == \"ACCEPT\" and implementer is None) instead of calling gate code, so they assert against a copy and would not catch a change to the real line. The forward end-to-end test does exercise the real resolution path, so the invariant is covered elsewhere.\n\nScope: the commit touches exactly gate/__init__.py plus the two new test files. No forbidden path, no config, no status-file write, no merge/push. Commit message carries gitmoji + Chinese."
+  },
   "consult": {},
-  "timestamps": {}
+  "timestamps": {
+    "dispatched_at": "2026-09-13T14:53:23Z",
+    "approved_for_merge_at": "2026-09-14T19:00Z"
+  }
 }

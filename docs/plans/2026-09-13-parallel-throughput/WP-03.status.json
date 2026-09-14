@@ -4,11 +4,11 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "a1336b3f-3e2a-44f2-aea1-2e7b361440b3 (impl); 0af014c3-16f7-4165-ae7c-1e1a0b12ceeb (commit-only re-dispatch)"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -20,10 +20,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "57509a4a5a313281e790e15983c16bcc35badd1f",
+    "base_commit": "c873e50",
     "branch": "feature/wp03-plan-lanes",
     "worktree": "../wp03-plan-lanes",
-    "commit": ""
+    "commit": "78b33f27c3204b8e5ace66d64a6d5e0b4ab40b4d"
   },
   "scope": {
     "allowed_paths": [
@@ -44,11 +44,41 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": []
+    "tests": [
+      {
+        "name": "tests/test_plan_lanes.py",
+        "command": "python3.11 -m pytest tests/test_plan_lanes.py -q",
+        "exit_code": 0,
+        "note": "27 passed (25 original + 2 regression guards from the rework round): dual-form validate, dependency topology (dangling/cycle/self-cycle), _lanes_ready pure function, cmd_lanes end-to-end, cmd_check under object form, plus type-error-entry rejection at both the validate() and CLI levels."
+      },
+      {
+        "name": "full suite (worktree, post-rework)",
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "4 failed, 519 passed, 4 skipped. The 519 is +2 over the pre-rework 517, matching exactly the two new regression tests. All 4 failures are the pre-existing tests/test_finalize_merge_triple_sign.py baseline (fixture runs `git checkout -q main` in a temp repo with no main branch); identical 4 appear in the WP-01 worktree and on the integration branch with both WPs absent. Outside WP-03 allowed_paths, correctly not touched."
+      },
+      {
+        "name": "quality-gate (from WP-03 worktree, post-rework)",
+        "command": "PYTHONPATH=src bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/2026-09-13-parallel-throughput/WP-03.status.json",
+        "exit_code": 1,
+        "note": "STATUS_VALID; scope enforcement PASSES after the orchestrator corrected allowed_paths (`tests/test_plan` -> `tests/test_plan_lanes.py`, the same prefix-vs-glob trap hit on WP-01). Remaining non-zero is only the 4 pre-existing failures above."
+      },
+      {
+        "name": "orchestrator independent regression probe",
+        "command": "plan check on work_packages=[123] / [null] / [\"x\"] / [{\"id\":\"A\"}]",
+        "exit_code": 0,
+        "note": "Verified the rework fix directly rather than trusting the executor report: 123 and null both yield rc=2 with PLAN_INVALID and zero tracebacks; valid str/dict entries pass validation. Pre-change code gave rc=2 cleanly, the regression gave rc=1 with a traceback, the fix restores rc=2."
+      }
+    ]
   },
-  "review": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code (orchestrator)",
+    "evidence": "ACCEPT after one REWORK round. Reviewed both commits independently against the WP-03 brief.\n\nCore delivery (eb11e6b), independently verified: (a) dual-form compat holds — validate() accepts legacy list[str] and new list[dict]; all three PLAN §0.1 risk-1 consumption points are normalized (validate() topology block via _normalize_work_packages, _status_git_paths via _wp_ids, cmd_check via _status_git_paths). (b) `plan lanes` verified end-to-end on real data: the legacy string-form PLAN-01 degrades to one READY WP with the other six blocked on same-lane serialization (safe default, no behavior change for existing plans); a dict-form plan correctly computes WP-01 [lane-gate] + WP-03 [lane-plan] as the two concurrent heads, which is exactly the dogfood case this iteration needs. (c) topology rejection verified: dangling depends_on, 2-cycle, and self-cycle all yield clean PLAN_INVALID.\n\nThe REWORK blocker is fixed correctly (78b33f2). I had found that a non-str/non-dict work_packages entry crashed _normalize_work_packages with AttributeError and rc=1 — a regression against the pre-change code, which cleanly emitted PLAN_INVALID with rc=2, and outside the module's own rc contract. The fix changes the bare `else` to `elif isinstance(item, dict)`, so invalid-typed entries are skipped in normalization while validate()'s per-entry loop still reports them. Two lines plus a comment; no logic beyond the defect. Kimi chose the broader of the two options I offered (fix in the helper rather than only in the topology block) and justified it: the helper is consumed by the topology block, _wp_ids, _dependency_graph and _lanes_ready, so one fix covers four call sites. I agree — the narrower fix would have left the other three reachable.\n\nIndependently re-verified the fix rather than trusting the report: entries 123 and null now both give rc=2 with \"PLAN_INVALID: work_packages entries must be strings or objects\" and zero tracebacks; valid str and dict entries still proceed past validation (rc=3 on an unrelated unresolvable-branch check, i.e. validation passed). Two regression tests added, one at the validate() level and one at the CLI level asserting rc == RC_FAIL and PLAN_INVALID on stderr rather than a traceback — the CLI-level one is the assertion that actually pins the contract.\n\nQuality gate from inside the WP-03 worktree: STATUS_VALID, scope enforcement passes, 4 failed / 519 passed / 4 skipped. The 519 is +2 over the pre-rework 517, matching exactly the two new tests. The 4 failures are the known pre-existing tests/test_finalize_merge_triple_sign.py baseline (fixture runs `git checkout -q main` in a temp repo with no main branch); identical 4 appear in the WP-01 worktree and on the integration branch with both WPs absent, and they lie outside WP-03 allowed_paths — correctly untouched.\n\nScope: both commits touch exactly src/agentic_loop/plan_cmd.py and tests/test_plan_lanes.py. No forbidden path, no status-file write, no merge/push. Commit messages carry gitmoji + Chinese, and the rework was appended rather than amended as instructed.\n\nKimi's earlier [CONCERNS] about `dict | None` breaking Python >= 3.9 was unfounded and I told it so: `from __future__ import annotations` is at line 52 and the annotation is pre-existing in the base version. Remaining cosmetic nit, not blocking: cmd_check's `wp_ids = data.get(\"work_packages\", [])` names a raw dual-form list \"wp_ids\"; used only for the emptiness check, so behavior is correct."
+  },
   "consult": {},
   "timestamps": {
-    "dispatched_at": "2026-09-13T09:50:33Z"
+    "dispatched_at": "2026-09-13T09:50:33Z",
+    "approved_for_merge_at": "2026-09-14T19:00Z"
   }
 }

@@ -4,10 +4,11 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
-    "tool": "unassigned"
+    "tool": "kimi",
+    "session": "a4dafe0e-f476-4d01-8939-b12be9d05d32"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -19,10 +20,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "",
+    "base_commit": "c873e50",
     "branch": "feature/wp01-gate-report-compact",
     "worktree": "../wp01-gate-report",
-    "commit": ""
+    "commit": "4a6f5d0c3c50386ab60afe6770231570f31dcc06"
   },
   "scope": {
     "allowed_paths": [
@@ -42,11 +43,41 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": []
+    "tests": [
+      {
+        "name": "test_gate_report.py",
+        "command": "python3.11 -m pytest tests/test_gate_report.py -q",
+        "exit_code": 0,
+        "note": "10 passed: 3 characterization (verdict/exit-code parity vs StageRunResult across PASS/FAIL/ERROR/FINDINGS/bogus x blocking) + 7 new-behaviour"
+      },
+      {
+        "name": "full suite (worktree)",
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "4 failed, 502 passed, 4 skipped. All 4 failures are pre-existing: independently reproduced by the orchestrator on the integration branch with WP-01 absent (4 failed, 492 passed). Cause: tests/test_finalize_merge_triple_sign.py fixture runs `git checkout -q main` in a temp repo with no main branch. Outside WP-01 allowed_paths; correctly not touched."
+      },
+      {
+        "name": "quality-gate scope check",
+        "command": "agentic quality-gate WP-01.status.json",
+        "exit_code": 1,
+        "note": "scope enforcement PASSES after the orchestrator corrected allowed_paths. Remaining non-zero is only the pre-existing suite failures above plus tests/test_init_githooks.py, which passes in isolation (9 passed, twice) and fails only in full-suite order — pre-existing order coupling, not WP-01."
+      },
+      {
+        "name": "quality-gate (from WP-01 worktree, post-rebase)",
+        "command": "PYTHONPATH=src bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/2026-09-13-parallel-throughput/WP-01.status.json",
+        "exit_code": 1,
+        "note": "Re-run after the freeze commit was amended a second time (WP-03 scope fix) and this branch rebased onto it. STATUS_VALID, scope enforcement passes, 4 failed / 502 passed / 4 skipped — the same 4 pre-existing baseline failures, unchanged by the rebase."
+      }
+    ]
   },
-  "review": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code (orchestrator)",
+    "evidence": "Read report.py in full and verified its two hard claims independently. (1) Verdict parity: is_blocked/exit_code replicate StageRunResult.blocked()/exit_code() exactly; the characterization test uses StageRunResult itself as ground truth and enumerates FINDINGS and 'bogus'. (2) Dead-code check: no caller in src/ — the module is additive and wires nothing, so it cannot change any live verdict. Found one latent divergence: report.normalize_decision omits the runner's FINDINGS->FAIL branch, so FINDINGS reads as ERROR. Traced gate_runner.py:412 as the only path where an executor decision enters gates[]; it normalizes there, so a raw FINDINGS can never reach the report from the runner. Verified by direct call that both spellings are non-PASS, hence is_blocked and exit_code are identical either way — the divergence mislabels a decision in the detail file but changes no verdict. Recorded as a follow-up, not a blocker."
+  },
   "consult": {},
   "timestamps": {
-    "dispatched_at": ""
+    "dispatched_at": "2026-09-13T09:43:23Z",
+    "approved_for_merge_at": "2026-09-14T19:00Z"
   }
 }
