@@ -166,6 +166,52 @@ def git_merge_base(repo: Path, base: str, tip: str) -> str:
     return lines[0].strip()
 
 
+def path_is_in_worktree(path: Path) -> bool:
+    """Single authoritative predicate: does ``path`` resolve inside a linked
+    git worktree? (A13, WP-19)
+
+    Git-fact based, never a path literal: the repository owning ``path`` is a
+    linked worktree exactly when its ``--git-dir`` differs from
+    ``--git-common-dir``. Both call sites that refuse worktree-local status
+    copies (this gate and ``wrappers/finalize_merge.sh``) reference this one
+    definition (global rule §5.3, single authority).
+
+    Fail-closed and never raises: an unresolvable path (not inside any git
+    repository, git missing, unexpected output) is treated as inside a
+    worktree, i.e. refused.
+    """
+    directory = path if path.is_dir() else path.parent
+    try:
+        proc = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(directory),
+                "rev-parse",
+                "--absolute-git-dir",
+                "--git-common-dir",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return True
+    if proc.returncode != 0:
+        return True
+    lines = proc.stdout.splitlines()
+    if len(lines) != 2:
+        return True
+    git_dir = Path(lines[0].strip())
+    common_dir = Path(lines[1].strip())
+    if not git_dir.is_absolute():
+        return True
+    # --git-common-dir may be relative; it is then relative to the cwd git
+    # ran in (``directory``), mirroring --git-dir semantics.
+    if not common_dir.is_absolute():
+        common_dir = directory / common_dir
+    return git_dir.resolve() != common_dir.resolve()
+
+
 def scope_prefix(pattern: str) -> str:
     """Reduce a scope pattern to the literal directory prefix it denotes.
 
@@ -662,7 +708,9 @@ def main(argv: list[str]) -> int:
             f"(resolved against main repo root {repo_root})"
         )
 
-    if "/.worktrees/" in str(status_file):
+    # A13: git-fact worktree refusal via the single authoritative predicate
+    # (no "/.worktrees/" path literal — sibling worktrees never contain it).
+    if path_is_in_worktree(status_file):
         raise GateError(
             f"status file resolves inside a worktree ({status_file}); "
             "pass the main-repo copy (single source of truth)"
