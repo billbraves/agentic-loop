@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -20,7 +20,7 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "2577a01",
+    "base_commit": "7f772a8",
     "branch": "feature/wp18-dispatch-proof",
     "worktree": "../wp18-dispatch-proof",
     "commit": ""
@@ -56,5 +56,7 @@
   },
   "review": {},
   "consult": {},
-  "timestamps": {}
+  "timestamps": {
+    "dispatched_at": "2026-09-14T20:10Z"
+  }
 }
