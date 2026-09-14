@@ -810,3 +810,126 @@ provider 的数值。编排者先前把它表述为「需用户接受的风险�
 
 **A6 的定性经 codex 确认成立**：「硬编码 768K 应改为可配置，并保留旧配置的
 兼容回退」。编排者先前把它表述为「需用户接受的风险」确属措辞不当。
+
+### A12. `finalize_merge.sh` 读自己要写的字段，`set -e` 下首次 finalize 必然中止
+
+> 编排者合并 WP-01/03/08 后调用 `agentic finalize` 时发现（2026-09-14），实证复现。
+
+`finalize_merge.sh:67`：
+
+```bash
+merged_commit_recorded=$(field git.merged_commit)
+```
+
+`field()` 调 `validate_wp_status.py --field`，该实现遇到不存在的点分字段
+打印 `STATUS_INVALID: unknown field <name>` 并 `return 2`。而
+`git.merged_commit` **正是 finalize 自己要写入的字段** —— 首次 finalize 时它
+必然不存在。脚本开头 `set -euo pipefail`，故此行直接中止，报出
+
+```
+STATUS_INVALID: unknown field git.merged_commit
+```
+
+**实证**（编排者直接复现，非推断）：三个 WP（WP-01/03/08）在
+`state=APPROVED_FOR_MERGE`、schema 校验 `STATUS_VALID` 的前提下，
+`agentic finalize` 均报此错；同一状态文件用
+`--field consult.override.approved` 读取正常返回 `True`。
+
+**根因是守卫不一致**：同一脚本第 72-75 行读 override 的四个可选字段时**都加了**
+`2>/dev/null || true` 守卫：
+
+```bash
+override_approved=$(field consult.override.approved 2>/dev/null || true)
+```
+
+第 67 行读同样「可选、可能不存在」的 `git.merged_commit` 时**漏了**这个守卫。
+第 161 行 `if [[ "$state" == "MERGED" && -n "$merged_commit_recorded" ]]` 的逻辑
+本身就假定该值可以为空 —— 即脚本的意图是「读不到就当空」，实现却是「读不到就死」。
+
+**影响**：`state=MERGED` 无法通过 `agentic finalize` 盖章，合并留痕链断在最后
+一步。当前只能手写 status，绕过了 finalize 的幂等校验（唯一解析 merge commit、
+校验 recorded 与 resolved 一致）。
+
+**候选修法**（三选一，倾向 1）：
+
+1. 给第 67 行补齐与 override 同样的守卫：
+   `merged_commit_recorded=$(field git.merged_commit 2>/dev/null || true)`。
+   最小改动，与同文件既有惯例一致。
+2. 让 `validate_wp_status.py --field` 对缺失字段返回空串 + rc=0。改动面大，
+   会影响所有 `field()` 调用点的语义，且会让真正的拼写错误静默。
+3. 在 status 模板里预置 `git.merged_commit: ""`。治标，老状态文件仍中招。
+
+> ⚠️ 修法 1 落在 `src/agentic_loop/wrappers/finalize_merge.sh`，与 A4/A7 的
+> preflight 侧修法同属 wrappers 目录，可并入同一个 WP。
+
+### A13. worktree 拒收判据用路径字面量 `/.worktrees/`，本仓拓扑下完全不生效
+
+> 编排者验收 WP-18 时核实执行者申报的防线而发现（2026-09-14）。
+
+`gate/__init__.py:692` 与 `finalize_merge.sh:38` 用同一模式判断「status 文件是否
+落在 worktree 内」：
+
+```python
+if "/.worktrees/" in str(status_file):
+    raise GateError(f"status file resolves inside a worktree ({status_file}); ...")
+```
+
+判据是**路径字面量**，前提是所有 worktree 都建在 `<repo>/.worktrees/` 下。
+但本仓 8 个已注册 worktree 无一命中：
+
+```
+/Users/admin/vibe/agentic_loop                   (主区)
+/Users/admin/vibe/agentic-loop-codex-verdict     MISS
+/Users/admin/vibe/agentic-loop-main-codex-merge  MISS
+/Users/admin/vibe/wp01-gate-report               MISS
+/Users/admin/vibe/wp03-plan-lanes                MISS
+/Users/admin/vibe/wp08-independence-degraded     MISS
+/Users/admin/vibe/wp17-isolation-evidence        MISS
+/Users/admin/vibe/wp18-dispatch-proof            MISS
+```
+
+全局规范 §3.1 与本仓既有实践都是 `git worktree add ../wpN-<desc>`（同级目录），
+**根本不会**产生 `.worktrees/` 路径段。故这条防线在本仓从未生效过。
+
+**为什么仍不构成 WP-18 的阻塞**：真正的主防线是路径解析而非字面量匹配 ——
+`resolve_paths --root main_repo` 在任何 worktree 内执行都返回主区根
+`/Users/admin/vibe/agentic_loop`（编排者在 wp18 worktree 内实测确认），
+相对路径 status 一律落到主区副本；叠加 §4.1 禁执行者写主区 + WP 锁。
+`/.worktrees/` 那条只是对**绝对路径**入参的补充兜底。
+
+**候选修法**：改用 git 事实而非路径字面量 —— 比较
+`git rev-parse --git-dir` 与 `--git-common-dir`，两者不同即在 worktree 内；
+或直接比较 status 文件所在仓根与 `resolve_paths --root main_repo` 的结果。
+
+### A14. `executor.dispatch_proof` 不受 schema 保护（WP-18 已知缺口，执行者主动申报）
+
+> WP-18 brief 陷阱 2 预先声明，执行者在 `[CONCERNS] 2` 如实申报，
+> 编排者实证确认（2026-09-14）。
+
+`validate_wp_status.py:377-383` 的未知字段检查**只在顶层**
+（`allowed = required | OPTIONAL_TOP_LEVEL`），不递归进 `executor` 块。
+故 `executor.dispatch_proof` 目前既不被 schema 要求、也不被 schema 禁止。
+
+**实证**：编排者构造类型完全合法的伪造块
+（`dispatched_by_engine: true`、`child_pid: 99999`、`exit_code: 0`、
+`argv_hash` 64 位十六进制、`orchestrator_session: "forged-session"`）
+写入 status 副本，`collect_dispatch_proof` 全字段采集成功，
+`evaluate()` 返回 `weak` —— 门被骗过。
+
+**为什么仍 ACCEPT WP-18**：
+
+1. 这是 brief 冻结时就明示的边界，`validate_wp_status.py` 是 WP-18 的
+   forbidden path，加严必然另立 WP —— 执行者遵守了范围而非擅自扩权。
+2. 任何**不完美**的伪造都被逐字段 fail-closed 归一到 `none`（编排者实测
+   七种畸形块全部落 none，含 bool 冒充 int pid 这种最易漏的情形）。
+3. 前置防线仍在：status 单一来源在主区（A13 已核实主防线是路径解析）、
+   §4.1 禁执行者写主区、WP 锁。伪造需要先突破「执行者不得写主区」这条
+   独立约束。
+4. 与 A11 的性质截然不同：A11 是**判据本身**把可自我声明的字段当 engine 事实，
+   一条环境变量即可、不需违反任何其他约束；A14 是判据正确但**存储层**缺
+   schema 强制，需先违规写主区。前者是设计错误，后者是纵深防御的一层缺口。
+
+**候选修法**：在 `validate_wp_status.py` 中把 `executor` 块的字段纳入白名单
+校验，并把 `dispatch_proof` 标记为 engine-only —— 校验时比对其
+`orchestrator_session` 是否等于当前锁 owner，不等则视为伪造落 fail-closed。
+与 A9 的 strong 上限同属 `independence`/`validate` 加严面，可评估并入同一 WP。
