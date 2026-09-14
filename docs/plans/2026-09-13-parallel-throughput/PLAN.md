@@ -120,7 +120,7 @@ WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
 | WP-13 | 门拒绝跑错目录并标注读取来源（B5+C3） | `quality-gate.sh` 前置校验 + 输出层标注 | 假阳性治理 |
 | WP-14 | `evidence.tests` 结构写进模板与文档（C2） | 模板示例 + QUICKSTART | 纯文档/模板 |
 | WP-15 | `max_context_size` 随 provider 配置走（A6） | `provider_binding.py` 增 `max_context_size: int \| None` + `adapters/kimi.py` 模板读 binding | 静默降级，独立修复（rev2 已与 A5 解耦） |
-| WP-17 | 补一条 engine-verifiable 的独立性判据（A5 修法 2） | `independence.py` + `adapters/base.py` 新增 `IsolationEvidence` + `gate/__init__.py` 读 git 事实 | **合并门准入语义变更**，已冻结待派发，基线 `feature/wp08-independence-degraded` |
+| WP-17 | 补一条 engine-verifiable 的独立性判据（A5 修法 2） | `independence.py` + `adapters/base.py` 新增 `IsolationEvidence` + `gate/__init__.py` 读 git 事实 | **合并门准入语义变更**，已验收 `ACCEPT`（`0d7db1e`，+807/-0，零回归），待合并；基线 `feature/wp08-independence-degraded` |
 
 > **A4 尚未拆包**，待用户裁定归属（涉及「状态文件提交两次」的契约变更）。
 >
@@ -157,6 +157,17 @@ WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
 > 要求站在 base_branch 上，而那时 WP-08 分支已被并掉）——详见 brief
 > 「⚠️ 合并操作序」一节，此时序矛盾与 A4 同源。
 >
+> **⚠️ A8（新增，2026-09-14，WP-17 验收时实测）：WP-17 的判据在框架自己的仓里
+> 无法自证，A0 依然没解开。** 实现无缺陷（已 `ACCEPT`），但四项 git 事实里两项
+> 恒为 False：`author_differs=False` 因本机编排者与执行者共用同一 git 身份
+> `xizhu`；`scope_respected=False` 因 A7 的处置把 7 个 `docs/plans/` 文件
+> merge 进了 WP-17 分支，落在 `base_commit..tip` 区间内且不在 allowed_paths 中
+> （采集函数如实报告，判断正确）。三条 bootstrap 逃逸路径在本仓的实际可达性：
+> WP-08 degraded ❌（A5 未绑 provider）、WP-07 attested ⚠️（可达但需人工签）、
+> WP-17 isolated ❌（本条）。四个候选修法（首选修 A5 而非放宽判据）详见
+> `WP-08-candidate.md` §A8，**需用户裁定后另立 WP**。
+> 与 A7 耦合：修 A7（改在主仓索引里查 status，不必 merge）会顺手消掉卡点 2。
+
 > 以下为裁定前的原始记录，保留备查：它改的
 > `gate/__init__.py` 与 `independence.py` 正是 WP-08 的范围，而 WP-08 的合并
 > 本身卡在 A0——即 WP-17 要解的那个问题。基线分支（基于 WP-08 分支开，

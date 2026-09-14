@@ -4,11 +4,11 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "bq6o29jfp"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -23,7 +23,7 @@
     "base_commit": "a46578c",
     "branch": "feature/wp17-isolation-evidence",
     "worktree": "../wp17-isolation-evidence",
-    "commit": ""
+    "commit": "0d7db1efd478383f31a9b3ad1d02600d43ab2516"
   },
   "scope": {
     "allowed_paths": [
@@ -49,9 +49,47 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": []
+    "tests": [
+      {
+        "name": "tests/test_independence_isolated.py + tests/test_gate_independence_isolated.py",
+        "command": "python3.11 -m pytest tests/test_independence_isolated.py tests/test_gate_independence_isolated.py -q",
+        "exit_code": 0,
+        "note": "32 passed (20 + 12). 含 7 个 characterization 逐字固化 isolation=None 下现有全部分支、逐项反向 4、strong 不可达反证、degraded 优先互补证明、evaluate 纯函数 AST 核验。"
+      },
+      {
+        "name": "full suite (WP-17 worktree)",
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "4 failed, 551 passed, 4 skipped。4 个为预存 tests/test_finalize_merge_triple_sign.py 基线失败（fixture 在无 main 分支的临时仓跑 git checkout main）。编排者在基线 a46578c 上独立复跑得 4 failed + 519 passed，551-519=32 与新增用例数吻合，零回归成立。"
+      },
+      {
+        "name": "orchestrator independent behavior probe (evaluate)",
+        "command": "直接调用 evaluate()/meets_threshold() 覆盖正向/逐项反向/能力/默认值/strong 不可达/零回归/degraded 优先",
+        "exit_code": 0,
+        "note": "不采信执行者测试的独立复核。四项全 True -> weak 且 reasons 含 weak-isolated；meets_threshold(strong)=False；逐项置 False 全部 none；capabilities 三种不满足全部 none；IsolationEvidence() 裸默认 none；isolation=None 时四条既有路径（none/weak-attested/degraded/strong）逐字不变。关键项：有 implementer_id（model 可观测）+ isolation 全 True 时走 WP-08 degraded 路径，reasons 不含 weak-isolated —— WP-08 优先权保住；attestation 有效时先走 weak-attested，isolation 不抢。"
+      },
+      {
+        "name": "orchestrator independent git-fact probe (collect_isolation_evidence)",
+        "command": "自建临时 git 仓验证四项事实采集与 7 个反向场景",
+        "exit_code": 0,
+        "note": "不采信执行者测试。正常隔离场景四项全 True 且 author/baseline 留痕正确；scope 不含改动路径、branch==base_branch、tip 不可解析、branch ref 不存在、author==baseline、空提交，六种情形全部正确 fail-closed 且不抛异常。函数签名参数仅 repo_root/tip_commit/base_commit/branch/base_branch/allowed_paths/forbidden_paths，无任何 executor/tool/identity/model 自填字段 —— 本 WP 最核心的诚实性要求成立。"
+      },
+      {
+        "name": "orchestrator A0-unblock probe against this repo's real config",
+        "command": "以本仓真实配置（developer=\"kimi\" 无 provider 绑定）模拟 gate main() 的独立性序列",
+        "exit_code": 0,
+        "note": "决定性检查，结论为 A0 仍未解开，但非本 WP 缺陷。implementer_id 正确 fail-close 到 None（A5 现场），is_bootstrap_normal=True，degraded 路径进不去，落到本 WP 判据。四项事实中两项为 False：(1) scope_respected=False —— a46578c..0d7db1e 区间含编排者为解 A7 而 merge 进来的 7 个 docs/plans/ 文件，不在 WP-17 的 allowed_paths 内，采集函数如实报告超范围，判断正确；(2) author_differs=False —— kimi 提交用的是本机 git config 身份 xizhu，与 base_commit 的 committer 同为一人，环境事实。故 evaluate() 返回 none。实现无误，但暴露设计层问题：本判据在框架自己的仓、单一 git 身份、且需 merge 规划提交（A7 处置）的拓扑下无法自证。已登记为 A8。"
+      }
+    ]
   },
-  "review": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code (orchestrator)",
+    "evidence": "ACCEPT。独立 review diff 对照 WP-17 冻结 brief，未因测试通过或因计划出自我手而接受。\n\n范围严格合规：commit 0d7db1e 恰好改 5 个 allowed_paths，全为净新增（+807/-0，无删改）。.agentic/config.toml、provider_binding.py、adapters/kimi.py、wrappers/、docs/plans/ 全部 untouched（逐一 git show --stat 核验）。工作区清洁，无 merge/push/切分支。\n\n三条硬约束逐项独立核验（未使用执行者的测试）：(1) evaluate() 纯函数——我自己写 AST 遍历函数体，禁用符号集 subprocess/os/pathlib/Path/open/git/shutil/io 命中为空，模块级亦无这些 import；(2) INDEPENDENCE_LEVELS 与 _LEVEL_RANK 未出现在 diff 中，当前值仍为 ('strong','weak','none') 与 {'strong':2,'weak':1,'none':0}；(3) strong 不可达——min_independence='strong' 且 isolation 全 True 时 evaluate 返回 weak，meets_threshold(weak,'strong')=False。\n\n诚实性要求成立（本 WP 的立命之处）：collect_isolation_evidence 签名参数仅 repo_root/tip_commit/base_commit/branch/base_branch/allowed_paths/forbidden_paths，无任何 executor/tool/identity/model 字段。四项事实全部对显式 commit/ref 读取而非当前 HEAD，故 detached HEAD 与 worktree 下可用；每次 git 读取失败经 _git_output_or_empty 退到空串再退到 False 布尔，绝不猜、绝不抛 GATE_FAIL。scope 判定复用 _path_in_scope（与 quality-gate.sh 同谓词），未另造第二份口径，符合全局规范 §5.3。author 对照基准取 base_commit 的 committer，且 author 与 author_baseline 两个原始值都写入 reasons，满足 brief 陷阱 10 的可复核要求。\n\n互补而非替代的语义正确实现（brief 最强调、最容易做错的一条）：我构造 implementer_id 有 model 的场景 + isolation 四项全 True，evaluate 走 WP-08 的 degraded 路径返回 weak 且 reasons 不含 weak-isolated；attestation 有效时先走 weak-attested，isolation 同样不抢。新判据位于 bootstrap and compare_against is None 分支内、attestation 判定之后并列，两条都不满足才落 none。WP-08 的优先权与 fail-closed 地板均未被削弱。\n\n零回归：基线 a46578c 独立复跑 4 failed + 519 passed，本 WP 4 failed + 551 passed，差 32 与新增用例数吻合；4 个失败为预存 test_finalize_merge_triple_sign.py 基线，未修，正确。isolation=None 时四条既有路径逐字不变（我直接调用复核，非读测试）。\n\n执行者未偏离 brief，[CONCERNS] 里主动写明的两处实现选择（author 基准取 committer、scope 用 _path_in_scope）均为 brief 要求或更优做法，非 scope creep。测试覆盖超出 DoD 最低要求：同作者、超范围路径、空提交、不可解析 commit、缺失 branch ref、detached HEAD、executor.tool 不算证据均有专门用例。\n\n一项超出本 WP 范围的发现，不影响 ACCEPT，但影响后续决策：拿本 WP 自己验 A0 时判据未放行，两项事实为 False —— scope_respected 因编排者为解 A7 而 merge 进的 docs/plans/ 文件落在区间内（采集正确，是编排者操作与判据口径的交互后果），author_differs 因本机单一 git 身份（kimi 提交署名 xizhu，与 base committer 同人）。实现无误，但本判据在框架自己的仓这一拓扑下无法自证，A0 依然没解开。已登记 A8，需用户裁定后另立 WP。"
+  },
   "consult": {},
-  "timestamps": {}
+  "timestamps": {
+    "dispatched_at": "2026-09-14T18:15Z",
+    "reviewed_at": "2026-09-14T18:40Z"
+  }
 }

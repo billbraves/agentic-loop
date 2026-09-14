@@ -7,7 +7,8 @@
 ## 分级
 
 **A 类 = 开箱即坏**（`agentic init` 出来的默认配置过不了自己的门，
-或框架允许的合法配置过不了自己的派发门——A4、A7 属后者），
+或框架允许的合法配置过不了自己的派发门——A4、A7 属后者，
+A8 更进一步：判据设计正确但本仓拓扑让它恒不放行），
 **B 类 = 误导性错误信息**（信息不足导致误诊，浪费一轮排查），
 **C 类 = 契约与模板不一致**（模板默认值与生命周期约束互相打脸）。
 
@@ -188,6 +189,64 @@ PREFLIGHT_FAIL: status file must be tracked before implementation
 > 与 A4 同源但不是同一条：A4 是「冻结期填不了 branch/worktree」（字段时序），
 > A7 是「派发期 status 在副 worktree 索引里不可见」（提交拓扑）。
 > 两者都出现在冻结与派发的接缝处，修 A4 不会顺手修掉 A7。
+
+### A8. WP-17 的隔离证据判据在框架自己的仓里无法自证——单一 git 身份 + A7 处置的 merge 双杀
+
+> 发现于 WP-17 验收（编排者独立复核，非执行者报告）。**实现无缺陷**，
+> 这是判据口径与本仓拓扑的交互后果，属设计层问题。
+
+WP-17 交付了第三条 bootstrap 逃逸路径 `weak-isolated`：engine 用 git 核对四项
+事实（作者不同于编排者、分支已隔离、树与基线不同、改动全在 scope 内），
+四项全 True 才给 `weak`。拿**本 WP 自己**去验 A0，判据未放行：
+
+```
+implementer_id      = None        （A5 现场，正确 fail-close）
+is_bootstrap_normal = True        （WP-08 的 degraded 路径进不去）
+author_differs_from_orchestrator = False   ← 卡点 1
+branch_is_isolated               = True
+tree_differs_from_base           = True
+scope_respected                  = False   ← 卡点 2
+evaluate() -> none
+```
+
+**卡点 1：单一 git 身份。** kimi 提交署名取本机 `git config` 身份
+`xizhu <8543264+billbraves@users.noreply.github.com>`，与 `base_commit` 的 committer 同为一人。
+判据要「作者不同」，但本机上编排者与执行者共用同一 git 身份，
+这项在任何单机 dogfood 场景里都恒为 False。
+
+**卡点 2：A7 处置引入的区间污染。** 为解 A7，编排者把 7 个 `docs/plans/`
+文件 merge 进了 WP-17 分支（见 A7）。`base_commit..tip` 区间因此含
+不在 WP-17 `allowed_paths` 内的路径，采集函数**如实**报告超范围 → False。
+采集正确，但「编排者为让 preflight 通过而做的 merge」与「判据要求区间内
+路径全在 WP scope 内」两条纪律互相拆台。
+
+**后果**：A0 依然没解开。三条逃逸路径在本仓的实际可达性：
+
+| 路径 | 判据 | 本仓可达 | 阻因 |
+|------|------|----------|------|
+| WP-08 degraded | 实现者 model 由 engine 观测 | ❌ | A5：`developer` 未绑 provider，`implementer_id=None` |
+| WP-07 attested | 审核者具名签署 | ⚠️ | 可达，但需人工签，非自动 |
+| WP-17 isolated | git 四项事实 | ❌ | 本条 A8 两个卡点 |
+
+**候选修法**（需用户裁定，另立 WP）：
+
+- **修 A5 而非改判据**（最小、最正）：给 `developer` 角色补 provider 绑定，
+  让 `implementer_id` 可观测，WP-08 的 degraded 路径自然放行；
+  WP-17 判据保留作「无 developer 绑定时」的兜底，不为自证而放宽。
+- **卡点 1 松绑口径**：把「作者不同于编排者」改为「作者身份可归因且已留痕」，
+  即 author 非空且写进 reasons 即可，不要求与 baseline 不同。
+  ⚠️ 这会削弱判据强度——同一人扮两角也能过，须评估是否等于放弃本判据的意义。
+- **卡点 2 排除编排者提交**：scope 判定跳过 merge commit 引入的、
+  仅含 `docs/plans/` 的改动（即「规划产物不计入 WP scope」）。
+  须与 `quality-gate.sh` 的 `_path_in_scope` 保持口径单一权威（§5.3），
+  不能只在 `collect_isolation_evidence` 里单独开洞。
+- **接受现状**：承认框架无法在自己的仓里自证独立性，A0 在本仓永久走
+  WP-07 的人工 attestation 路径，`weak-isolated` 只为下游真实项目服务。
+  这是诚实的选项，但要在文档里写明，不能让人以为 A0 已解。
+
+> 与 A5 同源：两条都是「判据设计得对，但本仓配置/拓扑让它落不了地」。
+> 与 A7 耦合：A7 的处置动作直接造成本条的卡点 2，修 A7（在主仓索引里查
+> status，不必 merge）会顺手消掉卡点 2。
 
 ## B 类
 
