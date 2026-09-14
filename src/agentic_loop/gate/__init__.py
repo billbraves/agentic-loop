@@ -601,6 +601,43 @@ def _enforce_autonomy(repo_root: Path) -> None:
         raise SystemExit(3)
 
 
+def _should_populate_implementer(review_decision: str) -> bool:
+    """Whether the degraded path should populate ``implementer_id``.
+
+    WP-08: the degraded path (compare consultant vs implementer, both
+    engine-observed identities, no self-attestation) is the strongest of the
+    three independence signals. It was previously gated only on
+    ``review.decision == "N/A"``, which meant an orchestrator who honestly
+    signed ``ACCEPT`` was pushed into the weaker bootstrap path (whose only
+    signal is a self-declared attestation). There is no defensible reason to
+    withhold the engine-observed comparison from an ACCEPT decision, so the
+    condition is widened to ``N/A`` or ``ACCEPT``.
+
+    Pure and side-effect free so the admission gate itself can be pinned by a
+    test without reproducing the whole ``main()`` git/validator pipeline.
+    """
+    return review_decision in ("N/A", "ACCEPT")
+
+
+def _resolve_implementer_identity(
+    executor_tool: str, binding: "Any"
+) -> AgentIdentity | None:
+    """Build the implementer's engine-observed identity for the degraded path.
+
+    WP-08: the degraded path (consultant vs implementer) is only as strong as
+    its premise — *both* identities are engine-observed. The consultant's model
+    comes from the ``consultant`` role binding (``CodexAdapter.identity()``);
+    the implementer's model must symmetrically come from the ``developer`` role
+    binding. When the implementer's model is not observable (no binding), we
+    return ``None`` so the caller falls back to the weaker bootstrap path
+    rather than entering the degraded path with only one observed model.
+    """
+    model = binding.identity_model if binding is not None else None
+    if model is None:
+        return None
+    return AgentIdentity(tool=executor_tool or "unassigned", model=model)
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print("usage: gate.py <work-package-status.json>", file=sys.stderr)
@@ -736,9 +773,12 @@ def main(argv: list[str]) -> int:
     consultant_identity = adapter.identity()
 
     implementer_id: AgentIdentity | None = None
-    if review_decision == "N/A":
+    if _should_populate_implementer(review_decision):
         executor_tool = read_field(validator, status_file, "executor.tool")
-        implementer_id = AgentIdentity(tool=executor_tool or "unassigned")
+        _, implementer_binding = resolve_role_binding("developer", repo=repo_root)
+        implementer_id = _resolve_implementer_identity(
+            executor_tool, implementer_binding
+        )
 
     # True bootstrap path: review=ACCEPT and no implementer fallback. The
     # reviewer is the orchestrator (no adapter identity), so its identity is
