@@ -980,3 +980,106 @@ STATUS_INVALID: unknown top-level fields: blocker
 （fail-closed：进 BLOCKED 必须说明原因）。改动落在
 `src/agentic_loop/validate_wp_status.py` —— 与 A14 的 `executor` 块字段校验、
 A9 的 strong 上限同属 validate/independence 加严面，可评估并入同一 WP。
+
+### A16. `DispatchProof` 的放行字段可由执行者子进程自造真值——engine 观测 ≠ 执行者不可及
+
+> Codex 独立审核 WP-18 时指出（2026-09-14，finding 2，confidence 10/10），
+> 编排者实证复现后确认成立。**这是 A11 的同构缺陷，同一层错误第二次出现。**
+
+WP-18 用 engine 在 fork 时观测的事实替换 WP-17 可伪造的 git author，五项放行条件是
+`dispatched_by_engine` / `child_pid` / `exit_code` / `argv_hash` / `orchestrator_session`
+（`independence.py` 的 `weak-dispatched` 判据要求五项同时成立）。声称的安全性质是
+**执行者不可读、不可写、不可预测**。
+
+**实证推翻**（编排者自建真实 argv-bearing 子进程，非推断）：
+
+| 字段 | 执行者能否自造真值 | 途径 |
+|------|------------------|------|
+| `child_pid` | **能** | `os.getpid()`，与 engine 观测的 `proc.pid` 逐位相同 |
+| `argv_hash` | **能** | 算法公开（`kimi.py:_argv_hash` 就是 sha256 逐元素 + `\x00`），子进程从自身 `sys.argv` 精确重算，哈希字符串完全一致 |
+| `orchestrator_session` | **能** | `kimi.py:140` 的 `subprocess.Popen(cmd, stdout=…, stderr=…, text=True)` **未传 `env=`**，`AGENTIC_SESSION_ID` 完整继承给子进程 |
+| `exit_code` | **能** | 子进程自选退出码 |
+| `dispatched_by_engine` | **能** | 常量 `True`，无信息量 |
+
+即：五项全部可由执行者自行取得**真值**，不需要猜测、不需要类型伪造。
+`collect_dispatch_proof` 只做逐字段类型校验（bool 不冒充 int 那类），
+没有写入者验证、没有签名，故任何完整且类型正确的 `executor.dispatch_proof`
+都会被构造成可信 `DispatchProof` 并放行 `weak`。
+
+**与 A14 的关系**：A14 说的是「`executor` 块不受 schema 保护，但不完美的伪造会
+fail-closed 归一到 `none`」。A16 说明**完美伪造无需任何猜测即可构造**，
+于是 A14 那条「伪造需要突破执行者不得写主区这条独立约束」的兜底论证，
+就是本判据**唯一**剩下的防线 —— 而那是外部流程约束，不是判据自身的性质。
+
+**与 A11 的同构关系**（最该记住的一条）：
+
+| | A11（WP-17） | A16（WP-18） |
+|---|---|---|
+| 判据读什么 | git commit `author` | engine fork 时的观测值 |
+| 声称的性质 | engine 可核对的身份事实 | 执行者不可读写不可预测 |
+| 实际为何不成立 | author 是提交者可自由声明的字段 | 观测值可被被观测方自我重现 |
+| 伪造成本 | 一条环境变量 | 零（子进程本来就知道这些） |
+
+两次的编排者失误性质完全相同：查了「状态文件的字段能不能被 schema 拦住」，
+没查「字段所声称的事实本身能不能被执行者取得」。**诚实性检查做在了错误的层面。**
+A11 时的教训写作「查了状态文件能不能自填，没查 git 事实能不能自造」，
+A16 时应写作「查了判据不读 git，没查判据读的东西能不能被自我重现」。
+
+**候选修法方向**（须先由用户裁定是否值得继续这条路）：
+
+1. **认证密封（seal）**：engine 用执行者环境中**不存在**的密钥对 proof 做 HMAC/签名，
+   gate 侧验签。关键是密钥材料必须不继承给子进程（`Popen(env=…)` 显式白名单，
+   而非当前的完整继承），且 proof 须绑定具体 WP id + 派发命令 + 会话，防重放。
+2. **engine-only 侧信道**：proof 根本不经过 `status.json`，由 engine 直接写入
+   执行者无写入权的位置（如锁目录下的派发记录），gate 侧对照。
+3. **承认这条路不通**，把独立性证明整体移到 A5（给 developer 角色绑异构 provider），
+   即 proof 类判据一律降为辅助信号、不作为独立性评级的充分条件。
+
+> ⚠️ 无论选哪条，**修法 1 的 `env=` 白名单是最低前提** —— 当前
+> `kimi.py:_run` 的完整环境继承会让任何基于「engine 环境秘密」的方案当场失效。
+
+> A16 与 A14（`executor` 块无 schema 保护）、A9（bootstrap 未封 strong 上限）
+> 同属独立性判据面，且 A16 的修法 3 直接指向 A5。四者的先后顺序须一并裁定。
+
+### A17. `CodexAdapter._parse_verdict` 只认纯 JSON，模型带前缀输出即整条裁决丢失
+
+> 编排者复审 WP-18 时实证（2026-09-14）。**裁决内容本身完好，是解析层把它判死。**
+
+`codex.py:212-234` 的 `_parse_verdict` 先 `json.loads(raw)`，失败则退回
+`re.search(r"\{.*\}", raw, re.DOTALL)` 抓第一个花括号块。两条都不中就抛
+`ValueError: Could not parse structured verdict from codex output: <raw>`。
+
+**实证**：Codex（gpt-5.6-sol）对 WP-18 返回的是
+
+```
+VERDICT: REWORK
+
+1. [阻断，confidence 10/10] `DispatchProof` 仍可通过 `status.json` 伪造……
+```
+
+—— 一份**结构清晰、内容完整、判定明确**的中文裁决，含 4 条 finding 与修复要求。
+但因为它以 `VERDICT: REWORK` 开头而非 `{`，且正文的反引号代码块里没有成对花括号，
+两条解析路径全部落空，整条裁决以 `ValueError` 抛出。
+
+**为什么这是缺陷而非模型不听话**：`review()` 已经传了 `--output-schema`
+（`codex.py:132`），即已用 CLI 层的结构化输出约束。模型仍以自然语言前缀回答，
+说明该约束在当前 provider/wire_api 组合下**不是强保证**。而解析层的设计假定它是
+强保证 —— 于是唯一的失败模式是「丢掉整条裁决」，最坏的一种：
+编排者若不看 `ValueError` 里的 `raw`，会以为顾问审核失败、可能重跑或干脆跳过，
+**而实际上顾问已经给出了阻断级发现**。
+
+本轮就差点如此：`raw` 恰好被完整打进异常消息才保住这份裁决。
+
+**候选修法**（倾向 1+2 并做）：
+
+1. `_parse_verdict` 增第三条路径：从纯文本里提 `VERDICT|DECISION:\s*(ACCEPT|REWORK|CONSULT)`，
+   命中即构造 `Verdict(decision=…, rationale=<全文>)`，findings 留空并在 rationale
+   里保全原文。fail-open 到「拿到裁决但结构降级」，而不是 fail-closed 到「什么都没有」。
+2. 解析失败时**先把 `raw` 落盘**到迭代目录（如 `WP-N.consult-raw.txt`）再抛异常，
+   保证裁决不因异常处理丢失。
+3. 评估 `wire_api=responses` + `--output-schema` 在本 provider 下是否真能强制 JSON；
+   若不能，文档化「结构化输出为尽力而为」，别让下游按强保证写代码。
+
+> 修法 1 须注意：不能因为「文本里出现 ACCEPT」就放行 —— 只认行首锚定的
+> `VERDICT:`/`DECISION:` 标签，且全文出现多个不同判定时 fail-closed 取最严
+> （REWORK > CONSULT > ACCEPT），防止把 rationale 里引用的词误当裁决。
