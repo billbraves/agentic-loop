@@ -1128,3 +1128,45 @@ STATUS_INVALID: unknown top-level fields: brief
 > A18 与 A15（`blocker`）、A14（`executor` 块字段无白名单）同属
 > `validate_wp_status.py` 的 schema 面。三者可并入同一个 WP。
 > 注意本轮 WP-19/WP-20 均把该文件列为 forbidden_paths，故这三条须另立 WP。
+
+### A19. 框架只有返工用的 `redispatch`，没有首次派发命令——`DispatchProof` 在首次派发时无从产生
+
+> 编排者派发 WP-19 时发现（2026-09-14）。**这是 A16 的下游后果，也解释了
+> WP-18 自举失败的第二层原因。**
+
+`agentic` 的子命令表里派发相关只有 `redispatch`（`-> scripts/agentic/redispatch.sh`），
+而 `redispatch.py:206` 的分支表明它只处理 `BLOCKED` 与 `REWORK` 两种状态
+（prompt 里写死 "Reason for redispatch"、"Recent log tail"、`diff --stat` 等
+返工上下文）。**`DISPATCHED` 状态的首次派发没有任何 engine 侧命令**。
+
+于是首次派发只能由编排者手工调用开发者工具（本仓即 `kimi --afk ...`）。
+后果是 `executor.dispatch_proof` 在首次派发时**必然缺失** —— 不是执行者不写，
+而是没有任何 engine 代码路径会写它：写入点 `redispatch.py:_proof_payload`
+只在 redispatch 流程里。
+
+**这解释了 WP-18 为何无法自证**（此前只归因于「WP-18 未合并所以主仓 gate 没有
+`collect_dispatch_proof`」，那只是第一层）：即便 WP-18 已合并，首次派发依然
+产不出 proof，`weak-dispatched` 判据只有在**返工**派发时才可能生效。
+一个只在返工路径上成立的独立性判据，无法用于首次验收 —— 而首次验收正是
+双签门最需要独立性的时刻。
+
+**与 A16 的关系**：A16 说 proof 的内容可被执行者自我重现（判据不可靠）；
+A19 说 proof 在首次派发时压根不存在（判据不可用）。两条叠加，
+`weak-dispatched` 在正常首次验收流程中**既不可靠也不可用** ——
+这为用户 2026-09-14 对 A16 的裁定（修法 3：放弃 proof 路线，
+独立性证明整体移交 A5）补充了一条独立理由。
+
+**候选修法**（与 A16 修法 3 并行，互不冲突）：
+
+1. 增 `agentic dispatch <status.json>` 子命令：engine 侧读 status、
+   构造开发者工具 argv、fork 并记录执行结果，把当前手工调 kimi 的步骤
+   变成一等命令。这同时使「记录 `executor.tool` 与 session id」
+   （CLAUDE.md §Dispatch 的要求）从人工誊抄变成 engine 事实。
+2. 或把 `redispatch` 的状态前置放宽到含 `DISPATCHED`，prompt 按状态分支
+   （首次派发用 brief 全文，返工用 diff + 日志尾）。改动更小但语义混淆，
+   命令名会与行为不符。
+
+> ⚠️ 修法 1/2 都**不**能解决 A16（proof 内容可自我重现），只解决可用性。
+> 若按 A16 修法 3 放弃 proof 路线，A19 依然值得修 —— 因为
+> 「engine 观测到的 `executor.tool` 与 session」对审计留痕仍有价值，
+> 只是不再作为独立性评级依据。
