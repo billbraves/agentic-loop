@@ -6,7 +6,8 @@
 
 ## 分级
 
-**A 类 = 开箱即坏**（`agentic init` 出来的默认配置过不了自己的门），
+**A 类 = 开箱即坏**（`agentic init` 出来的默认配置过不了自己的门，
+或框架允许的合法配置过不了自己的派发门——A4、A7 属后者），
 **B 类 = 误导性错误信息**（信息不足导致误诊，浪费一轮排查），
 **C 类 = 契约与模板不一致**（模板默认值与生命周期约束互相打脸）。
 
@@ -137,6 +138,56 @@ PREFLIGHT_FAIL: current branch feature/wp08-independence-degraded != status bran
 
 > 注意第二条会把「两次提交」纪律改成「三次」，是文档级契约变更，
 > 需要用户裁定，不能由执行者顺手改。
+
+### A7. 以另一个 WP 分支为基线时，本 WP 的 status 在副 worktree 索引里不可见，preflight 必挂
+
+**现象**（2026-09-14 实跑 WP-17）：WP-17 经用户裁定以
+`feature/wp08-independence-degraded` @ `a46578c` 为基线（WP-08 作上游依赖）。
+worktree 建好、分支起点正确（已核实 `_should_populate_implementer` 在场），
+但 `agentic preflight` 在副 worktree 里报：
+
+```
+PREFLIGHT_FAIL: status file must be tracked before implementation
+```
+
+**根因是提交拓扑，不是传参错误**。`preflight.sh:69` 是
+`git ls-files --error-unmatch "$status_file"`，它按**当前 worktree 的索引**解析。
+而各 status 文件首次出现的提交不同：
+
+| 文件 | 所在提交 | `a46578c` 能否看到 |
+|------|----------|--------------------|
+| `WP-08.status.json` | `802b667`（七 WP 冻结） | **能**——`a46578c` 是 `802b667` 的子提交 |
+| `WP-17.status.json` | `2dd9cfc`（WP-15/17 冻结） | **不能**——`2dd9cfc` 与 `a46578c` 是 `802b667` 的两个分叉 |
+
+已用 `git cat-file -e` 逐一核实：
+`feature/wp08-independence-degraded:…/WP-17.status.json` →
+`fatal: path … exists on disk, but not in 'feature/wp08-independence-degraded'`；
+同一路径在 `2dd9cfc` 下存在。
+
+**为什么这是缺陷而非操作失误**：常规 WP 的基线就是 plan 分支，冻结提交天然是
+基线的祖先，`ls-files` 永远能看到。但**一旦某 WP 以另一个未合并的 WP 分支为基线**
+（A5 修法 2 这种自举场景的必然形态），冻结提交与基线就成了兄弟分叉，
+`ls-files` 必然查不到。框架允许 `git.base_branch` 填任意分支
+（`validate_wp_status.py:439` 只校验非空），却没有任何一处提示这会打挂 preflight。
+
+**本轮的处置**：在副 worktree 里 `git merge --no-ff plan/2026-09-13-parallel-throughput`
+把冻结提交并进 WP-17 分支。该提交只动 `docs/plans/`，不含代码，
+故不污染 WP-17 的代码 diff，且副作用是好的——执行者在自己 worktree 里
+就能读到自己的冻结 brief。
+
+**候选修法**（择一）：
+
+- `preflight.sh:69` 改成在**主仓**索引里查 status（用已有的 `main_root`，
+  `resolve_paths --root main_repo` 那一行就在 `:77`），而不是当前 worktree。
+  status 本就是主区 live 状态（全局规范 §4.1），在主仓查才是对的语义。
+- 或：`dispatch-lint` 增一条检查——`git.base_branch` 不是 plan 分支时，
+  校验冻结提交是否为 `base_commit` 的祖先，不是则明确报
+  「以 WP 分支为基线须先把冻结提交并入该分支」，把这次的摸索变成一次性提示。
+- 或：文档化「上游依赖型 WP 的派发前置步骤」，写进 `AGENTS.md` §4.2。
+
+> 与 A4 同源但不是同一条：A4 是「冻结期填不了 branch/worktree」（字段时序），
+> A7 是「派发期 status 在副 worktree 索引里不可见」（提交拓扑）。
+> 两者都出现在冻结与派发的接缝处，修 A4 不会顺手修掉 A7。
 
 ## B 类
 
