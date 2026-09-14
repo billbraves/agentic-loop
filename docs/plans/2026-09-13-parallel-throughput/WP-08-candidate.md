@@ -248,6 +248,111 @@ evaluate() -> none
 > 与 A7 耦合：A7 的处置动作直接造成本条的卡点 2，修 A7（在主仓索引里查
 > status，不必 merge）会顺手消掉卡点 2。
 
+### A9. degraded 路径异源比较返回 `strong`，而 bootstrap 语义只允许 `weak`
+
+> Codex 独立审核 WP-08 时发现（2026-09-14），编排者核证为**预存缺陷**，非 WP-08 引入。
+
+`independence.py:132-139`：`_different_model()` 为真时**无条件** `return "strong"`，
+bootstrap 分支只往 reasons 追加一句 `level=strong-attested`，**级别本身仍是 strong**。
+
+```python
+if _different_model(consultant_id, compare_against):
+    ...
+    if bootstrap:
+        reasons.append("level=strong-attested: reviewer=orchestrator, attested not engine-proven")
+    return "strong", reasons          # <-- bootstrap 也走这里
+```
+
+`git log -L 128,140` 证明这段自 `c555daf`（框架 0.1.0 初始提交）就存在；
+WP-08 **完全没碰** `independence.py`（只改 `gate/__init__.py` +44 与两个测试文件），
+故非本 WP 回归。`[review_policy]` 注释也明确写着「strong 目前在 gate 路径上不可达」，
+即设计意图是 bootstrap 下最高 weak —— 代码与意图不一致。
+
+**当前不可达，修 A5 后立即可达**：本仓 `developer = "kimi"` 不绑 provider →
+`binding=None` → `_resolve_implementer_identity()` 返回 `None` → 落回 bootstrap，
+异源比较不发生。一旦按 A8 裁定给 developer 绑上异源 provider，
+consultant(gpt-5.6-sol) vs implementer(kimi-*) 立刻命中此分支评出 `strong`。
+
+> ⚠️ **修 A5 的前置条件**：必须先封 strong 上限（bootstrap 下 `_different_model`
+> 命中时返回 `weak` 而非 `strong`），否则修 A5 会顺手把一个预存缺陷激活成
+> 「合并门给出 strong」的实际误判。两者必须同一个 WP 或严格前后序。
+
+### A10. 身份 `identity_model` 来自可编辑的 config 声明，不是执行时实测
+
+> Codex 独立审核 WP-08 时发现（2026-09-14），编排者核证为**框架预存的身份模型问题**。
+
+`gate/__init__.py` 的 `resolve_role_binding("developer"|"consultant")` 读
+`.agentic/config.toml` 的 `providers.<name>.identity_model`。该值：
+
+- 是人工书写的**声明**，不是 dispatch 时对实际模型的探测结果；
+- dispatch 之后仍可被编辑，与产出 commit 无任何绑定；
+- 没有任何 probe 去核验「实际应答的模型确实是这个 id」。
+
+因此「双方身份均由 engine 观测」这一 degraded 路径的立论前提并不严格成立。
+同一批评**同等适用于 consultant_identity**（走同一个 `resolve_role_binding`），
+故这不是 WP-08 的新增问题 —— WP-08 只把准入条件从 `N/A` 放宽到 `N/A|ACCEPT`，
+未改变身份来源的可靠性。但 A0 的解法依赖这条链，所以必须记账。
+
+**候选修法**：dispatch 时探测实际模型并写入 status 的 engine-only 字段
+（执行者不可写），评级时以探测值而非 config 声明为准；或至少在
+`agentic --version` / gate 输出里标注「身份来自声明，未实测」，不让读者误以为已核。
+
+### A11. `weak-isolated` 判据可被一条环境变量伪造 —— 比不加更糟
+
+> Codex 独立审核 WP-17 时发现（2026-09-14），**编排者实证复现后撤回原 ACCEPT，
+> 改判 REWORK**。这是本轮唯一一条「实现有实质缺陷」的记录，其余 A 类均为设计/配置问题。
+
+WP-17 的 `author_differs_from_orchestrator` 用「tip 的 author 异于 base 的 committer」
+代理「改动来自他方主体」。但 commit author 是**提交者可自由声明的字段**，
+三条途径任选其一即可设定：`git config user.*`、`GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`
+环境变量、`git commit --author`。
+
+**决定性反证**（编排者自建临时 git 仓实测，非采信 Codex 论断）：
+
+```
+同一操作者、同一终端，仅加环境变量：
+  GIT_AUTHOR_NAME=totally-other-agent GIT_AUTHOR_EMAIL=other@agent.ai git commit
+
+采集结果：
+  author_differs_from_orchestrator = True   ← 伪造成功
+  branch_is_isolated               = True
+  tree_differs_from_base           = True
+  scope_respected                  = True
+  evaluate() -> 'weak'   meets_threshold(weak,'weak') = True   ← 合并门被骗过
+```
+
+且 reasons 打出的是一句**假陈述**：
+
+```
+isolation evidence verified by engine via git: author=totally-other-agent ...
+level=weak-isolated: change proven to originate elsewhere ...
+```
+
+改动并非来自他方，是同一主体换了个署名。判据把「可自我声明的字段」当成
+「engine 核对的事实」，用于满足独立性门，等于把「隔离的改动」冒充
+「独立的签署」—— **实质削弱既有 fail-closed 地板，比不加这条路径更糟**。
+
+**旁证判据加固不足**：同一次提交的 committer 仍是 `orchestrator <orch@x.com>`，
+真相就在 committer 字段里，但判据只读 author 没读 committer。
+连「两个字段交叉核对」这种最低成本的加固都没做。
+
+**编排者原验收失误的性质**（记录以免重犯）：我核了纯函数性、级别表不变、
+strong 不可达、口径单一权威、`collect_isolation_evidence` 签名无自填字段、
+七个反向场景 fail-closed、零回归 —— 全部成立且**仍然成立**。失误在于
+把「函数签名里没有 executor/tool/model 参数」当成了「判据不可伪造」的充分证据，
+漏了 **git author 本身就是一个可自填字段**这一层。诚实性检查做在了错误的层面：
+查了「状态文件能不能自填」，没查「git 事实本身能不能自造」。
+
+**返工方向**（Codex 建议，编排者认可）：移除 author 代理，改用实现者无法自行
+声明的来源证明 —— engine 侧记录的执行会话身份、签名提交（受信密钥）等；
+或大幅降低本判据的语义主张（不再声称 "proven to originate elsewhere"）
+并交叉核对 committer，仅作为**辅助**信号而非独立性门的充分条件。
+
+> 与 A8 的关系：A8 说「本判据在本仓拓扑下无法自证（恒不放行）」，
+> A11 说「本判据在他处可被轻易伪造（该拦的不拦）」。**两条并存**：
+> 判据同时过严（对诚实场景）和过松（对恶意场景），说明 author 这个代理量
+> 选错了，不是阈值调整能解决的。
+
 ## B 类
 
 ### B1. `preflight.sh` 的 tracked 检查吞掉 stderr，把「路径不在本 worktree 内」误报成「未跟踪」

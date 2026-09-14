@@ -120,7 +120,7 @@ WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
 | WP-13 | 门拒绝跑错目录并标注读取来源（B5+C3） | `quality-gate.sh` 前置校验 + 输出层标注 | 假阳性治理 |
 | WP-14 | `evidence.tests` 结构写进模板与文档（C2） | 模板示例 + QUICKSTART | 纯文档/模板 |
 | WP-15 | `max_context_size` 随 provider 配置走（A6） | `provider_binding.py` 增 `max_context_size: int \| None` + `adapters/kimi.py` 模板读 binding | 静默降级，独立修复（rev2 已与 A5 解耦） |
-| WP-17 | 补一条 engine-verifiable 的独立性判据（A5 修法 2） | `independence.py` + `adapters/base.py` 新增 `IsolationEvidence` + `gate/__init__.py` 读 git 事实 | **合并门准入语义变更**，已验收 `ACCEPT`（`0d7db1e`，+807/-0，零回归），待合并；基线 `feature/wp08-independence-degraded` |
+| WP-17 | 补一条 engine-verifiable 的独立性判据（A5 修法 2） | `independence.py` + `adapters/base.py` 新增 `IsolationEvidence` + `gate/__init__.py` 读 git 事实 | **REWORK**（原 ACCEPT 已撤回）：判据可被一条 `GIT_AUTHOR_NAME` 环境变量伪造，见 A11。待重新设计来源证明 |
 
 > **A4 尚未拆包**，待用户裁定归属（涉及「状态文件提交两次」的契约变更）。
 >
@@ -179,6 +179,34 @@ WP-01/WP-03/WP-08 的合并在修法 2 落地前继续挂起。
 > `gate/__init__.py` 与 `independence.py` 正是 WP-08 的范围，而 WP-08 的合并
 > 本身卡在 A0——即 WP-17 要解的那个问题。基线分支（基于 WP-08 分支开，
 > 还是先例外合并 WP-08）是冻结前唯一待定项。
+
+> **⚠️ Codex 双签审核结果（2026-09-14）：WP-08 与 WP-17 双双 REWORK，合并暂停。**
+> 用户授权合并后，`agentic merge` 卡在双签门（`consult.decision must be ACCEPT`），
+> 遂派 Codex（consultant, gpt-5.6-sol via kirogpt）实审两个改独立性判据的 WP。
+>
+> **WP-08 → REWORK（编排者维持 ACCEPT）**：两条发现现象成立但均为**预存缺陷**，
+> 非本 WP 引入（WP-08 完全没碰 `independence.py`）。已登记 **A9**（degraded 异源
+> 比较返回 `strong` 而 bootstrap 只允许 `weak`，自 `c555daf` 即存在；本仓当前
+> 不可达，**修 A5 后立即可达**）与 **A10**（`identity_model` 来自可编辑 config
+> 声明而非执行时实测，同等适用于 consultant）。
+>
+> **WP-17 → REWORK（编排者撤回原 ACCEPT，已登记 A11）**：Codex 指出 author 判据
+> 可伪造，编排者**自建临时 git 仓实证复现**——同一操作者仅加
+> `GIT_AUTHOR_NAME=... GIT_AUTHOR_EMAIL=... git commit`，四项判据全 True、
+> `evaluate()` 返回 `weak`、合并门被骗过，且 reasons 打出假陈述
+> "change proven to originate elsewhere"。判据把可自我声明的字段当作 engine 核对的
+> 事实，**实质削弱 fail-closed 地板，比不加这条路径更糟**。同一提交的 committer
+> 仍是 orchestrator，真相就在那个字段里，但判据没读。
+>
+> 原验收失误性质：查了「状态文件能不能自填」，没查「git 事实本身能不能自造」——
+> 诚实性检查做在了错误的层面。其余结论（纯函数、级别表、strong 不可达、口径单一、
+> 零回归）全部成立且仍然成立，问题在判据设计而非实现工艺。
+>
+> **A8 与 A11 并存**：判据同时**过严**（本仓恒不放行）和**过松**（他处可伪造），
+> 说明 `author` 这个代理量选错了，不是阈值调整能解决的。
+>
+> **修 A5 的前置条件（新增）**：必须先封 A9 的 strong 上限，否则给 developer 绑
+> 异源 provider 会把预存缺陷激活成「合并门实际给出 strong」的误判。
 
 ## §5 工作包拆分
 
