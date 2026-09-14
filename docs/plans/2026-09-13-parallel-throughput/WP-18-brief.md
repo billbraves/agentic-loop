@@ -204,3 +204,30 @@ def evaluate(..., *, proof: DispatchProof | None = None) -> tuple[str, list[str]
 [CONCERNS]
 [BLOCKER]
 ```
+
+## Allowed and forbidden paths
+
+见上文「范围」一节，此处为 `agentic dispatch-lint` 要求的英文标题锚点，
+以 `WP-18.status.json` 的 `scope.allowed_paths` / `scope.forbidden_paths` 为机器权威。
+
+## Completion definition
+
+见上文「完成定义（DoD）」一节，此处为 `agentic dispatch-lint` 要求的英文标题锚点。
+
+## Acceptance tests
+
+`python3.11 -m pytest tests -q` 相对基线零回归（基线 4 failed 为预存
+`tests/test_finalize_merge_triple_sign.py`，不得修）。
+
+本 WP 特有的硬性验收：
+
+1. `python3.11 -m pytest tests/test_dispatch_proof.py tests/test_independence_dispatch_proof.py -q` 全绿。
+2. **反伪造用例必须存在且通过**：分别用 ① `git config user.*`
+   ② `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` 环境变量 ③ `git commit --author`
+   ④ 自填 `status.json` 任意字段 —— 四条途径均无法使 `weak-dispatched` 放行，
+   全部落 `none`。这是本 WP 区别于 WP-17（A11）的立命之处。
+3. `evaluate()` 纯函数 AST 核验：函数体与模块级均无 `subprocess`/`os`/
+   `pathlib`/`Path`/`open`/`git`/`shutil`/`io`。
+4. `INDEPENDENCE_LEVELS` 与 `_LEVEL_RANK` 逐字未变；`weak-dispatched` 永不评 strong。
+5. characterization：`proof=None` 时既有四条路径（none / weak-attested /
+   weak-isolated / degraded）逐字不变。
