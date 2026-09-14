@@ -75,9 +75,21 @@
     "reviewer": "claude-code (orchestrator)",
     "evidence": "Read report.py in full and verified its two hard claims independently. (1) Verdict parity: is_blocked/exit_code replicate StageRunResult.blocked()/exit_code() exactly; the characterization test uses StageRunResult itself as ground truth and enumerates FINDINGS and 'bogus'. (2) Dead-code check: no caller in src/ — the module is additive and wires nothing, so it cannot change any live verdict. Found one latent divergence: report.normalize_decision omits the runner's FINDINGS->FAIL branch, so FINDINGS reads as ERROR. Traced gate_runner.py:412 as the only path where an executor decision enters gates[]; it normalizes there, so a raw FINDINGS can never reach the report from the runner. Verified by direct call that both spellings are non-PASS, hence is_blocked and exit_code are identical either way — the divergence mislabels a decision in the detail file but changes no verdict. Recorded as a follow-up, not a blocker."
   },
-  "consult": {},
+  "consult": {
+    "decision": "CONSULT",
+    "reviewer": "(未进行独立顾问审核)",
+    "independence": "none",
+    "evidence": "如实记录：本 WP 未经 codex 独立顾问审核，consult 签名缺位。编排者 review.decision=ACCEPT 为唯一技术签名，独立性等级 none。\n背景：双签合并门（review + consult 均须 ACCEPT）在「编排者同时是审核者」的常规路径上无法满足，此为已登记缺陷 A0；A0 的根因 A5（developer 角色未绑定异构 provider）尚未修复，故本迭代内无法通过正常路径取得可信的第二签名。\n风险评估（编排者）：本 WP 改动为 gate 报告紧凑化（WP-01）/ 计划泳道（WP-03）一类低风险面，不触及独立性判据、合并门、身份解析等安全语义，误判代价有限。\n处置：用户明示授权以 consult.override 放行，override 只放松「consult.decision 必须等于 ACCEPT」这一项，不改变 review 签名、不改变独立性等级、不掩盖 A0。A0/A5 另立 WP 修复。",
+    "override": {
+      "approved": true,
+      "approver": "xizhu (用户本人，会话 8a8bf01e 明示授权：「授权合并」/「b + 立缺陷」/「放行」)",
+      "justification": "A0（双签门在常规路径不可满足）阻塞合并，且 A0 根因 A5 未修复前无可信第二签名可取。本 WP 属低风险面（gate 报告 / 计划泳道），不触及独立性判据与合并门语义。用户明示授权放行，override 仅放松 consult.decision==ACCEPT 一项，independence 如实保留为 none，A0/A5 缺陷记录不因本次放行而关闭。",
+      "reviewed_at": "2026-09-14T20:10Z"
+    }
+  },
   "timestamps": {
     "dispatched_at": "2026-09-13T09:43:23Z",
-    "approved_for_merge_at": "2026-09-14T19:00Z"
+    "approved_for_merge_at": "2026-09-14T19:00Z",
+    "consulted_at": "2026-09-14T20:10Z"
   }
 }

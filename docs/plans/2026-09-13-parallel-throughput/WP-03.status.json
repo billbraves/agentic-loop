@@ -76,9 +76,21 @@
     "reviewer": "claude-code (orchestrator)",
     "evidence": "ACCEPT after one REWORK round. Reviewed both commits independently against the WP-03 brief.\n\nCore delivery (eb11e6b), independently verified: (a) dual-form compat holds — validate() accepts legacy list[str] and new list[dict]; all three PLAN §0.1 risk-1 consumption points are normalized (validate() topology block via _normalize_work_packages, _status_git_paths via _wp_ids, cmd_check via _status_git_paths). (b) `plan lanes` verified end-to-end on real data: the legacy string-form PLAN-01 degrades to one READY WP with the other six blocked on same-lane serialization (safe default, no behavior change for existing plans); a dict-form plan correctly computes WP-01 [lane-gate] + WP-03 [lane-plan] as the two concurrent heads, which is exactly the dogfood case this iteration needs. (c) topology rejection verified: dangling depends_on, 2-cycle, and self-cycle all yield clean PLAN_INVALID.\n\nThe REWORK blocker is fixed correctly (78b33f2). I had found that a non-str/non-dict work_packages entry crashed _normalize_work_packages with AttributeError and rc=1 — a regression against the pre-change code, which cleanly emitted PLAN_INVALID with rc=2, and outside the module's own rc contract. The fix changes the bare `else` to `elif isinstance(item, dict)`, so invalid-typed entries are skipped in normalization while validate()'s per-entry loop still reports them. Two lines plus a comment; no logic beyond the defect. Kimi chose the broader of the two options I offered (fix in the helper rather than only in the topology block) and justified it: the helper is consumed by the topology block, _wp_ids, _dependency_graph and _lanes_ready, so one fix covers four call sites. I agree — the narrower fix would have left the other three reachable.\n\nIndependently re-verified the fix rather than trusting the report: entries 123 and null now both give rc=2 with \"PLAN_INVALID: work_packages entries must be strings or objects\" and zero tracebacks; valid str and dict entries still proceed past validation (rc=3 on an unrelated unresolvable-branch check, i.e. validation passed). Two regression tests added, one at the validate() level and one at the CLI level asserting rc == RC_FAIL and PLAN_INVALID on stderr rather than a traceback — the CLI-level one is the assertion that actually pins the contract.\n\nQuality gate from inside the WP-03 worktree: STATUS_VALID, scope enforcement passes, 4 failed / 519 passed / 4 skipped. The 519 is +2 over the pre-rework 517, matching exactly the two new tests. The 4 failures are the known pre-existing tests/test_finalize_merge_triple_sign.py baseline (fixture runs `git checkout -q main` in a temp repo with no main branch); identical 4 appear in the WP-01 worktree and on the integration branch with both WPs absent, and they lie outside WP-03 allowed_paths — correctly untouched.\n\nScope: both commits touch exactly src/agentic_loop/plan_cmd.py and tests/test_plan_lanes.py. No forbidden path, no status-file write, no merge/push. Commit messages carry gitmoji + Chinese, and the rework was appended rather than amended as instructed.\n\nKimi's earlier [CONCERNS] about `dict | None` breaking Python >= 3.9 was unfounded and I told it so: `from __future__ import annotations` is at line 52 and the annotation is pre-existing in the base version. Remaining cosmetic nit, not blocking: cmd_check's `wp_ids = data.get(\"work_packages\", [])` names a raw dual-form list \"wp_ids\"; used only for the emptiness check, so behavior is correct."
   },
-  "consult": {},
+  "consult": {
+    "decision": "CONSULT",
+    "reviewer": "(未进行独立顾问审核)",
+    "independence": "none",
+    "evidence": "如实记录：本 WP 未经 codex 独立顾问审核，consult 签名缺位。编排者 review.decision=ACCEPT 为唯一技术签名，独立性等级 none。\n背景：双签合并门（review + consult 均须 ACCEPT）在「编排者同时是审核者」的常规路径上无法满足，此为已登记缺陷 A0；A0 的根因 A5（developer 角色未绑定异构 provider）尚未修复，故本迭代内无法通过正常路径取得可信的第二签名。\n风险评估（编排者）：本 WP 改动为 gate 报告紧凑化（WP-01）/ 计划泳道（WP-03）一类低风险面，不触及独立性判据、合并门、身份解析等安全语义，误判代价有限。\n处置：用户明示授权以 consult.override 放行，override 只放松「consult.decision 必须等于 ACCEPT」这一项，不改变 review 签名、不改变独立性等级、不掩盖 A0。A0/A5 另立 WP 修复。",
+    "override": {
+      "approved": true,
+      "approver": "xizhu (用户本人，会话 8a8bf01e 明示授权：「授权合并」/「b + 立缺陷」/「放行」)",
+      "justification": "A0（双签门在常规路径不可满足）阻塞合并，且 A0 根因 A5 未修复前无可信第二签名可取。本 WP 属低风险面（gate 报告 / 计划泳道），不触及独立性判据与合并门语义。用户明示授权放行，override 仅放松 consult.decision==ACCEPT 一项，independence 如实保留为 none，A0/A5 缺陷记录不因本次放行而关闭。",
+      "reviewed_at": "2026-09-14T20:10Z"
+    }
+  },
   "timestamps": {
     "dispatched_at": "2026-09-13T09:50:33Z",
-    "approved_for_merge_at": "2026-09-14T19:00Z"
+    "approved_for_merge_at": "2026-09-14T19:00Z",
+    "consulted_at": "2026-09-14T20:10Z"
   }
 }
