@@ -148,7 +148,18 @@
       "outcome": "REWORK 采纳，但不返工执行者交付物；缺口归编排者面（B11 尾巴），以 rev2 Brief 重派或单独 WP 补断言",
       "why_not_executor_rework": "codex 的观察成立、修法不可达。实测（真脚本调用，B11 修法 1）：把 later 锚点 'Completion definition' 分别做「改标题」与「留标题清段体」两种变异，stderr 完全逐字节相同（都是 DISPATCH_LINT_FAIL: brief missing section 'Completion definition'）。故 dispatch_lint.sh 的 :86/:98 在输出上不可区分，任何对 stderr 措辞的断言都无法钉死判据行——包括 codex 建议的 assert 'empty' in stderr（该词在两条路径都不出现）。执行者当初的处理是这条约束下的正解，不构成可返工的缺陷。",
       "gap_and_fix": "残余缺口真实：原因特异性目前由 fixture 承载（段体恰为 ''、另两锚点各留非空），而非由断言自证；fixture 若日后漂移，用例不会报警。已实测出不需改 gate 的替代判据——差分对：同一 fixture 保持 '## Acceptance tests' 标题恒定，仅增删一行段体，rc 从 2 翻到 0（实测 cleared→rc=2 / +一行 'x'→rc=0 DISPATCH_LINT_PASS）。标题在两次运行中都存在，故 :86 不可能是原因，红只能来自 :98。这条断言把原因特异性从 fixture 移回用例本身，且不碰 forbidden 的 dispatch_lint.sh。",
-      "next": "以 rev2 Brief 补该差分对断言（替换现 witness 的弱断言），或并入 B11 的编排者协议 WP 一并处理"
+      "next": "以 rev2 Brief 补该差分对断言（替换现 witness 的弱断言），或并入 B11 的编排者协议 WP 一并处理",
+      "differential_pair_verified": {
+        "verified_at": "2026-09-16T00:45:00Z",
+        "method": "判据从 dispatch_lint.sh 原文切片（索引定位 section_issue heredoc，非 retype、非副本），fixture 由真 helper _clear_section_body 生成（importlib 导入受审用例模块）",
+        "fixture_A": "_clear_section_body(tmpl,'Acceptance tests') — 保留 '## Acceptance tests' 标题，段体为空，62 行",
+        "fixture_B": "同一份 A，仅在该标题下插入一行 'x'，63 行；标题两次都在",
+        "result_A": "stdout=\"brief missing section 'Acceptance tests'\" rc=0（判据认定不合规）",
+        "result_B": "stdout='' rc=1（判据认定合规）",
+        "why_cause_specific": "两次运行只差一行段体，'## Acceptance tests' 标题在 A、B 中都存在，故 :86（标题缺失）在两次都不可能触发；A 的红只能来自 :98（段体为空）。原因特异性由用例本身承载，不再依赖 fixture 不漂移",
+        "scope": "不碰 forbidden 的 dispatch_lint.sh；只需改 tests/test_wp_template_dispatch_lint.py 的 witness 用例",
+        "status": "已验证可用，待以 rev2 Brief 派发或并入 B11 协议 WP"
+      }
     }
   },
   "timestamps": {
