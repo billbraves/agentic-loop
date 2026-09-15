@@ -228,3 +228,25 @@ def test_finalize_merge_rejects_worktree_local_status(repo: Path, tmp_path: Path
     )
     assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
     assert "resolves inside a worktree" in res.stderr, (res.stdout, res.stderr)
+
+
+def test_long_path_fails_closed_without_raising(repo: Path) -> None:
+    # A29-1 (WP-19 rev5): ``directory = resolved if resolved.is_dir() else
+    # resolved.parent`` sat outside every guard, and ``is_dir()`` stats the
+    # path — a ~300-character filename raises ``OSError: [Errno 63] File name
+    # too long``. The predicate's docstring promises "never raises", and the
+    # fail-open command-substitution call site in finalize_merge.sh turns a
+    # raised predicate into a skipped refusal. Overlong input must fail
+    # closed (True) without raising.
+    long_name = "a" * 300 + ".json"
+    assert path_is_in_worktree(repo / long_name) is True
+
+
+def test_null_byte_path_fails_closed_without_raising(repo: Path) -> None:
+    # A29-2 (WP-19 rev5): ``path.resolve()`` raises ``ValueError: embedded
+    # null byte`` for a path containing NUL, and ValueError is not an OSError
+    # subclass — the rev4 guards could not catch it. The three guards share
+    # one except form ``(OSError, RuntimeError, ValueError)`` (§5.3), so the
+    # predicate fails closed (True) instead of raising.
+    nul_path = Path(str(repo) + "/a\x00b.json")
+    assert path_is_in_worktree(nul_path) is True

@@ -237,6 +237,18 @@ def path_is_in_worktree(path: Path) -> bool:
     an ``OSError`` subclass); any resolution failure returns True. The
     A27 path resolution and the A28 git-dir/common-dir resolution share
     this one guard form (§5.3, single handling).
+
+    A29 (WP-19 rev5): "never raises" now actually holds for ANY input.
+    The ``is_dir()`` probe stats the path — a ~300-character filename
+    raises ``OSError: [Errno 63] File name too long`` — so it sits inside
+    the path-resolution guard, not between guards (A29-1). And every
+    guard catches ``ValueError`` too: ``resolve()`` raises
+    ``ValueError: embedded null byte`` for NUL-containing paths, which is
+    not an ``OSError`` subclass (A29-2). All three guards share the one
+    except form ``(OSError, RuntimeError, ValueError)`` (§5.3). This
+    matters because the ``finalize_merge.sh`` call site reads the verdict
+    via command substitution: a raised predicate empties stdout and the
+    fail-open comparison skips the worktree refusal entirely.
     """
     sanitized_env = {
         key: value
@@ -247,10 +259,13 @@ def path_is_in_worktree(path: Path) -> bool:
         # A27: resolve first, so the probed directory is the one owning the
         # file that will actually be read/written. A28-2: resolution never
         # escapes — OSError and RuntimeError (symlink loop) both fail closed.
+        # A29-1: is_dir() stats the path (overlong name -> OSError), so it
+        # belongs inside this guard, not between guards. A29-2: ValueError
+        # (embedded NUL) is not an OSError subclass and is caught too.
         resolved = path.resolve()
-    except (OSError, RuntimeError):
+        directory = resolved if resolved.is_dir() else resolved.parent
+    except (OSError, RuntimeError, ValueError):
         return True
-    directory = resolved if resolved.is_dir() else resolved.parent
     try:
         proc = subprocess.run(
             [
@@ -265,7 +280,8 @@ def path_is_in_worktree(path: Path) -> bool:
             text=True,
             env=sanitized_env,
         )
-    except OSError:
+    except (OSError, RuntimeError, ValueError):
+        # Same single guard form as the path resolution above (A29-2, §5.3).
         return True
     if proc.returncode != 0:
         return True
@@ -288,8 +304,8 @@ def path_is_in_worktree(path: Path) -> bool:
         common_dir = directory / common_dir
     try:
         return git_dir.resolve() != common_dir.resolve()
-    except (OSError, RuntimeError):
-        # A28-2: same single guard form as the path resolution above.
+    except (OSError, RuntimeError, ValueError):
+        # A28-2/A29-2: same single guard form as the path resolution above.
         return True
 
 
