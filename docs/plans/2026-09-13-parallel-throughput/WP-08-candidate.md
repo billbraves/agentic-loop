@@ -1738,3 +1738,25 @@ rev5（`77941f4`）与 rev6（`949b976`）是**同基线的替代提交**，不�
 故 `77941f4..949b976` 不等于本轮范围。正确写法是 `949b976^..949b976`。
 编排者原用 AST 逐 def 比对得出同样结论，但 range 写法应统一为后者，
 并入派发/验收命令形态 WP（任务 A19+A23）。
+
+#### A32 补充：证据内容已核实并留痕，worktree 已清理
+
+清理 `wp19-wrapper-seams` worktree 前，编排者核实了 codex 以 `--sandbox read-only`
+运行却留下的 `.serena/` 目录内容（20K，3 个文件）：
+
+| 文件 | 内容性质 |
+|------|----------|
+| `.serena/project.yml` | serena 项目配置模板，`project_name: "wp19-wrapper-seams"`（**以 worktree 名自动命名**，证明确由该 worktree 内的运行生成），其余为默认注释 |
+| `.serena/.gitignore` | 两行：`/cache`、`/project.local.yml` |
+| `.serena/project.local.yml` | 仅注释，无实际设置 |
+
+**无敏感内容，也无 codex 的分析产物**（不含代码摘要、记忆或索引缓存）。
+故 A32 的实质危害仅限于**污染「树是否干净」判据**：`git status --short` 因此长期显示
+`?? .serena/`，使「worktree 无未跟踪文件」这一验收信号失效。
+
+定性维持 **P2**：`--sandbox read-only` 的语义应是「不写被审仓」，但 MCP 工具的副作用
+绕过了该声明。修法方向：咨询命令加 `--disable serena`（同 A31 的 `--disable apps`），
+或把 serena 的项目目录重定向到仓外。并入 A31 的「固化 codex 咨询命令形态」待办。
+
+清理动作已由用户批准：`git worktree remove` + 删除已并入的 `feature/wp19-wrapper-seams`
+分支（`949b976` 已是 `plan/2026-09-13-parallel-throughput` 的祖先，且已推送 origin）。
