@@ -4,12 +4,12 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "4801b3af (rev2, exit=0); 2021e745->rev3 (exit=0)",
-    "redispatch_count": 2
+    "session": "4801b3af (rev2, exit=0); 2021e745->rev3 (exit=0); 9af9735d (rev4, exit=0, DONE_WITH_CONCERNS)",
+    "redispatch_count": 3
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -24,7 +24,7 @@
     "base_commit": "b97ce67",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
-    "commit": "bbfa258"
+    "commit": "d7e90fa"
   },
   "scope": {
     "allowed_paths": [
@@ -92,22 +92,20 @@
     }
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "claude (claude-code)",
-    "at": "2026-09-15T13:58:55+0800",
-    "evidence": "编排者撤回上一轮 ACCEPT——那是漏判。24 向量探测全在环境变量面，未覆盖输出解析面，故 rev2 Brief『输出异常->True』与 docstring『never raises』两条契约违反没被抓到。已独立复现：blank common_dir -> False；symlink loop 抛 RuntimeError；主区 symlink 指 worktree status -> False（后续读写跟随 symlink 操作 worktree 文件）。",
-    "note": "rev4 冻结 Brief = WP-19-brief-rev3.md，范围收窄到 path_is_in_worktree 一处 + 追加四条用例。"
+    "at": "2026-09-15T14:16:51+0800",
+    "evidence": "编排者独立 13 向量验证：改前 4/13 失败 -> 改后 0/13；三路还原 rev3判据+rev4测试=3 failed/12 passed，rev4判据=15 passed；零回归 4F+578P+4S（基线 bbfa258 = 4F+574P+4S，+4 恰为新增用例）；范围按执行者提交逐个测量=恰好2白名单文件、docs/写入0、A26三文件 diff 全空；签名 (path:'Path')->'bool' 未变；A22 回归保护在位；无 merge/amend；工作树干净。",
+    "note": "如实记录：Brief 要求四条新用例各自「改前失败」，实际 3 条满足。test_blank_git_dir_fails_closed 改前即通过（空白首行被既有 is_absolute() 挡住），是对称防御 pin 而非缺陷证明；由执行者主动申报，编排者独立复算一致。不构成驳回：Brief 那条写得比缺陷实况严。另：编排者自己「主区深层不存在路径应判 False」的预期被证伪，rev3/rev4 行为一致（git 无法 cd 进不存在目录，退出128，fail-closed），是预期错误非代码问题。"
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": "CONSULT",
     "consultant": "codex (kirogpt)",
-    "at": "2026-09-15T05:52:03Z",
-    "evidence": "codex(gpt-5.6-sol) 复审 rev2+rev3 判 REWORK，5 findings，编排者逐条独立复现后分流：F1=A28(P0，fail-closed 在空白 common_dir 与 resolve() 抛 RuntimeError 两条路径不成立；落 allowlist 内，并入 rev4)；F2=已登记 A25(worktree 内 .git gitfile 重指向，登记不返工)；F3=A26(resolve_paths.py:101 未净化环境，GIT_DIR 能把 --root main_repo 改指到别的仓；跨 forbidden_paths，另立 WP)；F4=A27(判未解析的 path.parent，主区 symlink 指 worktree 判 False；落 allowlist 内，并入 rev4)；F5=TOCTOU(os.environ 拷贝无实质线程风险，文件系统面并入 A27 语境)。",
-    "note": "codex 自陈只读沙箱无可用临时目录、无法重跑 pytest，故回归证据仍以编排者独立跑的全量套件为准。记录见 WP-19-consult-codex.md。"
+    "note": "rev4 待 codex 独立复审（decision=CONSULT 表示需咨询，非通过）。rev1 与 rev2+rev3 两轮均是编排者 ACCEPT 后被 codex 判 REWORK，A22 与 A28/A27 都是 codex 独立审出的，故 rev4 同样送审不走捷径。"
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T05:58:55Z",
+    "updated_at": "2026-09-15T06:16:51Z",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
   }
