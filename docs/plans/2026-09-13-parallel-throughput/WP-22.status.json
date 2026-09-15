@@ -21,7 +21,7 @@
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
     "base_commit": "9e4284a",
-    "dispatch_commit": "9e4284a",
+    "dispatch_commit": "b72e9c4",
     "branch": "feature/wp22-finalize-toctou",
     "worktree": "../wp22-finalize-toctou",
     "commit": ""
