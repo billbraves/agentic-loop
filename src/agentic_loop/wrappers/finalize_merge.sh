@@ -39,70 +39,189 @@ esac
 # worktrees like ../wpN-x never contain that segment). The single
 # authoritative predicate is agentic_loop.gate.path_is_in_worktree (§5.3);
 # this wrapper only references it. Unresolvable paths fail closed (refused).
-in_worktree=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY'
+#
+# A34: the predicate and every downstream read ("-f", both validator calls,
+# every --field, the old-JSON read) used to re-resolve the path string
+# independently, leaving a symlink-swap TOCTOU window between judgment and
+# use. The probe below collapses judgment and reads onto ONE opened file:
+# one Python process runs predicate -> os.open(O_NOFOLLOW) -> read -> validate
+# -> extract the decision fields, and hands everything back in a single
+# result. A symlink swapped in after the predicate is refused by O_NOFOLLOW
+# at open time (final-segment symlinks only; mid-directory swaps are the
+# declared residual surface), so no third party can re-point the path between
+# the worktree verdict and the reads that feed the decision. The plain
+# assignment keeps the probe fail-closed: any probe crash aborts this script
+# under set -e instead of being mistaken for a verdict.
+probe=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY'
+import errno
+import json
+import os
 import sys
 from pathlib import Path
 
 from agentic_loop.gate import path_is_in_worktree
+from agentic_loop.validate_wp_status import validate
 
-print("true" if path_is_in_worktree(Path(sys.argv[1])) else "false")
+# (dotted status path, bash-safe variable name, required)
+REQUIRED_FIELDS = (
+    ("schema_version", "schema_version"),
+    ("state", "state"),
+    ("review.decision", "review_decision"),
+    ("consult.decision", "consult_decision"),
+    ("git.commit", "git_commit"),
+    ("evidence.tests", "tests_json"),
+    ("git.base_branch", "base_branch"),
+    ("git.branch", "branch"),
+    ("iteration_id", "iteration_id"),
+    ("work_package_id", "wp_id"),
+)
+OPTIONAL_FIELDS = (
+    ("git.merged_commit", "merged_commit_recorded"),
+    ("consult.override.approved", "override_approved"),
+    ("consult.override.approver", "override_approver"),
+    ("consult.override.justification", "override_justification"),
+    ("consult.override.reviewed_at", "override_reviewed_at"),
+    ("qoder_security.decision", "qoder_decision"),
+    ("qoder_security.override.approved", "qoder_override_approved"),
+    ("qoder_security.override.approver", "qoder_override_approver"),
+    ("qoder_security.override.justification", "qoder_override_justification"),
+    ("qoder_security.override.reviewed_at", "qoder_override_reviewed_at"),
+)
+
+
+def lookup(data, dotted):
+    value = data
+    for part in dotted.split("."):
+        if not isinstance(value, dict) or part not in value:
+            return False, None
+        value = value[part]
+    return True, value
+
+
+def render(value):
+    # Exact --field rendering: containers as compact JSON, None as empty.
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def emit(verdict):
+    print(f"FINALIZE_PROBE\t{verdict}")
+
+
+path = sys.argv[1]
+
+# 1) Worktree predicate on the path (WP-19 single authority, referenced only).
+if path_is_in_worktree(Path(path)):
+    emit("WORKTREE")
+    sys.exit(0)
+
+# 2) Open ONCE with O_NOFOLLOW and never re-resolve: a symlink swapped in
+# after the predicate is refused here instead of being followed by the reads.
+try:
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+except FileNotFoundError:
+    emit("NOT_FOUND")
+    sys.exit(0)
+except OSError as exc:
+    emit("SYMLINK" if exc.errno == errno.ELOOP else "OPEN_FAILED")
+    sys.exit(0)
+
+try:
+    with os.fdopen(fd, "r", encoding="utf-8") as handle:
+        raw = handle.read()
+except IsADirectoryError:
+    emit("NOT_FOUND")
+    sys.exit(0)
+
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"STATUS_INVALID: invalid JSON at line {exc.lineno}: {exc.msg}", file=sys.stderr)
+    emit("INVALID")
+    sys.exit(0)
+if not isinstance(data, dict):
+    print("STATUS_INVALID: status root must be a JSON object", file=sys.stderr)
+    emit("INVALID")
+    sys.exit(0)
+
+# 3) Whole-file schema/state-machine validation (same rules as the CLI).
+errors = validate(data)
+if errors:
+    for error in errors:
+        print(f"STATUS_INVALID: {error}", file=sys.stderr)
+    emit("INVALID")
+    sys.exit(0)
+
+lines = ["FINALIZE_PROBE\tOK"]
+for dotted, var in REQUIRED_FIELDS:
+    found, value = lookup(data, dotted)
+    if not found:
+        # Mirror `--field` on a missing key: STATUS_INVALID on stderr plus exit
+        # 2; the plain assignment above then aborts this script under set -e.
+        print(f"STATUS_INVALID: unknown field {dotted}", file=sys.stderr)
+        sys.exit(2)
+    lines.append(f"{var}\t{render(value)}")
+for dotted, var in OPTIONAL_FIELDS:
+    found, value = lookup(data, dotted)
+    # Missing optional fields resolve to empty (fail-closed), like the guarded
+    # `field ... 2>/dev/null || true` reads this probe replaces.
+    lines.append(f"{var}\t{render(value) if found else ''}")
+print("\n".join(lines))
 PY
 )
-if [[ "$in_worktree" == "true" ]]; then
-  echo "FINALIZE_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy (single source of truth)" >&2
-  exit 2
-fi
 
-if [[ ! -f "$status_file" ]]; then
-  echo "FINALIZE_FAIL: status file not found at $status_file" >&2
-  exit 2
-fi
+probe_head=${probe%%$'\n'*}
+probe_kind=${probe_head#*$'\t'}
+case "$probe_kind" in
+  WORKTREE)
+    echo "FINALIZE_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy (single source of truth)" >&2
+    exit 2 ;;
+  NOT_FOUND)
+    echo "FINALIZE_FAIL: status file not found at $status_file" >&2
+    exit 2 ;;
+  SYMLINK)
+    echo "FINALIZE_FAIL: status file is a symlink ($status_file); refusing to follow it (finalize must read the real main-repo file)" >&2
+    exit 2 ;;
+  OPEN_FAILED)
+    echo "FINALIZE_FAIL: cannot open status file at $status_file" >&2
+    exit 2 ;;
+  INVALID)
+    echo "FINALIZE_FAIL: status validation failed" >&2
+    exit 2 ;;
+  OK)
+    ;;
+  *)
+    echo "FINALIZE_FAIL: status probe returned an unparseable verdict" >&2
+    exit 2 ;;
+esac
 
-field() { "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" --field "$1"; }
+# Read status fields required for the merge-finalization decision, as handed
+# back by the probe from the ONE opened file (A34).
+probe_fields=${probe#*$'\n'}
+while IFS=$'\t' read -r probe_key probe_value; do
+  [[ -n "$probe_key" ]] && printf -v "$probe_key" '%s' "$probe_value"
+done <<< "$probe_fields"
 
-# Step 1: schema/state-machine validation.
-if ! "${AGENTIC_PYTHON:-python3}" -m agentic_loop.validate_wp_status "$status_file" >/dev/null; then
-  echo "FINALIZE_FAIL: status validation failed" >&2
-  exit 2
-fi
-
-# Read status fields required for the merge-finalization decision.
-schema_version=$(field schema_version)
-state=$(field state)
-review_decision=$(field review.decision)
-consult_decision=$(field consult.decision)
-git_commit=$(field git.commit)
-tests_json=$(field evidence.tests)
-base_branch=$(field git.base_branch)
-branch=$(field git.branch)
-iteration_id=$(field iteration_id)
-wp_id=$(field work_package_id)
 # A12: git.merged_commit is the field THIS script writes, so it is absent on
-# the first finalize call. Guard the read exactly like the optional override
-# fields below — missing resolves to empty (fail-closed), never aborts.
-merged_commit_recorded=$(field git.merged_commit 2>/dev/null || true)
+# the first finalize call. The probe resolves it to empty (fail-closed),
+# never aborts — same semantics as the guarded read it replaces.
 
-# Read the optional consult.override fields for the honest-REWORK escape hatch.
+# The optional consult.override fields for the honest-REWORK escape hatch.
 # Missing or incomplete override resolves to empty values and therefore fails
 # closed below; this mirrors validate_wp_status._override_is_legal exactly.
-override_approved=$(field consult.override.approved 2>/dev/null || true)
-override_approver=$(field consult.override.approver 2>/dev/null || true)
-override_justification=$(field consult.override.justification 2>/dev/null || true)
-override_reviewed_at=$(field consult.override.reviewed_at 2>/dev/null || true)
 override_legal="false"
 if [[ "$override_approved" == "True" && -n "$override_approver" && -n "$override_justification" && -n "$override_reviewed_at" ]]; then
   override_legal="true"
 fi
 
-# Read the optional qoder_security third-signature fields. Missing or incomplete
-# values resolve to empty and therefore fail closed below; this mirrors
-# validate_wp_status._qoder_security_satisfied exactly. This block is read-only:
-# a FINDINGS/ERROR decision is never rewritten to PASS here.
-qoder_decision=$(field qoder_security.decision 2>/dev/null || true)
-qoder_override_approved=$(field qoder_security.override.approved 2>/dev/null || true)
-qoder_override_approver=$(field qoder_security.override.approver 2>/dev/null || true)
-qoder_override_justification=$(field qoder_security.override.justification 2>/dev/null || true)
-qoder_override_reviewed_at=$(field qoder_security.override.reviewed_at 2>/dev/null || true)
+# The optional qoder_security third-signature fields (already extracted by the
+# probe; missing resolves to empty). Missing or incomplete values fail closed
+# below; this mirrors validate_wp_status._qoder_security_satisfied exactly.
+# This block is read-only: a FINDINGS/ERROR decision is never rewritten to
+# PASS here.
 qoder_override_legal="false"
 if [[ "$qoder_override_approved" == "True" && -n "$qoder_override_approver" && -n "$qoder_override_justification" && -n "$qoder_override_reviewed_at" ]]; then
   qoder_override_legal="true"
