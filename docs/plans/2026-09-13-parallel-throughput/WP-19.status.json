@@ -8,8 +8,8 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "(rev2 dispatch, session id pending executor report)",
-    "redispatch_count": 1
+    "session": "4801b3af-f730-431c-bff9-73d1824a7594 (rev2, exit=0); rev3 pending",
+    "redispatch_count": 2
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -24,7 +24,7 @@
     "base_commit": "b97ce67",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
-    "commit": "b97ce67"
+    "commit": "7462c50"
   },
   "scope": {
     "allowed_paths": [
@@ -121,7 +121,7 @@
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T12:40:00+08:00",
+    "updated_at": "2026-09-15T13:25:00+08:00",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
   }
