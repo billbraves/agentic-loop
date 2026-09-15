@@ -1,0 +1,89 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-24",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi-cli",
+    "session": "",
+    "redispatch_count": 0
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "",
+    "dispatch_commit": "",
+    "branch": "feature/wp24-brief-template-anchors",
+    "worktree": "../wp24-brief-template-anchors",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+      "docs/agentic/templates/WORK_PACKAGE.md",
+      "tests/test_wp_template_dispatch_lint.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/wrappers/dispatch_lint.sh",
+      "src/agentic_loop/init_cmd.py",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-24-brief.md",
+      "sha256": "1a36ca63cbcb0c3c781899c2fa6bd2199c1a4233cb08980e95b592aa2f23bf2c"
+    },
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-15T10:30:00Z",
+      "measured_at_commit": "aa5e964",
+      "result": "4 failed, 581 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x, fixture runs `git checkout main` in a temp repo without a main branch) — do not fix"
+    },
+    "changed_files": [],
+    "tests": [],
+    "artifacts": [],
+    "remaining_risks": [
+      "模板锚点是文本约定，dispatch_lint 只检查存在性与非空，不检查英文段与中文段是否真的同义；同义性靠评审人工核，本轮不引入自动判据",
+      "docs/plans/ 里已有两份不合规 brief（WP-20-brief.md 缺三个锚点、WP-19-brief-rev2.md 缺两个），属编排者维护面，不在本 WP 范围"
+    ]
+  },
+  "review": {
+    "decision": "CONSULT",
+    "reviewed_by": "claude-code",
+    "notes": "Brief 已冻结待派发；执行者交付后独立验收。"
+  },
+  "consult": {
+    "decision": "CONSULT",
+    "reviewed_by": "codex",
+    "notes": "待交付后按触发条件咨询。"
+  },
+  "timestamps": {
+    "created_at": "2026-09-15T10:30:00Z"
+  }
+}
