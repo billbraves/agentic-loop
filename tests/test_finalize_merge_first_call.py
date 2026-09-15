@@ -195,14 +195,25 @@ def test_finalize_fails_closed_when_predicate_raises(
     # measured behavior (rc=1, zero later steps executed) so nobody can move
     # the assignment into an `if` condition or append `|| true` — either
     # would suspend `set -e` and turn the crash into a skipped refusal.
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _run_git(repo, "init", "-q")
-    _run_git(repo, "config", "user.email", "test@example.com")
-    _run_git(repo, "config", "user.name", "Test")
-    (repo / "README.md").write_text("init\n", encoding="utf-8")
-    _run_git(repo, "add", "README.md")
-    _run_git(repo, "commit", "-q", "-m", "init")
+    #
+    # A35 (WP-21 rev2): the status must be genuinely finalizable — built from
+    # the same existing fixtures as the happy-path test above and committed
+    # into the repo index — otherwise the run dies at a LATER step
+    # (`FINALIZE_FAIL: status file not found`) even under a fail-open
+    # mutation, and the two negative assertions hold vacuously. The positive
+    # control at the end (same status, no injection -> FINALIZE_OK) proves
+    # the case really reaches the finalize endpoint.
+    repo, base, wp_tip, merge_commit = _make_repo_with_merged_wp(tmp_path)
+    status_path = repo / PLAN_DIR / STATUS_NAME
+    status_path.parent.mkdir(parents=True)
+    status_path.write_text(
+        json.dumps(_status_without_merged_commit(base, wp_tip), indent=2),
+        encoding="utf-8",
+    )
+    # finalize requires the status to be tracked in the main repo index;
+    # write alone would make the run fail before the verdict read.
+    _run_git(repo, "add", str(PLAN_DIR / STATUS_NAME))
+    _run_git(repo, "commit", "-q", "-m", "add WP-FC status")
 
     inject = tmp_path / "inject"
     (inject / "agentic_loop" / "gate").mkdir(parents=True)
@@ -244,3 +255,20 @@ def test_finalize_fails_closed_when_predicate_raises(
     assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
     assert "FINALIZE_OK" not in res.stdout
     assert "FINALIZE_OK" not in res.stderr
+
+    # Positive control (A35): the SAME status without the injection reaches
+    # FINALIZE_OK, proving the negative run above died at the verdict read
+    # (the point under test), not at some earlier setup step.
+    control = subprocess.run(
+        ["bash", str(FINALIZE_SH), str(PLAN_DIR / STATUS_NAME)],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env=session_env,
+    )
+    assert control.returncode == 0, (
+        control.returncode,
+        control.stdout,
+        control.stderr,
+    )
+    assert control.stdout.strip() == f"FINALIZE_OK merged_commit={merge_commit}"
