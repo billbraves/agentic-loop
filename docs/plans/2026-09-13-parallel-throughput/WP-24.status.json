@@ -3,7 +3,7 @@
   "work_package_id": "WP-24",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -20,8 +20,8 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "",
-    "dispatch_commit": "",
+    "base_commit": "e78084c",
+    "dispatch_commit": "e78084c",
     "branch": "feature/wp24-brief-template-anchors",
     "worktree": "../wp24-brief-template-anchors",
     "commit": ""
@@ -84,6 +84,8 @@
     "notes": "待交付后按触发条件咨询。"
   },
   "timestamps": {
-    "created_at": "2026-09-15T10:30:00Z"
+    "created_at": "2026-09-15T10:30:00Z",
+    "dispatched_at": "2026-09-15T13:10:15Z",
+    "updated_at": "2026-09-15T13:10:15Z"
   }
 }
