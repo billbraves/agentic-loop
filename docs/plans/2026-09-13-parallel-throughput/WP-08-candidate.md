@@ -1306,3 +1306,156 @@ A19 缺证据，A23 缺「已开工」确认，A24 缺「冻结输入可达」�
 3. Brief 放在双方共同祖先提交上冻结。
 
 修法 1 是根治：它把「可达」变成派发的准入条件，而不是靠编排者每次记得。
+
+### A25 —— `path_is_in_worktree` 的语义边界：能写 worktree 内文件者可改变判据答案
+
+**等级**：登记备查（非缺陷，是判据的固有边界）
+**发现**：2026-09-15，编排者在 WP-19 rev3 验收时的对抗探测
+
+**实证**（rev3 代码，`bbfa258`）：
+
+```
+worktree 路径，改写 worktree/.git 这个 gitfile 指向主仓 .git  -> False
+```
+
+**这不是绕过。** 改写后该目录在 git 的定义下**确实**属于主仓，判 False 是
+正确语义。但它划出了这类判据的能力上限：
+
+`path_is_in_worktree` 回答的是「**git 认为**这个路径属于哪个仓」。
+A22 修的是「调用方能否用环境变量**声明**这个答案」——已修好（24 个向量实测全闭合，
+含 GIT_CONFIG_COUNT 注入、GIT_TRACE 系列污染 stdout、symlink、
+extensions.worktreeConfig 注入 core.worktree）。
+但「能写 worktree 内 `.git` 文件者能否**改变**这个答案」——能，且无法由此判据阻止。
+
+**为什么仍然可接受**：
+
+1. 能写 worktree 内 `.git` 的攻击者已在执行者的写入面内。全局规范 §5.7 的隔离
+   假设本就是「执行者能写自己 worktree」，这不是新增攻击面。
+2. **主防线仍是路径解析**（`resolve_paths --root main_repo`），A13 起就是如此，
+   本判据是绝对路径入参的兜底。改写 gitfile 骗过兜底，仍要另外突破主防线。
+3. 真正需要「不可伪造」的是独立性判据（A11/A16 那条线），不是 worktree 拒收。
+   worktree 拒收保护的是「别把 worktree 里的 status 副本当单一来源」，
+   是防误用，不是防对抗。
+
+**要点（与 A11/A16 同一透镜的自查结论）**：
+A11 的教训是「查了状态文件能不能自填，没查 git 事实能不能自造」。
+A16 是「查了判据不读 git，没查判据读的东西能不能自我重现」。
+本条的自查是「查了环境变量能不能声明答案，也要查文件系统能不能改变答案」——
+答案是能，但这条**不构成 A22 未修完**，因为它不依赖环境变量、需要更强的前置
+（写 worktree 内 .git），且撞不动主防线。**登记而不返工**，理由写在此处备查。
+
+**若将来要收紧**：判据可改为「由主仓的 `git worktree list --porcelain` 反查
+该路径是否在已注册 worktree 列表内」——权威从被测目录移到主仓，
+写 worktree 内文件就改不动答案了。但那会引入「主仓根从哪来」的依赖，
+与 `resolve_paths --root main_repo` 形成环，须另行设计，不在 WP-19 范围。
+
+---
+
+### A26 —— 入口在到达净化判据之前就已信任调用者的仓库选择
+
+**来源**：codex 复审 WP-19 rev2+rev3 的 finding 3（2026-09-15）。
+
+**实证**（编排者独立复现，在 `/Users/admin/vibe/wp19-wrapper-seams`）：
+
+```
+$ PYTHONPATH=src python3.11 -m agentic_loop.resolve_paths --root main_repo
+/Users/admin/vibe/agentic_loop
+$ GIT_DIR=/Users/admin/vibe/data_agent/.git PYTHONPATH=src python3.11 -m agentic_loop.resolve_paths --root main_repo
+/Users/admin/vibe/data_agent
+```
+
+`resolve_paths.py:101` 用 `subprocess.run(["git", *args])` 直接继承环境，
+没有 A22 那套净化。于是：
+
+- `gate main()` 先调未净化的 `main_repo()`；
+- `finalize_merge.sh:23`、`codex_merge_gate.sh:21` 也先跑继承环境的
+  `git rev-parse --git-common-dir`，并据其结果构造 `PYTHONPATH`；
+- 相对路径的 status 入参可在判据运行之前被重绑定到另一个仓库。
+
+**与 A22 的关系**：A22 是「判据本身被环境变量翻转」，已在 WP-19 修完
+（`GIT_DIR=<预期主仓>/.git` + 绝对 worktree 路径这条具体通道已闭合）。
+A26 是「判据上游的根解析被同一类变量翻转」。**这不是 A22 未修完**：
+WP-19 rev2 Brief 明确写了「**不要**在 CLI 层净化环境。判据自己必须站得住，
+不能依赖上游调用者替它擦干净」——那条要求是对的，判据现在确实自己站得住；
+但它没有、也不能顺带保证上游根解析的正确性。
+
+**为何不在 WP-19 内修**：`resolve_paths.py`、`cli.py`、`codex_merge_gate.sh`
+均不在 WP-19 的 `allowed_paths`（`codex_merge_gate.sh` 从未出现在任何 rev 的
+白名单里）。codex 自己也指出「完整修复可能需要重新冻结范围」。
+在验收阶段临时扩权改 forbidden_paths，等于用返工绕过范围冻结，比缺陷本身更坏。
+
+**候选修法**：
+1. 在 `resolve_paths.py` 里把 A22 的 `_GIT_SELECTION_VARS` 净化下沉为
+   **该模块唯一的 git 调用出口**（§5.3：净化口径只有一份，判据与根解析都引用它）。
+   注意这与 rev2 Brief 那条禁令不冲突——禁的是「在 CLI 层替判据擦环境」，
+   这里是「根解析自己也站得住」。
+2. wrapper 里那两处裸 `git rev-parse` 改为调用 `resolve_paths`，消灭第二份可执行判据。
+
+**优先级**：P1。威胁模型与 A22 同级（无需写权限、只需一个环境变量），
+但主防线 `resolve_paths --root main_repo` 恰恰是被打穿的那一环，比 A25 更实。
+
+---
+
+### A27 —— 判据判的是路径名归属，不是实际被读写文件的归属（status symlink）
+
+**来源**：codex 复审 WP-19 rev2+rev3 的 finding 4（2026-09-15）。
+
+**实证**（编排者独立复现，真实临时仓 + `git worktree add`）：
+
+```
+worktree 内真实文件            -> True （拒收，正确）
+主区里指向它的 symlink         -> False（放行）
+link.resolve() -> .../wt/WP.status.json   # 实际读写的是 worktree 里那个文件
+```
+
+`path_is_in_worktree` 取的是**未解析的** `path.parent`（`gate/__init__.py:224`
+附近的 `directory = path if path.is_dir() else path.parent`），
+而后续 `is_file()`、validator 读取、finalize 写回都跟随 symlink。
+于是「判的目录」与「读写的文件」可以属于两个不同的仓。
+
+**与 A25 的区别**：A25 要求攻击者能写 worktree 内的 `.git` gitfile；
+A27 只要求能在**主区**放一个 symlink。两者都属「拓扑可被布置」，
+但 A27 的前置更弱，且它绕过的是判据的**语义**（问错了对象），不只是它的权威来源。
+
+**候选修法**：判据先 `path.resolve()`（或 `os.path.realpath`）再取父目录，
+使「被判的目录」与「将被读写的文件」是同一个。注意 fail-closed 方向：
+`resolve()` 自身可能抛 `RuntimeError`（symlink loop，见 A28），须包在 try 内。
+
+**范围**：落在 `gate/__init__.py` 的 A13 判据一处，**在 WP-19 的 allowlist 内**，
+故并入 rev4 返工，不另立 WP。
+
+---
+
+### A28 —— `path_is_in_worktree` 的 fail-closed 在两条路径上不成立
+
+**来源**：codex 复审 WP-19 rev2+rev3 的 finding 1（2026-09-15）。**P0**。
+
+**实证 1：空白 `common_dir` 被当成「不在 worktree」**
+
+git 成功退出但第二行为空白时：
+
+```
+F1a blank common_dir -> False   （Brief 要求 True）
+```
+
+判据只校验「恰好两行」与 `git_dir` 为绝对路径，没有校验两行 strip 后均非空。
+`Path("")` 被当作相对路径，于是 `common_dir = directory / Path("")` == `directory`；
+若第一行也正好是该目录，两侧相等 -> `False`，worktree-local status 被放行。
+这直接违反 rev2 Brief「输出异常 -> `True`（拒收）」。
+
+**实证 2：`resolve()` 在 try 之外，symlink loop 直接抛异常**
+
+```
+F1c symlink loop RAISED: RuntimeError Symlink loop from '...'
+```
+
+违反 docstring 自己写的「Fail-closed and never raises」。
+
+**为什么编排者的 24 向量探测没抓到**：那 24 个向量全是**环境变量**面
+（`GIT_DIR` 家族、`GIT_CONFIG_*`、`GIT_TRACE*`、`PATH`……），
+验的是「调用者能否声明仓库归属」。A28 是**输出解析**面：
+git 正常退出、行数正确，但内容退化。两个面互不覆盖，
+而 Brief 的 fail-closed 条款同时约束两者。**这是编排者验收的漏项，不是执行者新引入的回归**
+——rev1 判据同样没有这两个校验，A22 的修复没有触及它们。
+
+**范围**：`gate/__init__.py` 的 A13 判据一处，**在 WP-19 的 allowlist 内**，并入 rev4。
