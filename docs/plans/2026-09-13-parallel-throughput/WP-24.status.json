@@ -21,7 +21,7 @@
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
     "base_commit": "e78084c",
-    "dispatch_commit": "e78084c",
+    "dispatch_commit": "b1ab985",
     "branch": "feature/wp24-brief-template-anchors",
     "worktree": "../wp24-brief-template-anchors",
     "commit": ""
@@ -86,6 +86,6 @@
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
     "dispatched_at": "2026-09-15T13:10:15Z",
-    "updated_at": "2026-09-15T13:10:15Z"
+    "updated_at": "2026-09-15T13:12:20Z"
   }
 }
