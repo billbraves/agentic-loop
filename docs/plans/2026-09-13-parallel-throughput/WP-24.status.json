@@ -7,8 +7,8 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "kimi (see wp24-exec.log)",
-    "redispatch_count": 0
+    "session": "bg b4t4y0xfs (see wp24-rev2-exec.log)",
+    "redispatch_count": 1
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -72,7 +72,18 @@
         "round": 1,
         "reason": "consult REWORK (codex)；观察成立但其修法不可达，编排者实测出等价且可达的差分对判据",
         "rev1_commit": "c04bc6b",
-        "carried_over": "rev1 的模板改动与 7 条用例保留；本轮只改 tests/test_wp_template_dispatch_lint.py 一个文件，两份模板转为 forbidden（零行 diff）"
+        "carried_over": "rev1 的模板改动与 7 条用例保留；本轮只改 tests/test_wp_template_dispatch_lint.py 一个文件，两份模板转为 forbidden（零行 diff）",
+        "dispatched": {
+          "at": "2026-09-16T01:10:00Z",
+          "command": "kimi --afk --print -w /Users/admin/vibe/wp24-brief-template-anchors -p <prompt>",
+          "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp24-rev2-prompt.md",
+          "prompt_sha256": "8c04750394553a398e9d310482e5370d307467c8f4e04e1239b306af8c3afbdc",
+          "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp24-rev2-exec.log",
+          "preflight": "PREFLIGHT_PASS branch=feature/wp24-brief-template-anchors state=CHANGES_REQUESTED（主仓绝对路径，规避 B17）",
+          "autonomy": "AUTONOMY_AUTO dispatch_developer",
+          "head_at_dispatch": "c04bc6b",
+          "parallel_with": "WP-22 rev2（bg bhye2i68q）；两者工作树与文件集互不相交，无共享写入面"
+        }
       },
       "gate_alignment": {
         "defect": "B16",
@@ -195,7 +206,7 @@
   },
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
-    "dispatched_at": "2026-09-15T13:10:15Z",
+    "dispatched_at": "2026-09-16T01:10:00Z",
     "updated_at": "2026-09-16T01:00:00Z",
     "review_completed_at": "2026-09-15T14:05:00Z",
     "consulted_at": "2026-09-15T15:40:00Z",
