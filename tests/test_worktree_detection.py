@@ -12,10 +12,17 @@ reference it (global rule §5.3). This suite pins:
 - unresolvable paths fail closed (treated as a worktree) without raising;
 - ``finalize_merge.sh`` end-to-end rejects a worktree-local absolute status
   path (the second call site).
+
+WP-19 rev2 / A22: the predicate's git probe must not inherit the caller's
+repository-selection environment (``GIT_DIR`` et al. declare which repository
+a path belongs to, overriding filesystem topology). The predicate reads the
+filesystem, so those variables are stripped — while the rest of the
+environment (``PATH`` in particular) is kept intact.
 """
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -75,6 +82,48 @@ def test_unresolvable_path_fails_closed_without_raising(tmp_path: Path) -> None:
     # Outside any git repository: fail closed (refuse) and never raise.
     missing = tmp_path / "no-such-dir" / "WP-X.status.json"
     assert path_is_in_worktree(missing) is True
+
+
+@pytest.mark.parametrize("var", ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"])
+def test_caller_env_cannot_disguise_worktree_path(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, var: str
+) -> None:
+    # A22 regression guard: a caller who exports a repository-selection
+    # variable pointing at the MAIN repo must not flip a linked-worktree
+    # path to False. GIT_DIR=<main>/.git alone bypassed the guard before
+    # rev2; GIT_WORK_TREE/GIT_COMMON_DIR must stay non-bypassing too.
+    branch = "feat/wp19-env-" + var.lower().replace("_", "-")
+    wt = tmp_path / ("wp19-env-" + var.lower().replace("_", "-"))
+    _run_git(repo, "worktree", "add", "-q", "-b", branch, str(wt))
+    value = str(repo) if var == "GIT_WORK_TREE" else str(repo / ".git")
+    monkeypatch.setenv(var, value)
+    assert path_is_in_worktree(wt / "README.md") is True
+
+
+def test_caller_env_cannot_disguise_main_repo_path(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The sanitization must not over-correct either: with GIT_DIR pointing
+    # at a linked worktree's git dir, a main-repo path still resolves by
+    # filesystem topology and is NOT refused (still False).
+    wt = tmp_path / "wp19-env-rev"
+    _run_git(repo, "worktree", "add", "-q", "-b", "feat/wp19-env-rev", str(wt))
+    wt_git_dir = _run_git(wt, "rev-parse", "--absolute-git-dir").stdout.strip()
+    monkeypatch.setenv("GIT_DIR", wt_git_dir)
+    assert path_is_in_worktree(repo / "README.md") is False
+
+
+def test_sanitized_env_still_preserves_path(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # env={} would drop PATH; on hosts where git lives outside the exec
+    # default path (e.g. Homebrew) the lookup then fails and fail-closed
+    # would incorrectly refuse a clean main-repo path. The sanitized env
+    # must keep PATH so git is still found and the verdict stays correct.
+    assert shutil.which("git") is not None
+    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    assert path_is_in_worktree(repo / "README.md") is False
 
 
 def test_finalize_merge_rejects_worktree_local_status(repo: Path, tmp_path: Path) -> None:

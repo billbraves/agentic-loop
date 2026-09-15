@@ -179,8 +179,23 @@ def path_is_in_worktree(path: Path) -> bool:
     Fail-closed and never raises: an unresolvable path (not inside any git
     repository, git missing, unexpected output) is treated as inside a
     worktree, i.e. refused.
+
+    A22 (WP-19 rev2): the probe never inherits the caller's repository
+    selection. ``GIT_DIR``/``GIT_WORK_TREE``/``GIT_COMMON_DIR`` let the
+    caller *declare* which repository a path belongs to, overriding
+    filesystem topology — a single ``GIT_DIR`` pointing at the main repo
+    made a linked-worktree path answer False and bypassed both call sites.
+    Those variables are stripped so the verdict reads the filesystem; the
+    rest of the environment (``PATH``, ``HOME``) is kept intact so git
+    itself still runs — a bare ``env={}`` would lose ``PATH``, fail to
+    find git, and fail closed on legitimate main-repo paths (a regression).
     """
     directory = path if path.is_dir() else path.parent
+    sanitized_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR")
+    }
     try:
         proc = subprocess.run(
             [
@@ -193,6 +208,7 @@ def path_is_in_worktree(path: Path) -> bool:
             ],
             capture_output=True,
             text=True,
+            env=sanitized_env,
         )
     except OSError:
         return True
