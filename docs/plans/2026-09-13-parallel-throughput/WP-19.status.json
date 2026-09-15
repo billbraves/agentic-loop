@@ -73,7 +73,17 @@
         "exit_code": 1,
         "result": "2 failed (empty-branch backfill, sibling-branch tracked lookup) before fix; 6 PASSED after"
       }
-    ]
+    ],
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev2.md",
+      "sha256": "8e80c8e68033e146fdf27e3756fe335129bac21d476ce3bd74256b029e2d3305",
+      "rev": 2,
+      "rev1": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief.md",
+        "commit": "b97ce67",
+        "outcome": "review ACCEPT (A4/A7/A12 verified, not reworked); consult REWORK on A13/A22"
+      }
+    }
   },
   "review": {
     "decision": "ACCEPT",
@@ -113,15 +123,5 @@
     "updated_at": "2026-09-15T12:35:00+08:00",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
-  },
-  "brief": {
-    "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev2.md",
-    "sha256": "8e80c8e68033e146fdf27e3756fe335129bac21d476ce3bd74256b029e2d3305",
-    "rev": 2,
-    "rev1": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief.md",
-      "commit": "b97ce67",
-      "outcome": "review ACCEPT (A4/A7/A12 verified, not reworked); consult REWORK on A13/A22"
-    }
   }
 }
