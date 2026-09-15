@@ -3,14 +3,25 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "DISPATCHED",
   "role": "Developer",
-  "executor": { "tool": "kimi-cli", "session": "", "redispatch_count": 0 },
-  "orchestrator": { "tool": "claude-code", "session": "8a8bf01e" },
-  "reviewer": { "tool": "claude-code", "session": "8a8bf01e" },
+  "executor": {
+    "tool": "kimi-cli",
+    "session": "",
+    "redispatch_count": 0
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "d28f626",
+    "base_commit": "9e4284a",
+    "dispatch_commit": "9e4284a",
     "branch": "feature/wp22-finalize-toctou",
     "worktree": "../wp22-finalize-toctou",
     "commit": ""
@@ -52,9 +63,18 @@
       "O_NOFOLLOW 只拒最后一段是 symlink，不防中间目录段被替换；该残余面在 Brief 附注里已声明，允许执行者以 CONCERNS 申报而不本轮修"
     ]
   },
-  "review": { "decision": "CONSULT", "reviewed_by": "claude-code",
-    "notes": "尚未派发，等 WP-21 结清后再 dispatch。" },
-  "consult": { "decision": "CONSULT", "reviewed_by": "codex",
-    "notes": "尚未派发。" },
-  "timestamps": { "created_at": "2026-09-15T00:00:00Z" }
+  "review": {
+    "decision": "CONSULT",
+    "reviewed_by": "claude-code",
+    "notes": "已派发，待执行者交付后独立验收。"
+  },
+  "consult": {
+    "decision": "CONSULT",
+    "reviewed_by": "codex",
+    "notes": "待交付后按触发条件咨询。"
+  },
+  "timestamps": {
+    "created_at": "2026-09-15T00:00:00Z",
+    "dispatched_at": "2026-09-15T09:52:00Z"
+  }
 }
