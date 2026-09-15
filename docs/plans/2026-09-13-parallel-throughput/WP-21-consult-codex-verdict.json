@@ -1,0 +1,25 @@
+{
+  "decision": "ACCEPT",
+  "rationale": "rev2 已具备实质区分力：status 是可成功 finalize 的真实 fixture，正面对照确认共同前置条件可达 `FINALIZE_OK`，独立 probe 验证影子模块确实抛出目标异常，且三类代表性 fail-open 变异均能使测试转红。当前未发现可让原实现与已知禁止变异同时通过的现实空验证通道。负向运行未直接断言目标 `RuntimeError` 仍留下未来退化时的理论空过可能，但结合当前 stderr 实测、probe 和变异证据，不构成当前正确性的阻断。`finalize_merge.sh` 的注释确有方向性错误：赋值位于 `&&`/`||` 左操作数会抑制 `set -e` 并可能 fail-open；位于右操作数通常仍是列表最后命令，失败会触发退出，属于 fail-closed。该问题仅影响维护指导，未改变当前可执行行为。",
+  "findings": {
+    "P0": [],
+    "P1": [],
+    "P2": [
+      {
+        "id": "P2-1",
+        "finding": "负向运行只断言 `rc != 0` 和不存在 `FINALIZE_OK`，没有在该运行的 stderr 中断言 `injected broken predicate`。正面对照只能证明无注入时共同路径可达终点，不能严格证明带注入的负向运行必然死于目标 predicate；probe 也只是独立证明注入模块可用。因此未来若出现注入环境特有的更早失败，该用例仍可能空过。",
+        "recommendation": "增加 `assert \"injected broken predicate\" in res.stderr`，把失败原因绑定到被测观测点；无需升级为 P1，因为当前实测已经出现该标记，且代表性 fail-open 变异均被捕获。"
+      },
+      {
+        "id": "P2-2",
+        "finding": "`finalize_merge.sh` 注释中 “after `&&`/`||`” 的方向写反。真正危险的是让赋值成为 AND/OR 列表中非末尾的左操作数，例如 `in_worktree=$(...) && true` 或 `in_worktree=$(...) || ...`；把它放在右操作数且作为列表末尾命令时，predicate 非零仍会触发 `set -e`，属于 fail-closed。",
+        "recommendation": "后续将注释改为禁止把赋值放在 `&&`/`||` 的左操作数或给它追加恢复分支，并避免笼统禁止安全的右操作数形态。该错误不影响当前实现，故为 P2。"
+      },
+      {
+        "id": "P2-3",
+        "finding": "A31、A35 与 B8 共同暴露流程级缺口：评审验证了测试结果，却没有系统验证测试所用 oracle 是否真正观察到目标事实。",
+        "recommendation": "在安全性/负向测试的 DoD 中加入最小“oracle 校验”三项：同 fixture 的正向可达性对照、负向运行的原因特异 witness（异常标记、状态或精确事件），以及至少一个代表性禁止变异必须使测试转红。评审时记录这三项证据，避免仅凭通用非零 rc、输出 tail 或错误基线作结论。"
+      }
+    ]
+  }
+}

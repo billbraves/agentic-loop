@@ -2059,7 +2059,28 @@ lock / merge / preflight / redispatch / quality-gate / qoder_security_gate），
 4. **基线/区间必须来自记录，不得来自推断**：B8 的修法（`git.dispatch_commit`
    写进 status，缺失即 `SCOPE_UNVERIFIABLE`）是这条的实例。
 
-**待办**：把 1、2 提为 Brief 模板的通用条目；把 3 提为「编排者不得手搓
-`codex exec`，一律走 adapter 或至少带 `--output-schema`」的硬规则。
+**codex 的补充（2026-09-15 第二轮咨询 P2-3，已采纳）**：
+
+codex 独立归纳的口径比上面四条更可操作——「评审验证了测试结果，却没有系统验证
+测试所用 **oracle** 是否真正观察到目标事实」。它给出的最小「oracle 校验」三项：
+
+1. 同 fixture 的**正向可达性对照**（证明前置条件可达终点）
+2. 负向运行的**原因特异 witness**（异常标记、状态或精确事件）
+3. 至少一个**代表性禁止变异必须使测试转红**
+
+**第 2 项是编排者漏掉的一环**。上面防线 1 写的是「否定式断言配正面对照」，只对应
+第 1 项；而正面对照证明的是**前置可达**，witness 证明的是**失败归因**，
+两者不能互相替代——「无注入时能到终点」并不排除「带注入时死在别处」。
+WP-21 rev2 恰好就缺第 2 项（实测 stderr 确实含 `injected broken predicate`，
+但没被断言锁住），这是 A35 后续加固项的由来。
+
+**待办**：把 oracle 校验三项提为 Brief 模板中「安全性/负向测试」的通用 DoD 条目，
+评审时逐项记录证据；把「编排者不得手搓 `codex exec`，一律走 adapter 或至少带
+`--output-schema`」提为硬规则。
 建议与 A19/A23/A24（都是「派发/咨询缺少代码化入口」）合成一个 WP——
 根因相同：**编排者的动作没有代码化，于是每次靠记性，而记性会失效。**
+
+**又一条实证（同轮）**：`--output-schema` 在本 provider 下是**软约束**。
+codex 输出的 `findings` 是按 severity 分键的对象，而 schema 声明的是数组。
+内容完整不影响采信，但消费方（如 `adapters/codex.py` 的 `_parse_verdict`）
+不能假定严格贴合，否则会在解析处炸。
