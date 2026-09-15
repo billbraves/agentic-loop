@@ -6,12 +6,21 @@
   "phase": "P1",
   "state": "DRAFT",
   "role": "Developer",
-  "executor":     { "tool": "unassigned" },
-  "orchestrator": { "tool": "claude-code", "session": "" },
-  "reviewer":     { "tool": "claude-code", "session": "" },
+  "executor": {
+    "tool": "unassigned"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
   "git": {
     "base_branch": "main",
     "base_commit": "",
+    "dispatch_commit": "",
     "branch": "",
     "worktree": "",
     "commit": ""
@@ -26,8 +35,12 @@
     "notifications": "FORBIDDEN",
     "data_access": "READ_ONLY"
   },
-  "evidence": { "tests": [] },
+  "evidence": {
+    "tests": []
+  },
   "review": {},
   "consult": {},
-  "timestamps": { "dispatched_at": "" }
+  "timestamps": {
+    "dispatched_at": ""
+  }
 }

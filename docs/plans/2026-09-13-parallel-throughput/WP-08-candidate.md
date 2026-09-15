@@ -1944,3 +1944,74 @@ lock / merge / preflight / redispatch / quality-gate / qoder_security_gate），
 补记 worktree 派发点 commit（需确认 schema 是否已有合适字段，若无则走
 `evidence.artifacts` 或另立字段的 WP，不要擅自加 top-level 字段——`redispatch_count`
 就因为放在 top-level 被 `validate_wp_status` 拒过一次）。
+
+**已修（2026-09-15）**：
+
+1. **字段**：实测 `validate_wp_status.py` 对 `git` 子块**不做**未知键拒收
+   （只有 top-level 有白名单，`:377-383`）。故 `git.dispatch_commit` 可直接写入，
+   无需新立 WP、无需 `evidence.artifacts` 变通。已在 `WP-21.status.json` 落地
+   （`dispatch_commit=daf537c`），`STATUS_VALID` 通过。
+2. **工具**：新增 `review_scope.sh`（编排者验收工具，暂存
+   `~/.claude/jobs/8a8bf01e/tmp/`，待并入 `.ci/` 或 `docs/agentic/templates/`）。
+   口径：区间恒为 `git.dispatch_commit..git.commit`。
+3. **fail-closed**：`dispatch_commit` 缺失时**拒绝核验**（`SCOPE_UNVERIFIABLE`，rc=3），
+   既不退化成 `base_commit`，也不猜 `HEAD^`——猜错基线正是 B8 本身。
+4. **配正面对照**（A35 的教训）：区间内 0 个文件改动时报 `SCOPE_VACUOUS` 并失败，
+   否则「无越界」本身就是空验证。
+5. **实测对比**（WP-21 rev2，同一执行者 commit `4b9fdfa`）：
+
+   | 基线 | 报出的改动文件 | 判定 |
+   |------|:---:|------|
+   | `6995873..4b9fdfa`（B8 错误口径） | 6（含 5 个编排者 `docs/`） | 假阳性越界 ❌ |
+   | `daf537c..4b9fdfa`（派发点口径） | 1 | `SCOPE_OK` ✅ |
+
+**辅助判据的一处修正**：B8 原文建议用 `git log --format='%h %an'` 看责任归属——
+**该判据在本仓无效**。实测 worktree 内 7 个提交的 `%an` **全部**是 `xizhu`
+（编排者与执行者的提交都经同一 git 身份落盘），作者名无法区分角色。
+责任归属只能靠**记录在 status 里的派发点**，不能靠启发式推断。
+
+
+### A35 后续加固（P2，来自 codex 复核 WP-21 rev2）
+
+**发现于** 2026-09-15，codex 复核 WP-21 rev2 时点名（该次咨询未出正式裁定，
+见 `WP-21-consult-codex.md`；以下事实由编排者独立实测复核）。
+
+负向运行只断言 `rc != 0` 且输出无 `FINALIZE_OK`，**未断言 stderr 确实含注入的
+`RuntimeError`**，因此形式上不能排除「影子环境在判据之前某一步失败」这一新空过通道。
+
+编排者实测：该运行 `rc=1`，stderr **确实**含
+`RuntimeError: injected broken predicate (WP-21 A29 hardening)`——结论正确，
+但**该事实没有被断言锁住**。用例第 62 行的 `probe` 断言只证明影子包会抛，
+不证明 finalize 那一次死在判据上。
+
+**为何不阻断 rev2**：正面对照（同一 status、不注入影子包必达 `FINALIZE_OK`）
+已排除「更早一步失败」——唯一变量是影子包。
+
+**待办**：随下一次触及 `tests/test_finalize_merge_first_call.py` 的 WP 加一行
+`assert "injected broken predicate" in res.stderr`。**不在验收阶段临时扩权改。**
+
+### A29 注释方向写反（P2，来自 codex 复核 WP-21 rev2）
+
+`finalize_merge.sh` 的 A29 注释写「Never move it into an `if` condition or after
+`&&`/`||`」。编排者实测（`set -euo pipefail`）：
+
+| 形态 | rc | 语义 |
+|------|:--:|------|
+| `x=$(crash)`（现行） | 7 | **fail-closed** ✅ |
+| `x=$(crash) && true`（赋值在 `&&` **左**） | 0 | **fail-open** ❌ |
+| `true && x=$(crash)`（赋值在 `&&` **右**） | 7 | fail-closed ✅ |
+| `x=$(crash) \|\| echo false`（赋值在 `\|\|` **左**） | 0 | **fail-open** ❌ |
+
+注释里的「after `&&`/`||`」**恰是安全的那一侧**（右操作数）；危险的是**位于
+`&&`/`||` 之前**（左操作数），此时赋值成为 AND/OR-list 的一部分，`set -e` 被抑制。
+
+**额外发现（编排者扩测，超出 rev2 Brief 指定的两种变异）**：变异 D
+（`in_worktree=$(...) && true`，左操作数形态）也是 fail-open，且 rev2 用例
+**能抓住**（`AssertionError: (0, 'FINALIZE_OK merged_commit=565d01b...')`）。
+即 rev2 用例的区分力超出 Brief 指定范围。变异已还原，0 行 diff。
+
+**归责**：那 6 行注释由 rev1 Brief 规定、rev1 已验收，属编排者遗留，非执行者本轮问题。
+**不影响**代码正确性（代码是安全形态）与用例区分力（实测能抓住）。
+
+**待办**：随下一次触及 `finalize_merge.sh` 的 WP 把方向改对——
+禁的是「赋值出现在 `&&`/`||` 的**左侧**」以及「挪进 `if` 条件」。
