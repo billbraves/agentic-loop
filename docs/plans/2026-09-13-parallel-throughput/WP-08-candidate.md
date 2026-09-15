@@ -1843,3 +1843,70 @@ fixture：`_make_repo_with_merged_wp()` + `_status_without_merged_commit()`，
 
 > 与 A31 补充同类：都是「用一个太弱的观测口径下结论」。A31 是用 `tail` 判有无
 > verdict，本条是用 `rc != 0` 判有无拦住。
+
+---
+
+#### A26 补充：编排者复核——通道比原记录更宽（含 `GIT_COMMON_DIR`），且**探针形态会误判为已修**
+
+**复核日期** 2026-09-15（WP-21 rev2 执行期间，编排者独立复核）。
+
+**先纠正一个探针陷阱**：用**linked worktree 的 `.git`** 当 `GIT_DIR` 探测，会得到
+「不受影响」的假阴性——
+
+```
+$ GIT_DIR=/Users/admin/vibe/wp21-test-contracts/.git \
+    PYTHONPATH=src python3.11 -m agentic_loop.resolve_paths --root main_repo
+/Users/admin/vibe/agentic_loop          # 看似已修，其实是因为该 worktree 的
+                                        # git-common-dir 本来就指向主仓
+```
+
+`main_repo()` 取的是 `--git-common-dir` 的父目录，而 linked worktree 的
+common-dir **本就是主仓的 `.git`**，所以这条探针**在缺陷存在时也会返回正确答案**。
+必须用**无关仓**探测。与 A31/A35 同一族教训：观测口径太弱，无法区分「已修」与
+「压根没测到」。
+
+**用无关仓复测的通道矩阵**（临时仓 `a26repo`，与本仓无任何关系）：
+
+| 环境变量 | `resolve_paths --root main_repo` 输出 | 判定 |
+|---------|--------------------------------------|------|
+| （无） | `/Users/admin/vibe/agentic_loop` | 基准 |
+| `GIT_DIR=<无关仓>/.git` | `<无关仓>` | **被改指** |
+| `GIT_COMMON_DIR=<无关仓>/.git` | `<无关仓>` | **被改指（原记录未列此条）** |
+| `GIT_WORK_TREE=<无关仓>` | `/Users/admin/vibe/agentic_loop` | 不受影响 |
+| `GIT_CEILING_DIRECTORIES=/Users/admin/vibe` | `/Users/admin/vibe/agentic_loop` | 不受影响 |
+
+**根因未变，仍然成立**：`resolve_paths.py:100-104` 的 `_git()` 是该模块**唯一**的
+git 调用出口，但 `subprocess.run(["git", *args])` 直接继承环境，无任何净化：
+
+```python
+def _git(*args: str) -> str:
+    proc = subprocess.run(["git", *args], capture_output=True, text=True)
+```
+
+对比 `gate/__init__.py:256` 已有的净化口径 `if key not in _GIT_SELECTION_VARS`
+——**净化逻辑在仓里已经有唯一权威了，只是根解析没引用它**。
+这使修法 1（下沉净化到 `_git()`）比原记录所写更直接：不是新造判据，
+而是让第二个调用方引用既有权威（§5.3）。
+
+**对修法的补充要求（已核实，结论更好）**：`_GIT_SELECTION_VARS` **已含全部 7 个变量**
+（`GIT_DIR`、`GIT_WORK_TREE`、`GIT_COMMON_DIR`、`GIT_INDEX_FILE`、
+`GIT_OBJECT_DIRECTORY`、`GIT_ALTERNATE_OBJECT_DIRECTORIES`、
+`GIT_CEILING_DIRECTORIES`），本次实测的两条活通道 `GIT_DIR` / `GIT_COMMON_DIR` 都在其中。
+→ 故修法 1 **不需要新增集合、不需要新写判据**，只需让 `resolve_paths._git()`
+**引用既有唯一权威**。这是纯粹的「第二个调用方接上已有权威」，是 §5.3 最干净的形态，
+WP 范围因此可以很窄。
+
+注意方向：净化集合当前定义在 `gate/__init__.py` 内（以 `_` 私有前缀）。让
+`resolve_paths` import `gate` 会造成**依赖方向问题**（§5.1）——`gate` 是上层门禁，
+`resolve_paths` 是被它调用的基础解析层。修法须把集合与净化动作下沉到**双方都能依赖的
+低层**（例如 `resolve_paths` 自身，再由 `gate` 引用），**不得**让 `resolve_paths` 反向
+import `gate`。
+
+**另注**：wrapper 侧共 **11 个** `.sh` 有裸 `git rev-parse --git-common-dir`
+（dispatch_lint / gate-runner / finalize_merge / codex_merge_gate / kimi-health /
+lock / merge / preflight / redispatch / quality-gate / qoder_security_gate），
+都在构造 `PYTHONPATH` 之前跑、都继承环境。修法 2（改调 `resolve_paths`）
+面比原记录估计的大得多，且存在自举顺序问题（要先有 `PYTHONPATH` 才能调 Python
+模块，而 `PYTHONPATH` 正是用这条 `rev-parse` 算出来的）。
+→ **建议 WP 只做修法 1**（Python 侧根解析净化），wrapper 侧的自举链单独评估，
+不要在同一个 WP 里混做。
