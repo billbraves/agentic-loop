@@ -1760,3 +1760,86 @@ rev5（`77941f4`）与 rev6（`949b976`）是**同基线的替代提交**，不�
 
 清理动作已由用户批准：`git worktree remove` + 删除已并入的 `feature/wp19-wrapper-seams`
 分支（`949b976` 已是 `plan/2026-09-13-parallel-throughput` 的祖先，且已推送 origin）。
+
+#### A34 补充：编排者实测——写面**不可利用**，读面**可换掉**，窗口仍在（维持 P2）
+
+编排者用独立临时仓（不碰被审仓）按 `finalize_merge.sh` 的真实时序做了两次探测。
+
+**探测 1：写回是否会落到 worktree 副本？→ 不会。**
+
+时序：判定通过 → 攻击者把主区 status 换成指向 worktree 副本的 symlink →
+`[[ -f ]]` → `mktemp "$status_file.XXXXXX"` → `mv "$tmp" "$status_file"`。
+
+| 观测项 | 结果 |
+|--------|------|
+| `[[ -f ]]` 是否跟随 symlink | **是**（通过） |
+| 写回后主区路径是否仍是 symlink | 否 |
+| 写回内容落在 | **主区路径**（`{"FINALIZED_BY_SCRIPT": true}`） |
+| worktree 副本 | **未被触碰**（内容原样） |
+
+根因：`mv` 是 `rename(2)`，**替换 symlink 本身**而不跟随它。故 `finalize_merge.sh:206-229`
+的 mktemp+mv 写回形态**天然免疫**这条路径的 symlink 重定向。
+
+**探测 2：读取是否会读到 worktree 副本？→ 会。**
+
+同一路径在替换前后读到不同内容：`MAIN_COPY_REWORK` → `WORKTREE_COPY_FORGED_ACCEPT`。
+故 `finalize_merge.sh:56`（`-f`）、`:61`/`:64`（两处 validator）、`:209`（读旧 JSON）
+这四处**都会跟随替换后的 symlink**。理论危害：用一份「伪造已双签」的 worktree status
+骗过 finalize 的决策逻辑。
+
+**但**：判据对**替换后**的该路径答 `True`（实测），即若判定发生在替换之后，
+拒收会正常启动。可利用性**完全取决于替换是否精确落在「判定完成」与「读取」之间的窗口**。
+
+**定级维持 P2**，理由更明确了：需要本地写权限 + 精确竞态时机 + 一份预置的伪造 status；
+而当前威胁模型是「防自证、防误操作」。写面已免疫，读面需竞态。
+**若日后把本地并发写入纳入威胁模型，重估为 P1。**
+
+**修法方向收窄**（供 WP 参考）：不必改写回形态（已免疫），重点是**判定与读取共用同一个
+已打开的文件**——判定后拿到 fd 并全程复用（`os.open` + `O_NOFOLLOW` 后按 fd 读），
+或判定与首次读取之间不再有第三方可插入的间隙。
+
+---
+
+### A35 · WP-21 的 A29 characterization test 是**空验证**：两种被明令禁止的变异都能通过（P1，测试有效性，编排者自身缺陷）
+
+**发现于**：WP-21 rev1 验收（编排者变异测试）。
+**责任**：**编排者**。WP-21 Brief 交付物 2 逐字规定了这两条断言
+（「断言 finalize **退出码非 0** 且输出中**无** `FINALIZE_OK`」），执行者严格照做，
+用例本身写得干净且前提断言齐备。缺陷在 Brief 的用例设计，不在执行。
+
+**现象**：`tests/test_finalize_merge_first_call.py::test_finalize_fails_closed_when_predicate_raises`
+用一个**不存在**的 status 路径（`docs/plans/wp19-first-call/WP-FC.status.json`，
+测试只 `repo.mkdir()` + init 一个 README，从未创建该 status）调用 finalize。
+于是 fail-open 变异并不会被抓住——判据崩掉后脚本继续走到下一步的
+`FINALIZE_FAIL: status file not found` 而 `exit 2`，两条断言（`rc != 0`、无
+`FINALIZE_OK`）**照样成立**。
+
+**实测（编排者变异测试，status 缺失 = 用例现状）**：
+
+| 形态 | rc | 有 `FINALIZE_OK`？ | 用例判定 |
+|------|----|-------------------|---------|
+| A 普通赋值（现行，应通过） | 1 | 无 | **PASS** |
+| B `\|\| echo false`（注释明令禁止） | 2 | 无 | **PASS ← 应当失败** |
+| C 挪进 `if` 条件（注释明令禁止） | 2 | 无 | **PASS ← 应当失败** |
+
+变异 B 的输出里还明确打印了 `false`，随后**跳过了 worktree 拒收**——正是用例
+本该锁住的行为，却因为 status 不存在而被下一步的 `not found` 掩盖。
+
+**修法（已实测有效）**：换成一个**真正可 finalize** 的 status。同文件已有现成
+fixture：`_make_repo_with_merged_wp()` + `_status_without_merged_commit()`，
+写入并提交后再跑。此时断言立刻具备区分力：
+
+| 形态 | rc | 有 `FINALIZE_OK`？ | 用例判定 |
+|------|----|-------------------|---------|
+| A 普通赋值（现行） | 1 | 无 | **PASS** |
+| B `\|\| echo false` | 0 | **有** | **FAIL ✅ 抓住** |
+| C 挪进 `if` 条件 | 0 | **有** | **FAIL ✅ 抓住** |
+
+**教训（写进 Brief 设计纪律）**：**凡 characterization test 锁的是「某个错误形态会
+被拦住」，Brief 必须同时要求执行者做一次变异自证**——把被禁止的形态真的写进去、
+跑一次、确认用例**变红**，并把这次变红写进 `[TESTS]`。只断言「rc != 0」这类
+**否定式**结论极易空过：脚本在任何更早的一步失败都能满足它。否定式断言必须配
+「正常路径能走到终点」的正面对照，否则无法区分「被拦住」与「压根没走到」。
+
+> 与 A31 补充同类：都是「用一个太弱的观测口径下结论」。A31 是用 `tail` 判有无
+> verdict，本条是用 `rc != 0` 判有无拦住。

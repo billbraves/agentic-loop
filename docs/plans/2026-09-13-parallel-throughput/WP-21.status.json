@@ -4,12 +4,12 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "IMPLEMENTING",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "",
-    "redispatch_count": 0
+    "session": "bgb1aabr8",
+    "redispatch_count": 1
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -21,10 +21,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "8224197",
+    "base_commit": "fd69fe9",
     "branch": "feature/wp21-test-contracts",
     "worktree": "../wp21-test-contracts",
-    "commit": ""
+    "commit": "6995873"
   },
   "scope": {
     "allowed_paths": [
@@ -53,27 +53,43 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_worktree_detection.py tests/test_finalize_merge_first_call.py -q",
+        "exit_code": 0
+      },
+      {
+        "command": "PYTHONPATH=src uv run --python 3.13 --with pytest --no-project python -m pytest tests/test_worktree_detection.py tests/test_finalize_merge_first_call.py -q",
+        "exit_code": 0
+      },
+      {
+        "command": "PYTHONPATH=src uv run --python 3.14 --with pytest --no-project python -m pytest tests/test_worktree_detection.py tests/test_finalize_merge_first_call.py -q",
+        "exit_code": 0
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "4 failed + 583 passed + 4 skipped; 基线 4f/581p/4s，失败集按名字相同（预存 triple_sign），零回归 +2 新通过"
+      }
+    ],
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-21-brief.md",
-      "sha256": "a231cf2082e062f065299742a4553b877aed27f900df04ebfaaa696dce07f641"
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-21-brief-rev2.md",
+      "sha256": "574fccbda873fbb9a90b008ae2cda902cd6606cc7a1c12bb4fcff457f245ed3b"
     }
   },
   "review": {
-    "decision": "CONSULT",
-    "by": "claude-code",
-    "at": "2026-09-15T08:46:16Z",
-    "note": "WP-21 Brief 已冻结，尚未派发、尚未验收。"
+    "decision": "REWORK",
+    "reviewed_by": "claude-code",
+    "notes": "rev1: 交付物 1、3 与全部范围/形态要求通过（gate 0 行 diff、finalize_merge.sh 只含注释、断言用 isinstance、三版本 21 passed、全套零回归 4f/583p/4s）。交付物 2 的 characterization test 空验证：变异测试证明 `|| echo false` 与挪进 if 两种禁止形态都能通过（status 路径不存在，判据崩掉后走到 not found 而 exit 2）。已登记 A35（P1，编排者自身缺陷）。rev2 只修该用例。"
   },
   "consult": {
     "decision": "CONSULT",
-    "by": "codex",
-    "at": "2026-09-15T08:46:16Z",
-    "note": "待执行后送审。送审须带 --disable apps（A31），且须全文检索 [VERDICT]（A31 补充）。"
+    "reviewed_by": "codex",
+    "notes": "rev1 未送咨询：编排者已自查出阻断级问题（A35），先返工到 rev2 再一并送独立审核。"
   },
   "timestamps": {
-    "dispatched_at": "",
-    "updated_at": "2026-09-15T08:46:16Z",
+    "dispatched_at": "2026-09-15T08:47:25Z",
+    "updated_at": "2026-09-15T08:49:28Z",
     "reviewed_at": "",
     "consulted_at": ""
   }
