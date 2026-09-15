@@ -2594,3 +2594,82 @@ brief_path = iteration_dir / f"{work_package_id}-brief.md"
 
 **证据**：上述差分对可复现；工作树 `/Users/admin/vibe/wp22-finalize-toctou` 已还原干净
 （`git status --porcelain` 空）。
+
+## B14 补充实测（2026-09-16）：`agentic` 不是 editable 安装，而是**冻结副本**，且落后活树 26/23/191 行
+
+登记 B14 时我的描述是「指向另一棵 worktree 的 editable 安装」。回查（任务 #13）后
+更正：**比那更糟，它根本不是 editable**。
+
+```
+/Users/admin/.local/bin/agentic  ->  shebang /Users/admin/.local/share/uv/tools/agentic-loop/bin/python
+agentic_loop.__file__            =  …/uv/tools/agentic-loop/lib/python3.12/site-packages/agentic_loop/__init__.py
+```
+
+site-packages 下是**实体文件副本**（无 `.pth`、无 `__editable__*` finder），
+即 `uv tool install` 时的快照，之后活树怎么改都不会跟随。
+（顺带：该路径的 `git rev-parse --show-toplevel` 落到 `/Users/admin`、
+分支 `feature/v3-skill-standardization` —— 一个与本项目无关的仓，
+所以任何「按 git 事实自证」的判据在该副本里跑都会得到别人的答案。）
+
+**冻结副本与活树的差异（`diff -rq`，排除 `__pycache__`）**：
+
+| 文件 | 差异行数 | 说明 |
+|---|---|---|
+| `wrappers/finalize_merge.sh` | 26 | 缺 WP-21 的 A29 fail-closed 注释（活树有、副本 0 处） |
+| `wrappers/preflight.sh` | 23 | —— |
+| `gate/__init__.py` | 191 | 权威判据 `path_is_in_worktree` 所在文件 |
+| `adapters/codex.py` | 差异 | 第二签名的取数通道 |
+| `plan_cmd.py` | 差异 | —— |
+| `gate/report.py` | **副本里根本没有** | 活树新增文件 |
+
+即：`agentic preflight` / `agentic finalize` / `agentic dispatch-lint` 跑的是
+一份落后活树上百行、且 `gate/__init__.py`（§5.3 单一权威判据的物理位置）都不同的代码。
+
+**与 B16/B17 合看**，本迭代的门禁读取面共有三处走偏，且是同一族：
+
+| 缺陷 | 判据读错了什么 | 后果 |
+|---|---|---|
+| B14 | 读**冻结副本的代码** | wrapper 判据本身是旧的 |
+| B16 | 读**固定命名的 brief** | rev 冻结不在 lint 面内 |
+| B17 | 读**工作树快照的 status** | state/scope/risk 全用旧口径 |
+
+三者叠加的最坏情形：用旧代码、按旧 brief、判旧状态，然后打印 PASS。
+本轮 WP-22/WP-24 的门禁我已全部改为「直跑活树脚本 + 主仓绝对路径」规避，
+但历史上凡以 `agentic <sub>` 输出作为证据的结论都须重新标注。
+
+**回查结论**：本迭代 status 里记录的 wrapper 证据，凡命令形态写作
+`agentic <sub>` 的，都不构成活树证据；写作
+`PYTHONPATH=src bash src/agentic_loop/wrappers/<x>.sh` 或
+`docs/agentic/tools/<x>.sh` 的，跑的是活树，证据有效。
+（本轮 WP-22/WP-24 的 SCOPE_OK、zero-diff、preflight 均属后者。）
+
+**修复方向**（并入任务 #14 的 WP）：
+1. `agentic` 启动时自检：`agentic_loop.__file__` 是否落在**当前主仓**的 `src/` 下；
+   不是则显著告警或 fail-closed（至少在 dogfood 场景）。
+2. 协议示例一律改为直跑活树脚本形态，不再示范 `agentic <sub>` 作为验收证据。
+3. 把 `uv tool install` 改为 editable/`--with-editable`，或在仓库 README 明写
+   dogfood 必须用活树路径调用。
+
+### B14 回查结果（任务 #13，已完成，2026-09-16）
+
+扫描全部 `docs/plans/*/WP-*.status.json` 的 `evidence.tests[].command`，
+命令形态含 `agentic <sub>` 的**只有 1 条**：
+
+- `WP-01.status.json` → `agentic quality-gate WP-01.status.json`（exit_code 1）
+
+该条**不构成需要推翻的结论**，两个独立理由：
+
+1. **同一检查已有活树形态的复跑**，就在同一份 status 的下一条：
+   `PYTHONPATH=src bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/…/WP-01.status.json`
+   （rebase 后复跑，STATUS_VALID、scope 通过、4 failed/502 passed/4 skipped）。
+2. **`wrappers/quality-gate.sh` 在冻结副本与活树之间逐字节相同**
+   （`diff -q` 无输出），故即便只有 `agentic` 那一条，其判据代码也未偏。
+
+其余所有 wrapper 证据的命令形态都是
+`PYTHONPATH=src bash src/agentic_loop/wrappers/<x>.sh` 或 `docs/agentic/tools/<x>.sh`，
+即直跑活树，证据有效。
+
+**结论**：B14 未污染本迭代任何已合入结论；风险是前瞻性的——只要协议示例仍示范
+`agentic <sub>`，下一次就可能踩中（`gate/__init__.py` 差 191 行、
+`gate/report.py` 副本里根本不存在）。故任务 #14 的 WP 仍须做，
+优先级是「防再犯」而非「补救已发生的误判」。
