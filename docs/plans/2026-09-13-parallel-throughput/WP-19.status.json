@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -96,12 +96,23 @@
       "A21 (new): A13 also tightened preflight's acceptance of a worktree-local ABSOLUTE status path (baseline PASSED, now PREFLIGHT_FAIL: must be tracked). Correct per global rule 4.1 (status is main-area live state) and the desirable direction; recorded because it is a behavior change beyond the four named defects.",
       "Executor CONCERNS 1-3 reviewed and concurred: gate import makes finalize_merge.sh startup heavier (unavoidable - only Python file in the whitelist); B1 remains in WP-11 scope; A9/A14/A15 sit behind forbidden paths."
     ],
-    "merge_authorization": "NOT GRANTED. Two gates outstanding: (1) codex consult.decision=ACCEPT is required by the schema for APPROVED_FOR_MERGE and does not exist yet; (2) explicit user approval is required for the merge itself per CLAUDE.md. Reviewer ACCEPT alone does not authorize a merge. Sequence once both are in: git merge --no-ff, then agentic finalize."
+    "merge_authorization": "NOT GRANTED. consult.decision=REWORK blocks merge. The orchestrator's review.decision=ACCEPT is retained as the record of what was verified, but it does not stand as an approval: the consultant found a blocking defect (A22) in the A13 criterion, which the orchestrator had rated registration-level. Next step is rework of A13's predicate, not merge."
   },
-  "consult": {},
+  "consult": {
+    "decision": "REWORK",
+    "consultant": "codex (adapter=codex, provider=kirogpt, identity_model=gpt-5.6-sol)",
+    "session": "codex exec --sandbox read-only, log wp19-consult.log, EXIT=0 2026-09-15T04:21:50Z",
+    "independence": "weak",
+    "reviewed_commit": "b97ce67",
+    "blocking_finding": "A22: A13's predicate is bypassable via git environment variables. gate/__init__.py:183 subprocess.run() inherits the caller's environment and does not clear GIT_DIR / GIT_WORK_TREE. With GIT_DIR=<main>/.git a linked-worktree status file flips path_is_in_worktree from True to False, so `GIT_DIR=/main/.git agentic gate /linked-worktree/WP.status.json` walks straight through the worktree refusal at both call sites.",
+    "orchestrator_corroboration": "Found independently by the orchestrator during the consult window, before reading codex's verdict. Confirmed at both call sites: finalize_merge.sh and codex_merge_gate.sh each emit their worktree-refusal message under a clean env and both fall through it under GIT_DIR spoofing (dying later on unrelated schema checks). cli.py:212 passes dict(os.environ) through unchanged and no wrapper unsets these vars. Narrowed the vector: GIT_DIR alone flips the predicate; GIT_WORK_TREE and GIT_COMMON_DIR alone do not.",
+    "orchestrator_disagreement_on_severity": "The orchestrator had rated this registration-level, not blocking, on three grounds: (1) the main defense holds - resolve_paths --root main_repo still returns the main root under GIT_DIR, GIT_WORK_TREE and GIT_COMMON_DIR spoofing, so relative status paths still land on the main copy; (2) strictly stronger than baseline, whose path literal missed all 8 worktrees in this repo with no env manipulation at all; (3) WP-08-candidate.md A13:913-916 and the Brief both define this guard as a backstop for absolute-path arguments. The orchestrator DEFERS to the consultant's REWORK: a security guard that a single env var defeats should not be merged as if it were sound, and the WP-17 lesson is precisely that the orchestrator's own severity judgement on a forgeable criterion is the thing that failed. Recorded, not overridden.",
+    "fix_direction": "Sanitize the environment inside the predicate: pass an env to subprocess.run with GIT_DIR, GIT_WORK_TREE, GIT_COMMON_DIR (and GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY for good measure) removed, so the judgment reads the filesystem topology rather than caller-declared repository selection. Keep it one authoritative predicate; both call sites inherit the fix."
+  },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T00:40:00+08:00",
-    "reviewed_at": "2026-09-15T00:40:00+08:00"
+    "updated_at": "2026-09-15T12:25:00+08:00",
+    "reviewed_at": "2026-09-15T00:40:00+08:00",
+    "consulted_at": "2026-09-15T12:25:00+08:00"
   }
 }

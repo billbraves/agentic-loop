@@ -1170,3 +1170,54 @@ A19 说 proof 在首次派发时压根不存在（判据不可用）。两条叠
 > 若按 A16 修法 3 放弃 proof 路线，A19 依然值得修 —— 因为
 > 「engine 观测到的 `executor.tool` 与 session」对审计留痕仍有价值，
 > 只是不再作为独立性评级依据。
+
+### A22. A13 的 worktree 判据可被 `GIT_DIR` 环境变量绕过
+
+> codex 独立审 WP-19 时判 REWORK 而发现（2026-09-15）；编排者在 consult 窗口内
+> 独立复现同一结论，两条证据链互不依赖。
+
+WP-19 的 A13 把 worktree 判据从路径字面量换成 git 事实：比较路径所在仓的
+`--absolute-git-dir` 与 `--git-common-dir`，不同即在 linked worktree。
+但 `gate/__init__.py:183` 的 `subprocess.run(...)` **继承调用者环境**，
+未清除 git 的仓库选择变量：
+
+```
+worktree 路径，干净环境                             -> True   （正确拒收）
+worktree 路径，GIT_DIR=<主仓>/.git                  -> False  ← 绕过成功
+worktree 路径，GIT_WORK_TREE=<主仓>                 -> True   （不绕过）
+worktree 路径，GIT_COMMON_DIR=<主仓>/.git           -> True   （不绕过）
+```
+
+`GIT_DIR` 单独一个变量即可翻转判据。两处调用方都中招（这是口径单一的必然
+结果，不是各自的实现缺陷）：
+
+```
+finalize_merge.sh   干净 -> FINALIZE_FAIL: resolves inside a worktree
+finalize_merge.sh   GIT_DIR 伪造 -> 越过守卫，死在后面无关的 schema 检查
+codex_merge_gate.sh 干净 -> GATE_FAIL: resolves inside a worktree
+codex_merge_gate.sh GIT_DIR 伪造 -> 同样越过
+```
+
+`cli.py:212` 用 `dict(os.environ)` 原样传给 wrapper，且无任何 wrapper unset
+这些变量，所以从 CLI 入口即可复现：
+
+```bash
+GIT_DIR=/main/.git agentic gate /linked-worktree/WP.status.json
+```
+
+**主防线未被打穿**：`resolve_paths --root main_repo` 在 `GIT_DIR`、
+`GIT_WORK_TREE`、`GIT_COMMON_DIR` 三种伪造下均返回主区根，相对路径 status
+仍一律落主区副本。
+
+**定级分歧的处置（重要留痕）**：编排者据「主防线未破 + 严格强于基线
+（基线字面量在本仓 8 个 worktree 全 MISS，无需任何环境变量即失效）+ Brief
+明确把本条定义为绝对路径入参的兜底」判为**登记级**；codex 判**阻断**。
+编排者**服从 consult 结论**，不行使覆盖：一个单个环境变量即可关掉的安全守卫
+不应以「看起来正确」的姿态合并，而 WP-17 的教训恰恰是**编排者对可伪造判据的
+严重性判断本身**是失效环节。分歧记录在 `WP-19.status.json`
+`consult.orchestrator_disagreement_on_severity`，不删改。
+
+**修法**：在谓词内部净化环境 —— 给 `subprocess.run` 传剔除了 `GIT_DIR` /
+`GIT_WORK_TREE` / `GIT_COMMON_DIR`（连带 `GIT_INDEX_FILE` /
+`GIT_OBJECT_DIRECTORY`）的 env，使判据读**文件系统拓扑**而非调用方声明的
+仓库选择。保持单一权威谓词，两处调用方自动继承修复。
