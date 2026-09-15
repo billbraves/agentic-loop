@@ -179,12 +179,43 @@ def test_blank_git_dir_fails_closed(
 
 
 def test_symlink_loop_fails_closed_without_raising(repo: Path) -> None:
-    # A28-2 (WP-19 rev4): resolving a symlink loop raises RuntimeError,
-    # which is NOT an OSError subclass — an `except OSError` guard cannot
-    # catch it, violating the "never raises" contract. The predicate must
-    # fail closed (True) and must not raise.
+    # A28-2 (WP-19 rev4): on Python <= 3.12, resolving a symlink loop raises
+    # RuntimeError, which is NOT an OSError subclass — an `except OSError`
+    # guard cannot catch it, violating the "never raises" contract.
+    #
+    # WP-21 / A33: since Python 3.13, ``Path.resolve()`` no longer raises
+    # RuntimeError for a symlink loop — it returns the path with the looping
+    # component left as-is. The predicate then takes the normal git path, and
+    # a symlink loop in the MAIN repo is correctly classified as NOT a
+    # worktree (False) — that answer was right all along. Both verdicts are
+    # correct per version, so the cross-version CONTRACT is: the call never
+    # raises and returns a real ``bool``. (``isinstance``, not
+    # ``result in (True, False)`` — the latter accepts ``1`` and cannot lock
+    # the type.) Detection power is pinned by the linked-worktree counterpart
+    # case below, which must answer True on every supported interpreter.
     loop = repo / "loop"
     loop.symlink_to("loop")  # real self-referential symlink loop
+    result = path_is_in_worktree(loop)
+    assert isinstance(result, bool)
+
+
+def test_symlink_loop_inside_linked_worktree_is_worktree(
+    repo: Path, tmp_path: Path
+) -> None:
+    # WP-21 / A33: the detection-power counterpart of the contract-level
+    # symlink-loop case above. A symlink loop INSIDE a linked worktree must
+    # be refused (True) on every supported interpreter: on Python <= 3.12
+    # resolve() raises RuntimeError and the guard fails closed; on 3.13+
+    # resolve() returns the path as-is and the probe either fails closed on
+    # the loop stat or falls back to the parent directory, whose git facts
+    # (git-dir != git-common-dir) say "linked worktree". Measured stable on
+    # 3.11 / 3.13 / 3.14. Without this case the contract-level assertion
+    # above would be vacuous — a predicate that always returned False would
+    # pass it.
+    wt = tmp_path / "wp21-loop"
+    _run_git(repo, "worktree", "add", "-q", "-b", "feat/wp21-loop", str(wt))
+    loop = wt / "loop"
+    loop.symlink_to("loop")
     assert path_is_in_worktree(loop) is True
 
 
@@ -234,9 +265,12 @@ def test_long_path_fails_closed_without_raising(repo: Path) -> None:
     # A29-1 (WP-19 rev5): ``directory = resolved if resolved.is_dir() else
     # resolved.parent`` sat outside every guard, and ``is_dir()`` stats the
     # path — a ~300-character filename raises ``OSError: [Errno 63] File name
-    # too long``. The predicate's docstring promises "never raises", and the
-    # fail-open command-substitution call site in finalize_merge.sh turns a
-    # raised predicate into a skipped refusal.
+    # too long``. The predicate's docstring promises "never raises". (WP-21
+    # correction: the command-substitution call site in finalize_merge.sh is
+    # a PLAIN assignment, so under ``set -e`` a raised predicate aborts the
+    # script outright — that call site is fail-closed, not fail-open. The
+    # "never raises" contract still has independent value: readability of the
+    # predicate and its other callers, e.g. the in-process gate call site.)
     #
     # A30 (WP-19 rev6): this case locks the CONTRACT, not one implementation
     # path. On Python <= 3.13 ``is_dir()`` raises ``OSError`` for an overlong

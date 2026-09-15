@@ -157,3 +157,90 @@ def test_first_call_without_merged_commit_finalizes_then_idempotent(
     assert second.stdout.strip() == (
         f"FINALIZE_OK merged_commit={merge_commit} (already finalized)"
     )
+
+
+# A syntactically valid gate module whose predicate raises when CALLED.
+# Shadows ONLY agentic_loop.gate via PYTHONPATH (see the test below);
+# agentic_loop.resolve_paths / agentic_loop.validate_wp_status keep loading
+# from the real src tree through the namespace-extending __init__.
+_BROKEN_GATE_INIT = '''\
+"""WP-21 A29 hardening fixture: valid syntax, raises on call."""
+from pathlib import Path
+
+
+def path_is_in_worktree(path: Path) -> bool:
+    raise RuntimeError("injected broken predicate (WP-21 A29 hardening)")
+'''
+
+# Extends the shadow package's search path with the real agentic_loop
+# directory so sibling modules (resolve_paths, validate_wp_status) still
+# import normally while gate resolves to the injected copy first.
+_SHADOW_PACKAGE_INIT = '''\
+import os
+
+__path__.append(os.path.join(os.environ["AGENTIC_REAL_SRC"], "agentic_loop"))
+'''
+
+
+def test_finalize_fails_closed_when_predicate_raises(
+    tmp_path: Path, session_env
+) -> None:
+    # WP-21 / A29 hardening characterization test. finalize_merge.sh reads the
+    # worktree verdict via a PLAIN command-substitution assignment
+    # (`in_worktree=$(...)`); under `set -euo pipefail` a crashed predicate
+    # aborts the script before any refusal/finalize logic — fail-closed.
+    # Inject a gate module that is syntactically valid but raises on call
+    # (shadowing ONLY agentic_loop.gate via PYTHONPATH precedence), and pin:
+    # non-zero exit AND no FINALIZE_OK anywhere in the output. This locks the
+    # measured behavior (rc=1, zero later steps executed) so nobody can move
+    # the assignment into an `if` condition or append `|| true` — either
+    # would suspend `set -e` and turn the crash into a skipped refusal.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _run_git(repo, "init", "-q")
+    _run_git(repo, "config", "user.email", "test@example.com")
+    _run_git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("init\n", encoding="utf-8")
+    _run_git(repo, "add", "README.md")
+    _run_git(repo, "commit", "-q", "-m", "init")
+
+    inject = tmp_path / "inject"
+    (inject / "agentic_loop" / "gate").mkdir(parents=True)
+    (inject / "agentic_loop" / "__init__.py").write_text(
+        _SHADOW_PACKAGE_INIT, encoding="utf-8"
+    )
+    (inject / "agentic_loop" / "gate" / "__init__.py").write_text(
+        _BROKEN_GATE_INIT, encoding="utf-8"
+    )
+
+    env = dict(session_env)
+    env["AGENTIC_REAL_SRC"] = str(PKG_SRC)
+    env["PYTHONPATH"] = str(inject) + os.pathsep + env["PYTHONPATH"]
+
+    # Premise: through the injected PYTHONPATH the predicate raises, while
+    # the sibling modules finalize also needs still import from real src.
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import agentic_loop.gate as g, agentic_loop.resolve_paths, "
+            "agentic_loop.validate_wp_status; "
+            "g.path_is_in_worktree(__import__('pathlib').Path('.'))",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert probe.returncode != 0
+    assert "injected broken predicate" in probe.stderr
+
+    res = subprocess.run(
+        ["bash", str(FINALIZE_SH), str(PLAN_DIR / STATUS_NAME)],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert res.returncode != 0, (res.returncode, res.stdout, res.stderr)
+    assert "FINALIZE_OK" not in res.stdout
+    assert "FINALIZE_OK" not in res.stderr

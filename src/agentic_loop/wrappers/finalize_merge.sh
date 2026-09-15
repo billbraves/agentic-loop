@@ -39,6 +39,12 @@ esac
 # worktrees like ../wpN-x never contain that segment). The single
 # authoritative predicate is agentic_loop.gate.path_is_in_worktree (§5.3);
 # this wrapper only references it. Unresolvable paths fail closed (refused).
+# A29 (WP-21): the call below MUST stay a plain assignment. Under
+# `set -euo pipefail` a non-zero exit from the predicate (e.g. it raises)
+# aborts the script outright — fail-closed. Never move it into an `if`
+# condition or after `&&`/`||`, and never append `|| true` / `|| echo false`:
+# those suspend `set -e` for the substitution, turning a crashed predicate
+# into "false" (not a worktree) — fail-open, silently skipping the refusal.
 in_worktree=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY'
 import sys
 from pathlib import Path
