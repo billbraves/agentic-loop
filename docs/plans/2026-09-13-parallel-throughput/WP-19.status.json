@@ -4,11 +4,12 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "c550104e-df7d-4565-a789-ec3e4b2c3347"
+    "session": "(rev2 dispatch, session id pending executor report)",
+    "redispatch_count": 1
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -120,7 +121,7 @@
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T12:35:00+08:00",
+    "updated_at": "2026-09-15T12:40:00+08:00",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
   }
