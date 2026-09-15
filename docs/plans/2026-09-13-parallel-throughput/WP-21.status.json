@@ -9,7 +9,7 @@
   "executor": {
     "tool": "kimi-cli",
     "session": "bgb1aabr8",
-    "redispatch_count": 0
+    "redispatch_count": 1
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -92,6 +92,5 @@
     "updated_at": "2026-09-15T08:49:28Z",
     "reviewed_at": "",
     "consulted_at": ""
-  },
-  "redispatch_count": 1
+  }
 }
