@@ -7,8 +7,8 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "1f3b5059-ce5d-4bd0-9664-6016e43d9b0a",
-    "redispatch_count": 0
+    "session": "bg bhye2i68q (see wp22-rev2-exec.log)",
+    "redispatch_count": 1
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -70,7 +70,18 @@
         "round": 1,
         "reason": "consult REWORK (codex) + 编排者 PoC 证实 B15 为 rev1 引入的合入门禁绕过回归",
         "rev1_commit": "2fbf05d",
-        "carried_over": "A34 修复（判定/读取收敛到同一次 O_NOFOLLOW open）保留，rev1 的 5 条用例须照旧通过"
+        "carried_over": "A34 修复（判定/读取收敛到同一次 O_NOFOLLOW open）保留，rev1 的 5 条用例须照旧通过",
+        "dispatched": {
+          "at": "2026-09-16T00:35:00Z",
+          "command": "kimi --afk --print -w /Users/admin/vibe/wp22-finalize-toctou -p <prompt>",
+          "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-rev2-prompt.md",
+          "prompt_sha256": "a432a8c9905f3fb1f0271b66174f6da9a171bfba32803225eef046a1920ae02d",
+          "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-rev2-exec.log",
+          "liveness_probe": "kimi --print -p 'reply PROBE_OK' -> rc=0, stdout contains PROBE_OK",
+          "preflight": "PREFLIGHT_PASS branch=feature/wp22-finalize-toctou state=CHANGES_REQUESTED (主仓绝对路径，规避 B17)",
+          "autonomy": "AUTONOMY_AUTO dispatch_developer",
+          "head_at_dispatch": "2fbf05d"
+        }
       },
       "gate_alignment": {
         "defect": "B16",
