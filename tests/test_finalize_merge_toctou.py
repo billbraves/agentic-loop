@@ -87,9 +87,15 @@ def _make_repo_with_merged_wp(tmp_path: Path) -> tuple[Path, str, str, str]:
     return repo, base, wp_tip, _head(repo)
 
 
-def _status(base: str, wp_tip: str, command: str) -> dict:
+def _status(
+    base: str,
+    wp_tip: str,
+    command: str,
+    branch: str = "feat/wp-toctou",
+    justification: str | None = None,
+) -> dict:
     """A schema-valid v2 APPROVED_FOR_MERGE status, distinguishable by command."""
-    return {
+    data = {
         "schema_version": "agentic-wp-status/v2",
         "work_package_id": "WP-TOCTOU",
         "iteration_id": "wp22-toctou",
@@ -102,7 +108,7 @@ def _status(base: str, wp_tip: str, command: str) -> dict:
         "git": {
             "base_branch": base,
             "base_commit": "0" * 40,
-            "branch": "feat/wp-toctou",
+            "branch": branch,
             "worktree": "../wp-toctou",
             "commit": wp_tip,
         },
@@ -126,6 +132,47 @@ def _status(base: str, wp_tip: str, command: str) -> dict:
         "consult": {"decision": "ACCEPT", "reviewed_by": "codex-cli"},
         "timestamps": {"created_at": "2026-09-15T00:00:00Z"},
     }
+    if justification is not None:
+        data["consult"]["override"] = {"justification": justification}
+    return data
+
+
+def _make_repo_with_unmerged_real_branch(
+    tmp_path: Path,
+) -> tuple[Path, str, str, str, str]:
+    """Repo where ``feature/real`` is NOT merged but ``feature/decoy`` IS.
+
+    Returns (repo, default_branch, real_tip, decoy_tip, decoy_merge_commit).
+    The B15 attack: a field value forges ``branch\tfeature/decoy`` in the
+    probe transport, trying to pass the merge check with the never-merged
+    ``feature/real``.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _run_git(repo, "init", "-q")
+    _run_git(repo, "config", "user.email", "test@example.com")
+    _run_git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("init\n", encoding="utf-8")
+    _run_git(repo, "add", "README.md")
+    _run_git(repo, "commit", "-q", "-m", "init")
+    base = _default_branch(repo)
+
+    _run_git(repo, "checkout", "-q", "-b", "feature/decoy")
+    (repo / "decoy.txt").write_text("decoy\n", encoding="utf-8")
+    _run_git(repo, "add", "decoy.txt")
+    _run_git(repo, "commit", "-q", "-m", "decoy work")
+    decoy_tip = _head(repo)
+    _run_git(repo, "checkout", "-q", base)
+    _run_git(repo, "merge", "-q", "--no-ff", "feature/decoy", "-m", "Merge decoy")
+    decoy_merge = _head(repo)
+
+    _run_git(repo, "checkout", "-q", "-b", "feature/real")
+    (repo / "real.txt").write_text("real\n", encoding="utf-8")
+    _run_git(repo, "add", "real.txt")
+    _run_git(repo, "commit", "-q", "-m", "real work")
+    real_tip = _head(repo)
+    _run_git(repo, "checkout", "-q", base)
+    return repo, base, real_tip, decoy_tip, decoy_merge
 
 
 def _write_status(path: Path, data: dict) -> None:
@@ -305,3 +352,134 @@ def test_unresolvable_path_fails_closed_without_traceback(
     control = _run_finalize(repo, session_env)
     assert control.returncode == 0, (control.returncode, control.stdout, control.stderr)
     assert control.stdout.strip() == f"FINALIZE_OK merged_commit={merge_commit}"
+
+
+# ---------------------------------------------------------------------------
+# WP-22 rev2 / B15: the probe->bash transport must be injection-proof.
+#
+# rev1 shipped fields as newline-separated "key<TAB>value" text consumed by
+# `while IFS=$'\t' read` + `printf -v`, so a newline inside any string field
+# forged an extra assignment. Orchestrator PoC: justification
+# "looks fine\nbranch\tfeature/decoy" made an unmerged branch pass the merge
+# check (FINALIZE_OK + forged MERGED). The fix is in the channel: NUL-separated
+# records (newline/tab are inert data) + a fail-closed variable-name whitelist
+# on the assignment side + fail-closed refusal of values containing the record
+# delimiter. These cases also carry the rev2 oracle discipline: each negative
+# pairs a positive reachability control on the same fixture, a cause-specific
+# witness (with the file:line that prints it), and — recorded in the WP report
+# — a mutation self-check that re-opens the hole and turns the case red.
+
+
+def test_newline_injection_cannot_override_branch_b15(
+    tmp_path: Path, session_env
+) -> None:
+    """Newline payload in override.justification must not forge `branch`."""
+    repo, base, real_tip, decoy_tip, decoy_merge = (
+        _make_repo_with_unmerged_real_branch(tmp_path)
+    )
+    status_path = repo / PLAN_DIR / STATUS_NAME
+    _write_status(
+        status_path,
+        _status(
+            base,
+            real_tip,
+            "MAIN_COPY pytest -q",
+            branch="feature/real",
+            justification="looks fine\nbranch\tfeature/decoy",
+        ),
+    )
+
+    result = _run_finalize(repo, session_env)
+
+    # Negative: refused, fail-closed, nothing stamped.
+    assert result.returncode == 2, (result.returncode, result.stdout, result.stderr)
+    assert "FINALIZE_OK" not in result.stdout
+    # Cause-specific witness: the REAL (unmerged) branch reached the merge
+    # check — the diagnostic at finalize_merge.sh:361 names its tip, proving
+    # `branch` was not overwritten by the forged record; the merged decoy
+    # tip must NOT appear anywhere in the refusal.
+    assert "merge not detected" in result.stderr
+    assert real_tip in result.stderr
+    assert decoy_tip not in result.stderr
+    after = json.loads(status_path.read_text(encoding="utf-8"))
+    assert after["state"] == "APPROVED_FOR_MERGE"
+    assert "merged_commit" not in after["git"]
+    assert after["git"]["branch"] == "feature/real"
+
+    # Positive reachability control (same fixture): the branch the payload
+    # tried to forge, with a newline-free justification, must reach
+    # FINALIZE_OK with the real merge commit — the fixture passes every gate.
+    _write_status(
+        status_path,
+        _status(
+            base,
+            decoy_tip,
+            "MAIN_COPY pytest -q",
+            branch="feature/decoy",
+            justification="looks fine",
+        ),
+    )
+    control = _run_finalize(repo, session_env)
+    assert control.returncode == 0, (control.returncode, control.stdout, control.stderr)
+    assert control.stdout.strip() == f"FINALIZE_OK merged_commit={decoy_merge}"
+    final = json.loads(status_path.read_text(encoding="utf-8"))
+    assert final["state"] == "MERGED"
+    assert final["git"]["merged_commit"] == decoy_merge
+
+
+def test_nul_injection_in_second_field_fails_closed_b15(
+    tmp_path: Path, session_env
+) -> None:
+    """NUL payload in a DIFFERENT string field (iteration_id) is refused.
+
+    The record delimiter itself, smuggled in via a JSON ``\\u0000`` escape,
+    would forge a record boundary even under NUL-separated transport; the
+    probe must refuse the whole status fail-closed. Using a different carrier
+    field than the newline case proves the fix is channel-wide, not per-field.
+    """
+    repo, base, real_tip, decoy_tip, decoy_merge = (
+        _make_repo_with_unmerged_real_branch(tmp_path)
+    )
+    status_path = repo / PLAN_DIR / STATUS_NAME
+
+    data = _status(
+        base,
+        real_tip,
+        "MAIN_COPY pytest -q",
+        branch="feature/real",
+    )
+    data["iteration_id"] = "wp22-toctou\u0000branch\tfeature/decoy"
+    _write_status(status_path, data)
+
+    result = _run_finalize(repo, session_env)
+
+    # Negative: refused, fail-closed, nothing stamped.
+    assert result.returncode == 2, (result.returncode, result.stdout, result.stderr)
+    assert "FINALIZE_OK" not in result.stdout
+    # Cause-specific witness: the refusal came from the transport guard, not
+    # the merge check — the NUL diagnostic printed at finalize_merge.sh:125
+    # must be present, and the merge-check line (finalize_merge.sh:361) must
+    # NOT fire.
+    assert "contains a NUL byte" in result.stderr
+    assert "refusing ambiguous transport" in result.stderr
+    assert "merge not detected" not in result.stderr
+    after = json.loads(status_path.read_text(encoding="utf-8"))
+    assert after["state"] == "APPROVED_FOR_MERGE"
+    assert "merged_commit" not in after["git"]
+    assert after["git"]["branch"] == "feature/real"
+
+    # Positive reachability control (same fixture): clean iteration_id and
+    # the merged branch must reach FINALIZE_OK with the real merge commit.
+    control_data = _status(
+        base,
+        decoy_tip,
+        "MAIN_COPY pytest -q",
+        branch="feature/decoy",
+    )
+    _write_status(status_path, control_data)
+    control = _run_finalize(repo, session_env)
+    assert control.returncode == 0, (control.returncode, control.stdout, control.stderr)
+    assert control.stdout.strip() == f"FINALIZE_OK merged_commit={decoy_merge}"
+    final = json.loads(status_path.read_text(encoding="utf-8"))
+    assert final["state"] == "MERGED"
+    assert final["git"]["merged_commit"] == decoy_merge

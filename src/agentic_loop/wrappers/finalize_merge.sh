@@ -49,10 +49,19 @@ esac
 # result. A symlink swapped in after the predicate is refused by O_NOFOLLOW
 # at open time (final-segment symlinks only; mid-directory swaps are the
 # declared residual surface), so no third party can re-point the path between
-# the worktree verdict and the reads that feed the decision. The plain
-# assignment keeps the probe fail-closed: any probe crash aborts this script
-# under set -e instead of being mistaken for a verdict.
-probe=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY'
+# the worktree verdict and the reads that feed the decision. The `if !`
+# guard around the probe keeps it fail-closed: any probe crash or non-zero
+# exit is refused below instead of being mistaken for a verdict.
+probe_tmp=$(mktemp)
+trap 'rm -f "$probe_tmp"' EXIT
+
+# B15: the probe returns its verdict and every status field as NUL-separated
+# records ("name<TAB>value" terminated by NUL) written to the temp file.
+# Bash command substitution silently drops NUL bytes, so a $(...) capture
+# cannot carry them; NUL is the record separator, so no byte sequence inside
+# a value (newlines, tabs) can forge an extra record, and the probe refuses
+# fail-closed any value that itself contains a NUL byte.
+if ! "${AGENTIC_PYTHON:-python3}" - "$status_file" >"$probe_tmp" <<'PY'
 import errno
 import json
 import os
@@ -107,15 +116,38 @@ def render(value):
     return str(value)
 
 
-def emit(verdict):
-    print(f"FINALIZE_PROBE\t{verdict}")
+def render_field(dotted, value):
+    rendered = render(value)
+    if "\0" in rendered:
+        # A NUL inside a value could forge a record boundary; refuse the
+        # whole status instead of shipping an ambiguous transport (B15).
+        print(
+            f"STATUS_INVALID: field {dotted} contains a NUL byte; "
+            "refusing ambiguous transport",
+            file=sys.stderr,
+        )
+        emit_verdict("INVALID")
+        sys.exit(0)
+    return rendered
+
+
+def emit_records(records):
+    # Every record is "name<TAB>value" terminated by NUL. The delimiter
+    # cannot occur inside a value (render_field refuses such values), so no
+    # value can change the record boundaries (B15).
+    for key, value in records:
+        sys.stdout.write(key + "\t" + value + "\0")
+
+
+def emit_verdict(verdict):
+    emit_records((("finalize_verdict", verdict),))
 
 
 path = sys.argv[1]
 
 # 1) Worktree predicate on the path (WP-19 single authority, referenced only).
 if path_is_in_worktree(Path(path)):
-    emit("WORKTREE")
+    emit_verdict("WORKTREE")
     sys.exit(0)
 
 # 2) Open ONCE with O_NOFOLLOW and never re-resolve: a symlink swapped in
@@ -123,28 +155,28 @@ if path_is_in_worktree(Path(path)):
 try:
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
 except FileNotFoundError:
-    emit("NOT_FOUND")
+    emit_verdict("NOT_FOUND")
     sys.exit(0)
 except OSError as exc:
-    emit("SYMLINK" if exc.errno == errno.ELOOP else "OPEN_FAILED")
+    emit_verdict("SYMLINK" if exc.errno == errno.ELOOP else "OPEN_FAILED")
     sys.exit(0)
 
 try:
     with os.fdopen(fd, "r", encoding="utf-8") as handle:
         raw = handle.read()
 except IsADirectoryError:
-    emit("NOT_FOUND")
+    emit_verdict("NOT_FOUND")
     sys.exit(0)
 
 try:
     data = json.loads(raw)
 except json.JSONDecodeError as exc:
     print(f"STATUS_INVALID: invalid JSON at line {exc.lineno}: {exc.msg}", file=sys.stderr)
-    emit("INVALID")
+    emit_verdict("INVALID")
     sys.exit(0)
 if not isinstance(data, dict):
     print("STATUS_INVALID: status root must be a JSON object", file=sys.stderr)
-    emit("INVALID")
+    emit_verdict("INVALID")
     sys.exit(0)
 
 # 3) Whole-file schema/state-machine validation (same rules as the CLI).
@@ -152,30 +184,82 @@ errors = validate(data)
 if errors:
     for error in errors:
         print(f"STATUS_INVALID: {error}", file=sys.stderr)
-    emit("INVALID")
+    emit_verdict("INVALID")
     sys.exit(0)
 
-lines = ["FINALIZE_PROBE\tOK"]
+lines = [("finalize_verdict", "OK")]
 for dotted, var in REQUIRED_FIELDS:
     found, value = lookup(data, dotted)
     if not found:
         # Mirror `--field` on a missing key: STATUS_INVALID on stderr plus exit
-        # 2; the plain assignment above then aborts this script under set -e.
+        # 2; the `if !` guard around the probe then refuses the run.
         print(f"STATUS_INVALID: unknown field {dotted}", file=sys.stderr)
         sys.exit(2)
-    lines.append(f"{var}\t{render(value)}")
+    lines.append((var, render_field(dotted, value)))
 for dotted, var in OPTIONAL_FIELDS:
     found, value = lookup(data, dotted)
     # Missing optional fields resolve to empty (fail-closed), like the guarded
     # `field ... 2>/dev/null || true` reads this probe replaces.
-    lines.append(f"{var}\t{render(value) if found else ''}")
-print("\n".join(lines))
+    lines.append((var, render_field(dotted, value) if found else ""))
+# B13: ship the exact bytes read from the single O_NOFOLLOW open so the
+# write-back below never re-opens the path.
+lines.append(("status_raw", raw))
+emit_records(lines)
 PY
-)
+then
+  echo "FINALIZE_FAIL: status probe failed (see STATUS_INVALID diagnostics above)" >&2
+  exit 2
+fi
 
-probe_head=${probe%%$'\n'*}
-probe_kind=${probe_head#*$'\t'}
-case "$probe_kind" in
+# Read the probe records one at a time. The variable name is whitelisted
+# against the exact set the probe may emit (B15): any other key is refused
+# and fails closed — never silently skipped, never assigned. Values pass
+# through verbatim: NUL is the only record boundary, so newlines and tabs
+# inside a value are inert data.
+finalize_verdict=""
+schema_version=""
+state=""
+review_decision=""
+consult_decision=""
+git_commit=""
+tests_json=""
+base_branch=""
+branch=""
+iteration_id=""
+wp_id=""
+merged_commit_recorded=""
+override_approved=""
+override_approver=""
+override_justification=""
+override_reviewed_at=""
+qoder_decision=""
+qoder_override_approved=""
+qoder_override_approver=""
+qoder_override_justification=""
+qoder_override_reviewed_at=""
+status_raw=""
+while IFS= read -r -d '' probe_record <&3; do
+  [[ -n "$probe_record" ]] || continue
+  if [[ "$probe_record" != *$'\t'* ]]; then
+    echo "FINALIZE_FAIL: probe record without field separator (transport rejected)" >&2
+    exit 2
+  fi
+  probe_key=${probe_record%%$'\t'*}
+  probe_value=${probe_record#*$'\t'}
+  case "$probe_key" in
+    finalize_verdict|schema_version|state|review_decision|consult_decision|git_commit|tests_json|base_branch|branch|iteration_id|wp_id|merged_commit_recorded|override_approved|override_approver|override_justification|override_reviewed_at|qoder_decision|qoder_override_approved|qoder_override_approver|qoder_override_justification|qoder_override_reviewed_at|status_raw)
+      ;;
+    *)
+      echo "FINALIZE_FAIL: probe returned unrecognized field '$probe_key' (refusing to assign)" >&2
+      exit 2
+      ;;
+  esac
+  printf -v "$probe_key" '%s' "$probe_value"
+done 3<"$probe_tmp"
+rm -f "$probe_tmp"
+trap - EXIT
+
+case "$finalize_verdict" in
   WORKTREE)
     echo "FINALIZE_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy (single source of truth)" >&2
     exit 2 ;;
@@ -197,13 +281,6 @@ case "$probe_kind" in
     echo "FINALIZE_FAIL: status probe returned an unparseable verdict" >&2
     exit 2 ;;
 esac
-
-# Read status fields required for the merge-finalization decision, as handed
-# back by the probe from the ONE opened file (A34).
-probe_fields=${probe#*$'\n'}
-while IFS=$'\t' read -r probe_key probe_value; do
-  [[ -n "$probe_key" ]] && printf -v "$probe_key" '%s' "$probe_value"
-done <<< "$probe_fields"
 
 # A12: git.merged_commit is the field THIS script writes, so it is absent on
 # the first finalize call. The probe resolves it to empty (fail-closed),
@@ -325,11 +402,13 @@ updated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 tmp_status=$(mktemp "$status_file.XXXXXX")
 trap 'rm -f "$tmp_status"' EXIT
 
-python3 - "$status_file" "$tmp_status" "$merged_commit" "$updated_at" <<'PY'
+# B13: the old JSON comes from the probe's single O_NOFOLLOW open
+# ($status_raw), not from re-opening the path — the judgment and the
+# write-back read the same bytes.
+python3 - "$tmp_status" "$merged_commit" "$updated_at" "$status_raw" <<'PY'
 import json, sys
-src, dst, merged_commit, updated_at = sys.argv[1:5]
-with open(src, encoding="utf-8") as fh:
-    data = json.load(fh)
+dst, merged_commit, updated_at, raw = sys.argv[1:5]
+data = json.loads(raw)
 data["state"] = "MERGED"
 data["git"] = dict(data.get("git", {}))
 data["git"]["merged_commit"] = merged_commit
