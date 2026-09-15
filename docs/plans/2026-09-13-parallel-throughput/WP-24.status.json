@@ -3,7 +3,7 @@
   "work_package_id": "WP-24",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -28,12 +28,12 @@
   },
   "scope": {
     "allowed_paths": [
-      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
-      "docs/agentic/templates/WORK_PACKAGE.md",
       "tests/test_wp_template_dispatch_lint.py"
     ],
     "forbidden_paths": [
       "src/agentic_loop/wrappers/dispatch_lint.sh",
+      "docs/agentic/templates/WORK_PACKAGE.md",
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
       "src/agentic_loop/init_cmd.py",
       "src/agentic_loop/validate_wp_status.py",
       "src/agentic_loop/gate/__init__.py",
@@ -55,8 +55,31 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-24-brief.md",
-      "sha256": "1a36ca63cbcb0c3c781899c2fa6bd2199c1a4233cb08980e95b592aa2f23bf2c"
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md",
+      "sha256": "49f0842454b24c5932ec0b3faaa64fc923ec19efc32cdaeb7f0169a6cd40e47f",
+      "rev": 2,
+      "supersedes": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md",
+        "sha256": "1a36ca63cbcb0c3c781899c2fa6bd2199c1a4233cb08980e95b592aa2f23bf2c",
+        "why": "rev1 交付 c04bc6b 被 codex 第二签名判 REWORK；witness 用例的原因特异性由 fixture 而非断言承载，改用已实测的差分对补齐"
+      },
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh 的 section 判据 heredoc 原文按索引切片出来直接跑（B11 修法 1）；并用已知不合规的 WP-20-brief.md 做正向对照",
+        "result": "PASS — rev2 三锚点均存在且非空（stdout='' rc=1）；对照 WP-20 报 brief missing section 'Acceptance tests' rc=0，判据具备区分力",
+        "checked_at": "2026-09-16T01:00:00Z"
+      },
+      "rework": {
+        "round": 1,
+        "reason": "consult REWORK (codex)；观察成立但其修法不可达，编排者实测出等价且可达的差分对判据",
+        "rev1_commit": "c04bc6b",
+        "carried_over": "rev1 的模板改动与 7 条用例保留；本轮只改 tests/test_wp_template_dispatch_lint.py 一个文件，两份模板转为 forbidden（零行 diff）"
+      },
+      "gate_alignment": {
+        "defect": "B16",
+        "workaround": "固定命名 WP-24-brief.md 内容置为 rev2（sha256 49f08424…），rev1 原文改名 WP-24-brief-rev1.md（sha256 1a36ca63… 与 supersedes 一致）；使 dispatch_lint.sh:60 与 redispatch.py:493 读到的都是 rev2",
+        "not_fixed_here": "B16 本体归任务 #18",
+        "aligned_at": "2026-09-16T01:00:00Z"
+      }
     },
     "baseline": {
       "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
@@ -133,9 +156,17 @@
     ]
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": null,
     "reviewed_by": "claude-code",
-    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b1ab985）；dispatch_lint.sh 与 init_cmd.py diff 均为 0 行；两份模板 byte-identical；新测试实际调用真脚本（非抄判据），评审侧独立变异自证转红后已还原；3.11/3.13/3.14 全绿；全量零回归 +7。Brief 的 empty/missing 断言是编排者之错（B11），执行者显式申报并以等价证据链替代，不判 REWORK。合入需用户批准，编排者不自签。"
+    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b1ab985）；dispatch_lint.sh 与 init_cmd.py diff 均为 0 行；两份模板 byte-identical；新测试实际调用真脚本（非抄判据），评审侧独立变异自证转红后已还原；3.11/3.13/3.14 全绿；全量零回归 +7。Brief 的 empty/missing 断言是编排者之错（B11），执行者显式申报并以等价证据链替代，不判 REWORK。合入需用户批准，编排者不自签。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "ACCEPT -> 保留但不解锁合入",
+        "reviewed_by": "claude-code",
+        "note": "rev1 交付本身在当时约束下是正解（gate 两条路径措辞相同，codex 建议的 empty 断言不可达）；但 oracle 第 2 项由 fixture 承载的残余缺口真实存在，故以 rev2 补断言而非驳回既有交付"
+      }
+    ]
   },
   "consult": {
     "decision": "REWORK",
@@ -165,8 +196,9 @@
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
     "dispatched_at": "2026-09-15T13:10:15Z",
-    "updated_at": "2026-09-15T15:45:00Z",
+    "updated_at": "2026-09-16T01:00:00Z",
     "review_completed_at": "2026-09-15T14:05:00Z",
-    "consulted_at": "2026-09-15T15:40:00Z"
+    "consulted_at": "2026-09-15T15:40:00Z",
+    "rev2_frozen_at": "2026-09-16T01:00:00Z"
   }
 }
