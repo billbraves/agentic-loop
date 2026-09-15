@@ -1521,3 +1521,81 @@ NOT REFUSED (fail-open)
 2. 调用点侧（另立 WP，属 A26 那批 wrapper 面）：`finalize_merge.sh` 应把
    「判据未输出 true/false」本身当失败，而不是当 false。这是 shell 层的
    fail-open 模式，不止影响这一个判据。
+
+### A30 · `test_long_path_fails_closed_without_raising` 锁的是实现细节，不是契约（P2，测试脆性）
+
+**面**：`tests/test_worktree_detection.py`（WP-19 rev5 新增用例）
+
+**事实**（编排者跨版本实测，4 个解释器）：
+
+| Python | `Path(300字符).resolve().is_dir()` | 主区长路径判据 | 用例断言 |
+|--------|-----------------------------------|--------------|---------|
+| 3.11.14 | `OSError: [Errno 63]` | `True`（fail-closed） | True ✅ |
+| 3.12.14 | `OSError: [Errno 63]` | `True` | True ✅ |
+| 3.13.12 | `OSError: [Errno 63]` | `True` | True ✅ |
+| 3.14.2 | `False`（不再抛） | **`False`**（正常走 git，主区本就该 False） | True ❌ |
+
+3.14 起 `is_dir()` 对超长名返回 `False` 而不抛 `OSError`（`Path.stat()` 的
+`ENAMETOOLONG` 处理改变）。此时判据**行为正确**——超长路径落在主区，答 `False`
+本就是对的——但用例把「超长名必然 fail-closed」当成契约写死，于是在 3.14 上失败。
+
+`pyproject.toml:8` 声明 `requires-python = ">=3.9"`，3.14 在支持范围内。
+
+**定性**：**不是 A29 修复的缺陷**。判据在 3.11/3.12/3.13/3.14 四个版本上都
+「对任意输入不抛」，主区判 False、linked worktree 判 True 全部正确（已实测）。
+缺陷在用例：它断言的是「触发 OSError 后 fail-closed」这一实现路径，
+而 A29 的契约是「不抛异常」。契约级写法应是「调用不抛」+
+「在 linked worktree 内的超长路径判 True」（后者在 3.14 上实测仍为 `True`）。
+
+**发现者**：codex（rev5 复审中主动做跨版本探查后提出），编排者独立复现确认。
+
+**修法建议**：把断言从 `is True` 改为「不抛异常」，或改用 linked worktree 内的
+超长路径（跨四版本都为 `True`）。**不在 WP-19 rev5 范围内**，另立 WP 或并入
+A29 修法 2 的 WP。
+
+### A31 · codex 咨询命令形态未固化，默认形态直接 HTTP 400（P1，流程）
+
+**面**：编排流程（`AGENTS.md` 的 codex 咨询触发点未给出可用命令形态）
+
+**事实**（WP-19 rev5 咨询实测，四次尝试）：
+
+| 形态 | 结果 |
+|------|------|
+| `codex exec --sandbox read-only -m kirogpt` | EXIT=1，HTTP 400 |
+| `+ -c 'mcp_servers={}'` | EXIT=1，同一 400 |
+| `+ --disable apps` | EXIT=0，能开工 |
+
+400 原文：`Tool name(s) exceed Kiro API limit of 64 characters:
+'mcp__codex_apps__codex_document_control___execute_document_command' (66)`
+等三个工具名。这些名字由 `apps` feature（`codex features list` 显示 stable/true）
+**服务端注入**，不来自 `~/.codex/config.toml`，故清空 `mcp_servers` 无效，
+必须 `--disable apps`。
+
+**影响**：默认形态下 codex 咨询在推理前即被拒，编排者若不逐层排查，会误判为
+「codex 无法审」或「模型不可用」。WP-19 已有两轮咨询未取得 verdict
+（rev4 中断、rev5 第 3 次空结论），排查成本全部落在编排者身上。
+
+**修法建议**：把 `codex exec --sandbox read-only -m kirogpt --disable apps`
+固化进 `AGENTS.md` 的咨询触发点，或包一个 `agentic consult` wrapper。
+与 A19/A23（派发命令形态与「已开工」确认）同类，建议并包。
+
+**另**：`codex_models_manager: failed to refresh available models` 在 rev4 与
+rev5 第 3 次尝试中都出现，且都伴随「最终消息为空、无 verdict」。二者是否因果
+未证实，但已两次共现，重试时应显式要求「直接给结论、不要长时间探查」。
+
+### A32 · 审核者 codex 在执行者 worktree 留下写入痕迹（P2，隔离）
+
+**面**：`--sandbox read-only` 下的 serena MCP 工具
+
+**事实**：rev5 咨询后，`/Users/admin/vibe/wp19-wrapper-seams` 出现未跟踪目录
+`.serena/`（`project.yml`、`project.local.yml`、`.gitignore`）。主仓无此目录；
+`.gitignore` 与 `.git/info/exclude` 均无 `serena` 规则，故它会出现在
+`git status --porcelain` 里，污染「树是否干净」这一验收判据。
+
+**定性**：违反全局规范 §5.7——审核者只读，不应在执行者工作区留下写入面。
+`--sandbox read-only` 约束的是 codex 自身的 exec，未约束其 MCP 工具的落盘。
+
+**编排者处置**：未删除，留作证据。
+
+**修法建议**：咨询 codex 时一并 `--disable` serena（或用不带 MCP 的 profile），
+并把 `.serena/` 写进 `.git/info/exclude` 作为兜底。可并入 A31 的 WP。
