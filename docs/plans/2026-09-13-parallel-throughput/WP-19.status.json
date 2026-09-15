@@ -8,8 +8,8 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "4801b3af (rev2, exit=0); 2021e745->rev3 (exit=0)",
-    "redispatch_count": 2
+    "session": "4801b3af (rev2, exit=0); 2021e745->rev3 (exit=0); 9af9735d (rev4, exit=0, DONE_WITH_CONCERNS)",
+    "redispatch_count": 3
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -24,7 +24,7 @@
     "base_commit": "b97ce67",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
-    "commit": "bbfa258"
+    "commit": "d7e90fa"
   },
   "scope": {
     "allowed_paths": [
@@ -76,9 +76,9 @@
       }
     ],
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev3.md",
-      "sha256": "d7c406ad64d791492bad03b7b657b4aae9c2d6c0c0bfbb3602257d0ef7c390b0",
-      "rev": 3,
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev4.md",
+      "sha256": "bbed3bebfb535e56195796c3a4a55603a5a7f441d4377ffbd7576f2cd27c3369",
+      "rev": 4,
       "rev1": {
         "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief.md",
         "commit": "b97ce67",
@@ -88,26 +88,31 @@
         "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev2.md",
         "sha256": "8e80c8e68033e146fdf27e3756fe335129bac21d476ce3bd74256b029e2d3305",
         "outcome": "review ACCEPT (withdrawn: 漏判输出解析面); consult REWORK on A28/A27 (+A26 另立WP, A25 维持登记)"
+      },
+      "rev3": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev3.md",
+        "sha256": "d7c406ad64d791492bad03b7b657b4aae9c2d6c0c0bfbb3602257d0ef7c390b0",
+        "outcome": "review ACCEPT (withdrawn: 未覆盖 unguarded is_dir()); consult 中断未出 verdict; A29 登记"
       }
     }
   },
   "review": {
     "decision": "REWORK",
     "reviewer": "claude (claude-code)",
-    "at": "2026-09-15T13:58:55+0800",
-    "evidence": "编排者撤回上一轮 ACCEPT——那是漏判。24 向量探测全在环境变量面，未覆盖输出解析面，故 rev2 Brief『输出异常->True』与 docstring『never raises』两条契约违反没被抓到。已独立复现：blank common_dir -> False；symlink loop 抛 RuntimeError；主区 symlink 指 worktree status -> False（后续读写跟随 symlink 操作 worktree 文件）。",
-    "note": "rev4 冻结 Brief = WP-19-brief-rev3.md，范围收窄到 path_is_in_worktree 一处 + 追加四条用例。"
+    "at": "2026-09-15T14:33:44+0800",
+    "evidence": "编排者撤回 rev4 的 ACCEPT。A28-2 只把 resolve() 包进 try，漏了 gate/__init__.py:253 的 resolved.is_dir()——它会 os.stat()，超长路径抛 OSError，正是 Brief 点名要 fail-closed 的类型（rev3 同样抛，是既有洞非 rev4 回归）。另 rev4 把 resolve() 前移后新增 ValueError 路径（含 NUL 路径），既非 OSError 也非 RuntimeError。定级 P0 的理由：finalize_merge.sh:42-51 命令替换是 fail-open——判据抛异常则 in_worktree 空串、!= true、worktree 拒收整道门被跳过，实测 NOT REFUSED。",
+    "note": "rev5 冻结 Brief = WP-19-brief-rev4.md。调用点 fail-open 列为 A29 修法 2，属 wrapper 面另立 WP。"
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": "CONSULT",
     "consultant": "codex (kirogpt)",
-    "at": "2026-09-15T05:52:03Z",
-    "evidence": "codex(gpt-5.6-sol) 复审 rev2+rev3 判 REWORK，5 findings，编排者逐条独立复现后分流：F1=A28(P0，fail-closed 在空白 common_dir 与 resolve() 抛 RuntimeError 两条路径不成立；落 allowlist 内，并入 rev4)；F2=已登记 A25(worktree 内 .git gitfile 重指向，登记不返工)；F3=A26(resolve_paths.py:101 未净化环境，GIT_DIR 能把 --root main_repo 改指到别的仓；跨 forbidden_paths，另立 WP)；F4=A27(判未解析的 path.parent，主区 symlink 指 worktree 判 False；落 allowlist 内，并入 rev4)；F5=TOCTOU(os.environ 拷贝无实质线程风险，文件系统面并入 A27 语境)。",
-    "note": "codex 自陈只读沙箱无可用临时目录、无法重跑 pytest，故回归证据仍以编排者独立跑的全量套件为准。记录见 WP-19-consult-codex.md。"
+    "at": "2026-09-15T06:26:34Z",
+    "evidence": "rev4 咨询（b296gqnzd）exit=0 但因网关错误 (codex_models_manager: failed to refresh available models) 提前中断，未输出 ACCEPT/REWORK verdict，tokens used 仅 5195（rev2+rev3 那轮为 9770）。但中途留下可复现证据：ValueError embedded null byte 与 is_dir() 的 OSError。编排者据此独立复现并登记 A29。**rev4 未获有效双签**。",
+    "note": "rev5 完成后须重新送 codex 复审并取得有效 verdict；本次中断不计为 ACCEPT，也不计为 REWORK。"
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T05:58:55Z",
+    "updated_at": "2026-09-15T06:33:44Z",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
   }
