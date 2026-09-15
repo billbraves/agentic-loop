@@ -1459,3 +1459,65 @@ git 正常退出、行数正确，但内容退化。两个面互不覆盖，
 ——rev1 判据同样没有这两个校验，A22 的修复没有触及它们。
 
 **范围**：`gate/__init__.py` 的 A13 判据一处，**在 WP-19 的 allowlist 内**，并入 rev4。
+
+---
+
+### A29 —— `path_is_in_worktree` 仍有一处 unguarded 文件系统调用，且调用点 fail-open
+
+**来源**：codex 复审 WP-19 rev4 期间的中途实证（该次咨询因网关错误提前中断、
+未给出 verdict，但留下了可复现的证据）。编排者独立复现并定级。**P0**。
+
+**缺陷 1（rev4 未闭合的既有洞）**：`gate/__init__.py:253`
+
+```python
+directory = resolved if resolved.is_dir() else resolved.parent
+```
+
+`is_dir()` 会 `os.stat()`，在超长路径上抛 `OSError: [Errno 63] File name too long`。
+这一行**在所有 try 之外**——A28-2 只把 `resolve()` 与末尾两处 `resolve()` 包进了 try。
+`OSError` 恰恰是 Brief 点名要求 fail-closed 的类型。
+
+rev3 在同一输入上同样抛 `OSError`，故这是**既有洞，不是 rev4 引入的回归**；
+A28 的修复范围没覆盖它。
+
+**缺陷 2（rev4 引入的新 raising 路径）**：`ValueError: embedded null byte`
+
+rev4 把 `resolve()` 前移到函数开头（A27 的修法），而 `resolve()` 对含 NUL 的路径抛
+`ValueError`——既不是 `OSError` 也不是 `RuntimeError`，现有 except 抓不到。
+
+```
+rev3: path_is_in_worktree(Path("/...a\x00b.json")) -> False   （不抛）
+rev4: 同一输入                                      -> RAISED ValueError
+```
+
+**缓解**：`execve` 禁止 argv 含 NUL，故两个调用点（`finalize_merge.sh` 的
+命令替换、`gate main()`）都无法从 shell 传入这种路径。属于契约违反
+（docstring 自陈「never raises」）而非可达攻击面。缺陷 1 则**可达**。
+
+**为何必须修：调用点是 fail-open 的**
+
+`finalize_merge.sh:42-51` 用命令替换取判据结果：
+
+```bash
+in_worktree=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY' ... )
+if [[ "$in_worktree" == "true" ]]; then ... exit 2; fi
+```
+
+判据抛异常 -> stdout 为空 -> `in_worktree` 为空串 -> `!= "true"` -> **worktree 拒收被跳过**。
+实测（超长路径，走真实命令替换）：
+
+```
+in_worktree=[<EMPTY>]
+NOT REFUSED (fail-open)
+```
+
+即：判据内部一个未捕获异常，会把「拒收 worktree-local status」这道门整个绕开——
+方向与 Brief 的 fail-closed 要求相反。这使缺陷 1 的严重度从「不优雅」升为 P0。
+
+**候选修法**
+
+1. 判据侧（本轮）：把 `resolved.is_dir()` 移进 try，并把 except 扩到
+   `(OSError, RuntimeError, ValueError)`。三处守卫仍保持同一形式（§5.3）。
+2. 调用点侧（另立 WP，属 A26 那批 wrapper 面）：`finalize_merge.sh` 应把
+   「判据未输出 true/false」本身当失败，而不是当 false。这是 shell 层的
+   fail-open 模式，不止影响这一个判据。
