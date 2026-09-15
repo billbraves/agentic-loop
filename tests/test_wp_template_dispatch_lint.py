@@ -168,18 +168,55 @@ def test_positive_control_real_brief_ok(lint_project):
 
 
 def test_witness_empty_anchor_body_fails(lint_project):
-    """Cause-specific witness for the section-body predicate: clearing the
-    body of ``## Acceptance tests`` (heading kept) must still go red through
-    the real script — the non-empty half of the predicate is separately alive,
-    independent of the heading half."""
+    """Cause-specific witness for the section-body predicate at
+    ``src/agentic_loop/wrappers/dispatch_lint.sh:98``, via a DIFFERENTIAL PAIR.
+
+    The script's two failure paths — heading missing (:86) and heading present
+    but body empty (:98) — print the SAME ``brief missing section`` line, so
+    stderr wording cannot identify which path fired (defect B11; codex's
+    ``empty``/``missing`` suggestion is unreachable).  We therefore hold
+    EVERYTHING constant and vary only the one thing the predicate checks: the
+    body of ``## Acceptance tests``.
+
+    Variant A = ``_clear_section_body(tmpl, "Acceptance tests")``: heading
+    kept, body cleared.  Variant B = the SAME bytes with exactly one line
+    ``x`` inserted under that heading.  Both fixtures contain the heading —
+    asserted explicitly below — so the heading check at ``dispatch_lint.sh:86``
+    cannot fire in EITHER run, by construction rather than by assumption.
+    Variant B passes (oracle item 1: positive reachability control on the
+    same fixture) and variant A goes red; the only difference between the two
+    runs is that one body line, so A's red can only come from the body-
+    emptiness check at ``dispatch_lint.sh:98`` (oracle item 2).  The ``:86``
+    half is covered separately by ``test_forbidden_mutation_renamed_anchor_fails``
+    (oracle item 3).
+    """
     proj, iterdir = lint_project
-    _write_brief(
-        iterdir, _clear_section_body(TEMPLATE_DOCS.read_text(encoding="utf-8"),
-                                     "Acceptance tests")
-    )
-    r = _run_dispatch_lint(proj)
-    assert r.returncode != 0, (r.returncode, r.stdout, r.stderr)
-    assert "Acceptance tests" in r.stderr, r.stderr
+    heading = "## Acceptance tests"
+    cleared = _clear_section_body(TEMPLATE_DOCS.read_text(encoding="utf-8"),
+                                  "Acceptance tests")
+
+    # Heading check (dispatch_lint.sh:86) excluded BY CONSTRUCTION in both
+    # variants — this must hold no matter how the fixture evolves.
+    assert heading in cleared
+    variant_a = cleared
+    variant_b = cleared.replace(f"{heading}\n", f"{heading}\nx\n", 1)
+    assert variant_b != variant_a, "fixture must gain exactly one body line"
+    assert heading in variant_b
+
+    # Variant B (body non-empty): positive control — same fixture, same
+    # script, must pass.  Proves the check is reachable and not vacuous.
+    _write_brief(iterdir, variant_b)
+    rb = _run_dispatch_lint(proj)
+    assert rb.returncode == 0, (rb.returncode, rb.stdout, rb.stderr)
+    assert "DISPATCH_LINT_PASS" in rb.stdout, (rb.stdout, rb.stderr)
+
+    # Variant A (body empty): same fixture minus that one line must go red.
+    # Weak aux only — NOT a cause-specific witness (both paths print the
+    # same line; B11).  The cause specificity lives in the differential pair.
+    _write_brief(iterdir, variant_a)
+    ra = _run_dispatch_lint(proj)
+    assert ra.returncode != 0, (ra.returncode, ra.stdout, ra.stderr)
+    assert "Acceptance tests" in ra.stderr, ra.stderr
 
 
 def test_forbidden_mutation_renamed_anchor_fails(lint_project):
