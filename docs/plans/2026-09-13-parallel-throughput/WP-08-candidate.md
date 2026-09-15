@@ -1669,3 +1669,72 @@ rev6 执行者在 `[STATUS] BLOCKED` 的理由里称该形态下判据 **fail-op
 也**不需要改 `gate/__init__.py`**。修法只需把断言契约化（与 A30 同法）。
 执行者判 BLOCKED 的前提有误，但其「不擅自扩权改禁改文件、交回编排者裁决」
 的处置是**正确**的——按 §4.1，范围裁决权在编排者。
+
+#### A29 修法 2「wrapper 命令替换 fail-open」经编排者实测**不成立**（撤销该待办）
+
+原登记的担忧：`finalize_merge.sh:42-50` 用命令替换取判据结果
+（`in_worktree=$(python … path_is_in_worktree …)`），若判据抛异常则 `$in_worktree`
+为空串，`[[ "$in_worktree" == "true" ]]` 不成立，**拒收分支被跳过**，即 fail-open。
+
+编排者在真实调用点直测（worktree `wp19-wrapper-seams` @ `949b976`）：
+构造一个语法合法但调用即抛 `RuntimeError` 的 `path_is_in_worktree` 覆盖版，
+经 `PYTHONPATH` 注入，只让该判据失败而 `resolve_paths` / `validate_wp_status` 正常：
+
+| 观测项 | 结果 |
+|--------|------|
+| 脚本退出码 | `rc=1` |
+| 是否打印 `FINALIZE_OK` | 否 |
+| 是否执行到后续任何 finalize 步骤 | 否（0 处匹配） |
+| 是否打印 worktree 拒收信息 | 否（但也**没有**放行） |
+
+根因：`finalize_merge.sh:4` 是 `set -euo pipefail`，而该命令替换出现在
+**普通赋值语句**中，不在 `if` 条件、`&&`/`||` 或 `!` 之后。POSIX shell 语义下，
+简单赋值的命令替换退出码即赋值语句退出码，`set -e` 因此立即终止脚本。
+对照实验确认了这条边界：
+
+```
+v=$(python3 -c 'raise RuntimeError("boom")')        -> script_rc=1（中止）
+if [[ "$(python3 -c 'raise ...' 2>/dev/null)" == "true" ]]  -> PROCEED（set -e 在 if 条件里被挂起，才会 fail-open）
+```
+
+→ 现有形态是**赋值**而非 if 条件内嵌，故 **fail-closed**，A29 修法 2 不构成缺陷，
+待办撤销。**遗留加固建议（非缺陷，P2）**：该保护依赖「赋值 + `set -e`」这一隐式
+耦合，若日后有人把它挪进 `if` 条件或加上 `|| true`，就会真的变成 fail-open；
+建议在该行上方留一行注释锁定意图，并补一个 characterization test（注入抛异常的判据，
+断言 `rc != 0` 且无 `FINALIZE_OK`）。此项并入「用例契约化」WP。
+
+### A34 · `path_is_in_worktree` 判定与后续使用之间存在 symlink TOCTOU 窗口（P2，安全，另立 WP）
+
+**来源**：WP-19 rev6 codex 复审的 P2 新发现（编排者与执行者均未看到）。
+
+`finalize_merge.sh` 的时序是：先算 `in_worktree`（解析路径 + git 探测）→ 再 `[[ -f ]]`
+→ 再 `validate_wp_status` → 再写回。判定与后续每一步都各自重新解析同一路径，
+其间存在时间窗：若本地并发者在判定通过后把该路径（或其中一段目录）替换为
+指向 worktree 内文件的 symlink，则拒收判据已过、后续操作却落到被替换后的目标上。
+
+**与 A33 的区别**：A33 是**静态** symlink 循环，codex 与编排者各自独立确认其不构成绕过；
+A34 需要**竞态**，是另一类问题。
+
+**定级理由（P2 而非 P0/P1）**：需要本地并发写权限的攻击者，而当前威胁模型是
+「防自证、防误操作」，未纳入本机恶意并发。**若日后把本地并发写入纳入威胁模型，
+本条应重估为 P1**。
+
+**修法方向（供后续 WP 参考）**：判定与使用共用**同一个已解析结果**（一次解析、
+后续复用），或改用文件描述符 / `O_NOFOLLOW` 语义，而非每步各自重新按路径解析。
+
+#### A31 补充：不能只看日志尾部判断 codex 是否给出结论
+
+rev6 咨询这一轮，codex **完整输出了 `[VERDICT] ACCEPT` 与全部 findings**，
+随后才以 `codex_models_manager: failed to refresh available models` 结束，
+故 verdict 位于日志**中段**而非末尾。编排者第一次只 `tail` 日志，误判为「无结论」
+并发起了一次多余的重试。
+
+→ 判据修正：读 codex 日志须**全文检索** `[VERDICT]`（注意 ANSI 转义与非 UTF-8 字节，
+`grep` 前先剥转义或用 `LC_ALL=C grep -a`），不得以 `tail` 的内容作为「是否有结论」的依据。
+
+#### A19 补充：codex 指出「同基线替代提交」不能用 `A..B` 判范围
+
+rev5（`77941f4`）与 rev6（`949b976`）是**同基线的替代提交**，不是父子关系，
+故 `77941f4..949b976` 不等于本轮范围。正确写法是 `949b976^..949b976`。
+编排者原用 AST 逐 def 比对得出同样结论，但 range 写法应统一为后者，
+并入派发/验收命令形态 WP（任务 A19+A23）。

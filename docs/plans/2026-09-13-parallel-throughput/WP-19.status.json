@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -103,10 +103,10 @@
     "note": "rev6（949b976）交付物全部就绪，编排者独立验收通过。范围：diff 恰好 1 个文件tests/test_worktree_detection.py（+28/-3），gate/__init__.py diff 为 0 行（本轮硬要求），7 个 forbidden 文件全 0，docs/ 与 .agentic/ 均 0；AST 逐 def 比对 17→18，仅 test_long_path_fails_closed_without_raising 变更 + 1 新增，其余 16 例（含 NUL 例）字节不变；删除的 3 行正是旧断言与其两行注释。跨版本：编排者用 uv 跑真 pytest 四版本实测，3.11/3.12 全绿 18 passed，3.13/3.14 各 1 failed；该唯一失败为 test_symlink_loop_fails_closed_without_raising（rev4 引入，登记为 A33），已证基线 16e59ff 在 3.13 上同样失败，故非 rev6 引入；rev6 自己的两个用例在四版本全绿。编排者另建 7 条契约向量 harness（自造 temp repo + worktree add），四版本 7/7 通过。全套 4F+581P+4S vs 基线 4F+580P+4S，恰为 +1 新用例，零回归。无 merge/amend，77941f4 与 bbfa258 仍可达。执行者自报 BLOCKED 且称该形态 fail-open——该定性经编排者实测否证：linked worktree 内的 symlink 循环在 3.11/3.13/3.14 上始终判 True、拒收从未被绕过，3.13+ 主区判 False 本就是正确答案。故 A33 为测试脆性、非安全缺陷、不需改判据。编排者据此裁决：A33 不在 rev6 交付物内（该用例不在 rev6 Brief 的清单里），不构成 BLOCKED，转任务 #6「用例契约化」WP 收尾；rev6 判 ACCEPT。执行者不擅自改禁改文件、交回编排者裁决的处置正确（§4.1 范围裁决权在编排者）。"
   },
   "consult": {
-    "decision": "CONSULT",
+    "decision": "ACCEPT",
     "by": "codex",
-    "at": "2026-09-15T07:31:04Z",
-    "note": "rev6（949b976）尚未取得 codex 有效 verdict：本轮待送审。schema 的 DECISIONS 仅允许 ACCEPT/REWORK/CONSULT，故以 CONSULT 表达「待独立审核者裁决」，该值同时使 APPROVED_FOR_MERGE 等终态校验不通过，天然阻断误合并。送审须带 --disable apps（见 A31：codex 默认注入的 mcp__codex_apps__* 工具名超 64 字符导致 HTTP 400）。"
+    "at": "2026-09-15T07:47:26Z",
+    "note": "rev6（949b976）codex 独立复审判 ACCEPT，P0 无。记录见 WP-19-consult-codex-rev6.md。codex 独立核实 949b976^..949b976 恰好只改 tests/test_worktree_detection.py（+28/-3）、gate/__init__.py 零差异，A30 目标完成且无 rev6 新回归；独立推演 symlink 循环四条形态后确认「未发现无需竞态即可绕过拒收的形态」，与编排者实测一致，A33 非 fail-open；并澄清 rev5 那条 P1 的边界——落在白名单只是允许修改，本轮闭合义务须同时满足「本轮引入」，A33 由 rev4 引入故转后续 WP 恰当。三条非阻断项已入册：P1=A33（转用例契约化 WP）；P2=finalize_merge.sh 注释关于 fail-open 的说法不准确（A29 修法 2 待办撤销，编排者已实测 rc=1 中止）；P2=A34 判定与使用之间的 symlink TOCTOU 窗口（新发现，另立 WP，非 rev6 引入）。"
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
