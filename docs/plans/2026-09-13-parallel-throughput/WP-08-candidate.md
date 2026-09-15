@@ -2545,3 +2545,52 @@ brief_path = iteration_dir / f"{work_package_id}-brief.md"
 **本轮规避**：WP-22 rev2 派发前，先让固定命名那份路径承载 rev2 内容
 （见 WP-22.status.json 的 `evidence.brief.gate_alignment`），
 不依赖尚未修好的门禁行为。
+
+## B17 · `preflight` 判的是**工作树里那份 status 快照**，不是编排者刚冻结的主仓 live 状态
+
+**发现于**：2026-09-16，B16 规避后跑 WP-22 rev2 派发前门禁时。
+
+**症状**：`preflight` 打印 `PREFLIGHT_PASS ... state=DISPATCHED`，而主仓 live
+状态文件此刻是 `state=DRAFT`——`DRAFT` 根本不在可执行集
+（`preflight.sh:70` 只放行 `APPROVED|DISPATCHED|IMPLEMENTING|CHANGES_REQUESTED`）。
+两者不可能同真，说明它读的不是同一个文件。
+
+**根因**：`preflight.sh:9` 直接 `status_file=$1`，相对路径按**当前工作目录**解析。
+而 §4.1 要求 preflight 必须在**次级工作树**内运行（`preflight.sh:39` 的
+`PREFLIGHT_FAIL: implementation must run in a secondary worktree`），
+于是相对路径必然落到工作树自己那份 git 追踪副本上。
+对比 `dispatch_lint.sh:26-29` —— 那里显式用 resolver 求主仓根并 `${main_root:+$main_root/}$status_arg`
+把相对路径钉到主仓。**同一仓里两个 wrapper 对同一个参数用了两种解析口径**（违 §5.3）。
+
+**差分对（真脚本，原因特异性由用例承载）**：
+- 控制 A：工作树副本 `state=DISPATCHED`，主仓副本 `DRAFT` → `PREFLIGHT_PASS ... state=DISPATCHED`
+- 控制 B：**只**把工作树副本改成 `BLOCKED`，主仓副本一字不动 → `PREFLIGHT_FAIL: state BLOCKED is not executable`
+- 两次运行主仓副本恒为 `DRAFT`，红绿只随工作树副本翻转 → 判据读的是工作树快照，主仓 live 状态从不参与。
+
+**后果（比 B16 更重）**：
+1. **派发门禁形同虚设**。工作树副本是 commit 时的历史快照，编排者冻结/改写 live
+   状态（state、scope.allowed_paths、risk、evidence.brief）后，preflight 全部看不见。
+   本例：rev2 冻结把 state 打回 `DRAFT`（未就绪），preflight 却按上一轮 commit 里的
+   `DISPATCHED` 放行——**我差点在「门禁已过」的错觉下派发**。
+2. **scope/risk 判据同样跑偏**。同一份文件里的 `scope.allowed_paths`、`risk.*`
+   也来自快照，故越界与风险边界的判定用的都是旧口径。
+3. **`evidence.brief.path` 叠加 B16**：工作树副本的 brief.path 还是 rev1
+   （`WP-22-brief.md`），与主仓 rev2 记录不一致，两个缺陷叠加后
+   「lint 过的 brief」与「冻结的 brief」可以完全无关。
+
+**根因（缺陷族）**：与 B11/B13/B14/B15/B16 同族——**判据的通道变了，判据本身没变**。
+`preflight` 的判据文本（可执行状态集）一直正确，但它取状态的通道从「主仓唯一事实源」
+悄悄变成了「本分支的历史快照」；而 §4.1 明写 status 是主仓 live 协调面、
+只有编排者维护，工作树里那份按定义就是过期的。
+
+**修复方向**（留给 WP，不在本轮修）：
+1. `preflight.sh` 的 `status_file` 解析改与 `dispatch_lint.sh:26-29` 同源：
+   相对路径一律钉到 resolver 求出的主仓根；两处必须调**同一个**解析函数，不各写一份。
+2. 加自检：若参数解析出的路径落在当前工作树内（`path_is_in_worktree` 已有权威判据），
+   直接 fail-closed —— status 只能读主仓那份。
+3. 回查：所有 `PREFLIGHT_PASS` 历史证据都须重新标注「判的是工作树快照」；
+   凡快照与当时 live 状态不一致的，该次放行不构成门禁证据。
+4. 与 B16 合并考虑：status 与 brief 两条读取面都要统一到主仓 + 单点解析。
+
+**证据**：上述差分对可复现；工作树 `/Users/admin/vibe/wp22-finalize-toctou` 已还原干净
+（`git status --porcelain` 空）。

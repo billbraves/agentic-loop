@@ -3,7 +3,7 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -78,7 +78,18 @@
         "differential_pair": "evidence.brief.path 改指 DOES-NOT-EXIST.md -> 仍 DISPATCH_LINT_PASS rc=0；同一 status 仅换 work_package_id=WP-999 -> DISPATCH_LINT_FAIL brief not found rc=2",
         "workaround": "把固定命名 WP-22-brief.md 的内容置为 rev2（sha256 与本字段一致 81a202f8...），rev1 原文改名保存为 WP-22-brief-rev1.md（sha256 3384e8ce... 与 supersedes 记录一致）；不依赖尚未修好的门禁行为",
         "not_fixed_here": "B16 本身归独立 WP（任务 #18），本轮只做派发前对齐",
-        "aligned_at": "2026-09-16T00:00:00Z"
+        "aligned_at": "2026-09-16T00:00:00Z",
+        "preflight_note": "B17：preflight 相对路径落到工作树快照，首次 PREFLIGHT_PASS(state=DISPATCHED) 不构成门禁证据；改用主仓绝对路径复跑，真实裁决为 PREFLIGHT_FAIL: state DRAFT is not executable，故本次显式置 CHANGES_REQUESTED 后再跑"
+      },
+      "base_integration": {
+        "decided_at": "2026-09-16T00:00:00Z",
+        "situation": "分支基于 dispatch_commit b72e9c4；计划分支自那以来对 finalize_merge.sh 只有 6995873(WP-21) 的一处改动",
+        "measured": "git diff b72e9c4..HEAD -- finalize_merge.sh 的非注释改动行数 = 0（纯 6 行 A29 fail-closed 注释），且正落在 rev1 改写的 probe 调用处",
+        "rebase_attempted": "是，git rebase 8c2485d 在该处冲突（UU finalize_merge.sh）；已 git rebase --abort，工作树恢复干净 2fbf05d",
+        "why_not_resolved_by_orchestrator": "冲突解法要决定 A29 的告警枚举是否随调用点迁入新 probe（实现源取舍），属执行者面；编排者手改 finalize_merge.sh 即越权写实现（同 CLAUDE.md.tmpl 那次已纠正的边界）",
+        "why_not_pushed_to_executor": "rev2 Brief 已冻结（sha256 81a202f8…），加交付项须再冻结为 rev3；本轮不为一处注释再冻结一版",
+        "resolution_rule_predeclared": "合入时由编排者在 merge --no-ff 中解此冲突，规则预先声明：两段注释都保留（A29 的 fail-closed 枚举随调用点迁至新 probe 赋值，因 rev1 注释自身已断言同一契约），代码行取 rev2 的 probe 赋值；不得借解冲突改动任何非注释行",
+        "verification_at_merge": "合入后 git diff <merged>~1..<merged> -- finalize_merge.sh 须显示 A29 六行注释仍在，且 merge 引入的非注释行全部来自 rev2 分支"
       }
     },
     "changed_files": [
@@ -166,8 +177,8 @@
   },
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
-    "dispatched_at": "2026-09-15T09:52:00Z",
-    "updated_at": "2026-09-16T00:05:00Z",
+    "dispatched_at": "2026-09-16T00:30:00Z",
+    "updated_at": "2026-09-16T00:30:00Z",
     "review_completed_at": "2026-09-15T14:25:00Z",
     "consulted_at": "2026-09-15T15:40:00Z",
     "rev2_frozen_at": "2026-09-16T00:05:00Z"
