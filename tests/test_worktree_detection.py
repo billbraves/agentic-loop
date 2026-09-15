@@ -113,16 +113,38 @@ def test_caller_env_cannot_disguise_main_repo_path(
     assert path_is_in_worktree(repo / "README.md") is False
 
 
-def test_sanitized_env_still_preserves_path(
-    repo: Path, monkeypatch: pytest.MonkeyPatch
+def test_caller_env_combined_cannot_disguise_worktree_path(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # env={} would drop PATH; on hosts where git lives outside the exec
-    # default path (e.g. Homebrew) the lookup then fails and fail-closed
-    # would incorrectly refuse a clean main-repo path. The sanitized env
-    # must keep PATH so git is still found and the verdict stays correct.
+    # A22 regression guard, combined form: GIT_DIR + GIT_WORK_TREE +
+    # GIT_COMMON_DIR all pointing at the MAIN repo at once must still not
+    # flip a linked-worktree path to False. (Set after worktree creation so
+    # the fixture's own git calls are unaffected.)
+    wt = tmp_path / "wp19-env-all"
+    _run_git(repo, "worktree", "add", "-q", "-b", "feat/wp19-env-all", str(wt))
+    monkeypatch.setenv("GIT_DIR", str(repo / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(repo))
+    monkeypatch.setenv("GIT_COMMON_DIR", str(repo / ".git"))
+    assert path_is_in_worktree(wt / "README.md") is True
+
+
+def test_sanitized_env_still_preserves_path(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Distinguish "env sanitized" from "env emptied": env={} would drop PATH
+    # (or fall back to the exec default, which on macOS still finds
+    # /usr/bin/git — so merely asserting False proves nothing). The contrast
+    # here locks the real invariant: with a PATH that has NO git, the probe
+    # cannot find git and must fail closed (True); with the inherited PATH
+    # it finds git and the main-repo path is correctly NOT refused (False).
+    # Only the second verdict proves the sanitized env kept PATH usable.
+    empty_bin = tmp_path / "empty-bin"
+    empty_bin.mkdir()
+    monkeypatch.setenv("PATH", str(empty_bin))
+    assert shutil.which("git") is None  # premise: git genuinely unfindable
+    assert path_is_in_worktree(repo / "README.md") is True  # fail-closed
+    monkeypatch.undo()  # restore the real PATH
     assert shutil.which("git") is not None
-    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"):
-        monkeypatch.delenv(var, raising=False)
     assert path_is_in_worktree(repo / "README.md") is False
 
 

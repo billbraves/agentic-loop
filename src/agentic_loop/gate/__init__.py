@@ -166,6 +166,37 @@ def git_merge_base(repo: Path, base: str, tip: str) -> str:
     return lines[0].strip()
 
 
+# A22 (WP-19 rev2/rev3): git's repository-selection variable family, stripped
+# from the environment of ``path_is_in_worktree``'s probe. Each is removed
+# because it lets the CALLER declare repository facts instead of letting the
+# predicate read them from filesystem topology:
+#   GIT_DIR — declares the git dir directly; pointing it at the main repo made
+#             a linked-worktree path answer False (the actual A22 bypass).
+#   GIT_WORK_TREE — declares the working-tree root, decoupling a path from the
+#             repository git discovers by walking the filesystem.
+#   GIT_COMMON_DIR — overrides the shared .git dir; flips the
+#             ``--git-common-dir`` side of the worktree comparison.
+#   GIT_INDEX_FILE / GIT_OBJECT_DIRECTORY /
+#   GIT_ALTERNATE_OBJECT_DIRECTORIES — redirect index/object storage lookups.
+#             The current probe does not consult them, but they are part of
+#             the same selection family: if the probe's git invocation ever
+#             changes (e.g. ``--show-toplevel`` or ``git status``), they
+#             become selection surface again (defense in depth).
+#   GIT_CEILING_DIRECTORIES — caps git's upward repository discovery, which
+#             can change or defeat which repository a path resolves to.
+_GIT_SELECTION_VARS = frozenset(
+    {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+    }
+)
+
+
 def path_is_in_worktree(path: Path) -> bool:
     """Single authoritative predicate: does ``path`` resolve inside a linked
     git worktree? (A13, WP-19)
@@ -180,8 +211,8 @@ def path_is_in_worktree(path: Path) -> bool:
     repository, git missing, unexpected output) is treated as inside a
     worktree, i.e. refused.
 
-    A22 (WP-19 rev2): the probe never inherits the caller's repository
-    selection. ``GIT_DIR``/``GIT_WORK_TREE``/``GIT_COMMON_DIR`` let the
+    A22 (WP-19 rev2/rev3): the probe never inherits the caller's repository
+    selection. ``GIT_DIR`` and its family (``_GIT_SELECTION_VARS``) let the
     caller *declare* which repository a path belongs to, overriding
     filesystem topology — a single ``GIT_DIR`` pointing at the main repo
     made a linked-worktree path answer False and bypassed both call sites.
@@ -194,7 +225,7 @@ def path_is_in_worktree(path: Path) -> bool:
     sanitized_env = {
         key: value
         for key, value in os.environ.items()
-        if key not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR")
+        if key not in _GIT_SELECTION_VARS
     }
     try:
         proc = subprocess.run(
