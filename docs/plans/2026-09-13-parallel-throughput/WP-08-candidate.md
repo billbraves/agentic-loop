@@ -1910,3 +1910,37 @@ lock / merge / preflight / redispatch / quality-gate / qoder_security_gate），
 模块，而 `PYTHONPATH` 正是用这条 `rev-parse` 算出来的）。
 → **建议 WP 只做修法 1**（Python 侧根解析净化），wrapper 侧的自举链单独评估，
 不要在同一个 WP 里混做。
+
+---
+
+### B8 · 范围核验的基线取错：把编排者自己的 `docs/` 提交误报成执行者越界（编排者工具缺陷）
+
+**发现于** WP-21 rev2 验收（2026-09-15）。**责任**：编排者的验收脚本。
+
+**现象**：`verify_wp21r2.sh` 用 `git diff --name-only <rev1 commit>..HEAD` 判越界，
+报出 5 个 `docs/` 文件「白名单外」→ `SOME CHECKS FAILED`。实际全是**编排者自己**的
+提交（`a806e8e` 报告与 rev2 Brief、`d28f626` status、`4aab0e5` WP-22 Brief），
+经 A24 的「合入 plan 分支使冻结 Brief 在执行者 worktree 内可达」这一步进入 worktree。
+执行者本轮 commit（`4b9fdfa`，父提交 `daf537c`）**只改了 1 个文件**。
+
+**根因**：范围核验的基线取了**上一轮的执行者 commit**（`6995873`），而两轮之间
+夹了一个编排者的 A24 merge。`6995873..HEAD` 这个区间因此同时包含
+「执行者本轮改动」与「编排者经 merge 带进来的 docs 改动」，两者混在一起。
+
+**正确口径**：范围核验必须只看**执行者本轮 commit 自身的改动面**，即
+`<派发时 worktree HEAD>..<执行者 commit>`——本例是 `daf537c..4b9fdfa`。
+派发时的 worktree HEAD 应在 status 里记下来（现在 `git.base_commit` 记的是主区
+基线，不是 worktree 派发点，两者在有 A24 merge 时不同）。
+
+**辅助判据**（本次用来快速定性，可并用）：
+- `git log --format='%h %an' -1 -- <file>` 看每个可疑文件到底是谁改的
+- `git diff --name-only <exec_commit>^..<exec_commit>` 只看执行者那一个 commit
+
+**与 A31/A35/A26-补充同族**：都是「观测口径选错，导致结论不可靠」。前三条是
+**假阴性**（该报的没报出来），本条是**假阳性**（不该报的报了）。假阳性同样有害：
+它会诱使编排者去驳回一个合规的交付，或在噪声里漏掉真实越界。
+
+**待办**：把「范围核验用派发点作基线」写进编排者的验收脚本模板，并在 status 里
+补记 worktree 派发点 commit（需确认 schema 是否已有合适字段，若无则走
+`evidence.artifacts` 或另立字段的 WP，不要擅自加 top-level 字段——`redispatch_count`
+就因为放在 top-level 被 `validate_wp_status` 拒过一次）。
