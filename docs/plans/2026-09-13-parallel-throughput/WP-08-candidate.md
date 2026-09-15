@@ -2212,3 +2212,113 @@ B9 的形态是：判据通道（`rc != 0` / `grep hit`）与结论（「阻塞�
       **本身也降低了可观测性**（标题缺失与段内为空无法从输出区分）。
       这是 gate 侧的**可选**改进，不是缺陷；若改，须同步任何依赖该措辞的断言。
       本轮不动（WP-24 已判零改动）。
+
+---
+
+## B12 · 派发时基线既未落盘、又在提示里写错，零回归判据一度无锚
+
+**发现时间**：2026-09-15，WP-22 交付验收时，由**执行者的 `[CONCERNS] 3`** 指出。
+**责任方**：编排者（claude）。
+**族属**：与 B9 同族的一个变体——判据（「零回归」）依赖一个**未落盘、未复核**的数字。
+
+### 事实
+
+WP-22 的 Brief DoD 写着「相对基线**零回归**（基线届时由编排者在派发时写入 status）」。
+实际：
+
+1. `WP-22.status.json` 的 `evidence` 里**没有** `baseline` 块——我漏了；
+2. 我在派发提示里口述了一个基线「583 passed」——**这个数是错的**；
+3. 执行者在自己 worktree 的干净树上实测得 `581 passed`，在 `[CONCERNS] 3` 提出
+   「疑基线录自集成分支快照，多出 2 个测试」，并改用**同树前后对照**自证零回归。
+
+编排者复核：在 `b72e9c4`（该 WP 的 `dispatch_commit`）起一个 detached worktree
+实测 `PYTHONPATH=src python3.11 -m pytest tests -q` → `4 failed, 581 passed, 4 skipped`。
+**执行者正确**。交付后 586 = 581 + 5 个新用例，零回归成立。
+
+### 危害
+
+「零回归」是每个 WP 的 DoD 硬项。基线不落盘时，这条判据的锚点只存在于派发提示
+（一次性、不可审计）和编排者记忆里；基线写错时，判据会给出**假阳性或假阴性**：
+- 若执行者照 583 比，交付 586 会被算成「+3」，而真实是「+5」——两个新用例的存在
+  会被悄悄吞掉；
+- 反向情形（基线报低）则会把真实回归读成正常。
+
+本轮之所以没出错，**唯一**原因是执行者没照抄我的数字，而是自己测了一遍并申报。
+这不是流程的功劳。
+
+### 修法
+
+1. **基线必须落 `evidence.baseline`**，且带 `measured_at_commit`——必须等于
+   `git.dispatch_commit`（不是 `base_commit`，B8 同理），以及 `measured_by`。
+2. **基线必须在 `dispatch_commit` 上实测**，不能取自集成分支快照或另一个 worktree
+   的顺手一跑（本轮 583 就是这么来的）。
+3. **`preflight` 应把「`evidence.baseline` 缺失」判为 fail**，让漏录在派发时就被拦住，
+   而不是靠执行者事后质疑。当前 `validate_wp_status` 只强制 `evidence.tests` 每项有
+   `exit_code`，不强制 baseline 存在。
+4. **执行者质疑基线时，编排者第一动作是复测，不是解释**。本轮复测花了 97 秒，
+   收益是把一条错判据从仓里拿掉。
+
+### 待办
+
+- [ ] `validate_wp_status` / `preflight` 增加 baseline 必填校验（含
+      `measured_at_commit == git.dispatch_commit` 的一致性检查）。与 B8 同一处口径，
+      建议合成一个 WP。
+- [ ] 回查已交付各 WP 的 status，补齐缺失的 `evidence.baseline`（WP-22 已补）。
+
+---
+
+## B13 · finalize 写回段「落点免疫」被当成「读取也免疫」
+
+**发现时间**：2026-09-15，WP-22 验收时，由**执行者的 `[CONCERNS] 2`** 指出。
+**责任方**：编排者（写 WP-22 Brief 前置事实的那份实测）。
+**族属**：B9「观测通道选错」——测了 A，结论写成 A+B。
+
+### 事实
+
+WP-22 Brief 的前置事实表把写回面判为「**已免疫，不要改**」，依据是：
+`mktemp "$status_file.XXXXXX"` 取路径字符串的 dirname（不解析 symlink），
+`mv` 是 `rename(2)`（替换 symlink 本身而非跟随它）——实测写回**落在主区路径**，
+worktree 副本未被触碰。该实测本身**正确**。
+
+但写回段是这样的（`finalize_merge.sh:325-348`，本轮 diff=0）：
+
+```
+tmp_status=$(mktemp "$status_file.XXXXXX")
+python3 - "$status_file" "$tmp_status" ... <<'PY'
+with open(src, encoding="utf-8") as fh:      # ← 按路径重新打开、重新解析
+    data = json.load(fh)
+... data["state"] = "MERGED" ...
+mv "$tmp_status" "$status_file"
+```
+
+`open(src)` 是**第 N+1 次按路径解析同一个文件**。probe 关掉的是「判定→决策读取」
+之间的窗口；「判定→写回读取」之间的窗口**没关**。我实测的是**写到哪里**（落点），
+写进 Brief 的结论却覆盖了**读到什么**（内容）。这两件事不是一回事：
+
+- 落点免疫 ⇒ 不会把 MERGED 戳到 worktree 伪造副本上。**已证。**
+- 读取免疫 ⇒ 写回时读到的旧 JSON 一定是判定时那一份。**未证，且现在看是假的。**
+
+后果面：攻击者若在 probe 之后、写回之前换入 symlink，`open(src)` 会读到伪造内容，
+脚本把**伪造内容 + MERGED 戳**写进 tmp，`mv` 再把它落到**真实主区路径**上。
+落点对了，内容被换了——这比落点被换更隐蔽。
+
+（尚未构造 PoC，故记为缺陷而非已证漏洞；`state`/`review.decision` 等决策字段已由
+probe 定过，被换的是写回时一并保留的**其余全部字段**。）
+
+### 为什么 WP-22 不该扩范围
+
+Brief 明令写回段 diff 必须为 0 行，执行者按约未动并在 `[CONCERNS] 2` 申报——
+处理正确，判 ACCEPT。本条是**Brief 前置事实的缺陷**，不是交付的缺陷。
+
+### 修法（另立 WP）
+
+把写回也收进同一个 fd 面：probe 已经读过整份 JSON，可让它把**整份 data** 交回
+（或直接由 probe 所在进程完成「读—改—写 tmp」），写回段不再 `open(src)` 第二次。
+`mv` 形态保持（已免疫，不要动）。
+
+### 待办
+
+- [ ] 立 WP：写回段消除按路径重读（复用 probe 已读的内容），`mv` 形态零改动。
+- [ ] 先构造 PoC 确认可利用性（probe 后、`open(src)` 前换入 symlink 是否真能改写
+      非决策字段），再决定优先级——**不要在没有 witness 的情况下当已证漏洞写进 Brief**
+      （B11 的教训）。

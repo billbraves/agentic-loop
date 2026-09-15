@@ -3,11 +3,11 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "",
+    "session": "1f3b5059-ce5d-4bd0-9664-6016e43d9b0a",
     "redispatch_count": 0
   },
   "orchestrator": {
@@ -24,7 +24,7 @@
     "dispatch_commit": "b72e9c4",
     "branch": "feature/wp22-finalize-toctou",
     "worktree": "../wp22-finalize-toctou",
-    "commit": ""
+    "commit": "2fbf05d"
   },
   "scope": {
     "allowed_paths": [
@@ -56,17 +56,76 @@
       "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief.md",
       "sha256": "3384e8ced97d5ee23f2e77792cbfaebb24a8735dde7bf397625710a59df89515"
     },
-    "changed_files": [],
-    "tests": [],
-    "artifacts": [],
+    "changed_files": [
+      "src/agentic_loop/wrappers/finalize_merge.sh (+209/-45: 判定与读取收敛为单一 O_NOFOLLOW probe；写回段 diff=0)",
+      "tests/test_finalize_merge_toctou.py (+307: 5 用例，每条自带 oracle 三项)"
+    ],
+    "tests": [
+      {
+        "name": "tests/test_finalize_merge_toctou.py + tests/test_finalize_merge_first_call.py",
+        "command": "PYTHONPATH=src python3.11 -m pytest <2 files> -q",
+        "result": "6 passed",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "cross-version 3.13 / 3.14",
+        "command": "uv run --python <ver> --with pytest --no-project python -m pytest <2 files> -q",
+        "result": "6 passed / 6 passed",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "whole suite",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 586 passed, 4 skipped (baseline at b72e9c4: 4 failed, 581 passed -> +5 new, 0 regression)",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "reviewer mutation self-check (A34 window reopened)",
+        "command": "s/os.O_RDONLY | os.O_NOFOLLOW/os.O_RDONLY/ in finalize_merge.sh, rerun toctou test, then restore from backup",
+        "result": "1 failed, 4 passed; test_symlink_swap_window_is_closed_forged_copy_not_used RED with rc=0 stdout='FINALIZE_OK merged_commit=267fdad...' (the A34 attack reproduced); restore byte-identical (git status clean); 5 passed after restore",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "scope verification (B8 baseline = git.dispatch_commit)",
+        "command": "docs/agentic/tools/review_scope.sh ../wp22-finalize-toctou <status.json> <allowed-regex>",
+        "result": "SCOPE_OK; b72e9c4..2fbf05d; 无越界; 区间内 2 个文件改动（具备区分力）",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "zero-diff forbidden paths + writeback unchanged",
+        "command": "git diff b72e9c4..HEAD -- <forbidden set>; grep '^[-+].*(mktemp|trap |mv )' on the finalize diff",
+        "result": "forbidden set 0 lines; no +/- line touches mktemp/trap/mv (writeback :325-348 intact); validate_wp_status.py unchanged",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      }
+    ],
+    "artifacts": [
+      "docs/plans/2026-09-13-parallel-throughput/WP-22.report.md",
+      "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-exec.log"
+    ],
     "remaining_risks": [
-      "O_NOFOLLOW 只拒最后一段是 symlink，不防中间目录段被替换；该残余面在 Brief 附注里已声明，允许执行者以 CONCERNS 申报而不本轮修"
-    ]
+      "O_NOFOLLOW 只拒最后一段是 symlink，不防中间目录段被替换；该残余面在 Brief 附注 4 已声明，执行者按约以 CONCERNS 申报，本轮不修",
+      "写回段 :328 仍按路径重读旧 JSON，判定→写回之间理论窗口未关。写回落点已证免疫（mktemp 取 dirname 不解析 symlink、mv 是 rename(2) 替换 symlink 本身），但写回读到的旧 JSON 新鲜度未证；Brief 明令写回段 diff=0 故未动，待编排者单独评估",
+      "probe 内联了一份字段渲染实现替代 10 处 --field 调用。校验规则仍唯一来自 validate()（无第二份口径），但渲染逻辑若日后在 validate_wp_status.main() 一侧漂移，probe 不会自动跟随；需漂移防护"
+    ],
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-15T14:20:00Z",
+      "measured_at_commit": "b72e9c4",
+      "result": "4 failed, 581 passed, 4 skipped",
+      "measured_by": "orchestrator (detached worktree at dispatch_commit; corrects the wrong 583 in the dispatch prompt, per executor CONCERN 3)",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x, fixture runs `git checkout main` in a temp repo without a main branch) — do not fix"
+    }
   },
   "review": {
-    "decision": "CONSULT",
+    "decision": "ACCEPT",
     "reviewed_by": "claude-code",
-    "notes": "已派发，待执行者交付后独立验收。"
+    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b72e9c4）；forbidden 全集 diff=0，validate_wp_status.py 零改动，写回段未动（无 +/- 行触及 mktemp/trap/mv）；probe 的错误分支与字段渲染逐行核验与 validate_wp_status.load_status+main() 同义；评审侧独立变异自证（摘掉 O_NOFOLLOW）复现 A34 攻击 FINALIZE_OK，还原 byte-identical；五个用例每条自带 oracle 三项（同 fixture 正向对照 + 原因特异 witness + 变异转红）。执行者 4 条 CONCERNS 逐条核实均属实，其中基线 583 是我派发时写错、执行者正确（已实测 581 并补录）。合入需用户批准，编排者不自签。"
   },
   "consult": {
     "decision": "CONSULT",
@@ -75,6 +134,8 @@
   },
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
-    "dispatched_at": "2026-09-15T09:52:00Z"
+    "dispatched_at": "2026-09-15T09:52:00Z",
+    "updated_at": "2026-09-15T14:25:00Z",
+    "review_completed_at": "2026-09-15T14:25:00Z"
   }
 }
