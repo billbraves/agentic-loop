@@ -3,11 +3,11 @@
   "work_package_id": "WP-24",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "",
+    "session": "kimi (see wp24-exec.log)",
     "redispatch_count": 0
   },
   "orchestrator": {
@@ -24,7 +24,7 @@
     "dispatch_commit": "b1ab985",
     "branch": "feature/wp24-brief-template-anchors",
     "worktree": "../wp24-brief-template-anchors",
-    "commit": ""
+    "commit": "c04bc6b"
   },
   "scope": {
     "allowed_paths": [
@@ -65,18 +65,77 @@
       "result": "4 failed, 581 passed, 4 skipped",
       "known_failures": "tests/test_finalize_merge_triple_sign.py (4x, fixture runs `git checkout main` in a temp repo without a main branch) — do not fix"
     },
-    "changed_files": [],
-    "tests": [],
-    "artifacts": [],
+    "changed_files": [
+      "docs/agentic/templates/WORK_PACKAGE.md (+33: 三个英文锚点段，标注与中文段同义)",
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl (+33: 同上，与 docs 份 byte-identical)",
+      "tests/test_wp_template_dispatch_lint.py (+212: 7 用例，实际调用真 dispatch_lint.sh)"
+    ],
+    "tests": [
+      {
+        "name": "tests/test_wp_template_dispatch_lint.py",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "7 passed",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "cross-version 3.13 / 3.14",
+        "command": "uv run --python <ver> --with pytest --no-project python -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "7 passed / 7 passed",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "tests/test_init_contract.py::test_init_scaffolds_reference_templates",
+        "command": "PYTHONPATH=src python3.11 -m pytest <node> -q",
+        "result": "1 passed",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "whole suite",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 588 passed, 4 skipped (baseline 4 failed, 581 passed, 4 skipped -> +7 new, 0 regression)",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "reviewer mutation self-check",
+        "command": "rename '## Acceptance tests' -> '## MUTATED_ANCHOR' in both templates, rerun new test, then git checkout --",
+        "result": "4 failed, 3 passed; real script printed \"DISPATCH_LINT_FAIL: brief missing section 'Acceptance tests'\"; worktree clean after restore",
+        "verified_by": "orchestrator",
+        "exit_code": 1
+      },
+      {
+        "name": "scope verification (B8 baseline = git.dispatch_commit)",
+        "command": "docs/agentic/tools/review_scope.sh ../wp24-brief-template-anchors <status.json> <allowed-regex>",
+        "result": "SCOPE_OK; b1ab985..c04bc6b; 无越界; 区间内 3 个文件改动（具备区分力）",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "zero-diff forbidden paths",
+        "command": "git diff b1ab985..HEAD -- src/agentic_loop/wrappers/dispatch_lint.sh src/agentic_loop/init_cmd.py",
+        "result": "0 lines",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      }
+    ],
+    "artifacts": [
+      "docs/plans/2026-09-13-parallel-throughput/WP-24.report.md",
+      "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp24-exec.log"
+    ],
     "remaining_risks": [
       "模板锚点是文本约定，dispatch_lint 只检查存在性与非空，不检查英文段与中文段是否真的同义；同义性靠评审人工核，本轮不引入自动判据",
-      "docs/plans/ 里已有两份不合规 brief（WP-20-brief.md 缺三个锚点、WP-19-brief-rev2.md 缺两个），属编排者维护面，不在本 WP 范围"
+      "docs/plans/ 里已有两份不合规 brief（WP-20-brief.md 缺三个锚点、WP-19-brief-rev2.md 缺两个），属编排者维护面，执行者已按 Brief 申报未动",
+      "冻结 Brief 有一处编排者错误：要求 witness 断言报 empty 而非 missing，真 gate 两条失败路径都打印 missing（dispatch_lint.sh:86/:98）。执行者已在 CONCERNS 申报并用等价三段证据链替代；已登记为缺陷 B11",
+      "B11 的根治（编排者冻结前自检：判据只能来自真脚本、负面断言须给出打印点 file:line）尚未立 WP"
     ]
   },
   "review": {
-    "decision": "CONSULT",
+    "decision": "ACCEPT",
     "reviewed_by": "claude-code",
-    "notes": "Brief 已冻结待派发；执行者交付后独立验收。"
+    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b1ab985）；dispatch_lint.sh 与 init_cmd.py diff 均为 0 行；两份模板 byte-identical；新测试实际调用真脚本（非抄判据），评审侧独立变异自证转红后已还原；3.11/3.13/3.14 全绿；全量零回归 +7。Brief 的 empty/missing 断言是编排者之错（B11），执行者显式申报并以等价证据链替代，不判 REWORK。合入需用户批准，编排者不自签。"
   },
   "consult": {
     "decision": "CONSULT",
@@ -86,6 +145,7 @@
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
     "dispatched_at": "2026-09-15T13:10:15Z",
-    "updated_at": "2026-09-15T13:12:20Z"
+    "updated_at": "2026-09-15T14:05:00Z",
+    "review_completed_at": "2026-09-15T14:05:00Z"
   }
 }
