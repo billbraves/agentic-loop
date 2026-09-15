@@ -2084,3 +2084,47 @@ WP-21 rev2 恰好就缺第 2 项（实测 stderr 确实含 `injected broken pred
 codex 输出的 `findings` 是按 severity 分键的对象，而 schema 声明的是数组。
 内容完整不影响采信，但消费方（如 `adapters/codex.py` 的 `_parse_verdict`）
 不能假定严格贴合，否则会在解析处炸。
+
+---
+
+### B10 · WP Brief 模板过不了 `dispatch_lint` 自己要求的三个锚点
+
+**等级**：流程级（工具面），P1
+**发现于** 2026-09-15，编排者在推进 B9 待办（把 oracle 校验三项提为模板 DoD）时实测
+
+**事实**：`dispatch_lint.sh:69-76` 要求每份 brief 必须含三个 `## ` 精确锚点且各段非空：
+
+```
+Acceptance tests / Allowed and forbidden paths / Completion definition
+```
+
+而两份模板母本**一个锚点都没有**，且互为同一份内容：
+
+| 文件 | 角色 | 同一判据下的结果 |
+|------|------|----------------|
+| `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` | 打包母本（`init_cmd.py:109` 铺开来源） | `FAIL missing 'Acceptance tests'` |
+| `docs/agentic/templates/WORK_PACKAGE.md` | 项目内被引用的骨架 | `FAIL missing 'Acceptance tests'`（与母本 `diff` 为空） |
+| `WP-22-brief.md`（真实派发过） | 正面对照 | `OK` |
+| 模板 + 三个空锚点 | witness | `FAIL empty 'Acceptance tests'`（非 `missing`，证明第二段判据也活着） |
+
+**后果**：照模板写的 brief 必然在 `agentic preflight` 里挂掉。历史上每个人都是
+在挨了一次 lint 之后**手工补**三个英文锚点——所以 `WP-20-brief.md`（三个全缺）
+和 `WP-19-brief-rev2.md`（缺两个）留在了仓里，它们要么从未真正过 preflight，
+要么过的是别的路径。锚点靠记性补，而记性会失效（同 B9 结构）。
+
+**与 B9 的关系**：B9 的待办之一是「把 oracle 校验三项提为 Brief 模板中的通用
+DoD 条目」。落这条时才发现模板连**现有**硬要求都不满足——**往一个本身不合规的
+模板里加 DoD 条目，加完还是不合规**。故 B10 必须先修，是 B9 待办的前置。
+
+**修法（单一，无争议）**：在两份模板里补齐三个英文锚点段，且与既有中文段
+**同义不同份**——按 `WP-19-brief.md:147-149` 已确立的写法，显式标注
+「以下为 `dispatch-lint` 要求的英文锚点，内容与上文中文章节同义，非另一份口径」，
+避免造出第二份可执行口径（§5.3）。同时把 B9 的 oracle 校验三项写进
+`Acceptance tests` 段作为通用要求。
+
+**为什么不能只改 `docs/` 那份**：`init_cmd.py:109` 从 `.tmpl` 铺开，只改项目内
+那份会在下次 `agentic init` 被覆盖回不合规状态。两份必须同改（它们本就 `diff` 为空）。
+
+**待办**：与 B9 的模板改造合成一个 WP（都改模板、都要跑 `dispatch_lint` 自证），
+建议记为 WP-24。修完须以「模板副本喂 `dispatch_lint` 的 section 检查得 `OK`」
+自证，并保留失败前状态的对照（否则又是一条空验证）。
