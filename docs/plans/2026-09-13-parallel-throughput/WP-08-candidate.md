@@ -2673,3 +2673,80 @@ site-packages 下是**实体文件副本**（无 `.pth`、无 `__editable__*` fi
 `agentic <sub>`，下一次就可能踩中（`gate/__init__.py` 差 191 行、
 `gate/report.py` 副本里根本不存在）。故任务 #14 的 WP 仍须做，
 优先级是「防再犯」而非「补救已发生的误判」。
+
+## B18 · 把「值」搬进 argv 换掉「按路径重读」，顺手引入了一条原先不存在的 ARG_MAX 上限
+
+**同族**：与 B15 同一根因的**反向面**。B15 是「值经文本通道走私成了记录分隔」；
+B18 是「为修 B13 把整份 JSON 搬上 argv，通道本身有了长度上限」。
+判据没变（还是那份 JSON），通道又变了一次。
+
+**发生位置**：`src/agentic_loop/wrappers/finalize_merge.sh:408`（WP-22 rev2 `b216b50`）
+
+rev2 为关掉 B13（写回段按路径重读旧 JSON），把 probe 单次 `O_NOFOLLOW open()`
+读到的原始字节作为 `status_raw` 记录传回 bash，写回段改为：
+
+```bash
+python3 - "$tmp_status" "$merged_commit" "$updated_at" "$status_raw" <<'PY'
+data = json.loads(raw)
+```
+
+**这个方向是对的**（判定与写回读同一批字节，窗口关闭），但整份 status 从此走 argv。
+
+**实测（编排者，2026-09-16，`/Users/admin/.claude/jobs/8a8bf01e/tmp/argv_size.py`）**：
+
+| status 大小 | rc | state 事后 | 落章 | 备注 |
+|---|---|---|---|---|
+| 1322 B | 0 | MERGED | 有 | 正常 |
+| 603913 B | 0 | MERGED | 有 | 2000 条 evidence 全部保留 |
+| 1811913 B | 1 | APPROVED_FOR_MERGE | 无 | `python3: Argument list too long` |
+
+- `getconf ARG_MAX` = 1048576（本机）
+- 本仓最大真实 status = 15129 B（`WP-18.status.json`），**约 70 倍余量**
+
+**性质判定**：**fail-closed**，不是静默截断 —— 超限时状态不变、不盖章，
+这是安全的一侧。但两点不足：
+
+1. 诊断是**裸的 bash 报错**，不是 `FINALIZE_FAIL:` 行，与脚本其余全部拒收路径的
+   口径不一致；调用方按 `FINALIZE_FAIL` 抓错会漏掉这一类。
+2. 上限**原先不存在**（按路径重读没有长度限制），属修复引入的新约束，
+   未在任何地方声明。
+
+**不阻断 WP-22 合入**（70 倍余量 + fail-closed），已记入
+`WP-22.status.json` 的 `evidence.remaining_risks`。
+
+**建议修法**：`status_raw` 改走**文件描述符或临时文件**（probe 已经在写临时文件了，
+再复用一次即可），而不是 argv；同时补一条 `FINALIZE_FAIL: status too large for
+the write-back transport` 诊断。—— 注意这条修法本身又是一次通道更换，
+按纪律须给差分对。
+
+## B19 · fixture 的**无关格式选择**（`indent=2`）让用例改由分层守卫转红，遮住了它本该复现的突破
+
+**同族**：B9/B11 的变体。判据在、用例在、红也转了 —— 但**红的原因**不是用例声称的那个。
+
+**发生位置**：`tests/test_finalize_merge_toctou.py::test_newline_injection_cannot_override_branch_b15`
+（WP-22 rev2 `b216b50`）
+
+**实测（编排者变异自证 2，2026-09-16）**：把 rev2 的传输**只**回退成换行分记录
+（probe 侧 `\0` → `\n`，bash 侧 `read -r -d ''` → `read -r`），
+该用例转红 —— 但红在 `assert "merge not detected" in result.stderr` 上，
+实际 stderr 是 `FINALIZE_FAIL: probe record without field separator`。
+即它是被**分层防御里的「记录无 TAB 分隔」守卫**拦下的，**没有复现伪造 OK**。
+
+**原因**（实测）：`_write_status()` 用 `json.dumps(data, indent=2)`，
+于是 `status_raw` 天然多行；换行传输下，`status_raw` 的第二行先被当成一条无 TAB 的
+记录，触发该守卫，控制流在到达伪造记录之前就退出了。
+
+编排者用**紧凑 JSON** 的独立 PoC 在同一变异下确认 A/C/E 三种载荷**仍可完整复现突破**
+（`rc=0`，未合入分支盖上 decoy 的真 merge commit），故用例的钉住能力由外部证据补足。
+
+**教训**：fixture 里一个看似与判据无关的格式参数（`indent=2` vs 紧凑），
+决定了变异下**哪一层守卫先响**。变异自证转红了，不等于转红的原因是你想钉的那一层；
+**要核对红的那一行断言是不是你声称的 witness**。
+
+> 执行者如实上报了这一点（`[CONCERNS]` 里明写「未复现伪造 OK，因为多行的 status_raw
+> 记录先触发了该守卫」），没有把它写成干净的击杀 —— 这是正确的报告行为，
+> 缺陷归 fixture 设计，不归诚信。
+
+**建议修法**：补一条紧凑 JSON fixture 的用例（同一载荷、`json.dumps` 无 `indent`），
+让「仅传输编码回退」这一变异有一条能复现突破的用例钉住。已记入
+`WP-22.status.json` 的 `evidence.remaining_risks`。

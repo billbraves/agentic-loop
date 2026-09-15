@@ -3,7 +3,7 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -24,7 +24,7 @@
     "dispatch_commit": "b72e9c4",
     "branch": "feature/wp22-finalize-toctou",
     "worktree": "../wp22-finalize-toctou",
-    "commit": ""
+    "commit": "b216b50"
   },
   "scope": {
     "allowed_paths": [
@@ -104,49 +104,70 @@
       }
     },
     "changed_files": [
-      "src/agentic_loop/wrappers/finalize_merge.sh (+209/-45: 判定与读取收敛为单一 O_NOFOLLOW probe；写回段 diff=0)",
-      "tests/test_finalize_merge_toctou.py (+307: 5 用例，每条自带 oracle 三项)"
+      "src/agentic_loop/wrappers/finalize_merge.sh (rev2 +145/-? on top of rev1: NUL-separated probe transport + assignment-side name whitelist + B13 writeback from status_raw)",
+      "tests/test_finalize_merge_toctou.py (rev2 +184: 2 new B15 cases, rev1's 5 A34 cases unchanged and green)"
     ],
     "tests": [
       {
-        "name": "tests/test_finalize_merge_toctou.py + tests/test_finalize_merge_first_call.py",
-        "command": "PYTHONPATH=src python3.11 -m pytest <2 files> -q",
-        "result": "6 passed",
+        "name": "rev2 toctou+first_call (py3.11/3.13/3.14)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_finalize_merge_toctou.py tests/test_finalize_merge_first_call.py -q; uv run --python 3.13|3.14 ...",
+        "result": "8 passed / 8 passed / 8 passed (rev1's 5 A34 cases carried, no regression)",
         "exit_code": 0,
         "verified_by": "orchestrator"
       },
       {
-        "name": "cross-version 3.13 / 3.14",
-        "command": "uv run --python <ver> --with pytest --no-project python -m pytest <2 files> -q",
-        "result": "6 passed / 6 passed",
-        "exit_code": 0,
-        "verified_by": "orchestrator"
-      },
-      {
-        "name": "whole suite",
+        "name": "rev2 full suite (py3.11)",
         "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "4 failed, 586 passed, 4 skipped (baseline at b72e9c4: 4 failed, 581 passed -> +5 new, 0 regression)",
+        "result": "4 failed, 588 passed, 4 skipped (baseline b72e9c4: 4 failed, 581 passed -> +7 new, 0 regression; the 4 are the known test_finalize_merge_triple_sign.py fixture failures)",
         "exit_code": 1,
         "verified_by": "orchestrator"
       },
       {
-        "name": "reviewer mutation self-check (A34 window reopened)",
-        "command": "s/os.O_RDONLY | os.O_NOFOLLOW/os.O_RDONLY/ in finalize_merge.sh, rerun toctou test, then restore from backup",
-        "result": "1 failed, 4 passed; test_symlink_swap_window_is_closed_forged_copy_not_used RED with rc=0 stdout='FINALIZE_OK merged_commit=267fdad...' (the A34 attack reproduced); restore byte-identical (git status clean); 5 passed after restore",
-        "exit_code": 1,
-        "verified_by": "orchestrator"
-      },
-      {
-        "name": "scope verification (B8 baseline = git.dispatch_commit)",
-        "command": "docs/agentic/tools/review_scope.sh ../wp22-finalize-toctou <status.json> <allowed-regex>",
-        "result": "SCOPE_OK; b72e9c4..2fbf05d; 无越界; 区间内 2 个文件改动（具备区分力）",
+        "name": "rev2 orchestrator INDEPENDENT B15 PoC (5 payload shapes x rev1/rev2 differential)",
+        "command": "/Users/admin/.claude/jobs/8a8bf01e/tmp/b15_poc.py (own fixture, compact JSON, not the executor's): A newline in override.justification; B NUL in override.justification; C newline in iteration_id; D NUL in override.approver targeting status_raw; E newline+tab forging finalize_verdict. Same script re-pointed at rev1's finalize_merge.sh (git show 2fbf05d:...) as the differential arm.",
+        "result": "rev2: all 5 REFUSED rc=2, state stays APPROVED_FOR_MERGE, no merged_commit; positive control (clean status on merged branch) -> FINALIZE_OK + MERGED. rev1: A/C/E BREACH (rc=0, forged state=MERGED with a real merge commit of the DECOY branch while the named branch was never merged). The harness therefore discriminates: rev2's refusals are the fix, not the harness being blind.",
         "exit_code": 0,
         "verified_by": "orchestrator"
       },
       {
-        "name": "zero-diff forbidden paths + writeback unchanged",
-        "command": "git diff b72e9c4..HEAD -- <forbidden set>; grep '^[-+].*(mktemp|trap |mv )' on the finalize diff",
-        "result": "forbidden set 0 lines; no +/- line touches mktemp/trap/mv (writeback :325-348 intact); validate_wp_status.py unchanged",
+        "name": "rev2 reviewer mutation 1 — probe NUL guard removed",
+        "command": "in finalize_merge.sh render_field: `if \"\\0\" in rendered:` -> `if False:`; rerun the file + my PoC; restore from backup",
+        "result": "test_nul_injection_in_second_field_fails_closed_b15 RED with rc=0 'FINALIZE_OK merged_commit=5c3e1c86...' and my PoC case B flips REFUSED->BREACH. The guard is load-bearing and the case pins it. Restore byte-identical (git status clean).",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 reviewer mutation 2 — transport reverted to newline records",
+        "command": "probe: NUL record terminator -> newline; bash: `read -r -d ''` -> plain `read -r`; run the whole file; restore",
+        "result": "ALL 7 cases RED. test_newline_injection_cannot_override_branch_b15 goes red on its cause-specific witness ('merge not detected' absent, replaced by 'probe record without field separator'), i.e. it detects the reversion but via the layered no-TAB guard rather than by reproducing the breach. Measured why: _write_status uses json.dumps(indent=2), so status_raw is multi-line and trips the no-TAB guard before the forged record is reached; my PoC uses compact JSON and DOES reproduce the breach (A/C/E) under the same mutation. This matches the executor's self-reported CONCERN — it reported this honestly rather than claiming a clean kill.",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 B13 writeback source verification",
+        "command": "read finalize_merge.sh:398-430; grep for open(/status_file inside the writeback heredoc",
+        "result": "writeback python takes (tmp_status, merged_commit, updated_at, status_raw) and does json.loads(raw); no open(src). Only mktemp/mv touch status_file, i.e. the atomic landing site is unchanged as the brief required. B13 closed.",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 status_raw NUL-bypass attempt (reviewer's own attack idea)",
+        "command": "status_raw skips render_field, so I tested whether a literal NUL can reach it: json.loads on a literal NUL inside a string value / after the object / between tokens (/Users/admin/.claude/jobs/8a8bf01e/tmp/nulprobe.py)",
+        "result": "all three REJECTED by strict json.loads (JSONDecodeError 'Invalid control character' / 'Extra data' / 'Expecting value'). A \\u0000 escape decodes to NUL in the VALUE (caught by render_field) but leaves the raw source NUL-free. status_raw is therefore structurally NUL-free — the bypass does not exist. Not a gap.",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 argv-size headroom for status_raw (new residual)",
+        "command": "/Users/admin/.claude/jobs/8a8bf01e/tmp/argv_size.py at 1.3KB / 604KB / 1.81MB status sizes; getconf ARG_MAX",
+        "result": "1.3KB and 604KB finalize fine (state=MERGED, all 2000 evidence entries preserved). At 1.81MB: rc=1, state stays APPROVED_FOR_MERGE, nothing stamped — fail-closed, but the diagnostic is a raw bash 'Argument list too long' rather than a FINALIZE_FAIL line. ARG_MAX=1048576; largest real status here is 15129 bytes (70x headroom).",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 scope verification (round diff 2fbf05d..b216b50 + cumulative b72e9c4..HEAD)",
+        "command": "git diff --stat 2fbf05d..b216b50; git diff --name-only b72e9c4..HEAD; git diff --stat b72e9c4..HEAD -- src/agentic_loop/validate_wp_status.py",
+        "result": "round: 2 files (finalize_merge.sh, test_finalize_merge_toctou.py). cumulative: the same 2 files only — no forbidden path, no cross-owner write. validate_wp_status.py ZERO diff (the injection was closed in the transport, not by tightening the schema, as the brief required).",
         "exit_code": 0,
         "verified_by": "orchestrator"
       }
@@ -156,9 +177,10 @@
       "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-exec.log"
     ],
     "remaining_risks": [
-      "O_NOFOLLOW 只拒最后一段是 symlink，不防中间目录段被替换；该残余面在 Brief 附注 4 已声明，执行者按约以 CONCERNS 申报，本轮不修",
-      "写回段 :328 仍按路径重读旧 JSON，判定→写回之间理论窗口未关。写回落点已证免疫（mktemp 取 dirname 不解析 symlink、mv 是 rename(2) 替换 symlink 本身），但写回读到的旧 JSON 新鲜度未证；Brief 明令写回段 diff=0 故未动，待编排者单独评估",
-      "probe 内联了一份字段渲染实现替代 10 处 --field 调用。校验规则仍唯一来自 validate()（无第二份口径），但渲染逻辑若日后在 validate_wp_status.main() 一侧漂移，probe 不会自动跟随；需漂移防护"
+      "O_NOFOLLOW 只拒最后一段是 symlink，不防中间目录段被替换；A34 声明的残余面，Brief 附注 4 允许，执行者按约以 CONCERNS 申报，本轮不修。",
+      "【本轮新增，编排者实测】status_raw 经 argv 传给写回 python，引入了原先不存在的 ARG_MAX 上限（本机 1048576）。604KB status 正常落盘；1.81MB 时 rc=1、state 不变、不落章（fail-closed），但诊断是裸的 bash 'Argument list too long'，不是 FINALIZE_FAIL 行。本仓最大真实 status 15129 字节（70 倍余量），故不阻断合入；建议后续 WP 改用 fd/临时文件传 status_raw 并补一条 FINALIZE_FAIL 诊断。",
+      "【本轮新增，编排者实测】B15 的换行用例靠分层的「记录无 TAB 分隔」守卫转红，而非复现伪造 OK——因为 fixture 用 json.dumps(indent=2)，status_raw 天然多行，先触发该守卫。编排者用紧凑 JSON 的独立 PoC 已确认在同一变异下仍可复现完整突破，故用例的钉住能力经外部证据补足；但用例自身对「仅传输编码回退」的区分力弱于对「仅 NUL 守卫摘除」的区分力。建议后续补一条紧凑 JSON fixture 的用例。",
+      "probe 内联了一份字段渲染实现替代 10 处 --field 调用。校验规则仍唯一来自 validate()（无第二份口径），但渲染逻辑若日后在 validate_wp_status.main() 一侧漂移，probe 不会自动跟随；需漂移防护。"
     ],
     "baseline": {
       "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
@@ -170,27 +192,42 @@
     }
   },
   "review": {
-    "decision": null,
-    "notes": "rev2 交付后重审。rev1 的 ACCEPT 已作废：我逐字段核验了 probe 与 --field 的渲染等价（值相同），却未核验传输通道已从「一次调用一个值」变为「一段文本多行赋值」——换行由此获得语法意义（B15，rev1 commit 2fbf05d）。核对了值、漏掉了通道变更。",
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-16T00:00:00Z",
+    "notes": "rev2 关掉了 rev1 我漏掉的那一层：传输通道。修法落在通道本身（NUL 分记录 + 值内含 NUL 则整状态拒收 + 赋值端变量名白名单 fail-closed），validate_wp_status.py 零行 diff —— 没有靠收紧 schema 掩盖通道缺陷，这是对的方向。B13 一并关掉：写回改自 status_raw 解析，写回段不再 open(status_file)，mktemp/mv 落点未动。本次我不复用执行者的 fixture：自建 5 种载荷形态的 PoC，并把同一 PoC 指向 rev1 做差分——rev1 上 A/C/E 突破（伪造 MERGED，未合入分支盖上 decoy 的真 merge commit），rev2 上 5 条全拒，正向对照仍 FINALIZE_OK，证明拒收来自修复而非 PoC 失明。另外我自己找了一条攻击路径（status_raw 绕过 render_field 的 NUL 检查），实测 strict json.loads 在三个位置全部拒收字面 NUL，该绕过不存在。执行者关于变异 A 的 CONCERN 属实且如实上报（用例被分层守卫先拦下，未复现伪造 OK），我已用紧凑 JSON PoC 补足外部证据，并把两条实测残余面写入 remaining_risks（argv/ARG_MAX 上限、换行用例区分力偏弱），均不阻断合入。",
     "history": [
       {
         "rev": 1,
         "decision": "ACCEPT -> 作废",
         "reviewed_by": "claude-code",
         "why_void": "逐字段核验了 probe 与 --field 的渲染等价（值相同），未核验传输通道已从「一次调用一个值」变为「一段文本多行赋值」；换行由此获得语法意义。B15。"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "claude-code",
+        "basis": "independent PoC with rev1/rev2 differential + 2 reviewer mutations + reviewer's own bypass attempt disproved + cross-version green + zero regression + validate_wp_status.py zero diff + scope clean"
       }
     ]
   },
   "consult": {
-    "decision": "CONSULT",
+    "decision": null,
     "reviewed_by": "codex",
-    "notes": "rev1 裁决 REWORK 已留档 WP-22-consult-codex-verdict.json；rev2 交付后重新咨询。"
+    "notes": "rev1 裁决 REWORK 已留档 WP-22-consult-codex-verdict.json；rev2 待重新咨询（合入需第二签名）。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "REWORK",
+        "record": "WP-22-consult-codex-verdict.json"
+      }
+    ]
   },
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
     "dispatched_at": "2026-09-16T00:30:00Z",
-    "updated_at": "2026-09-16T00:30:00Z",
-    "review_completed_at": "2026-09-15T14:25:00Z",
+    "updated_at": "2026-09-16T00:00:00Z",
+    "review_completed_at": "2026-09-16T00:00:00Z",
     "consulted_at": "2026-09-15T15:40:00Z",
     "rev2_frozen_at": "2026-09-16T00:05:00Z"
   }

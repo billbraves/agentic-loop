@@ -3,7 +3,7 @@
   "work_package_id": "WP-24",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -24,7 +24,7 @@
     "dispatch_commit": "b1ab985",
     "branch": "feature/wp24-brief-template-anchors",
     "worktree": "../wp24-brief-template-anchors",
-    "commit": "c04bc6b"
+    "commit": "f508aca"
   },
   "scope": {
     "allowed_paths": [
@@ -153,6 +153,34 @@
         "result": "0 lines",
         "verified_by": "orchestrator",
         "exit_code": 0
+      },
+      {
+        "name": "rev2 witness differential pair (py3.11/3.13/3.14)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q; uv run --python 3.13|3.14 ...",
+        "result": "7 passed / 7 passed / 7 passed",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 full suite (py3.11)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 588 passed, 4 skipped (baseline e78084c: 4 failed, 581 passed -> +7 new, 0 regression; the 4 are the known test_finalize_merge_triple_sign.py fixture failures)",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 reviewer orthogonality mutation pair (cause-specificity proof)",
+        "command": "in dispatch_lint.sh: (A) neuter only the body-emptiness branch `if not non_empty:` -> `if False:`; (B) neuter only the heading branch `if not m:` -> `if False:` + `continue`; run the file after each, restore from backup",
+        "result": "A: ONLY test_witness_empty_anchor_body_fails RED (rc=0 DISPATCH_LINT_PASS on variant A); B: ONLY test_forbidden_mutation_renamed_anchor_fails RED. The two tests are orthogonal — each pins exactly one predicate half. Both restores byte-identical (git status clean), 7 passed after each.",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 scope verification (round diff = c04bc6b..f508aca)",
+        "command": "git diff --stat c04bc6b..f508aca; git diff --name-only c04bc6b..f508aca -- <forbidden set>",
+        "result": "1 file changed (+48/-11), tests/test_wp_template_dispatch_lint.py only; both templates and wrappers/ zero lines this round",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
       }
     ],
     "artifacts": [
@@ -167,48 +195,44 @@
     ]
   },
   "review": {
-    "decision": null,
-    "reviewed_by": "claude-code",
-    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b1ab985）；dispatch_lint.sh 与 init_cmd.py diff 均为 0 行；两份模板 byte-identical；新测试实际调用真脚本（非抄判据），评审侧独立变异自证转红后已还原；3.11/3.13/3.14 全绿；全量零回归 +7。Brief 的 empty/missing 断言是编排者之错（B11），执行者显式申报并以等价证据链替代，不判 REWORK。合入需用户批准，编排者不自签。",
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-16T00:00:00Z",
+    "notes": "rev2 兑现了 rev1 缺的那一项：原因特异性从断言措辞搬回 fixture。codex 的修法（assert 'empty' in stderr / 'missing' not in stderr）编排者已实测为不可达（dispatch_lint.sh:86 与 :98 打印同一句 brief missing section '<h>'），执行者据此明确不采纳并写入 docstring —— 这是正确的判断，不是绕过审核意见。替代方案为差分对：同一 fixture 只差 `## Acceptance tests` 下的一行 body，两个变体都显式断言标题存在，故 :86 按构造被排除，A 的红只能来自 :98。编排者用一对正交变异独立证实：只废 :98 -> 仅 witness 用例红；只废 :86 -> 仅 renamed-anchor 用例红。",
     "history": [
       {
         "rev": 1,
         "decision": "ACCEPT -> 保留但不解锁合入",
         "reviewed_by": "claude-code",
         "note": "rev1 交付本身在当时约束下是正解（gate 两条路径措辞相同，codex 建议的 empty 断言不可达）；但 oracle 第 2 项由 fixture 承载的残余缺口真实存在，故以 rev2 补断言而非驳回既有交付"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "claude-code",
+        "basis": "orthogonal mutation pair + same-fixture positive control + cross-version green + zero regression + scope clean"
       }
     ]
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": null,
     "reviewed_by": "codex",
-    "consultant": "codex (provider kirogpt, identity_model gpt-5.6-sol, effort high, sandbox read-only)",
-    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-verdict.json",
-    "notes": "第二签名为 REWORK，唯一阻塞项指 test_witness_empty_anchor_body_fails 的断言（只断言 stderr 含 'Acceptance tests'）不足以区分 :86/:98 两条判据路径。观察成立，但它给的修法（断言 stderr 含 'empty'、不含 'missing'）不可达——真脚本两条路径打印同一句 'brief missing section'。codex 是被我自己那份仍留在冻结 Brief 里的 empty/missing 错误要求（已登记 B11）误导的。本轮实测：导入真 helper 后 _clear_section_body 产出的 fixture 保留 '## Acceptance tests' 标题、段体恰为 ''，另两个锚点各留 3 行非空，故只有 :98 可能触发——原因特异性由 fixture 承载而非断言本身，是真实但弱于 codex 所述的残余缺口。",
-    "orchestrator_disposition": {
-      "decided_at": "2026-09-16T00:00:00Z",
-      "outcome": "REWORK 采纳，但不返工执行者交付物；缺口归编排者面（B11 尾巴），以 rev2 Brief 重派或单独 WP 补断言",
-      "why_not_executor_rework": "codex 的观察成立、修法不可达。实测（真脚本调用，B11 修法 1）：把 later 锚点 'Completion definition' 分别做「改标题」与「留标题清段体」两种变异，stderr 完全逐字节相同（都是 DISPATCH_LINT_FAIL: brief missing section 'Completion definition'）。故 dispatch_lint.sh 的 :86/:98 在输出上不可区分，任何对 stderr 措辞的断言都无法钉死判据行——包括 codex 建议的 assert 'empty' in stderr（该词在两条路径都不出现）。执行者当初的处理是这条约束下的正解，不构成可返工的缺陷。",
-      "gap_and_fix": "残余缺口真实：原因特异性目前由 fixture 承载（段体恰为 ''、另两锚点各留非空），而非由断言自证；fixture 若日后漂移，用例不会报警。已实测出不需改 gate 的替代判据——差分对：同一 fixture 保持 '## Acceptance tests' 标题恒定，仅增删一行段体，rc 从 2 翻到 0（实测 cleared→rc=2 / +一行 'x'→rc=0 DISPATCH_LINT_PASS）。标题在两次运行中都存在，故 :86 不可能是原因，红只能来自 :98。这条断言把原因特异性从 fixture 移回用例本身，且不碰 forbidden 的 dispatch_lint.sh。",
-      "next": "以 rev2 Brief 补该差分对断言（替换现 witness 的弱断言），或并入 B11 的编排者协议 WP 一并处理",
-      "differential_pair_verified": {
-        "verified_at": "2026-09-16T00:45:00Z",
-        "method": "判据从 dispatch_lint.sh 原文切片（索引定位 section_issue heredoc，非 retype、非副本），fixture 由真 helper _clear_section_body 生成（importlib 导入受审用例模块）",
-        "fixture_A": "_clear_section_body(tmpl,'Acceptance tests') — 保留 '## Acceptance tests' 标题，段体为空，62 行",
-        "fixture_B": "同一份 A，仅在该标题下插入一行 'x'，63 行；标题两次都在",
-        "result_A": "stdout=\"brief missing section 'Acceptance tests'\" rc=0（判据认定不合规）",
-        "result_B": "stdout='' rc=1（判据认定合规）",
-        "why_cause_specific": "两次运行只差一行段体，'## Acceptance tests' 标题在 A、B 中都存在，故 :86（标题缺失）在两次都不可能触发；A 的红只能来自 :98（段体为空）。原因特异性由用例本身承载，不再依赖 fixture 不漂移",
-        "scope": "不碰 forbidden 的 dispatch_lint.sh；只需改 tests/test_wp_template_dispatch_lint.py 的 witness 用例",
-        "status": "已验证可用，待以 rev2 Brief 派发或并入 B11 协议 WP"
+    "notes": "rev1 裁决 REWORK 已留档；rev2 待重新咨询。rev1 的具体修法（assert 'empty' in stderr）编排者实测不可达（dispatch_lint.sh:86 与 :98 同措辞），rev2 改用差分对承载原因特异性，重咨询须就此替代方案表态。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "REWORK",
+        "finding": "test_witness_empty_anchor_body_fails 只断言 'Acceptance tests' in stderr，无法区分 :86/:98，oracle 空验证",
+        "suggested_fix": "assert 'empty' in stderr; assert 'missing' not in stderr",
+        "orchestrator_note": "缺陷成立，修法不可达；已实测两路径 stderr 逐字节相同"
       }
-    }
+    ]
   },
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
     "dispatched_at": "2026-09-16T01:10:00Z",
-    "updated_at": "2026-09-16T01:00:00Z",
-    "review_completed_at": "2026-09-15T14:05:00Z",
+    "updated_at": "2026-09-16T00:00:00Z",
+    "review_completed_at": "2026-09-16T00:00:00Z",
     "consulted_at": "2026-09-15T15:40:00Z",
     "rev2_frozen_at": "2026-09-16T01:00:00Z"
   }
