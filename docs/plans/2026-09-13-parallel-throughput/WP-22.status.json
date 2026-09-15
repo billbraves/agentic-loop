@@ -3,7 +3,7 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "DRAFT",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -24,7 +24,7 @@
     "dispatch_commit": "b72e9c4",
     "branch": "feature/wp22-finalize-toctou",
     "worktree": "../wp22-finalize-toctou",
-    "commit": "2fbf05d"
+    "commit": ""
   },
   "scope": {
     "allowed_paths": [
@@ -53,8 +53,25 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief.md",
-      "sha256": "3384e8ced97d5ee23f2e77792cbfaebb24a8735dde7bf397625710a59df89515"
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief-rev2.md",
+      "sha256": "81a202f8fe8943d61015a7b52c452de8bac4701f37700ad3f6cc75f7b852e9c3",
+      "rev": 2,
+      "supersedes": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief.md",
+        "sha256": "3384e8ced97d5ee23f2e77792cbfaebb24a8735dde7bf397625710a59df89515",
+        "why": "rev1 交付 2fbf05d 被 codex 第二签名判 REWORK；B15 注入面（编排者 PoC 已证绕过合入门禁）+ B13 写回重读需一并修"
+      },
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh 的 section 判据 heredoc 原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不retype、不跑副本）",
+        "result": "PASS — 三个英文锚点均存在且非空",
+        "checked_at": "2026-09-16T00:00:00Z"
+      },
+      "rework": {
+        "round": 1,
+        "reason": "consult REWORK (codex) + 编排者 PoC 证实 B15 为 rev1 引入的合入门禁绕过回归",
+        "rev1_commit": "2fbf05d",
+        "carried_over": "A34 修复（判定/读取收敛到同一次 O_NOFOLLOW open）保留，rev1 的 5 条用例须照旧通过"
+      }
     },
     "changed_files": [
       "src/agentic_loop/wrappers/finalize_merge.sh (+209/-45: 判定与读取收敛为单一 O_NOFOLLOW probe；写回段 diff=0)",
@@ -123,23 +140,28 @@
     }
   },
   "review": {
-    "decision": "REWORK",
-    "reviewed_by": "claude-code",
-    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b72e9c4）；forbidden 全集 diff=0，validate_wp_status.py 零改动，写回段未动（无 +/- 行触及 mktemp/trap/mv）；probe 的错误分支与字段渲染逐行核验与 validate_wp_status.load_status+main() 同义；评审侧独立变异自证（摘掉 O_NOFOLLOW）复现 A34 攻击 FINALIZE_OK，还原 byte-identical；五个用例每条自带 oracle 三项（同 fixture 正向对照 + 原因特异 witness + 变异转红）。执行者 4 条 CONCERNS 逐条核实均属实，其中基线 583 是我派发时写错、执行者正确（已实测 581 并补录）。合入需用户批准，编排者不自签。",
-    "superseded_notes": "此前的 ACCEPT 已作废：我逐字段核验了 probe 与 --field 的渲染等价，却没测过「渲染结果含换行时的传输」。旧 `field` 每次子进程只返回一个值，换行无害；新的 tab 行协议把换行变成了变量赋值。核对了值、漏掉了通道变更。"
+    "decision": null,
+    "notes": "rev2 交付后重审。rev1 的 ACCEPT 已作废：我逐字段核验了 probe 与 --field 的渲染等价（值相同），却未核验传输通道已从「一次调用一个值」变为「一段文本多行赋值」——换行由此获得语法意义（B15，rev1 commit 2fbf05d）。核对了值、漏掉了通道变更。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "ACCEPT -> 作废",
+        "reviewed_by": "claude-code",
+        "why_void": "逐字段核验了 probe 与 --field 的渲染等价（值相同），未核验传输通道已从「一次调用一个值」变为「一段文本多行赋值」；换行由此获得语法意义。B15。"
+      }
+    ]
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": "CONSULT",
     "reviewed_by": "codex",
-    "consultant": "codex (provider kirogpt, identity_model gpt-5.6-sol, effort high, sandbox read-only)",
-    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-22-consult-codex-verdict.json",
-    "notes": "第二签名为 REWORK，与我的 ACCEPT 相反，且 codex 是对的。核心是 P0-2：probe 的 key<TAB>value 传输 + `while read` + `printf -v` 可被字段内容注入——我已写出可用 PoC：在 consult.override.justification 里塞 '\\nbranch\\tfeature/decoy'（validate() 全绿），真脚本即为一个从未合入 base 的分支打上 MERGED，rc=0；派发点 b72e9c4 的旧版对同一输入拒收（FINALIZE_FAIL: merge not detected）。属 WP-22 引入的回归，登记为 B15。P0-1 即我已登记的 B13（写回按路径重读），codex 判为阻塞，我此前只记为待评估——采纳其定级。P0-3 降为 P2（判定与读取已收敛到同一次 open，无窗口可竞）。P0-4 不成立（test_finalize_merge_toctou.py:283 已有不可解析路径用例）。"
+    "notes": "rev1 裁决 REWORK 已留档 WP-22-consult-codex-verdict.json；rev2 交付后重新咨询。"
   },
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
     "dispatched_at": "2026-09-15T09:52:00Z",
-    "updated_at": "2026-09-15T15:45:00Z",
+    "updated_at": "2026-09-16T00:05:00Z",
     "review_completed_at": "2026-09-15T14:25:00Z",
-    "consulted_at": "2026-09-15T15:40:00Z"
+    "consulted_at": "2026-09-15T15:40:00Z",
+    "rev2_frozen_at": "2026-09-16T00:05:00Z"
   }
 }
