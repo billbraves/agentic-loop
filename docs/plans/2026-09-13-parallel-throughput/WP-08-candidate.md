@@ -1221,3 +1221,42 @@ GIT_DIR=/main/.git agentic gate /linked-worktree/WP.status.json
 `GIT_WORK_TREE` / `GIT_COMMON_DIR`（连带 `GIT_INDEX_FILE` /
 `GIT_OBJECT_DIRECTORY`）的 env，使判据读**文件系统拓扑**而非调用方声明的
 仓库选择。保持单一权威谓词，两处调用方自动继承修复。
+
+### A23 —— 派发无「执行者真的开工了」验收位，静默空转 6 分钟
+
+**等级**：流程级（编排面），非代码缺陷
+**发现**：2026-09-15，WP-19 rev2 派发（编排者自证）
+
+**实证**：rev2 首次派发用 `kimi --afk < prompt.txt`。`--afk` 单独使用会拉起
+交互 TUI，**不消费 stdin**；prompt 落进输入框但从未提交。表现为：
+
+```
+kimi 进程存活、%cpu 非零、日志有内容（欢迎横幅）
+health 判 PROGRESS baseline -> PROGRESS -> FROZEN_3m
+worktree 干净，HEAD 未动，零改动
+```
+
+`agentic health` 的 `PROGRESS` 只测「日志尾部哈希是否变化」与「工作树是否脏」，
+TUI 的 spinner 动画足以让尾部持续变化，于是启动即空转被判成正常进展，
+直到 spinner 停下才转 FROZEN。**6 分钟浪费，且 FROZEN 的成因被误导为「执行者卡住」，
+而真实成因是「执行者从未收到任务」。**
+
+第二次派发改 `--afk --print -w -p` 后，kimi 3 秒退出 exit=1：
+自动加载的 `mcp-server-starrocks`（属另一项目）返回 503，启动即中止。
+这次 health 会正确报 FROZEN，但同样无法区分「没开工」与「开工后卡住」。
+
+**要点**：两次失败形态不同（一次假活、一次早退），但暴露同一个缺口 ——
+**派发后缺一个「执行者已接收并开始执行」的正向确认**。现有 health 契约
+（`PROGRESS`/`FROZEN_<N>m`/`DONE`）三个取值都不区分「未开工」。
+
+**候选修法**：
+1. 派发命令形态收进代码（`agentic dispatch` 或 wrapper），不由编排者每次手写。
+   rev1 日志头 `(retry: --afk --print -w -p)` 已记录过正确形态，靠人记会再犯。
+2. health 增第四个取值 `NOT_STARTED`：日志中无执行者的首个工具调用/首行实质输出，
+   且 worktree 无改动，超过 N 分钟即报。与 FROZEN 区分开。
+3. 派发时用空 MCP 配置（`--mcp-config-file <empty>`)，把无关项目的 MCP 依赖
+   从执行者启动路径上摘掉。本仓 WP 不需要任何 MCP server。
+
+**与 A19 的关系**：A19 是「无首次派发命令，DispatchProof 首派无从产生」。
+A23 是同一个空缺的另一面：没有命令，就既没有证据，也没有形态保证。
+两条应由同一个 WP 一并解决。
