@@ -1,0 +1,25 @@
+{
+  "decision": "REWORK",
+  "findings_count": 4,
+  "raw_verbatim": "VERDICT: REWORK\n\n阻塞问题：\n\n1. **旧 JSON 仍按路径重新读取，A34 只修了一半。**  \n   新 probe 关闭 fd 后，原写回段仍会通过 `$status_file` 读取旧 JSON；Diff 没有修改或传递 probe 已读取的 `raw/data`。攻击者可在 probe 完成后替换 status 路径，使决策基于原文件，但最终写回基于替换后的伪造内容。这直接违反“所有下游读取共用同一个已打开文件”。\n\n2. **新增字段传输协议不安全，也不保持 `--field` 语义。**  \n   `key<TAB>value` 加 `while read` 无法无损承载包含换行或制表符的字符串，例如 `override_justification`。内容中的额外行还会被当作变量名传给 `printf -v`。应使用无歧义编码，并仅允许固定字段名赋值。\n\n3. **核心测试没有执行 Brief 要求的竞态时序。**  \n   `test_symlink_swap_window_is_closed_forged_copy_not_used` 在启动 finalize 前就创建了 symlink，并未做到“判定通过后再替换”。它证明了 `O_NOFOLLOW` 拒绝预先存在的 symlink，但没有证明 predicate/read 间的窗口已关闭，也无法覆盖 probe 完成后、旧 JSON 重读前的剩余窗口。\n\n4. **“不可解析路径”测试缺失。**  \n   当前测试刻意创建了可解析的父目录，只验证最终文件不存在；测试注释也明确说明 predicate 可以正常解析。这不能替代 Brief 单独要求的“不可解析路径 fail-closed 且无异常”。\n\n修复应让校验、决策字段提取和写回所依据的旧 JSON 全部来自同一次打开得到的内容；采用无歧义且字段名白名单化的进程间传输，并增加受控同步测试，在 predicate 返回后执行 symlink swap。\n",
+  "consultant": {
+    "adapter": "codex",
+    "provider": "kirogpt",
+    "identity_model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "read-only",
+    "consulted_at": "2026-09-15T15:40:00Z",
+    "transport": "CodexAdapter.review() + gate.VERDICT_SCHEMA (--output-schema soft; model answered in prose, decision transcribed verbatim by the orchestrator)"
+  },
+  "orchestrator_verification": {
+    "P0-1 writeback re-reads by path": "CONFIRMED — identical to defect B13; codex rates it blocking, I had deferred it",
+    "P0-2 tab transport unsafe / not --field-equivalent": "CONFIRMED AND WORSE — working PoC: a poisoned consult.override.justification overwrites `branch`, and the real script stamps MERGED for a branch never merged into base (rc=0). Pre-WP-22 finalize refuses the same input (FINALIZE_FAIL: merge not detected). Registered as B15, a WP-22-introduced regression",
+    "P0-3 test does not exercise the race timing": "VALID AS A LIMITATION, NOT A DEFECT — the test creates the symlink before finalize starts, so it proves O_NOFOLLOW refuses a pre-existing symlink rather than a post-predicate swap. The test's own comment says so ('timing-invariant because O_NOFOLLOW refuses at open time'), and that is the correct argument: with judgment and read collapsed onto one open(), there is no longer a window to race, so a swap at any instant lands either before the open (refused) or after it (irrelevant to the already-opened fd). A synchronized swap test would document the property more directly but cannot strengthen it. Downgraded to P2.",
+    "P0-4 unresolvable-path test missing": "FACTUALLY WRONG — tests/test_finalize_merge_toctou.py:283 test_unresolvable_path_fails_closed_without_traceback asserts rc=2, 'not found' in stderr, no 'FINALIZE_OK', no 'Traceback', plus a positive control that the same invocation finalizes once the file exists. Exactly the brief's line 56 requirement. Codex was told not to read the repo (contract.forbid_repo_read) and the test file IS in the diff it was given, so this is a reading miss, not a scope limit."
+  },
+  "orchestrator_assessment": {
+    "decision_accepted": true,
+    "net": "REWORK stands on P0-2 alone (B15: a real, PoC-proven, WP-22-introduced merge-gate bypass). P0-1 = my B13, promoted from deferred to blocking. P0-3 downgraded to P2. P0-4 wrong.",
+    "reviewer_self_correction": "My ACCEPT on WP-22 was wrong. I verified probe/--field equivalence field-by-field for RENDERING but never tested the TRANSPORT of a rendered value containing a newline. The old `field` call returned one value per subprocess, so a newline was inert; the new tab-line protocol makes it a variable assignment. I checked that the two produced the same strings and missed that the channel carrying them changed."
+  }
+}

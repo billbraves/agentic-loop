@@ -138,14 +138,17 @@
     "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b1ab985）；dispatch_lint.sh 与 init_cmd.py diff 均为 0 行；两份模板 byte-identical；新测试实际调用真脚本（非抄判据），评审侧独立变异自证转红后已还原；3.11/3.13/3.14 全绿；全量零回归 +7。Brief 的 empty/missing 断言是编排者之错（B11），执行者显式申报并以等价证据链替代，不判 REWORK。合入需用户批准，编排者不自签。"
   },
   "consult": {
-    "decision": "CONSULT",
+    "decision": "REWORK",
     "reviewed_by": "codex",
-    "notes": "待交付后按触发条件咨询。"
+    "consultant": "codex (provider kirogpt, identity_model gpt-5.6-sol, effort high, sandbox read-only)",
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-verdict.json",
+    "notes": "第二签名为 REWORK，唯一阻塞项指 test_witness_empty_anchor_body_fails 的断言（只断言 stderr 含 'Acceptance tests'）不足以区分 :86/:98 两条判据路径。观察成立，但它给的修法（断言 stderr 含 'empty'、不含 'missing'）不可达——真脚本两条路径打印同一句 'brief missing section'。codex 是被我自己那份仍留在冻结 Brief 里的 empty/missing 错误要求（已登记 B11）误导的。本轮实测：导入真 helper 后 _clear_section_body 产出的 fixture 保留 '## Acceptance tests' 标题、段体恰为 ''，另两个锚点各留 3 行非空，故只有 :98 可能触发——原因特异性由 fixture 承载而非断言本身，是真实但弱于 codex 所述的残余缺口。"
   },
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
     "dispatched_at": "2026-09-15T13:10:15Z",
-    "updated_at": "2026-09-15T14:05:00Z",
-    "review_completed_at": "2026-09-15T14:05:00Z"
+    "updated_at": "2026-09-15T15:45:00Z",
+    "review_completed_at": "2026-09-15T14:05:00Z",
+    "consulted_at": "2026-09-15T15:40:00Z"
   }
 }

@@ -2406,3 +2406,61 @@ B7 只说 `quality-gate` 自证不可信。实际上**每一个** `agentic` 子�
 - [ ] 回查：本迭代此前所有「`agentic preflight` 通过 / `dispatch-lint` 通过」的结论，
       标注它们实际由 `main` 的快照判定，必要时用当前树重跑。**这一条影响已交付
       各 WP 的证据可信度**，优先级高于前两条。
+
+---
+
+### B15 — WP-22 的 probe 传输协议可被字段内容注入，绕过合入门禁（已证，PoC 可复现）
+
+**级别**：P0（合入门禁被绕过；WP-22 引入的回归）
+**发现者**：codex 第二签名（WP-22 咨询 P0-2），编排者据其提示写出 PoC 证实并加重
+**状态**：WP-22 已因此转 `CHANGES_REQUESTED`
+
+**缺陷**：`finalize_merge.sh` 的 probe 用 `key<TAB>value` 单行文本把 20 个字段
+交回 bash，消费端是：
+
+```bash
+while IFS=$'\t' read -r probe_key probe_value; do
+  [[ -n "$probe_key" ]] && printf -v "$probe_key" '%s' "$probe_value"
+done <<< "$probe_fields"
+```
+
+`render()` 不转义换行（`str(value)` 原样返回），因此**任何字符串字段的内容里的
+换行都会被当成新的一行 `key<TAB>value` 解析，成为一次变量赋值**。可选字段在
+必需字段**之后**发出，所以注入行可以覆盖先前已正确读出的任一变量。
+
+**PoC（已实测，非推演）**：`consult.override.justification` 写
+
+```
+looks fine\nbranch\tfeature/decoy
+```
+
+`validate()` 对此**全绿**（它不约束 justification 的内容）。真脚本运行后：
+
+```
+FINALIZE_OK merged_commit=c5e5b55e...     rc=0   state -> MERGED
+```
+
+——而 `git.branch` 声明的 `feature/real` **从未合入 base**。合入检测
+（`merge-base --is-ancestor`）被绕过，因为它检查的是被覆盖后的 `feature/decoy`。
+
+**是回归，不是既有问题**：派发点 `b72e9c4` 的旧版对同一份 status 拒收：
+
+```
+FINALIZE_FAIL: merge not detected (branch tip c1612103... is not an ancestor of base c5e5b55e...)
+```
+
+旧版每个字段一次 `field` 子进程调用，返回值经命令替换赋给单个变量，换行是惰性的。
+WP-22 把「一次调用一个值」换成「一段文本多行赋值」，换行由此获得语法意义。
+
+**根因（缺陷族）**：与 B11/B13/B14 同族——**判据的通道变了，判据本身没变**。
+我逐字段核验了 probe 与 `--field` 的**渲染**等价（值相同），却没核验**传输**
+（承载值的通道换了）。等价性核验必须覆盖「值 + 通道」两面。
+
+**修复方向**（留给 WP，不在本轮修）：
+1. probe 与 bash 之间改用无歧义编码（NUL 分隔、或 JSON + `jq`/python 单点解析）；
+2. 赋值端**白名单字段名**，拒绝任何不在 `REQUIRED_FIELDS`/`OPTIONAL_FIELDS` 里的 key；
+3. 与 B13 一并处理：写回段读的旧 JSON 也应来自 probe 那一次 `open()`（`raw` 传递），
+   而不是按路径重读。
+
+**证据**：PoC 工程 `/Users/admin/.claude/jobs/8a8bf01e/tmp/poc-b15b/`；
+裁决记录 `WP-22-consult-codex-verdict.json`。

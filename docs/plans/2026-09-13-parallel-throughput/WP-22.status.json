@@ -3,7 +3,7 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -123,19 +123,23 @@
     }
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewed_by": "claude-code",
-    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b72e9c4）；forbidden 全集 diff=0，validate_wp_status.py 零改动，写回段未动（无 +/- 行触及 mktemp/trap/mv）；probe 的错误分支与字段渲染逐行核验与 validate_wp_status.load_status+main() 同义；评审侧独立变异自证（摘掉 O_NOFOLLOW）复现 A34 攻击 FINALIZE_OK，还原 byte-identical；五个用例每条自带 oracle 三项（同 fixture 正向对照 + 原因特异 witness + 变异转红）。执行者 4 条 CONCERNS 逐条核实均属实，其中基线 583 是我派发时写错、执行者正确（已实测 581 并补录）。合入需用户批准，编排者不自签。"
+    "notes": "独立核验：范围 SCOPE_OK（B8 基线 dispatch_commit=b72e9c4）；forbidden 全集 diff=0，validate_wp_status.py 零改动，写回段未动（无 +/- 行触及 mktemp/trap/mv）；probe 的错误分支与字段渲染逐行核验与 validate_wp_status.load_status+main() 同义；评审侧独立变异自证（摘掉 O_NOFOLLOW）复现 A34 攻击 FINALIZE_OK，还原 byte-identical；五个用例每条自带 oracle 三项（同 fixture 正向对照 + 原因特异 witness + 变异转红）。执行者 4 条 CONCERNS 逐条核实均属实，其中基线 583 是我派发时写错、执行者正确（已实测 581 并补录）。合入需用户批准，编排者不自签。",
+    "superseded_notes": "此前的 ACCEPT 已作废：我逐字段核验了 probe 与 --field 的渲染等价，却没测过「渲染结果含换行时的传输」。旧 `field` 每次子进程只返回一个值，换行无害；新的 tab 行协议把换行变成了变量赋值。核对了值、漏掉了通道变更。"
   },
   "consult": {
-    "decision": "CONSULT",
+    "decision": "REWORK",
     "reviewed_by": "codex",
-    "notes": "待交付后按触发条件咨询。"
+    "consultant": "codex (provider kirogpt, identity_model gpt-5.6-sol, effort high, sandbox read-only)",
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-22-consult-codex-verdict.json",
+    "notes": "第二签名为 REWORK，与我的 ACCEPT 相反，且 codex 是对的。核心是 P0-2：probe 的 key<TAB>value 传输 + `while read` + `printf -v` 可被字段内容注入——我已写出可用 PoC：在 consult.override.justification 里塞 '\\nbranch\\tfeature/decoy'（validate() 全绿），真脚本即为一个从未合入 base 的分支打上 MERGED，rc=0；派发点 b72e9c4 的旧版对同一输入拒收（FINALIZE_FAIL: merge not detected）。属 WP-22 引入的回归，登记为 B15。P0-1 即我已登记的 B13（写回按路径重读），codex 判为阻塞，我此前只记为待评估——采纳其定级。P0-3 降为 P2（判定与读取已收敛到同一次 open，无窗口可竞）。P0-4 不成立（test_finalize_merge_toctou.py:283 已有不可解析路径用例）。"
   },
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
     "dispatched_at": "2026-09-15T09:52:00Z",
-    "updated_at": "2026-09-15T14:25:00Z",
-    "review_completed_at": "2026-09-15T14:25:00Z"
+    "updated_at": "2026-09-15T15:45:00Z",
+    "review_completed_at": "2026-09-15T14:25:00Z",
+    "consulted_at": "2026-09-15T15:40:00Z"
   }
 }
