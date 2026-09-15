@@ -142,7 +142,14 @@
     "reviewed_by": "codex",
     "consultant": "codex (provider kirogpt, identity_model gpt-5.6-sol, effort high, sandbox read-only)",
     "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-verdict.json",
-    "notes": "第二签名为 REWORK，唯一阻塞项指 test_witness_empty_anchor_body_fails 的断言（只断言 stderr 含 'Acceptance tests'）不足以区分 :86/:98 两条判据路径。观察成立，但它给的修法（断言 stderr 含 'empty'、不含 'missing'）不可达——真脚本两条路径打印同一句 'brief missing section'。codex 是被我自己那份仍留在冻结 Brief 里的 empty/missing 错误要求（已登记 B11）误导的。本轮实测：导入真 helper 后 _clear_section_body 产出的 fixture 保留 '## Acceptance tests' 标题、段体恰为 ''，另两个锚点各留 3 行非空，故只有 :98 可能触发——原因特异性由 fixture 承载而非断言本身，是真实但弱于 codex 所述的残余缺口。"
+    "notes": "第二签名为 REWORK，唯一阻塞项指 test_witness_empty_anchor_body_fails 的断言（只断言 stderr 含 'Acceptance tests'）不足以区分 :86/:98 两条判据路径。观察成立，但它给的修法（断言 stderr 含 'empty'、不含 'missing'）不可达——真脚本两条路径打印同一句 'brief missing section'。codex 是被我自己那份仍留在冻结 Brief 里的 empty/missing 错误要求（已登记 B11）误导的。本轮实测：导入真 helper 后 _clear_section_body 产出的 fixture 保留 '## Acceptance tests' 标题、段体恰为 ''，另两个锚点各留 3 行非空，故只有 :98 可能触发——原因特异性由 fixture 承载而非断言本身，是真实但弱于 codex 所述的残余缺口。",
+    "orchestrator_disposition": {
+      "decided_at": "2026-09-16T00:00:00Z",
+      "outcome": "REWORK 采纳，但不返工执行者交付物；缺口归编排者面（B11 尾巴），以 rev2 Brief 重派或单独 WP 补断言",
+      "why_not_executor_rework": "codex 的观察成立、修法不可达。实测（真脚本调用，B11 修法 1）：把 later 锚点 'Completion definition' 分别做「改标题」与「留标题清段体」两种变异，stderr 完全逐字节相同（都是 DISPATCH_LINT_FAIL: brief missing section 'Completion definition'）。故 dispatch_lint.sh 的 :86/:98 在输出上不可区分，任何对 stderr 措辞的断言都无法钉死判据行——包括 codex 建议的 assert 'empty' in stderr（该词在两条路径都不出现）。执行者当初的处理是这条约束下的正解，不构成可返工的缺陷。",
+      "gap_and_fix": "残余缺口真实：原因特异性目前由 fixture 承载（段体恰为 ''、另两锚点各留非空），而非由断言自证；fixture 若日后漂移，用例不会报警。已实测出不需改 gate 的替代判据——差分对：同一 fixture 保持 '## Acceptance tests' 标题恒定，仅增删一行段体，rc 从 2 翻到 0（实测 cleared→rc=2 / +一行 'x'→rc=0 DISPATCH_LINT_PASS）。标题在两次运行中都存在，故 :86 不可能是原因，红只能来自 :98。这条断言把原因特异性从 fixture 移回用例本身，且不碰 forbidden 的 dispatch_lint.sh。",
+      "next": "以 rev2 Brief 补该差分对断言（替换现 witness 的弱断言），或并入 B11 的编排者协议 WP 一并处理"
+    }
   },
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
