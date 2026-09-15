@@ -8,7 +8,8 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "(rev2 dispatch, session id pending executor report)",
+    "redispatch_count": 1
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -16,29 +17,28 @@
   },
   "reviewer": {
     "tool": "claude-code",
-    "session": ""
+    "session": "claude-8a8bf01e"
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "fd6bcd4",
+    "base_commit": "b97ce67",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
-    "commit": ""
+    "commit": "b97ce67"
   },
   "scope": {
     "allowed_paths": [
-      "src/agentic_loop/wrappers/preflight.sh",
-      "src/agentic_loop/wrappers/finalize_merge.sh",
       "src/agentic_loop/gate/__init__.py",
-      "tests/test_preflight_branch_binding.py",
-      "tests/test_finalize_merge_first_call.py",
       "tests/test_worktree_detection.py"
     ],
     "forbidden_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
       "src/agentic_loop/validate_wp_status.py",
       "src/agentic_loop/independence.py",
       "src/agentic_loop/adapters/",
       "src/agentic_loop/redispatch.py",
+      "src/agentic_loop/cli.py",
       "docs/",
       ".agentic/config.toml",
       ".agentic/locks/",
@@ -53,11 +53,76 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": []
+    "tests": [
+      {
+        "name": "PYTHONPATH=src python3.11 -m pytest tests -q (worktree, reviewer-run)",
+        "exit_code": 1,
+        "result": "4 failed + 568 passed + 4 skipped; baseline @2a184a8 = 4 failed + 556 passed + 4 skipped; delta +12 == new cases; the 4 failures are the pre-existing test_finalize_merge_triple_sign.py 'git checkout main' fixture, untouched"
+      },
+      {
+        "name": "A12 revert-probe: git checkout 2a184a8 -- wrappers/finalize_merge.sh; pytest tests/test_finalize_merge_first_call.py",
+        "exit_code": 1,
+        "result": "FAILED with 'STATUS_INVALID: unknown field git.merged_commit' before fix; PASSED after"
+      },
+      {
+        "name": "A13 revert-probe: git checkout 2a184a8 -- gate/__init__.py; pytest tests/test_worktree_detection.py",
+        "exit_code": 2,
+        "result": "collection error (predicate absent) before fix; 5 PASSED after"
+      },
+      {
+        "name": "A4+A7 revert-probe: git checkout 2a184a8 -- wrappers/preflight.sh; pytest tests/test_preflight_branch_binding.py",
+        "exit_code": 1,
+        "result": "2 failed (empty-branch backfill, sibling-branch tracked lookup) before fix; 6 PASSED after"
+      }
+    ],
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev2.md",
+      "sha256": "8e80c8e68033e146fdf27e3756fe335129bac21d476ce3bd74256b029e2d3305",
+      "rev": 2,
+      "rev1": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief.md",
+        "commit": "b97ce67",
+        "outcome": "review ACCEPT (A4/A7/A12 verified, not reworked); consult REWORK on A13/A22"
+      }
+    }
   },
-  "review": {},
-  "consult": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code (claude-8a8bf01e), independent of executor kimi",
+    "reviewed_commit": "b97ce67",
+    "evidence": [
+      "SCOPE: git diff --name-only fd6bcd4..b97ce67 == exactly the 6 scope.allowed_paths; zero forbidden_paths; no unused allowed path",
+      "DISCIPLINE: reflog shows one commit atop 2a184a8; no merge/push/branch-switch by the executor; commit message matches the frozen form",
+      "FAILING-TO-PASSING: reviewer reverted each source file individually and re-ran only its test (see evidence.tests); worktree restored clean to b97ce67 afterwards",
+      "ZERO REGRESSION: 568 passed vs baseline 556 @2a184a8, same 4 pre-existing failures",
+      "A4 CONSTRAINT (relax only empty string): -z branch backfills with PREFLIGHT_WARN; elif keeps strict compare and exit 2; two regression tests cover non-empty mismatch for branch and worktree separately",
+      "A13 CONSTRAINT (single authority): path_is_in_worktree defined once at gate/__init__.py:169, referenced by gate/__init__.py:713 and finalize_merge.sh:46; no duplicated implementation",
+      "A13 PREDICATE PROBED on 5 real paths: main-repo file False, worktree file True, nonexistent-in-worktree True, /tmp outside any repo True, main-repo root dir False",
+      "A13 FAIL-CLOSED IS REAL, NOT JUST DOCUMENTED: breaking the helper's imports makes finalize_merge.sh abort under set -e rather than fall through to accept",
+      "GATE SCOPE: diff of gate/__init__.py contains zero occurrences of dispatch_proof/DispatchProof/evaluate/independence; WP-18 surface untouched"
+    ],
+    "findings_non_blocking": [
+      "A20 (new): preflight.sh never absolutizes status_file against main_root the way dispatch_lint.sh:26-28 and finalize_merge.sh:31-33 do. After A7 the arg is validated cwd-relative but tracked-checked via 'git -C $main_root', so from a worktree SUBDIR the same string names two different files - reviewer confirmed empirically that a bogus state in the worktree copy is what gets validated while trackedness is asserted against the main copy. NOT a regression: at baseline that invocation already died one step later inside dispatch_lint.sh, which is main-root-anchored; A7 made preflight consistent with the rest of the chain. Both documented forms (repo-root-relative, absolute main-repo path) work correctly.",
+      "A21 (new): A13 also tightened preflight's acceptance of a worktree-local ABSOLUTE status path (baseline PASSED, now PREFLIGHT_FAIL: must be tracked). Correct per global rule 4.1 (status is main-area live state) and the desirable direction; recorded because it is a behavior change beyond the four named defects.",
+      "Executor CONCERNS 1-3 reviewed and concurred: gate import makes finalize_merge.sh startup heavier (unavoidable - only Python file in the whitelist); B1 remains in WP-11 scope; A9/A14/A15 sit behind forbidden paths."
+    ],
+    "merge_authorization": "NOT GRANTED. consult.decision=REWORK blocks merge. The orchestrator's review.decision=ACCEPT is retained as the record of what was verified, but it does not stand as an approval: the consultant found a blocking defect (A22) in the A13 criterion, which the orchestrator had rated registration-level. Next step is rework of A13's predicate, not merge."
+  },
+  "consult": {
+    "decision": "REWORK",
+    "consultant": "codex (adapter=codex, provider=kirogpt, identity_model=gpt-5.6-sol)",
+    "session": "codex exec --sandbox read-only, log wp19-consult.log, EXIT=0 2026-09-15T04:21:50Z",
+    "independence": "weak",
+    "reviewed_commit": "b97ce67",
+    "blocking_finding": "A22: A13's predicate is bypassable via git environment variables. gate/__init__.py:183 subprocess.run() inherits the caller's environment and does not clear GIT_DIR / GIT_WORK_TREE. With GIT_DIR=<main>/.git a linked-worktree status file flips path_is_in_worktree from True to False, so `GIT_DIR=/main/.git agentic gate /linked-worktree/WP.status.json` walks straight through the worktree refusal at both call sites.",
+    "orchestrator_corroboration": "Found independently by the orchestrator during the consult window, before reading codex's verdict. Confirmed at both call sites: finalize_merge.sh and codex_merge_gate.sh each emit their worktree-refusal message under a clean env and both fall through it under GIT_DIR spoofing (dying later on unrelated schema checks). cli.py:212 passes dict(os.environ) through unchanged and no wrapper unsets these vars. Narrowed the vector: GIT_DIR alone flips the predicate; GIT_WORK_TREE and GIT_COMMON_DIR alone do not.",
+    "orchestrator_disagreement_on_severity": "The orchestrator had rated this registration-level, not blocking, on three grounds: (1) the main defense holds - resolve_paths --root main_repo still returns the main root under GIT_DIR, GIT_WORK_TREE and GIT_COMMON_DIR spoofing, so relative status paths still land on the main copy; (2) strictly stronger than baseline, whose path literal missed all 8 worktrees in this repo with no env manipulation at all; (3) WP-08-candidate.md A13:913-916 and the Brief both define this guard as a backstop for absolute-path arguments. The orchestrator DEFERS to the consultant's REWORK: a security guard that a single env var defeats should not be merged as if it were sound, and the WP-17 lesson is precisely that the orchestrator's own severity judgement on a forgeable criterion is the thing that failed. Recorded, not overridden.",
+    "fix_direction": "Sanitize the environment inside the predicate: pass an env to subprocess.run with GIT_DIR, GIT_WORK_TREE, GIT_COMMON_DIR (and GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY for good measure) removed, so the judgment reads the filesystem topology rather than caller-declared repository selection. Keep it one authoritative predicate; both call sites inherit the fix."
+  },
   "timestamps": {
-    "dispatched_at": "2026-09-14T15:44:23+00:00"
+    "dispatched_at": "2026-09-14T15:44:23+00:00",
+    "updated_at": "2026-09-15T12:40:00+08:00",
+    "reviewed_at": "2026-09-15T00:40:00+08:00",
+    "consulted_at": "2026-09-15T12:25:00+08:00"
   }
 }

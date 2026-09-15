@@ -1170,3 +1170,139 @@ A19 说 proof 在首次派发时压根不存在（判据不可用）。两条叠
 > 若按 A16 修法 3 放弃 proof 路线，A19 依然值得修 —— 因为
 > 「engine 观测到的 `executor.tool` 与 session」对审计留痕仍有价值，
 > 只是不再作为独立性评级依据。
+
+### A22. A13 的 worktree 判据可被 `GIT_DIR` 环境变量绕过
+
+> codex 独立审 WP-19 时判 REWORK 而发现（2026-09-15）；编排者在 consult 窗口内
+> 独立复现同一结论，两条证据链互不依赖。
+
+WP-19 的 A13 把 worktree 判据从路径字面量换成 git 事实：比较路径所在仓的
+`--absolute-git-dir` 与 `--git-common-dir`，不同即在 linked worktree。
+但 `gate/__init__.py:183` 的 `subprocess.run(...)` **继承调用者环境**，
+未清除 git 的仓库选择变量：
+
+```
+worktree 路径，干净环境                             -> True   （正确拒收）
+worktree 路径，GIT_DIR=<主仓>/.git                  -> False  ← 绕过成功
+worktree 路径，GIT_WORK_TREE=<主仓>                 -> True   （不绕过）
+worktree 路径，GIT_COMMON_DIR=<主仓>/.git           -> True   （不绕过）
+```
+
+`GIT_DIR` 单独一个变量即可翻转判据。两处调用方都中招（这是口径单一的必然
+结果，不是各自的实现缺陷）：
+
+```
+finalize_merge.sh   干净 -> FINALIZE_FAIL: resolves inside a worktree
+finalize_merge.sh   GIT_DIR 伪造 -> 越过守卫，死在后面无关的 schema 检查
+codex_merge_gate.sh 干净 -> GATE_FAIL: resolves inside a worktree
+codex_merge_gate.sh GIT_DIR 伪造 -> 同样越过
+```
+
+`cli.py:212` 用 `dict(os.environ)` 原样传给 wrapper，且无任何 wrapper unset
+这些变量，所以从 CLI 入口即可复现：
+
+```bash
+GIT_DIR=/main/.git agentic gate /linked-worktree/WP.status.json
+```
+
+**主防线未被打穿**：`resolve_paths --root main_repo` 在 `GIT_DIR`、
+`GIT_WORK_TREE`、`GIT_COMMON_DIR` 三种伪造下均返回主区根，相对路径 status
+仍一律落主区副本。
+
+**定级分歧的处置（重要留痕）**：编排者据「主防线未破 + 严格强于基线
+（基线字面量在本仓 8 个 worktree 全 MISS，无需任何环境变量即失效）+ Brief
+明确把本条定义为绝对路径入参的兜底」判为**登记级**；codex 判**阻断**。
+编排者**服从 consult 结论**，不行使覆盖：一个单个环境变量即可关掉的安全守卫
+不应以「看起来正确」的姿态合并，而 WP-17 的教训恰恰是**编排者对可伪造判据的
+严重性判断本身**是失效环节。分歧记录在 `WP-19.status.json`
+`consult.orchestrator_disagreement_on_severity`，不删改。
+
+**修法**：在谓词内部净化环境 —— 给 `subprocess.run` 传剔除了 `GIT_DIR` /
+`GIT_WORK_TREE` / `GIT_COMMON_DIR`（连带 `GIT_INDEX_FILE` /
+`GIT_OBJECT_DIRECTORY`）的 env，使判据读**文件系统拓扑**而非调用方声明的
+仓库选择。保持单一权威谓词，两处调用方自动继承修复。
+
+### A23 —— 派发无「执行者真的开工了」验收位，静默空转 6 分钟
+
+**等级**：流程级（编排面），非代码缺陷
+**发现**：2026-09-15，WP-19 rev2 派发（编排者自证）
+
+**实证**：rev2 首次派发用 `kimi --afk < prompt.txt`。`--afk` 单独使用会拉起
+交互 TUI，**不消费 stdin**；prompt 落进输入框但从未提交。表现为：
+
+```
+kimi 进程存活、%cpu 非零、日志有内容（欢迎横幅）
+health 判 PROGRESS baseline -> PROGRESS -> FROZEN_3m
+worktree 干净，HEAD 未动，零改动
+```
+
+`agentic health` 的 `PROGRESS` 只测「日志尾部哈希是否变化」与「工作树是否脏」，
+TUI 的 spinner 动画足以让尾部持续变化，于是启动即空转被判成正常进展，
+直到 spinner 停下才转 FROZEN。**6 分钟浪费，且 FROZEN 的成因被误导为「执行者卡住」，
+而真实成因是「执行者从未收到任务」。**
+
+第二次派发改 `--afk --print -w -p` 后，kimi 3 秒退出 exit=1：
+自动加载的 `mcp-server-starrocks`（属另一项目）返回 503，启动即中止。
+这次 health 会正确报 FROZEN，但同样无法区分「没开工」与「开工后卡住」。
+
+**要点**：两次失败形态不同（一次假活、一次早退），但暴露同一个缺口 ——
+**派发后缺一个「执行者已接收并开始执行」的正向确认**。现有 health 契约
+（`PROGRESS`/`FROZEN_<N>m`/`DONE`）三个取值都不区分「未开工」。
+
+**候选修法**：
+1. 派发命令形态收进代码（`agentic dispatch` 或 wrapper），不由编排者每次手写。
+   rev1 日志头 `(retry: --afk --print -w -p)` 已记录过正确形态，靠人记会再犯。
+2. health 增第四个取值 `NOT_STARTED`：日志中无执行者的首个工具调用/首行实质输出，
+   且 worktree 无改动，超过 N 分钟即报。与 FROZEN 区分开。
+3. 派发时用空 MCP 配置（`--mcp-config-file <empty>`)，把无关项目的 MCP 依赖
+   从执行者启动路径上摘掉。本仓 WP 不需要任何 MCP server。
+
+**与 A19 的关系**：A19 是「无首次派发命令，DispatchProof 首派无从产生」。
+A23 是同一个空缺的另一面：没有命令，就既没有证据，也没有形态保证。
+两条应由同一个 WP 一并解决。
+
+### A24 —— 冻结 Brief 落在编排分支，执行者在 feature worktree 里读不到
+
+**等级**：流程级（编排面）阻断，非代码缺陷
+**发现**：2026-09-15，WP-19 rev2 执行者 `[CONCERNS]` 主动申报，编排者复核成立
+
+**实证**：
+
+```
+主区 plan/2026-09-13-parallel-throughput：
+  docs/.../WP-19-brief-rev2.md          存在（317594b 冻结）
+  docs/.../WP-08-candidate.md §A22      存在（9de1885 登记）
+
+worktree feature/wp19-wrapper-seams：
+  docs/.../WP-19-brief-rev2.md          不存在
+  grep -c A22 WP-08-candidate.md        0（该分支的文档只到 A19）
+```
+
+编排者把 Brief 冻结提交到 plan 分支，却把执行者派到 feature worktree，
+两者不含同一份文档。执行者按提示里的摘要执行，**从未读到冻结权威**。
+
+**后果（本次实测）**：rev2 Brief 要求剔除 7 个 git 变量并提成模块级常量
+`_GIT_SELECTION_VARS`，派发提示只摘了 3 个。执行者严格按提示做，交付
+3 个变量、无常量、缺「三变量同时设置」用例。核心缺陷 A22 已闭合（编排者
+独立探针证实 10 个向量全 True），但**冻结要求有三条未实现，成因是派发缺陷**。
+
+执行者自己发现了这个矛盾并在 `[CONCERNS]` 里写明「请编排者补落 rev2 Brief，
+若其口径与提示有出入，以 Brief 为准裁定本提交」—— 判断正确，处置正确。
+
+**要点**：这不是执行者失职。全局规范 §4.1 说 Brief 是「冻结输入、可审计、
+执行期只读」，隐含前提是**执行者能读到**。规范没写「冻结提交必须对执行者
+可达」，于是这个前提可以静默不成立，而且**不成立时没有任何门禁报警**：
+`dispatch-lint` 校验 Brief 存在于主区，不校验它在执行者的工作树里可见。
+
+**与 A19/A23 的关系**：三条同源于「首次派发没有代码化的命令」。
+A19 缺证据，A23 缺「已开工」确认，A24 缺「冻结输入可达」前置校验。
+`agentic dispatch` 若存在，这三条都是它的入口检查。
+
+**候选修法**：
+1. `dispatch-lint`（或未来的 `agentic dispatch`）增一条：在**执行者工作树的
+   HEAD** 上校验 Brief 与其引用的缺陷文档可读，且 sha256 与 status 锚点一致。
+   不可达即拒绝派发（fail-closed）。
+2. 派发前把冻结文档合入/cherry-pick 到 feature 分支，或
+3. Brief 放在双方共同祖先提交上冻结。
+
+修法 1 是根治：它把「可达」变成派发的准入条件，而不是靠编排者每次记得。
