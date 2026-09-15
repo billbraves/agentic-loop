@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -21,7 +21,7 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "8224197",
+    "base_commit": "fd69fe9",
     "branch": "feature/wp21-test-contracts",
     "worktree": "../wp21-test-contracts",
     "commit": ""
@@ -72,8 +72,8 @@
     "note": "待执行后送审。送审须带 --disable apps（A31），且须全文检索 [VERDICT]（A31 补充）。"
   },
   "timestamps": {
-    "dispatched_at": "",
-    "updated_at": "2026-09-15T08:46:16Z",
+    "dispatched_at": "2026-09-15T08:47:25Z",
+    "updated_at": "2026-09-15T08:47:25Z",
     "reviewed_at": "",
     "consulted_at": ""
   }
