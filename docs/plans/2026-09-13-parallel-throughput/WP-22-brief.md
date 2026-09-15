@@ -1,72 +1,133 @@
-# WP-22: 消除 finalize 判定与读取之间的 symlink TOCTOU 窗口（A34）
+# WP-22 rev2: 关掉 finalize probe 的字段注入面（B15）与写回段的按路径重读（B13）
 
-> 冻结日期 2026-09-15 | 编排者 claude（claude-code） | 执行者 kimi。
+> 冻结日期 2026-09-16 | 编排者 claude（claude-code） | 执行者 kimi。
 > 所属 Plan：2026-09-13-parallel-throughput（集成到 `plan/2026-09-13-parallel-throughput`，不直接合入 main）。
-> 冻结后执行期间不得修改；需修订走 re-freeze（新建 rev2 并重派）。
+> **本文是 rev2**：rev1 交付（`2fbf05d`）已被 codex 第二签名判 REWORK，编排者据其提示
+> 写出 PoC 证实并加重定级。冻结后执行期间不得修改；需修订走 re-freeze（新建 rev3 并重派）。
 
 ## 目标（一句话）
 
-`finalize_merge.sh` 先用 `path_is_in_worktree` 判定 status 路径，随后 `-f`、两处
-validator、读旧 JSON 各自**重新按路径解析**同一个文件；把这段「判定一次、按路径读四次」
-改成「判定与读取共用同一个已打开的文件」，关掉 symlink 重定向的时间窗。
+rev1 把「判定与读取」正确收敛到同一次 `O_NOFOLLOW` open（A34 已关），但**新引入的
+probe→bash 传输协议可被字段内容注入**，使合入门禁可被绕过（B15）；本轮把传输改成
+无歧义编码 + 字段名白名单，并顺带让写回段读的旧 JSON 也来自那一次 open（B13）。
 
 ## 前置事实（编排者已实测，执行者不必重做，但**不得与之矛盾**）
 
-| 面 | 结论 | 依据 |
-|----|------|------|
-| **写回** | **已免疫，不要改** | `mktemp "$status_file.XXXXXX"` 取的是**路径字符串的 dirname**（不解析 symlink），临时文件建在主区；`mv` 是 `rename(2)`，**替换 symlink 本身**而非跟随它。实测写回落在主区路径，worktree 副本未被触碰，且与主区/worktree 是否同一文件系统无关 |
-| **读取** | **可被换掉** | 同一路径替换前后读到不同内容（`MAIN_COPY_REWORK` → `WORKTREE_COPY_FORGED_ACCEPT`）；`:56` `-f`、`:61`/`:64` 两处 validator、`:209` 读旧 JSON 四处都跟随替换后的 symlink |
-| **判据本身** | 正确 | 对替换**后**的路径答 `True`（会拒收）。问题不在判据，在「判定与读取之间存在间隙」 |
+### B15：注入可绕过合入检测（**已有可复现 PoC**）
 
-→ 故本 WP **只收读面**，**不要动写回形态**（改它属于无谓返工，会被驳回）。
+`finalize_merge.sh` 的 probe 把 20 个字段以 `key<TAB>value` 单行文本交回 bash，
+消费端在 `:204-206`：
+
+```bash
+while IFS=$'\t' read -r probe_key probe_value; do
+  [[ -n "$probe_key" ]] && printf -v "$probe_key" '%s' "$probe_value"
+done <<< "$probe_fields"
+```
+
+`render()`（`:102-108`）对字符串是 `str(value)` 原样返回，**不转义换行**。因此任何
+字符串字段内容里的换行都会被 `read` 解析成新的一行 `key<TAB>value`，成为一次
+`printf -v` 赋值。又因 `OPTIONAL_FIELDS` 在 `REQUIRED_FIELDS`**之后**发出
+（`:158-171`），注入行可以**覆盖先前已正确读出的任一变量**。
+
+`validate()` 不约束这些字符串的内容（`validate_wp_status.py:207-208` 只要求
+`justification` 是非空 str），所以注入载荷可以完全合法地通过 schema 校验。
+
+**PoC（真脚本调用，两次干净 fixture 复现）**：`consult.override.justification` 写
+
+```
+looks fine\nbranch\tfeature/decoy
+```
+
+构造 `git.branch = feature/real`（**从未合入 base**）、`feature/decoy`（已合入）。
+`validate()` 全绿；真脚本输出：
+
+```
+FINALIZE_OK merged_commit=d38fd875...     rc=0     state -> MERGED
+```
+
+而 `git merge-base --is-ancestor feature/real main` 为**假**。合入检测
+（`:282`）被绕过，因为它检查的是被覆盖后的 `feature/decoy`。
+
+**这是 rev1 引入的回归**：派发点 `b72e9c4` 的旧版对**同一份 status** 拒收——
+
+```
+FINALIZE_FAIL: merge not detected (branch tip c1612103... is not an ancestor of base c5e5b55e...)
+```
+
+旧版每字段一次 `field` 子进程 + 命令替换赋给单个变量，换行是惰性的。
+rev1 把「一次调用一个值」换成「一段文本多行赋值」，换行由此获得语法意义。
+
+### B13：写回段仍按路径重读
+
+`:325-348` 的写回段（rev1 按 Brief 明令零改动）里 `:328` 仍是
+`with open(src, encoding="utf-8") as fh:`，即**再次按路径解析**并读旧 JSON。
+写回**落点**已证免疫（`mktemp "$status_file.XXXXXX"` 取路径串的 dirname、不解析
+symlink；`mv` 是 `rename(2)`，替换 symlink 本身而非其目标），但写回**读到的旧
+JSON 的新鲜度未证**。本条目前登记为**缺陷、非已证漏洞**（无 PoC）——不得在报告里
+把它说成已证漏洞。
 
 ## 范围
 
-- **allowed_paths**（白名单）：
-  - `src/agentic_loop/wrappers/finalize_merge.sh`（判定与读取的时序）
-  - `src/agentic_loop/validate_wp_status.py`（**仅**为支持按已打开 fd/描述符读取而必要的最小改动；若你的修法不需要改它，就不要改）
-  - `tests/test_finalize_merge_toctou.py`（新建）
-- **forbidden_paths**（黑名单）：
-  - `src/agentic_loop/gate/__init__.py`（判据正确，本轮零改动）
-  - `src/agentic_loop/wrappers/preflight.sh`
-  - `src/agentic_loop/independence.py`
+- **allowed_paths**（白名单，只能改这些）：
+  - `src/agentic_loop/wrappers/finalize_merge.sh`
+  - `tests/test_finalize_merge_toctou.py`
+- **forbidden_paths**（黑名单，绝不能碰）：
+  - `src/agentic_loop/validate_wp_status.py`（**判据唯一权威，零改动**；
+    不得靠收紧 schema 去堵注入——那是把传输缺陷推给校验层）
+  - `src/agentic_loop/gate/__init__.py`、`src/agentic_loop/independence.py`
+  - `src/agentic_loop/wrappers/` 下其余全部 `.sh`
   - `src/agentic_loop/adapters/`、`src/agentic_loop/redispatch.py`
-  - `docs/`（brief 与 status 由编排者维护）
+  - `docs/`（含本 brief 自身）
   - `.agentic/config.toml`、`.agentic/locks/`、`.env`、`.context/`
 - **owner 边界**：对齐 CODEOWNERS，不跨 owner 写入。
 
-> ⚠️ `validate_wp_status.py` 是 A14/A15/A18 的面。本 WP 白名单里**只为 fd 读取支持**，
-> 不得改 `--field` 的返回语义、不得改校验规则、不得碰 A14/A15/A18 相关逻辑。
+> ⚠️ **方向不可反**：修的是 probe→bash 的**传输**，不是 schema。
+> 在 `validate_wp_status.py` 里禁掉 justification 含换行是错解：注入面在通道，
+> 换一个不受 schema 约束的字段仍可复现。
 
 ## 交付物清单
 
-- [ ] `finalize_merge.sh`：判定与后续读取**共用同一个已打开的文件**。
-      建议形态：判定阶段用 `os.open(path, O_RDONLY | O_NOFOLLOW)` 拿到 fd，
-      在**同一个 Python 进程内**完成「判定 + 读取决策所需字段」，把结果一次性交回 shell；
-      而不是让 shell 拿着路径字符串反复调 Python。
-      若采用别的等效修法，须在报告里说明为何同样关掉了窗口。
-- [ ] 保留现有的全部拒收语义：worktree 内路径仍拒收、不可解析路径仍 fail-closed、
-      status 不存在仍 `FINALIZE_FAIL`。**不得因重构而放宽任何一条。**
-- [ ] 写回段（`:204-229` 的 mktemp/trap/mv）**保持不变**（已免疫，见前置事实）。
-- [ ] `tests/test_finalize_merge_toctou.py`：
-      - 判定通过后把主区 status 换成指向 worktree 副本的 symlink，
-        断言 finalize **不会**采用 worktree 副本的字段做决策（用两份内容可区分的 status）
-      - 主区真文件的正常路径仍 `FINALIZE_OK`（不回归）
-      - worktree 内路径仍被拒收
-      - 不可解析路径仍 fail-closed 且不抛异常
+- [ ] **传输改无歧义编码**。probe 与 bash 之间不再用「换行分记录 + TAB 分字段」的
+      文本协议。可选形态（择一，理由写进报告）：
+      - NUL 分隔 + `read -r -d ''`；
+      - probe 输出 JSON，bash 侧走**单点**解析（同一个 python 调用批量取值）。
+      判据：**任何字段值都不能改变记录边界**。
+- [ ] **赋值端字段名白名单**。只接受 `REQUIRED_FIELDS` / `OPTIONAL_FIELDS` 里声明的
+      变量名；任何其他 key 一律拒绝并 fail-closed（不是忽略）。
+- [ ] **B13：写回读的旧 JSON 来自 probe 那一次 `open()`**。把 probe 已读到的 `raw`
+      传给写回段（如经 `$tmp` 文件或 stdin），写回段不再 `open(src)`。
+      落点已免疫、维持 `mktemp`+`mv` 的原子写不变。
+- [ ] `tests/test_finalize_merge_toctou.py` 增补用例，**每条自带 oracle 三项**。
 
 ## 完成定义（DoD）
 
-- [ ] 交付物逐项就绪；A34 有一个失败→通过的测试
-- [ ] **跨版本**：`tests/test_finalize_merge_toctou.py` 与
-      `tests/test_finalize_merge_first_call.py` 在 **python3.11、3.13、3.14** 三个解释器全绿
-      （缺 pytest 的用 `uv run --python <ver> --with pytest --no-project python -m pytest <file> -q`）
-- [ ] `PYTHONPATH=src python3.11 -m pytest tests -q` 相对基线**零回归**
-      （基线届时由编排者在派发时写入 status；那 4 个
-      `tests/test_finalize_merge_triple_sign.py` 预存失败**不要修**）
-- [ ] 按缺陷 B7：直接跑工作树代码，**不要**用 `agentic quality-gate` 自证
-- [ ] `src/agentic_loop/gate/__init__.py` diff **必须为 0 行**
-- [ ] 写回段 diff **必须为 0 行**
+- [ ] **B15 回归用例**：把编排者的 PoC 固化为用例——
+      - **负向**：`consult.override.justification` 含 `\nbranch\t<已合入的分支>`，
+        `git.branch` 指向**未合入** base 的分支 → 必须 `FINALIZE_FAIL`、
+        `rc != 0`、**`FINALIZE_OK` 不出现**、status 的 `state` 仍是
+        `APPROVED_FOR_MERGE`、`git.merged_commit` 不存在。
+      - **原因特异 witness**：断言拒收原因来自**合入检测或白名单拒绝**，
+        不是「碰巧别处挂了」。给出你所依赖的那句诊断的 `file:line`。
+      - **正向可达性对照（同 fixture）**：把 justification 换成不含换行的等价文本，
+        其余全同 → 必须 `FINALIZE_OK` 且 `merged_commit` 等于真实 merge commit。
+        这一项证明 fixture 本身能过全部门禁，负向那次不是死在别处。
+      - **代表性禁止变异转红**：把你的白名单/编码守卫**临时**摘掉一处 →
+        该用例必须转红（复现 `FINALIZE_OK` + 伪 MERGED）；随后还原到
+        **零行 diff**（`git status` 干净），并把摘除形态与观测结果写进报告。
+- [ ] **注入面不止 justification**：再取**一个**不同的字符串字段（如
+      `qoder_security.override.approver` 或 `iteration_id`）做同形态负向用例，
+      证明修的是通道而非某个字段。
+- [ ] rev1 已有的 5 条用例**全部照旧通过**（A34 不得回退）。
+- [ ] **跨版本**：新旧用例在 **python3.11、3.13、3.14** 三个解释器全绿
+      （缺 pytest 的用 `uv run --python <ver> --with pytest --no-project python -m pytest <file> -q`）。
+- [ ] `PYTHONPATH=src python3.11 -m pytest tests -q` 相对基线**零回归**。
+      基线（编排者在 `dispatch_commit` 的 detached worktree 实测，见 status
+      `evidence.baseline`）：`4 failed, 581 passed, 4 skipped`。那 4 个
+      `tests/test_finalize_merge_triple_sign.py` 预存失败**不要修**。
+- [ ] `validate_wp_status.py` diff **必须为 0 行**。
+- [ ] 按缺陷 B7/B14：**直接跑工作树代码**（`PYTHONPATH=src bash src/...`），
+      **不要**用 `agentic <sub>` 自证——本机 `agentic` 是指向**另一棵 worktree** 的
+      editable 安装，判的是别人的代码。
 - [ ] 无 forbidden_paths / 跨 owner 写入
 - [ ] 无生产写入、无网络、无通知、无推送
 - [ ] 不 merge、不 push、不切生产分支
@@ -85,19 +146,29 @@ validator、读旧 JSON 各自**重新按路径解析**同一个文件；把这�
 
 ### 已知陷阱
 
-1. **不要改写回形态**。mktemp+mv 已免疫；改它是无谓返工。
-2. **不要改判据**。`path_is_in_worktree` 对替换后的路径答 `True`，行为正确。
-3. **不要放宽拒收**。重构时最容易把 fail-closed 分支写丢——四条拒收语义逐条留测试。
-4. **`O_NOFOLLOW` 的语义边界**：它只拒绝**最后一段**是 symlink，不防中间目录段被替换。
-   若你的修法依赖它，须在报告里说明这个残余面（可作为 `[CONCERNS]` 申报，不必本轮修）。
-5. **`validate_wp_status.py` 只碰 fd 支持那一处**。A14/A15/A18 是别的 WP 的面。
-6. **`set -euo pipefail` 下的读取一律要守卫**（缺陷 A12 的来历）。
+1. **不要改 schema 去堵注入**。`validate_wp_status.py` 零改动。注入面在传输通道，
+   收紧某个字段的 schema 只是把同一个洞挪到别的字段。
+2. **`printf -v` 的变量名来自数据 = 任意变量覆盖**。即使改了记录分隔符，只要 key
+   仍来自数据且不过白名单，就仍可覆盖 `branch` / `consult_decision` 等判据变量。
+   两件事要同时做：**无歧义编码**（管边界）+ **白名单**（管 key）。
+3. **`set -euo pipefail` 下的读取一律要守卫**（缺陷 A12 的来历）。
+   `git.merged_commit` 在首次 finalize 时不存在，必须解析为空而非中止。
+4. **A34 不得回退**。判定与读取仍须收敛在同一次 `O_NOFOLLOW` open 上；
+   `O_NOFOLLOW` 只拒最后一段是 symlink，中间目录段被替换仍是残余面，本轮不修，
+   在 `[CONCERNS]` 申报即可。
+5. **负面断言须给出打印点**。凡断言「报了某句话」，在报告里写出该句的
+   `file:line`；若权威脚本对两种成因打印**同一句**，改用**差分对**证明
+   （其余恒定、只改一个输入，断言红/绿翻转），不要断言无法区分的措辞。
+   这是编排者缺陷 B11 的教训，本轮起对执行者同样适用。
+6. **变异自证要还原干净**。摘守卫→看转红→还原，最终 diff 必须零行。
 
 ### 口径权威源引用
 
-- worktree 判定：`agentic_loop.gate.path_is_in_worktree`（WP-19 建立的唯一权威，本轮只读）
-- 主仓根解析：`resolve_paths --root main_repo`（既有唯一权威，不另造）
-- 范围校验：`quality-gate.sh` 的 `_path_in_scope`（既有唯一权威，不另造）
+- status 校验判据：`src/agentic_loop/validate_wp_status.py` 的 `validate()`（唯一权威，本轮只读）
+- `--field` 渲染语义：`validate_wp_status.main()`（唯一权威，probe 须与之同义）
+- worktree 判定：`src/agentic_loop/gate/path_is_in_worktree`（唯一权威，不另造）
+- B15 / B13 / B11 详情：`WP-08-candidate.md` 对应条目
+- rev1 裁决：`WP-22-consult-codex-verdict.json`（codex REWORK + 编排者逐条核验）
 
 ---
 
@@ -108,46 +179,68 @@ validator、读旧 JSON 各自**重新按路径解析**同一个文件；把这�
 
 **allowed_paths**
 
-- `src/agentic_loop/wrappers/finalize_merge.sh` — collapse the predicate/read gap
-- `src/agentic_loop/validate_wp_status.py` — **only** the minimum needed to read from an
-  already-open descriptor; do not touch `--field` semantics or A14/A15/A18 logic
-- `tests/test_finalize_merge_toctou.py` (new)
+- `src/agentic_loop/wrappers/finalize_merge.sh`
+- `tests/test_finalize_merge_toctou.py`
 
 **forbidden_paths**
 
-- `src/agentic_loop/gate/__init__.py` — predicate is correct; **zero-line diff**
-- `src/agentic_loop/wrappers/preflight.sh`
-- `src/agentic_loop/independence.py` — A9/A5 surface, separate WP (WP-20)
+- `src/agentic_loop/validate_wp_status.py` — the authoritative predicate;
+  **zero-line diff**. Never tighten the schema to block the injection: the
+  defect is in the transport channel, and another unconstrained string field
+  reproduces it
+- `src/agentic_loop/gate/__init__.py`, `src/agentic_loop/independence.py`
+- every other `.sh` under `src/agentic_loop/wrappers/`
 - `src/agentic_loop/adapters/`, `src/agentic_loop/redispatch.py`
-- `docs/` — brief and status are orchestrator-maintained
+- `docs/` — briefs and status files are orchestrator-maintained (including this brief)
 - `.agentic/config.toml`, `.agentic/locks/`, `.env`, `.context/`
 
 ## Acceptance tests
 
 Run with `PYTHONPATH=src python3.11 -m pytest` directly against the worktree.
-Do **not** use `agentic quality-gate` to self-certify (defect B7).
+Do **not** self-certify with `agentic <sub>` (defects B7/B14: the installed CLI
+is an editable install pointing at a different worktree).
 
-- `tests/test_finalize_merge_toctou.py` — A34:
-  - after the predicate passes, replacing the main-repo status with a symlink to a
-    worktree copy must **not** let finalize take its decision fields from that copy
-    (use two distinguishable status contents)
-  - a normal main-repo file still reaches `FINALIZE_OK`
-  - a worktree-local path is still refused
-  - an unresolvable path still fails closed without raising
-- **Cross-version**: both `test_finalize_merge_toctou.py` and
-  `test_finalize_merge_first_call.py` green under python3.11, 3.13 and 3.14.
-- Whole suite: zero regression against the baseline recorded in the status JSON at
-  dispatch time. The 4 pre-existing `test_finalize_merge_triple_sign.py` failures
-  stay exactly as they are — **do not fix them**.
+- `tests/test_finalize_merge_toctou.py` — B15 regression, each case carrying the
+  oracle three items:
+  - **negative**: `consult.override.justification` containing
+    `\nbranch\t<a merged branch>` while `git.branch` names a branch **not**
+    merged into base must yield `FINALIZE_FAIL`, `rc != 0`, no `FINALIZE_OK`,
+    `state` still `APPROVED_FOR_MERGE`, and no `git.merged_commit`
+  - **cause-specific witness**: assert the refusal comes from the merge check or
+    the key whitelist, not from an incidental failure elsewhere; cite the
+    `file:line` of the diagnostic you rely on
+  - **positive reachability control** on the same fixture: the same status with a
+    newline-free justification must reach `FINALIZE_OK` with the real merge commit
+  - **representative forbidden mutation**: temporarily remove one of your
+    whitelist/encoding guards; the case must go red (reproducing `FINALIZE_OK`
+    plus a forged MERGED stamp), then restore to a **zero-line diff**
+  - a second, different string field (e.g. `qoder_security.override.approver` or
+    `iteration_id`) carrying the same payload shape, proving the fix is in the
+    channel rather than in one field
+- All 5 rev1 cases still pass (A34 must not regress).
+- **Cross-version**: green under python3.11, 3.13 and 3.14.
+- Whole suite: zero regression against the recorded baseline
+  (`4 failed, 581 passed, 4 skipped` at `dispatch_commit`). The 4 pre-existing
+  `tests/test_finalize_merge_triple_sign.py` failures stay — **do not fix them**.
+- Every negative assertion must name the `file:line` that prints the message it
+  expects. When the authoritative script prints the **same** message for two
+  distinct causes, use a differential pair instead (hold everything constant,
+  change only the one input, assert redness flips) — never assert on a message
+  that cannot discriminate. This is the lesson of orchestrator defect B11.
 
 ## Completion definition
 
-- [ ] Every deliverable in place; A34 has one failing-to-passing test
-- [ ] All three interpreters green on the two target test files
+- [ ] Transport uses an unambiguous encoding: no field value can change a record
+      boundary
+- [ ] The assigning side whitelists variable names; any other key fails closed
+- [ ] The writeback reads the old JSON from the probe's single `open()`, not by
+      path; the atomic `mktemp` + `mv` landing stays unchanged
+- [ ] B15 regression cases in place with all four oracle items, plus a second
+      field proving the fix is channel-wide
+- [ ] All 5 rev1 cases still pass; A34 not regressed
+- [ ] All three interpreters (3.11, 3.13, 3.14) green
 - [ ] Zero regression relative to the recorded baseline
-- [ ] `src/agentic_loop/gate/__init__.py` diff is **zero lines**
-- [ ] The write-back block (mktemp/trap/mv) diff is **zero lines**
-- [ ] All four refusal semantics still covered by tests
+- [ ] `validate_wp_status.py` diff is **zero lines**
 - [ ] No writes to forbidden_paths, no cross-owner writes
 - [ ] No production writes, no network, no notifications, no pushes
 - [ ] No merge, no push, no switching to a production branch

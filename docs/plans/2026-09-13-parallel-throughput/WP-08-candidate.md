@@ -2483,3 +2483,65 @@ WP-22 把「一次调用一个值」换成「一段文本多行赋值」，换�
 
 **证据**：PoC 工程 `/Users/admin/.claude/jobs/8a8bf01e/tmp/poc-b15b/`；
 裁决记录 `WP-22-consult-codex-verdict.json`。
+
+## B16 · 冻结 Brief 的 rev 路径写在 status 里，门禁却按固定命名去 lint 另一个文件（rev2 冻结实际无门禁）
+
+**发现于**：2026-09-16，准备把 WP-22 rev2 派发给执行者时。
+
+**事实**（真脚本实测，非读码推断）：
+
+`dispatch_lint.sh:60` 按**固定命名约定**算 brief 路径，完全不读 `evidence.brief.path`：
+
+```bash
+brief_file="$iterations_dir/$iteration_id/${work_package_id}-brief.md"
+```
+
+`redispatch.py:493` 同样硬编码同一约定，且它是**喂给执行者 prompt 的那一份**：
+
+```python
+brief_path = iteration_dir / f"{work_package_id}-brief.md"
+```
+
+实测：WP-22 的 `evidence.brief.path` 已冻结为 `WP-22-brief-rev2.md`，
+`bash -x` 抓到门禁实际 lint 的却是
+
+```
++ brief_file=/Users/admin/vibe/agentic_loop/docs/plans/2026-09-13-parallel-throughput/WP-22-brief.md
++ echo DISPATCH_LINT_PASS
+```
+
+**差分对（原因特异性由用例承载，非 fixture）**：把 `evidence.brief.path`
+改指 `DOES-NOT-EXIST.md`（sha256 一并置零）——门禁仍 `DISPATCH_LINT_PASS rc=0`；
+同一份临时 status 只把 `work_package_id` 换成 `WP-999`——门禁立刻
+`DISPATCH_LINT_FAIL: brief not found at .../WP-999-brief.md rc=2`。
+两次运行只差一个输入，红只可能来自固定命名那条路径，故证明：
+门禁读的是 `work_package_id`，**从不读 `evidence.brief.path`**。
+
+**后果（两层，均已证）**：
+1. **rev 冻结没有门禁**。所有 `-revN` 冻结的 Brief 都不在 lint 面内；
+   门禁 PASS 只证明**被 supersede 的 rev1** 三锚点齐全。本迭代命中三例：
+   WP-19（claimed rev5）、WP-22（claimed rev2）、WP-21（`evidence.brief` 整块缺失，
+   但门禁照样 PASS）。
+2. **`redispatch` 会把过期 Brief 喂给执行者**。重派读的也是 `WP-N-brief.md`，
+   即执行者可能照 rev1 施工，而我以为它在照 rev2 施工。
+
+**且 `evidence.brief.sha256` 全仓无人校验**：`grep -rn brief src/agentic_loop`
+只有上述两处硬编码 + 无关命中，没有任何一处把 `sha256` 与文件内容比对。
+「冻结锚定」目前是纯文档承诺，无可执行判据。
+
+**根因（缺陷族）**：与 B11/B13/B14/B15 同族——**判据的通道变了，判据本身没变**。
+我把冻结产物换了个文件名（rev2），却没核验消费该产物的通道是否跟着走；
+门禁的「PASS」和我心里的「rev2 已过闸」指的根本不是同一个文件。
+
+**修复方向**（留给 WP，不在本轮修）：
+1. `dispatch_lint.sh` / `redispatch.py` 统一从 `evidence.brief.path` 取路径，
+   固定命名只作缺省回退；两处必须来自**同一个**解析函数（§5.3 口径单点）。
+2. 校验 `evidence.brief.sha256` 与文件内容一致，不一致 fail-closed —— 让
+   「冻结」变成可执行判据。
+3. `evidence.brief.path` 缺失时（WP-21 那种）应判 FAIL，而非静默走约定。
+4. 回查：凡 `evidence.brief.path` 与固定命名不一致的历史 WP，其
+   `DISPATCH_LINT_PASS` 证据须重新标注为「lint 的是 rev1」。
+
+**本轮规避**：WP-22 rev2 派发前，先让固定命名那份路径承载 rev2 内容
+（见 WP-22.status.json 的 `evidence.brief.gate_alignment`），
+不依赖尚未修好的门禁行为。

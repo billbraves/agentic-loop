@@ -57,7 +57,7 @@
       "sha256": "81a202f8fe8943d61015a7b52c452de8bac4701f37700ad3f6cc75f7b852e9c3",
       "rev": 2,
       "supersedes": {
-        "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief.md",
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief-rev1.md",
         "sha256": "3384e8ced97d5ee23f2e77792cbfaebb24a8735dde7bf397625710a59df89515",
         "why": "rev1 交付 2fbf05d 被 codex 第二签名判 REWORK；B15 注入面（编排者 PoC 已证绕过合入门禁）+ B13 写回重读需一并修"
       },
@@ -71,6 +71,14 @@
         "reason": "consult REWORK (codex) + 编排者 PoC 证实 B15 为 rev1 引入的合入门禁绕过回归",
         "rev1_commit": "2fbf05d",
         "carried_over": "A34 修复（判定/读取收敛到同一次 O_NOFOLLOW open）保留，rev1 的 5 条用例须照旧通过"
+      },
+      "gate_alignment": {
+        "defect": "B16",
+        "measured": "dispatch_lint.sh:60 和 redispatch.py:493 都按固定命名 WP-22-brief.md 取 brief，从不读 evidence.brief.path；bash -x 实测门禁 lint 的是 WP-22-brief.md 而非本字段指向的 rev2",
+        "differential_pair": "evidence.brief.path 改指 DOES-NOT-EXIST.md -> 仍 DISPATCH_LINT_PASS rc=0；同一 status 仅换 work_package_id=WP-999 -> DISPATCH_LINT_FAIL brief not found rc=2",
+        "workaround": "把固定命名 WP-22-brief.md 的内容置为 rev2（sha256 与本字段一致 81a202f8...），rev1 原文改名保存为 WP-22-brief-rev1.md（sha256 3384e8ce... 与 supersedes 记录一致）；不依赖尚未修好的门禁行为",
+        "not_fixed_here": "B16 本身归独立 WP（任务 #18），本轮只做派发前对齐",
+        "aligned_at": "2026-09-16T00:00:00Z"
       }
     },
     "changed_files": [
