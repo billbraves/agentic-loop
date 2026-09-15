@@ -1760,3 +1760,40 @@ rev5（`77941f4`）与 rev6（`949b976`）是**同基线的替代提交**，不�
 
 清理动作已由用户批准：`git worktree remove` + 删除已并入的 `feature/wp19-wrapper-seams`
 分支（`949b976` 已是 `plan/2026-09-13-parallel-throughput` 的祖先，且已推送 origin）。
+
+#### A34 补充：编排者实测——写面**不可利用**，读面**可换掉**，窗口仍在（维持 P2）
+
+编排者用独立临时仓（不碰被审仓）按 `finalize_merge.sh` 的真实时序做了两次探测。
+
+**探测 1：写回是否会落到 worktree 副本？→ 不会。**
+
+时序：判定通过 → 攻击者把主区 status 换成指向 worktree 副本的 symlink →
+`[[ -f ]]` → `mktemp "$status_file.XXXXXX"` → `mv "$tmp" "$status_file"`。
+
+| 观测项 | 结果 |
+|--------|------|
+| `[[ -f ]]` 是否跟随 symlink | **是**（通过） |
+| 写回后主区路径是否仍是 symlink | 否 |
+| 写回内容落在 | **主区路径**（`{"FINALIZED_BY_SCRIPT": true}`） |
+| worktree 副本 | **未被触碰**（内容原样） |
+
+根因：`mv` 是 `rename(2)`，**替换 symlink 本身**而不跟随它。故 `finalize_merge.sh:206-229`
+的 mktemp+mv 写回形态**天然免疫**这条路径的 symlink 重定向。
+
+**探测 2：读取是否会读到 worktree 副本？→ 会。**
+
+同一路径在替换前后读到不同内容：`MAIN_COPY_REWORK` → `WORKTREE_COPY_FORGED_ACCEPT`。
+故 `finalize_merge.sh:56`（`-f`）、`:61`/`:64`（两处 validator）、`:209`（读旧 JSON）
+这四处**都会跟随替换后的 symlink**。理论危害：用一份「伪造已双签」的 worktree status
+骗过 finalize 的决策逻辑。
+
+**但**：判据对**替换后**的该路径答 `True`（实测），即若判定发生在替换之后，
+拒收会正常启动。可利用性**完全取决于替换是否精确落在「判定完成」与「读取」之间的窗口**。
+
+**定级维持 P2**，理由更明确了：需要本地写权限 + 精确竞态时机 + 一份预置的伪造 status；
+而当前威胁模型是「防自证、防误操作」。写面已免疫，读面需竞态。
+**若日后把本地并发写入纳入威胁模型，重估为 P1。**
+
+**修法方向收窄**（供 WP 参考）：不必改写回形态（已免疫），重点是**判定与读取共用同一个
+已打开的文件**——判定后拿到 fd 并全程复用（`os.open` + `O_NOFOLLOW` 后按 fd 读），
+或判定与首次读取之间不再有第三方可插入的间隙。
