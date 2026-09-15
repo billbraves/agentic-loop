@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -25,7 +25,8 @@
     "branch": "feature/wp21-test-contracts",
     "worktree": "../wp21-test-contracts",
     "commit": "4b9fdfa",
-    "dispatch_commit": "daf537c"
+    "dispatch_commit": "daf537c",
+    "merged_commit": "4a3e6f6ea91266f13035372135d2489f79ec8935"
   },
   "scope": {
     "allowed_paths": [
@@ -73,7 +74,7 @@
       {
         "name": "full suite (py3.11)",
         "exit_code": 1,
-        "result": "4 failed, 583 passed, 4 skipped \u2014 identical to baseline (pre-existing test_finalize_merge_triple_sign.py failures)"
+        "result": "4 failed, 583 passed, 4 skipped — identical to baseline (pre-existing test_finalize_merge_triple_sign.py failures)"
       },
       {
         "name": "orchestrator mutation self-check (A/B/C/D)",
@@ -95,19 +96,26 @@
   "review": {
     "decision": "ACCEPT",
     "reviewer": "claude-code",
-    "notes": "Code deliverable accepts: single-file diff, three zero-line diffs, green on 3.11/3.13/3.14, zero regression, and the orchestrator's own mutation self-check kills four fail-open forms (one beyond the brief). A35 closed. See WP-21.report.md rev2 section."
+    "notes": "Code deliverable accepts: single-file diff, three zero-line diffs, green on 3.11/3.13/3.14, zero regression, and the orchestrator's own mutation self-check kills four fail-open forms (one beyond the brief). A35 closed. See WP-21.report.md rev2 section.",
+    "merge_approval": {
+      "approved_by": "user",
+      "approved_at": "2026-09-15T14:40:00Z",
+      "instruction": "先处理四个WP的合入",
+      "note": "用户批准即合入授权（第二签名为 codex 第二轮结构化裁决 ACCEPT，非编排者自签）。本地 merge --no-ff，不 push（always_stop）。"
+    }
   },
   "consult": {
     "decision": "ACCEPT",
     "consultant": "codex",
     "record": "docs/plans/2026-09-13-parallel-throughput/WP-21-consult-codex.md",
     "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-21-consult-codex-verdict.json",
-    "notes": "Round 2 produced a formal structured verdict: ACCEPT, P0=0, P1=0, P2=3 (negative run does not bind failure to the predicate; the &&/|| comment names the safe side; oracle-check triad should enter the DoD). All three adopted, recorded as A35-followup, A29-comment-direction and B9. Round 1 died on 'stream disconnected' without a verdict; switching to --output-schema + -o <file> (the form adapters/codex.py already uses) removed the log-scraping channel. Note: findings came back keyed by severity rather than as the schema's array \u2014 --output-schema is a soft constraint here."
+    "notes": "Round 2 produced a formal structured verdict: ACCEPT, P0=0, P1=0, P2=3 (negative run does not bind failure to the predicate; the &&/|| comment names the safe side; oracle-check triad should enter the DoD). All three adopted, recorded as A35-followup, A29-comment-direction and B9. Round 1 died on 'stream disconnected' without a verdict; switching to --output-schema + -o <file> (the form adapters/codex.py already uses) removed the log-scraping channel. Note: findings came back keyed by severity rather than as the schema's array — --output-schema is a soft constraint here."
   },
   "timestamps": {
     "dispatched_at": "2026-09-15T08:47:25Z",
-    "updated_at": "2026-09-15T08:49:28Z",
+    "updated_at": "2026-09-15T15:10:22Z",
     "reviewed_at": "2026-09-15",
-    "consulted_at": ""
+    "consulted_at": "",
+    "approved_for_merge_at": "2026-09-15T14:40:00Z"
   }
 }

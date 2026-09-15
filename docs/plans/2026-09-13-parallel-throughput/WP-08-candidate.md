@@ -2322,3 +2322,87 @@ Brief 明令写回段 diff 必须为 0 行，执行者按约未动并在 `[CONCE
 - [ ] 先构造 PoC 确认可利用性（probe 后、`open(src)` 前换入 symlink 是否真能改写
       非决策字段），再决定优先级——**不要在没有 witness 的情况下当已证漏洞写进 Brief**
       （B11 的教训）。
+
+---
+
+## B14 · `agentic` CLI 是指向**另一个 worktree** 的 editable 安装，所有 wrapper 判据都跑别人的代码
+
+**发现时间**：2026-09-15，合入 WP-21 后调 `agentic finalize` 时。
+**族属**：B7（「不要用 `agentic quality-gate` 自证」）的**根因**。B7 记的是现象，
+这条记的是机制——且比 B7 描述的更严重。
+
+### 事实
+
+```
+$ which agentic
+/Users/admin/.local/bin/agentic          # uv tool，shebang 指向 tools/agentic-loop/bin/python
+
+$ cat .../site-packages/_editable_impl_agentic_loop.pth
+/Users/admin/vibe/agentic-loop-main-codex-merge/src
+```
+
+即 `agentic` 是 **editable 安装**，源码路径固定指向
+`/Users/admin/vibe/agentic-loop-main-codex-merge`——一个**停在 `main`（600c2f1）
+的另一个 worktree**，不是当前工作分支。
+
+实测后果（`agentic finalize` 对一份 `APPROVED_FOR_MERGE` 前的 WP-21 status）：
+
+```
+$ agentic finalize docs/plans/.../WP-21.status.json
+STATUS_INVALID: unknown field git.merged_commit
+```
+
+原因：两个树的同一行不同——
+
+| 树 | 行 | 代码 |
+|----|----|------|
+| `agentic-loop-main-codex-merge`（CLI 实际跑的） | `:67` | `merged_commit_recorded=$(field git.merged_commit)` |
+| `agentic_loop`（当前 plan 分支） | `:89` | `merged_commit_recorded=$(field git.merged_commit 2>/dev/null \|\| true)` |
+
+后者是 A12 的修法（WP-19 交付）。CLI 跑的是**未修版**，所以**任何第一次 finalize
+调用都必然失败**——`git.merged_commit` 正是该脚本要写的字段，首次调用时不存在。
+
+改用当前树自己的 wrapper 即通过：
+
+```
+$ PYTHONPATH=src bash src/agentic_loop/wrappers/finalize_merge.sh <status>
+FINALIZE_OK merged_commit=4a3e6f6ea91266f13035372135d2489f79ec8935
+```
+
+### 危害面（比 B7 记的大）
+
+B7 只说 `quality-gate` 自证不可信。实际上**每一个** `agentic` 子命令都受影响：
+`preflight`、`dispatch-lint`、`quality-gate`、`finalize`、`lock`、`health`、
+`redispatch`、`gate`。这意味着：
+
+1. **判据版本漂移不可见**。当前分支修好的判据（A12、A29、A34、A35…）在 CLI 上
+   全部不生效；CLI 通过/拒收反映的是 `main` 在某个时刻的行为。
+2. **方向双向错**。既可能「当前分支已修但 CLI 报旧错」（本轮，噪声），
+   也可能「当前分支引入回归但 CLI 照旧放行」（**危险**，假绿）。
+3. **`agentic health` 也在其中**。它的 `FROZEN_<N>m` 判据同样跑别人的代码。
+4. 编排者协议（`CLAUDE.md`）通篇写 `agentic preflight <status>`、
+   `agentic finalize <status>`——**协议本身在指导使用一个错误的通道**。
+
+本轮之所以只造成噪声而非放行，纯属运气：`main` 的版本恰好比当前分支**更严格**
+（少一个守卫 → 更容易失败）。反向情形不会有任何提示。
+
+### 修法
+
+1. **判据必须来自被判定的那棵树**。凡对某分支/worktree 做判定，一律
+   `PYTHONPATH=src bash src/agentic_loop/wrappers/<script>.sh`（或
+   `PYTHONPATH=src python3.11 -m agentic_loop.<mod>`）直跑该树，不走 PATH 上的 `agentic`。
+2. **协议要改**。`CLAUDE.md` / `AGENTS.md` 里所有 `agentic <sub>` 的示例须改成
+   直跑形态，或明确写「`agentic` 仅用于与被判定树无关的操作」。
+3. **给 CLI 加自检**：启动时比对「editable 源码路径」与「`resolve_paths --root
+   main_repo` 解析出的仓根」，不一致则**打印醒目告警**（不宜直接 fail——可能有正当
+   的跨仓用法），把版本漂移变成可见事实而非静默假设。
+4. 这条与 B11/B13 是同一族的第三个实例：**判定通道 ≠ 被判定对象**。
+   B11 是「副本 vs 真脚本」，B13 是「落点 vs 内容」，B14 是「另一棵树 vs 本棵树」。
+
+### 待办
+
+- [ ] 立 WP：给 `agentic` 加源码路径 / 主仓根一致性自检告警（修法 3）。
+- [ ] 改协议：`CLAUDE.md` / `AGENTS.md` 的 `agentic <sub>` 示例改直跑形态（修法 2）。
+- [ ] 回查：本迭代此前所有「`agentic preflight` 通过 / `dispatch-lint` 通过」的结论，
+      标注它们实际由 `main` 的快照判定，必要时用当前树重跑。**这一条影响已交付
+      各 WP 的证据可信度**，优先级高于前两条。
