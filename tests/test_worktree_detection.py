@@ -148,6 +148,65 @@ def test_sanitized_env_still_preserves_path(
     assert path_is_in_worktree(repo / "README.md") is False
 
 
+def test_blank_common_dir_fails_closed(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A28-1 (WP-19 rev4): git exits 0 with exactly two lines, but the
+    # --git-common-dir line is blank after strip(). Before rev4 this
+    # degenerated to common_dir = directory / Path("") == directory, which
+    # resolved equal to git_dir and answered False (fail-OPEN). Degenerate
+    # output must fail closed.
+    directory = str(repo)
+    fake = subprocess.CompletedProcess(
+        args=["git"], returncode=0, stdout=f"{directory}\n \n", stderr=""
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: fake)
+    assert path_is_in_worktree(repo / "README.md") is True
+
+
+def test_blank_git_dir_fails_closed(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A28-1 (WP-19 rev4): symmetric degeneration on the --absolute-git-dir
+    # line. A blank first line is not an absolute path, but the blank check
+    # must reject it as degenerate output regardless of line position.
+    directory = str(repo)
+    fake = subprocess.CompletedProcess(
+        args=["git"], returncode=0, stdout=f" \n{directory}\n", stderr=""
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: fake)
+    assert path_is_in_worktree(repo / "README.md") is True
+
+
+def test_symlink_loop_fails_closed_without_raising(repo: Path) -> None:
+    # A28-2 (WP-19 rev4): resolving a symlink loop raises RuntimeError,
+    # which is NOT an OSError subclass — an `except OSError` guard cannot
+    # catch it, violating the "never raises" contract. The predicate must
+    # fail closed (True) and must not raise.
+    loop = repo / "loop"
+    loop.symlink_to("loop")  # real self-referential symlink loop
+    assert path_is_in_worktree(loop) is True
+
+
+def test_main_repo_symlink_to_worktree_status_is_refused(
+    repo: Path, tmp_path: Path
+) -> None:
+    # A27 (WP-19 rev4): the predicate must judge the file actually read and
+    # written, not the path NAME. A symlink in the main repo pointing at a
+    # worktree-local status file is followed by is_file()/validator/finalize
+    # write-back, so the verdict must be the worktree's: True (refused).
+    # Before rev4 the probe used the UNRESOLVED path, answered False, and
+    # let the write-back land on the worktree copy.
+    wt = tmp_path / "wp19-link"
+    _run_git(repo, "worktree", "add", "-q", "-b", "feat/wp19-link", str(wt))
+    status_in_wt = wt / "docs" / "plans" / "iter" / "WP-L.status.json"
+    status_in_wt.parent.mkdir(parents=True)
+    status_in_wt.write_text("{}\n", encoding="utf-8")
+    link = repo / "WP-L.status.json"
+    link.symlink_to(status_in_wt)
+    assert path_is_in_worktree(link) is True
+
+
 def test_finalize_merge_rejects_worktree_local_status(repo: Path, tmp_path: Path) -> None:
     wt = tmp_path / "wp19-y"
     _run_git(repo, "worktree", "add", "-q", "-b", "feat/wp19-y", str(wt))

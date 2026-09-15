@@ -220,13 +220,37 @@ def path_is_in_worktree(path: Path) -> bool:
     rest of the environment (``PATH``, ``HOME``) is kept intact so git
     itself still runs — a bare ``env={}`` would lose ``PATH``, fail to
     find git, and fail closed on legitimate main-repo paths (a regression).
+
+    A27 (WP-19 rev4): the verdict must classify the file that will actually
+    be read/written, not the path NAME. The path is therefore resolved
+    BEFORE its parent directory is probed: a main-repo symlink pointing at
+    a worktree-local status file is followed by every later consumer
+    (``is_file()``, the validator, the finalize write-back), so the probe
+    must follow it too and answer the worktree's verdict.
+
+    A28 (WP-19 rev4): fail-closed holds on every degenerate path. Both
+    output lines must be non-empty after ``strip()`` — a blank
+    ``--git-common-dir`` line used to degenerate into
+    ``directory / Path("") == directory`` and answer False. And every
+    ``Path.resolve()`` sits inside a ``try`` that catches ``OSError`` AND
+    ``RuntimeError`` (a symlink loop raises ``RuntimeError``, which is not
+    an ``OSError`` subclass); any resolution failure returns True. The
+    A27 path resolution and the A28 git-dir/common-dir resolution share
+    this one guard form (§5.3, single handling).
     """
-    directory = path if path.is_dir() else path.parent
     sanitized_env = {
         key: value
         for key, value in os.environ.items()
         if key not in _GIT_SELECTION_VARS
     }
+    try:
+        # A27: resolve first, so the probed directory is the one owning the
+        # file that will actually be read/written. A28-2: resolution never
+        # escapes — OSError and RuntimeError (symlink loop) both fail closed.
+        resolved = path.resolve()
+    except (OSError, RuntimeError):
+        return True
+    directory = resolved if resolved.is_dir() else resolved.parent
     try:
         proc = subprocess.run(
             [
@@ -248,15 +272,25 @@ def path_is_in_worktree(path: Path) -> bool:
     lines = proc.stdout.splitlines()
     if len(lines) != 2:
         return True
-    git_dir = Path(lines[0].strip())
-    common_dir = Path(lines[1].strip())
+    git_dir_text = lines[0].strip()
+    common_dir_text = lines[1].strip()
+    # A28-1: degenerate (blank) output fails closed; Path("") would
+    # otherwise be treated as relative and collapse the comparison.
+    if not git_dir_text or not common_dir_text:
+        return True
+    git_dir = Path(git_dir_text)
+    common_dir = Path(common_dir_text)
     if not git_dir.is_absolute():
         return True
     # --git-common-dir may be relative; it is then relative to the cwd git
     # ran in (``directory``), mirroring --git-dir semantics.
     if not common_dir.is_absolute():
         common_dir = directory / common_dir
-    return git_dir.resolve() != common_dir.resolve()
+    try:
+        return git_dir.resolve() != common_dir.resolve()
+    except (OSError, RuntimeError):
+        # A28-2: same single guard form as the path resolution above.
+        return True
 
 
 def scope_prefix(pattern: str) -> str:
