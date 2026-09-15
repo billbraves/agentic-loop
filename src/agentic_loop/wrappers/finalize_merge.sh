@@ -35,7 +35,20 @@ esac
 
 # Refuse worktree-local copies: they are branch-local working-tree state, not
 # the shared source of truth. Mirrors codex_merge_gate.sh:42-45.
-if [[ "$status_file" == *"/.worktrees/"* ]]; then
+# A13: git-fact judgment instead of a "/.worktrees/" path literal (sibling
+# worktrees like ../wpN-x never contain that segment). The single
+# authoritative predicate is agentic_loop.gate.path_is_in_worktree (§5.3);
+# this wrapper only references it. Unresolvable paths fail closed (refused).
+in_worktree=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY'
+import sys
+from pathlib import Path
+
+from agentic_loop.gate import path_is_in_worktree
+
+print("true" if path_is_in_worktree(Path(sys.argv[1])) else "false")
+PY
+)
+if [[ "$in_worktree" == "true" ]]; then
   echo "FINALIZE_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy (single source of truth)" >&2
   exit 2
 fi
@@ -64,7 +77,10 @@ base_branch=$(field git.base_branch)
 branch=$(field git.branch)
 iteration_id=$(field iteration_id)
 wp_id=$(field work_package_id)
-merged_commit_recorded=$(field git.merged_commit)
+# A12: git.merged_commit is the field THIS script writes, so it is absent on
+# the first finalize call. Guard the read exactly like the optional override
+# fields below — missing resolves to empty (fail-closed), never aborts.
+merged_commit_recorded=$(field git.merged_commit 2>/dev/null || true)
 
 # Read the optional consult.override fields for the honest-REWORK escape hatch.
 # Missing or incomplete override resolves to empty values and therefore fails
