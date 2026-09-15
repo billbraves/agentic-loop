@@ -1,0 +1,80 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-21",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi-cli",
+    "session": "",
+    "redispatch_count": 0
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "codex-cli",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "8224197",
+    "branch": "feature/wp21-test-contracts",
+    "worktree": "../wp21-test-contracts",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "tests/test_worktree_detection.py",
+      "tests/test_finalize_merge_first_call.py",
+      "src/agentic_loop/wrappers/finalize_merge.sh"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "docs/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [],
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-21-brief.md",
+      "sha256": "a231cf2082e062f065299742a4553b877aed27f900df04ebfaaa696dce07f641"
+    }
+  },
+  "review": {
+    "decision": "CONSULT",
+    "by": "claude-code",
+    "at": "2026-09-15T08:46:16Z",
+    "note": "WP-21 Brief 已冻结，尚未派发、尚未验收。"
+  },
+  "consult": {
+    "decision": "CONSULT",
+    "by": "codex",
+    "at": "2026-09-15T08:46:16Z",
+    "note": "待执行后送审。送审须带 --disable apps（A31），且须全文检索 [VERDICT]（A31 补充）。"
+  },
+  "timestamps": {
+    "dispatched_at": "",
+    "updated_at": "2026-09-15T08:46:16Z",
+    "reviewed_at": "",
+    "consulted_at": ""
+  }
+}
