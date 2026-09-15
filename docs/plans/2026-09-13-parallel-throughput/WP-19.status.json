@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -24,7 +24,8 @@
     "base_commit": "16e59ff",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
-    "commit": "949b976"
+    "commit": "949b976",
+    "merged_commit": "f9e166469f1599ddb1d9984c145a3ee2118b0467"
   },
   "scope": {
     "allowed_paths": [
@@ -110,7 +111,7 @@
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T06:33:44Z",
+    "updated_at": "2026-09-15T08:07:59Z",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
   }
