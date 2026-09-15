@@ -236,10 +236,35 @@ def test_long_path_fails_closed_without_raising(repo: Path) -> None:
     # path — a ~300-character filename raises ``OSError: [Errno 63] File name
     # too long``. The predicate's docstring promises "never raises", and the
     # fail-open command-substitution call site in finalize_merge.sh turns a
-    # raised predicate into a skipped refusal. Overlong input must fail
-    # closed (True) without raising.
+    # raised predicate into a skipped refusal.
+    #
+    # A30 (WP-19 rev6): this case locks the CONTRACT, not one implementation
+    # path. On Python <= 3.13 ``is_dir()`` raises ``OSError`` for an overlong
+    # name and the guard fails closed (True); on Python 3.14+ ``is_dir()``
+    # returns ``False`` instead of raising, the predicate takes the normal
+    # git path, and a main-repo overlong path is correctly classified as
+    # NOT a worktree (False). Both verdicts are correct per version, so the
+    # only cross-version invariant is: the call never raises and returns a
+    # real ``bool``. (``isinstance``, not ``result in (True, False)`` — the
+    # latter accepts ``1`` and cannot lock the type.)
     long_name = "a" * 300 + ".json"
-    assert path_is_in_worktree(repo / long_name) is True
+    result = path_is_in_worktree(repo / long_name)
+    assert isinstance(result, bool)
+
+
+def test_long_path_inside_linked_worktree_is_worktree(
+    repo: Path, tmp_path: Path
+) -> None:
+    # A30 (WP-19 rev6): the worktree-side counterpart of the overlong-path
+    # contract. An overlong path INSIDE a linked worktree must be refused
+    # (True) on every supported interpreter — measured stable on
+    # 3.11.14 / 3.12.14 / 3.13.12 / 3.14.2: even when 3.14's ``is_dir()``
+    # stops raising, the probe falls back to the parent directory, whose
+    # git facts (git-dir != git-common-dir) still say "linked worktree".
+    wt = tmp_path / "wp19-long"
+    _run_git(repo, "worktree", "add", "-q", "-b", "feat/wp19-long", str(wt))
+    long_name = "a" * 300 + ".json"
+    assert path_is_in_worktree(wt / long_name) is True
 
 
 def test_null_byte_path_fails_closed_without_raising(repo: Path) -> None:
