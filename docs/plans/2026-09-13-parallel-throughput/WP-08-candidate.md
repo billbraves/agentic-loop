@@ -1599,3 +1599,73 @@ rev5 第 3 次尝试中都出现，且都伴随「最终消息为空、无 verdi
 
 **修法建议**：咨询 codex 时一并 `--disable` serena（或用不带 MCP 的 profile），
 并把 `.serena/` 写进 `.git/info/exclude` 作为兜底。可并入 A31 的 WP。
+
+### A33 · `test_symlink_loop_fails_closed_without_raising` 同类脆性，且从 Python **3.13** 起就失败（P1，测试脆性）
+
+**面**：`tests/test_worktree_detection.py`（WP-19 **rev4** 新增用例，非 rev5/rev6 引入）
+
+**事实**（编排者跨四版本实测，真实自指 symlink + 真实临时仓）：
+
+| Python | `Path(自指symlink).resolve()` | `is_dir()` | 判据 | 用例断言 `is True` |
+|--------|------------------------------|-----------|------|------------------|
+| 3.11.14 | `RuntimeError` | `False` | `True`（fail-closed） | ✅ |
+| 3.12.14 | `RuntimeError` | `False` | `True` | ✅ |
+| 3.13.12 | **不抛，原样返回路径** | `False` | **`False`** | ❌ |
+| 3.14.2 | **不抛，原样返回路径** | `False` | **`False`** | ❌ |
+
+自 3.13 起 `Path.resolve()`（非 strict 模式）对 symlink 循环不再抛 `RuntimeError`，
+而是原样返回路径。此时判据走正常 git 路径：该 symlink 位于主区，答 `False`
+**本来就是对的**。判据行为正确，错的仍是断言——它锁死了 3.11/3.12 的实现表现。
+
+**与 A30 的关系**：**同一个类，不同实例**。A30 是 `is_dir()` 在 3.14 变，
+A33 是 `resolve()` 在 3.13 变。共同根因：rev4/rev5 的「fail-closed 用例」都用
+**触发某个特定异常**的方式构造输入，而这些异常的抛出条件跨 Python 版本会变；
+契约（「不抛异常且返回 bool」）却是稳定的。
+
+**引入轮次**：A33 的用例来自 **rev4**（A28-2），比 A30 更早。
+编排者在 rev4 与 rev5 两轮验收中**都只用 python3.11 单解释器测**，
+故两次都没发现。这是编排者验收方法的漏项，不是执行者新引入的回归。
+
+**实测分层证据**（基线 `16e59ff` = rev5 代码，未含 rev6 改动）：
+
+| 解释器 | rev5 代码（基线） | rev6 工作树 |
+|--------|------------------|------------|
+| 3.11 | 17 passed | 18 passed |
+| 3.13 | **1 failed** + 16 passed | （A33 仍在） |
+| 3.14 | **2 failed** + 15 passed | **1 failed** + 17 passed（A30 已修，A33 仍在） |
+
+→ rev6 确实修掉了 A30（3.14 上 2 failed → 1 failed），且未引入新失败；
+剩下的 1 failed 是 A33，**在 rev6 范围之外**（该用例不在 rev6 Brief 的交付物里）。
+
+**修法建议**：与 A30 同法——断言降为「不抛异常且返回 `bool`」，
+并补一条 linked worktree 内 symlink 循环判 `True` 的用例（若跨版本稳定）。
+**建议与 A30 的收尾并成一个「用例契约化」WP 一次做完**，并把
+「验收必须跨 3.11/3.13/3.14 三个解释器」写进该 WP 的 DoD，避免第三次漏。
+
+**编排者方法更正**：本轮起，凡涉及「异常路径 / fail-closed」的用例，
+验收一律用 `uv run --python <ver> --with pytest --no-project` 跨版本实跑，
+不再只用 python3.11。
+
+#### A33 补充：执行者「fail-open」定性经编排者实测**不成立**
+
+rev6 执行者在 `[STATUS] BLOCKED` 的理由里称该形态下判据 **fail-open**，
+并据此认为必须改判据（本轮硬禁）才能闭合。**编排者独立实测否证了这一点。**
+
+判别方法：fail-open 的定义是「本该拒收的输入被放行」，即
+**位于 linked worktree 内**的 status 被判 `False`。故必须测 worktree 内的 symlink 循环，
+而不是主区的。
+
+| Python | 主区内 symlink 循环（正确答案 False） | **linked worktree 内** symlink 循环（正确答案 True） | fail-open？ |
+|--------|--------------------------------|------------------------------------------|-----------|
+| 3.11.14 | `True`（因 `resolve()` 抛错而 fail-closed，答案偏保守） | `True` ✅ | 否 |
+| 3.13.12 | `False` ✅（正确） | `True` ✅ | **否** |
+| 3.14.2 | `False` ✅（正确） | `True` ✅ | **否** |
+
+**结论**：三个版本上，worktree 内的 symlink 循环**始终被拒收**，拒收从未被绕过。
+3.13+ 主区答 `False` 是**正确**答案；3.11 答 `True` 只是因为 `resolve()` 抛异常
+触发了 fail-closed 兜底，属"偏保守但恰好也不错"。
+
+→ A33 的定性维持为**测试脆性（P1）**，**不是安全缺陷**，
+也**不需要改 `gate/__init__.py`**。修法只需把断言契约化（与 A30 同法）。
+执行者判 BLOCKED 的前提有误，但其「不擅自扩权改禁改文件、交回编排者裁决」
+的处置是**正确**的——按 §4.1，范围裁决权在编排者。

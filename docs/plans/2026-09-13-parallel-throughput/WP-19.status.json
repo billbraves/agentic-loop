@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -21,10 +21,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "b97ce67",
+    "base_commit": "16e59ff",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
-    "commit": "77941f4"
+    "commit": "949b976"
   },
   "scope": {
     "allowed_paths": [
@@ -97,16 +97,16 @@
     }
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "by": "claude-code",
-    "at": "2026-09-15T07:10:40Z",
-    "note": "撤回编排者本轮 ACCEPT。A29 判据修复本身闭合无疑（17/17 向量、2/2 新用例改前失败改后通过、四版本 3.11/3.12/3.13/3.14 均不抛且主区 False / linked worktree True、零回归、AST 27/27 仅 path_is_in_worktree 变更），但 codex 的 P1 成立：test_long_path_fails_closed_without_raising 断言主区超长路径 is True，而 Python 3.14 起 is_dir() 对超长名返回 False 不再抛，此时判据答 False 才正确，该用例在声明支持的解释器上失败（pyproject requires-python >= 3.9）。编排者原把 A30 推给下一个 WP 属处置错误：A26 与 A29 修法 2 落在 forbidden path 无权限修，而 A30 落在本轮白名单文件、且是本轮自己新增的断言，推走等于让 77941f4 带着一个会失败的新增用例进合并候选。转 rev6：只改断言，不动判据。"
+    "at": "2026-09-15T07:31:04Z",
+    "note": "rev6（949b976）交付物全部就绪，编排者独立验收通过。范围：diff 恰好 1 个文件tests/test_worktree_detection.py（+28/-3），gate/__init__.py diff 为 0 行（本轮硬要求），7 个 forbidden 文件全 0，docs/ 与 .agentic/ 均 0；AST 逐 def 比对 17→18，仅 test_long_path_fails_closed_without_raising 变更 + 1 新增，其余 16 例（含 NUL 例）字节不变；删除的 3 行正是旧断言与其两行注释。跨版本：编排者用 uv 跑真 pytest 四版本实测，3.11/3.12 全绿 18 passed，3.13/3.14 各 1 failed；该唯一失败为 test_symlink_loop_fails_closed_without_raising（rev4 引入，登记为 A33），已证基线 16e59ff 在 3.13 上同样失败，故非 rev6 引入；rev6 自己的两个用例在四版本全绿。编排者另建 7 条契约向量 harness（自造 temp repo + worktree add），四版本 7/7 通过。全套 4F+581P+4S vs 基线 4F+580P+4S，恰为 +1 新用例，零回归。无 merge/amend，77941f4 与 bbfa258 仍可达。执行者自报 BLOCKED 且称该形态 fail-open——该定性经编排者实测否证：linked worktree 内的 symlink 循环在 3.11/3.13/3.14 上始终判 True、拒收从未被绕过，3.13+ 主区判 False 本就是正确答案。故 A33 为测试脆性、非安全缺陷、不需改判据。编排者据此裁决：A33 不在 rev6 交付物内（该用例不在 rev6 Brief 的清单里），不构成 BLOCKED，转任务 #6「用例契约化」WP 收尾；rev6 判 ACCEPT。执行者不擅自改禁改文件、交回编排者裁决的处置正确（§4.1 范围裁决权在编排者）。"
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": "CONSULT",
     "by": "codex",
-    "at": "2026-09-15T07:10:40Z",
-    "note": "取得有效 verdict（第 4 次尝试，需 --disable apps 绕开 Kiro API 64 字符工具名上限，见 A31）。P0 无：A29-1/A29-2 修复成立，未发现逃逸路径。P1：A30 阻断本轮 ACCEPT。P2：用例应只锁「不抛异常并返回 bool」，或改用确定性触发 OSError 的构造。P2：finalize_merge.sh fail-open 仍是系统性风险，但不否定本轮判据修复，另立 WP 且应高优先级。三处同形 except 属同一函数的统一异常策略、不算三份口径；A28-1 空行 fail-closed 未被吞；A22/A27 语义未回归。记录：docs/plans/2026-09-13-parallel-throughput/WP-19-consult-codex-rev5.md"
+    "at": "2026-09-15T07:31:04Z",
+    "note": "rev6（949b976）尚未取得 codex 有效 verdict：本轮待送审。schema 的 DECISIONS 仅允许 ACCEPT/REWORK/CONSULT，故以 CONSULT 表达「待独立审核者裁决」，该值同时使 APPROVED_FOR_MERGE 等终态校验不通过，天然阻断误合并。送审须带 --disable apps（见 A31：codex 默认注入的 mcp__codex_apps__* 工具名超 64 字符导致 HTTP 400）。"
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
