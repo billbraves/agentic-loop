@@ -215,9 +215,9 @@
     ]
   },
   "consult": {
-    "decision": null,
+    "decision": "ACCEPT",
     "reviewed_by": "codex",
-    "notes": "rev1 裁决 REWORK 已留档；rev2 待重新咨询。rev1 的具体修法（assert 'empty' in stderr）编排者实测不可达（dispatch_lint.sh:86 与 :98 同措辞），rev2 改用差分对承载原因特异性，重咨询须就此替代方案表态。",
+    "notes": "rev2 第二签名 ACCEPT。codex 撤回 rev1 的修法并认可替代方案：'差分对等价且优于原先的措辞断言'，确认两条失败路径 stderr 完全相同故基于措辞的原因区分在当前实现下不可达。其走完了推理链：variant_b 仅比 variant_a 多一行 x 且断言二者不等（证明替换发生）；两变体标题均在且显式断言，故 variant_b 过真 dispatch_lint.sh 排除 :86；variant_a 仅缺该 body 行却失败，红因被隔离到 :98；stderr 断言已明确降级为弱辅助，不再承担原因特异性；renamed-anchor 用例继续覆盖 :86。Scope 与 Brief 一致，仅改允许的测试文件；未发现 correctness/architecture/time-as-of/migration/security 阻断项，亦无削弱测试、阈值或信号语义。传输口径：codex 再次以自然语言（'VERDICT: ACCEPT'）作答而非 --output-schema 的 schema 形状，adapters/codex.py::_parse_verdict 抛 ValueError；裁决由编排者逐字转录，原文见 verdict_file.raw_verbatim。与 WP-21 记录的同一软约束问题（--output-schema 对该 provider 只是建议）。codex 明确声明其结论仅基于内联 Brief + 本轮 diff + 题面实测证据，未读取仓库其他文件、未独立重跑测试，故其为第二签名而非独立复测。",
     "history": [
       {
         "rev": 1,
@@ -225,15 +225,25 @@
         "finding": "test_witness_empty_anchor_body_fails 只断言 'Acceptance tests' in stderr，无法区分 :86/:98，oracle 空验证",
         "suggested_fix": "assert 'empty' in stderr; assert 'missing' not in stderr",
         "orchestrator_note": "缺陷成立，修法不可达；已实测两路径 stderr 逐字节相同"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "codex",
+        "consulted_at": "2026-09-16T07:30:00Z",
+        "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-rev2-verdict.json",
+        "basis": "inline rev2 brief + round-only diff, forbid_repo_read=True; no independent test rerun (stated by codex itself)",
+        "transport": "prose answer; --output-schema soft for this provider; transcribed verbatim by orchestrator"
       }
-    ]
+    ],
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-rev2-verdict.json"
   },
   "timestamps": {
     "created_at": "2026-09-15T10:30:00Z",
     "dispatched_at": "2026-09-16T01:10:00Z",
-    "updated_at": "2026-09-16T00:00:00Z",
+    "updated_at": "2026-09-16T07:40:00Z",
     "review_completed_at": "2026-09-16T00:00:00Z",
-    "consulted_at": "2026-09-15T15:40:00Z",
+    "consulted_at": "2026-09-16T07:30:00Z",
     "rev2_frozen_at": "2026-09-16T01:00:00Z"
   }
 }

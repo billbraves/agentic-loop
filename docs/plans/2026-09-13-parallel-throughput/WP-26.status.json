@@ -1,0 +1,85 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-26",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "unassigned",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "",
+    "branch": "feature/wp26-brief-source-of-truth",
+    "worktree": "../wp26-brief-source-of-truth",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/dispatch_lint.sh",
+      "src/agentic_loop/redispatch.py",
+      "tests/test_dispatch_lint_brief_source.py",
+      "tests/test_redispatch_brief_source.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/templates/",
+      "CLAUDE.md",
+      "AGENTS.md",
+      "docs/agentic/OPERATING_MODEL.md",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md",
+      "sha256": "757aa64e12fd233eb315ce45f148a3f72005ff0dc8a39dd94c1967757b00b534",
+      "rev": 1,
+      "covers": "任务 #18（B16）：dispatch_lint.sh:60 与 redispatch.py:493-494 按固定命名推 brief 路径，既不读 evidence.brief.path 也不校验 evidence.brief.sha256；后果是 -revN 冻结不进门禁面，且重派会把 rev1 正文喂给执行者。",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑 agentic 冻结副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已用 diff 证明与活树 dispatch_lint.sh:69-101 逐字节相同；行 68/102 为 <<'PY' / PY，切片边界正确未截断。",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-25/WP-26/WP-27 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T07:45:00Z"
+      },
+      "gate_alignment": {
+        "defect": "B16",
+        "note": "B16 是本 WP 要修的缺陷本体，所以门禁此刻仍按固定命名读 —— 本 brief 已用固定名 WP-26-brief.md，无需 rev 搬移 workaround。执行者交付后，验收须用「把 evidence.brief.path 改指不存在文件」的差分对复测修复生效。"
+      }
+    },
+    "tests": []
+  },
+  "review": {
+    "decision": null
+  },
+  "consult": {
+    "decision": null
+  },
+  "timestamps": {
+    "created_at": "2026-09-16T07:45:00Z",
+    "updated_at": "2026-09-16T07:45:00Z"
+  }
+}

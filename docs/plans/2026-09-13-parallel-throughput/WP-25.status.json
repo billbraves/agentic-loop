@@ -1,0 +1,86 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-25",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "unassigned",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "",
+    "branch": "feature/wp25-protocol-disciplines",
+    "worktree": "../wp25-protocol-disciplines",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/templates/CLAUDE.md.tmpl",
+      "src/agentic_loop/contract_render.py",
+      "tests/test_contract_render.py",
+      "tests/test_orchestrator_protocol_disciplines.py"
+    ],
+    "forbidden_paths": [
+      "CLAUDE.md",
+      "AGENTS.md",
+      "docs/agentic/OPERATING_MODEL.md",
+      "src/agentic_loop/templates/AGENTS.md.tmpl",
+      "src/agentic_loop/templates/OPERATING_MODEL.md.tmpl",
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/redispatch.py",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief.md",
+      "sha256": "a84d74409003477bb70a2f5af9eeba2b1a11601c1b75d7106c87b3a758622b69",
+      "rev": 1,
+      "covers": "任务 #12（B11 冻结前自检进协议）+ 任务 #14（B14 agentic 源码路径/协议示例）合并；同时纳入 B16/B17 的读取面纪律",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）；切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-24-brief-rev2.md 与 WP-25-brief.md 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T00:00:00Z"
+      },
+      "gate_alignment": {
+        "note": "B16 仍未修：门禁与 redispatch 都按固定命名 WP-25-brief.md 读，本 brief 已用该固定名，无需 workaround"
+      }
+    },
+    "tests": []
+  },
+  "review": {
+    "decision": null
+  },
+  "consult": {
+    "decision": null
+  },
+  "timestamps": {
+    "created_at": "2026-09-16T00:00:00Z",
+    "updated_at": "2026-09-16T00:00:00Z"
+  }
+}

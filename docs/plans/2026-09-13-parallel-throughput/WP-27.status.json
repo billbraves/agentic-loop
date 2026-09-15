@@ -1,0 +1,84 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-27",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "unassigned",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "",
+    "branch": "feature/wp27-preflight-status-source",
+    "worktree": "../wp27-preflight-status-source",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "tests/test_preflight_status_source.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/wrappers/dispatch_lint.sh",
+      "src/agentic_loop/redispatch.py",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/templates/",
+      "CLAUDE.md",
+      "AGENTS.md",
+      "docs/agentic/OPERATING_MODEL.md",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-27-brief.md",
+      "sha256": "c3cbcecd26d029a053038ffc7fd736770bbb2d2e65cf4e7bed22210f008c42c8",
+      "rev": 1,
+      "covers": "任务 #19（B17）：preflight.sh:9 裸赋值接 status 路径，相对路径落 cwd，而协议强制 cwd 为次级工作树，故门禁判的是被 git 跟踪的历史快照；state/scope/risk 三类判断全部基于旧口径。",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑 agentic 冻结副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已用 diff 证明与活树 dispatch_lint.sh:69-101 逐字节相同；行 68/102 为 <<'PY' / PY，切片边界正确未截断。",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-25/WP-26/WP-27 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T07:45:00Z"
+      },
+      "gate_alignment": {
+        "defect": "B17",
+        "note": "派发本 WP 时必须传主仓**绝对**路径以规避 B17 本身（本迭代 WP-22/WP-24 rev2 派发已如此处理）。验收须用三行差分对复测：只改工作树副本不应再影响裁决。"
+      }
+    },
+    "tests": []
+  },
+  "review": {
+    "decision": null
+  },
+  "consult": {
+    "decision": null
+  },
+  "timestamps": {
+    "created_at": "2026-09-16T07:45:00Z",
+    "updated_at": "2026-09-16T07:45:00Z"
+  }
+}

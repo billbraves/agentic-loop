@@ -212,23 +212,33 @@
     ]
   },
   "consult": {
-    "decision": null,
+    "decision": "ACCEPT",
     "reviewed_by": "codex",
-    "notes": "rev1 裁决 REWORK 已留档 WP-22-consult-codex-verdict.json；rev2 待重新咨询（合入需第二签名）。",
+    "notes": "rev2 第二签名 ACCEPT，阻断项 0。逐条确认：B15 已关闭（NUL 作记录边界，值内 NUL 在 render_field() 整次拒收；TAB 仅按首个分隔符拆分故值内 TAB/换行无语法意义；赋值前固定 case 白名单阻止未知变量名进入 printf -v；未发现由合法字段值制造新记录或走私赋值的残余路径）；B13 已关闭（写回改为对 $status_raw 执行 json.loads，不再 open(status_file)，判定与写回同一份字节）；B18 不阻断（ARG_MAX 是可用性上限，超限 fail-closed 不伪造 MERGED，15KB 实际规模对 1.81MB 阈值余量充足；建议后续改临时文件/stdin 并补诊断）；B19 不阻断（削弱的是变异证明的特异性，非生产修复本身；编码守卫回退时测试仍转红，紧凑 JSON PoC 补足真实绕过证据）。残余非阻断关注：中间目录替换面按 Brief 留存；B18/B19 继续登记为后续改进。传输口径：codex 再次以自然语言（'VERDICT: ACCEPT'）作答而非 --output-schema 的 schema 形状，adapters/codex.py::_parse_verdict 抛 ValueError；裁决由编排者逐字转录，原文见 verdict_file.raw_verbatim。与 WP-21 记录的同一软约束问题（--output-schema 对该 provider 只是建议）。codex 明确声明其结论仅基于内联 Brief + 本轮 diff + 题面实测证据，未读取仓库其他文件、未独立重跑测试，故其为第二签名而非独立复测。",
     "history": [
       {
         "rev": 1,
         "decision": "REWORK",
         "record": "WP-22-consult-codex-verdict.json"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "codex",
+        "consulted_at": "2026-09-16T07:30:00Z",
+        "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-22-consult-codex-rev2-verdict.json",
+        "basis": "inline rev2 brief + round-only diff, forbid_repo_read=True; no independent test rerun (stated by codex itself)",
+        "transport": "prose answer; --output-schema soft for this provider; transcribed verbatim by orchestrator"
       }
-    ]
+    ],
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-22-consult-codex-rev2-verdict.json"
   },
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
     "dispatched_at": "2026-09-16T00:30:00Z",
-    "updated_at": "2026-09-16T00:00:00Z",
+    "updated_at": "2026-09-16T07:40:00Z",
     "review_completed_at": "2026-09-16T00:00:00Z",
-    "consulted_at": "2026-09-15T15:40:00Z",
+    "consulted_at": "2026-09-16T07:30:00Z",
     "rev2_frozen_at": "2026-09-16T00:05:00Z"
   }
 }
