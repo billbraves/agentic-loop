@@ -20,25 +20,24 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "fd6bcd4",
+    "base_commit": "b97ce67",
     "branch": "feature/wp19-wrapper-seams",
     "worktree": "../wp19-wrapper-seams",
     "commit": "b97ce67"
   },
   "scope": {
     "allowed_paths": [
-      "src/agentic_loop/wrappers/preflight.sh",
-      "src/agentic_loop/wrappers/finalize_merge.sh",
       "src/agentic_loop/gate/__init__.py",
-      "tests/test_preflight_branch_binding.py",
-      "tests/test_finalize_merge_first_call.py",
       "tests/test_worktree_detection.py"
     ],
     "forbidden_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
       "src/agentic_loop/validate_wp_status.py",
       "src/agentic_loop/independence.py",
       "src/agentic_loop/adapters/",
       "src/agentic_loop/redispatch.py",
+      "src/agentic_loop/cli.py",
       "docs/",
       ".agentic/config.toml",
       ".agentic/locks/",
@@ -111,8 +110,18 @@
   },
   "timestamps": {
     "dispatched_at": "2026-09-14T15:44:23+00:00",
-    "updated_at": "2026-09-15T12:25:00+08:00",
+    "updated_at": "2026-09-15T12:35:00+08:00",
     "reviewed_at": "2026-09-15T00:40:00+08:00",
     "consulted_at": "2026-09-15T12:25:00+08:00"
+  },
+  "brief": {
+    "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev2.md",
+    "sha256": "8e80c8e68033e146fdf27e3756fe335129bac21d476ce3bd74256b029e2d3305",
+    "rev": 2,
+    "rev1": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief.md",
+      "commit": "b97ce67",
+      "outcome": "review ACCEPT (A4/A7/A12 verified, not reworked); consult REWORK on A13/A22"
+    }
   }
 }
