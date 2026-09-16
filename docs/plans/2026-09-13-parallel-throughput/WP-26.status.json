@@ -38,8 +38,9 @@
     "base_commit": "58c7624",
     "branch": "feature/wp26-brief-source-of-truth",
     "worktree": "../wp26-brief-source-of-truth",
-    "commit": "0b4deb28458098e6db055a3601d971702ab8b1af",
-    "dispatch_commit": "0a12bed"
+    "commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
+    "dispatch_commit": "0a12bed",
+    "commit_rev2_impl": "0b4deb28458098e6db055a3601d971702ab8b1af"
   },
   "scope": {
     "allowed_paths": [
@@ -287,13 +288,52 @@
         "measured": "path 里塞 \\n 后，报错退化为 `brief not found at …/docs/plans/x`（截断后的路径），仍 rc=2 fail-closed。",
         "why_non_blocking": "fail-closed 方向正确，只是措辞不够精确；且现有全部 fail() message 均为单行。"
       }
-    ]
+    ],
+    "hardening_rev2": {
+      "commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
+      "message": "test(dispatch-lint): strengthen failure-token assertions",
+      "origin": "codex rev2 第二签名提出的关切（其提议判据 len(stderr.splitlines())==1 已被编排者实测证伪，见 B24）；本补丁取其关切、弃其形式。",
+      "files_touched": [
+        "tests/test_dispatch_lint_brief_source.py"
+      ],
+      "assertion_shape": "_assert_single_fail_token(proc) 同时断言三条不变量：(1) stderr.count('DISPATCH_LINT_FAIL:')==1；(2) stdout.strip()==''；(3) stderr 首行以该 token 开头。7 处调用点全部改签。",
+      "rejected_shape": "len(stderr.splitlines())==1 —— 状态校验器可在 token 行之后合法追加多条 STATUS_INVALID: 续行，该判据会误红。docstring 已记录拒用理由，防止后人重新采纳。",
+      "anti_regression_test": "test_multi_error_continuation_keeps_single_token：构造 state=NOT_A_STATE + review.decision=NOPE 的双错状态，断言两条错误消息都在 stderr、token 仍恰好一次、且 len(stderr.splitlines())>1（后者正是对被证伪判据的钉子）。",
+      "orchestrator_probe_reintroduction": "编排者把 codex 的被拒判据原样塞回 helper（assert len(stderr.splitlines())==1），实测 1 failed, 13 passed，失败点恰为新增的 multi_error 测试，失败 stderr 为 \"DISPATCH_LINT_FAIL: STATUS_INVALID: invalid state: 'NOT_A_STATE'\\nSTATUS_INVALID: review.decision is invalid: 'NOPE'\\n\"。随后 git diff --stat 为空 = 逐字节还原。",
+      "orchestrator_probe_stdout_invariant": "第二次探针：在 tmp_path 的 copytree scratch 副本上把 dispatch_lint.sh 的 fail() 改为额外向 stdout 泄一行，断言 _assert_single_fail_token 抛出 'stdout must be empty' —— 证明第 (2) 条不变量并非装饰，确有承重。探针后 git diff --stat 为空。",
+      "tests": [
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_dispatch_lint_brief_source.py -q",
+          "result": "23 passed",
+          "exit_code": 0,
+          "note": "加固前 22 passed，新增 1 条 multi_error 测试"
+        },
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest -q  # 全量",
+          "result": "4 failed, 620 passed, 4 skipped in 86.41s",
+          "exit_code": 1,
+          "note": "4 条失败全为 tests/test_finalize_merge_triple_sign.py 既有失败（git checkout -q main CalledProcessError），与 rev2 基线 359cb1a 的 4 failed / 606 passed 同一失败集；passed 由 619 增至 620，正是新增的那 1 条"
+        },
+        {
+          "cmd": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest --no-project python -m pytest tests/test_dispatch_lint_brief_source.py -q",
+          "result": "23 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest --no-project python -m pytest tests/test_dispatch_lint_brief_source.py -q",
+          "result": "23 passed",
+          "exit_code": 0
+        }
+      ],
+      "worktree_clean_after_runs": true,
+      "measured_at": "2026-09-16T14:05:00Z"
+    }
   },
   "review": {
     "decision": "ACCEPT",
     "reviewer": "orchestrator (claude)",
     "reviewed_at": "2026-09-16T13:20:00Z",
-    "reviewed_commit": "0b4deb28458098e6db055a3601d971702ab8b1af",
+    "reviewed_commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
     "rev": 2,
     "basis": "rev2 冻结 brief 四项交付物逐条实测通过（见 evidence.orchestrator_independent_review_rev2）：sha256 校验脱离 path 在场、四种在场组合矩阵齐备且含 no-path+correct-sha 正控制、变异改在 scratch 副本、每条失败路径恰一行 FAIL token。零回归成立（616 -> 619，失败集合不变）。3.11/3.13/3.14 全绿。redispatch.py 零 diff。",
     "blocking_defect": null,
@@ -303,8 +343,9 @@
     ],
     "next_gate": "需 codex 第二签名后才可提交用户批准合入；编排者不得自签自批（本轮 B21 正是编排者一审漏判、由第二签名捕获）。",
     "supersedes": "review.decision=REWORK @ 0a12bed（B21）",
-    "merge_gate": "BLOCKED — 待 (1) 断言加固补丁落地并由编排者重测；(2) codex 对加固后的复签；(3) 用户明确批准。state 保持 READY_FOR_REVIEW，未置 APPROVED_FOR_MERGE。",
-    "consult_adjudication": "codex rev2 判 REWORK；编排者判其阻塞级别不成立（提议判据被多错并报实测证伪），但接受底层关切并派发最小加固补丁。合入仍需加固后重跑 + codex 复签 + 用户批准。"
+    "merge_gate": "BLOCKED — (1) 加固补丁已落地 16bfdf3 并由编排者重测通过 ✅；(2) codex 对加固后的复签 ⏳未完成；(3) 用户明确批准 ⏳未取得。state 保持 READY_FOR_REVIEW，未置 APPROVED_FOR_MERGE。",
+    "consult_adjudication": "codex rev2 判 REWORK；编排者判其阻塞级别不成立（提议判据被多错并报实测证伪），但接受底层关切并派发最小加固补丁。合入仍需加固后重跑 + codex 复签 + 用户批准。",
+    "hardening_verified": "是 —— 编排者独立重测加固补丁（见 evidence.hardening_rev2），含两条反向探针证明新增不变量承重。加固未触碰被审脚本，仅测试文件。"
   },
   "consult": {
     "requested": true,
@@ -340,12 +381,13 @@
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
-    "updated_at": "2026-09-16T11:30:00Z",
+    "updated_at": "2026-09-16T14:05:00Z",
     "dispatched_at": "2026-09-16T12:40:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
     "redispatched_at": "2026-09-16T11:30:00Z",
     "reviewed_at": "2026-09-16T12:20:00Z",
     "refrozen_at": "2026-09-16T12:20:00Z",
-    "reviewed_rev2": "2026-09-16T13:20:00Z"
+    "reviewed_rev2": "2026-09-16T13:20:00Z",
+    "hardened_at": "2026-09-16T14:05:00Z"
   }
 }
