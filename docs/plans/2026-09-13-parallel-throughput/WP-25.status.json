@@ -3,11 +3,24 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
-    "tool": "kimi-cli",
-    "session": "e38b7640-6b4f-418c-9456-3ea6c0c1cd15"
+    "tool": "kimi",
+    "session": "e38b7640-6b4f-418c-9456-3ea6c0c1cd15",
+    "dispatched_at": "2026-09-16T11:09:34Z",
+    "dispatch_rev": 2,
+    "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev2-prompt.md)\"",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev2-prompt.md",
+    "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev2-exec.log",
+    "background_task_id": "bt371mi1p",
+    "dispatched_brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev2.md",
+      "sha256": "9d19fbe70e2f5b9dbbad757d18f9911777a7c7c8486ad02a33658bbb62aea66b",
+      "rev": 2
+    },
+    "dispatch_base_commit": "359cb1a",
+    "dispatch_note": "rev2 返工派发（自 CHANGES_REQUESTED 状态转入）。派发前置：brief 过活树 dispatch_lint.sh:151-183 section 判据（rc=1），WP-20 反向对照 rc=0 证判据有区分力；status 内全部 path+sha256 MATCH；锁 owner=claude-53c58ab0；preflight 自工作树内发起 PREFLIGHT_PASS。三个 WP allowed_paths 互不相交，故并行派发，不再受原 dispatch_ordering_constraint 约束（该约束前提为 WP-26 rev2 合入，已因 rev2 加固补丁复签 REWORK 而失效）。"
   },
   "orchestrator": {
     "tool": "claude-code",

@@ -3,10 +3,10 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
-    "tool": "kimi-cli",
+    "tool": "kimi",
     "session": "",
     "round": 3,
     "rev": 2,
@@ -23,7 +23,20 @@
       "brief_handoff": "prompt 里给的是主仓绝对路径 + rev2 的 sha256，并明确告知工作树内同名文件是历史快照不可作判据（规避 B16/B17）",
       "gate_note": "主仓活树 dispatch_lint.sh 仍按固定命名读 brief（B16 本体，正是本 WP 要修的），实测它 lint 的是 WP-26-brief.md（rev1）而非 rev2 —— 该 PASS 对 rev2 无效力。编排者已用真脚本 :69-101 的判据切片手工核过 rev2：rc=1 通过；同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 报缺段，证明切片有区分力。",
       "preflight": "PREFLIGHT_PASS branch=feature/wp26-brief-source-of-truth state=DISPATCHED worktree=/Users/admin/vibe/wp26-brief-source-of-truth（从工作树内以主仓绝对路径调用；PASS 行无 status= 字段属正常，那是 WP-27 rev1 新增、尚未合入主仓）"
-    }
+    },
+    "dispatched_at": "2026-09-16T11:09:34Z",
+    "dispatch_rev": 3,
+    "dispatch_command": "cd /Users/admin/vibe/wp26-brief-source-of-truth && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev3-prompt.md)\"",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev3-prompt.md",
+    "log": "~/.claude/jobs/8a8bf01e/tmp/wp26-rev3-exec.log",
+    "background_task_id": "by2ur76ts",
+    "dispatched_brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev3.md",
+      "sha256": "1fe6ed28ab70fab3cb6fc1dd031c9a4057fe7b82c8a6ba2964bd722f19796bbd",
+      "rev": 3
+    },
+    "dispatch_base_commit": "16bfdf3",
+    "dispatch_note": "rev3 返工派发（自 CHANGES_REQUESTED 状态转入）。派发前置：brief 过活树 dispatch_lint.sh:151-183 section 判据（rc=1），WP-20 反向对照 rc=0 证判据有区分力；status 内全部 path+sha256 MATCH；锁 owner=claude-53c58ab0；preflight 自工作树内发起 PREFLIGHT_PASS。三个 WP allowed_paths 互不相交，故并行派发，不再受原 dispatch_ordering_constraint 约束（该约束前提为 WP-26 rev2 合入，已因 rev2 加固补丁复签 REWORK 而失效）。"
   },
   "orchestrator": {
     "tool": "claude-code",
