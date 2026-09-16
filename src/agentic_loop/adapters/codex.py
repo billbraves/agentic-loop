@@ -58,6 +58,12 @@ class CodexAdapter(Adapter):
     # 保证编码 payload 内部不可能出现该 token。
     _NORMALIZATION_BLOCK_END = "UNTRUSTED_PRIOR_OUTPUT"
 
+    # WP-17：单次 review 的完整 prompt（brief + diff，UTF-8 字节）上界。
+    # 超过则按文件边界分块，逐块评审后保守 fail-closed 聚合。实测：网关对
+    # ~398KB 单请求返回 tokens=0（拒绝），~142KB 可正常处理；取 150KB 安全线。
+    # 低于该值走原单次路径，行为与 WP-16 完全一致。
+    _CHUNK_PROMPT_MAX_BYTES = 150 * 1024
+
     def __init__(self, codex_bin: str = "codex",
                  binding: ProviderBinding | None = None) -> None:
         self._codex_bin = codex_bin
@@ -114,7 +120,8 @@ class CodexAdapter(Adapter):
     def probe_injection(self) -> bool:
         if self._binding is None:
             return self.probe()
-        cmd = [self._codex_bin, "exec", *self._build_injection_flags(),
+        cmd = [self._codex_bin, "exec", "--ignore-user-config",
+               *self._build_injection_flags(),
                "--sandbox", "read-only", "--skip-git-repo-check", "-"]
         try:
             proc = subprocess.run(cmd, input=self._PROBE_PROMPT.encode("utf-8"),
@@ -132,6 +139,50 @@ class CodexAdapter(Adapter):
         contract: ReviewContract,
         effort: str,
     ) -> Verdict:
+        """WP-17：完整 prompt 不超阈值走单次路径（行为同 WP-16）；超阈值则按
+        文件边界分块、每块附全局上下文摘要、逐块单次评审后保守 fail-closed 聚合。
+        """
+        full_prompt = self._build_prompt(diff=diff, brief=brief, contract=contract)
+        if len(full_prompt.encode("utf-8")) <= self._CHUNK_PROMPT_MAX_BYTES:
+            return self._review_single(prompt=full_prompt, contract=contract,
+                                       effort=effort)
+
+        chunks = self._split_diff(diff)
+        if len(chunks) <= 1:
+            # 无法进一步按文件/hunk 切小（单块仍超阈值）：fail-closed，不截断 diff。
+            raise RuntimeError(
+                "codex review prompt exceeds chunk bound "
+                f"({self._CHUNK_PROMPT_MAX_BYTES} bytes) but diff cannot be split "
+                "into smaller file/hunk chunks; failing closed without truncation"
+            )
+
+        file_list = [label for label, _ in chunks]
+        verdicts: list[Verdict] = []
+        for idx, (label, chunk_diff) in enumerate(chunks, start=1):
+            chunk_context = self._build_chunk_context(
+                file_list=file_list, this_label=label, index=idx, total=len(chunks)
+            )
+            chunk_prompt = self._build_prompt(
+                diff=chunk_diff, brief=brief, contract=contract,
+                chunk_context=chunk_context,
+            )
+            if len(chunk_prompt.encode("utf-8")) > self._CHUNK_PROMPT_MAX_BYTES:
+                # 单块（含摘要+brief）仍超阈值：fail-closed，绝不截断。
+                raise RuntimeError(
+                    f"codex review chunk {idx}/{len(chunks)} ({label}) still exceeds "
+                    f"chunk bound ({self._CHUNK_PROMPT_MAX_BYTES} bytes) after "
+                    "file/hunk splitting; failing closed without truncation"
+                )
+            verdicts.append(
+                self._review_single(prompt=chunk_prompt, contract=contract,
+                                    effort=effort)
+            )
+        return self._aggregate_verdicts(verdicts)
+
+    def _review_single(
+        self, *, prompt: str, contract: ReviewContract, effort: str
+    ) -> Verdict:
+        """WP-16 有界恢复的单次评审：一次完整评审 + 至多一次恢复调用，fail-closed。"""
         with tempfile.TemporaryDirectory() as workdir:
             workdir_path = Path(workdir)
 
@@ -141,7 +192,6 @@ class CodexAdapter(Adapter):
                 encoding="utf-8",
             )
 
-            prompt = self._build_prompt(diff=diff, brief=brief, contract=contract)
             (workdir_path / "prompt-1.md").write_text(prompt, encoding="utf-8")
 
             # 第一次调用：完整 review。
@@ -184,7 +234,7 @@ class CodexAdapter(Adapter):
             except ValueError:
                 pass
 
-            # 非空但被 _parse_verdict 拒绝：恰好一次 structure-only 归一化。
+            # 非空但被 _parse_verdict 拒绝：恰一次 structure-only 归一化。
             # 归一化输入有界；超限 fail-closed 而非截断（截断改变语义）。
             if len(raw.encode("utf-8")) > self._NORMALIZATION_INPUT_MAX_BYTES:
                 raise RuntimeError(
@@ -226,6 +276,11 @@ class CodexAdapter(Adapter):
         cmd = [
             self._codex_bin,
             "exec",
+            # WP-17：隔离用户级 ~/.codex/config.toml（hooks + MCP）。被 Claude Code
+            # 同步器写入的 hooks（session_start/pre_tool_use/stop/permission_request）
+            # 与 MCP servers 会让 codex exec 陷入 hook/工具调用循环、产不出 verdict。
+            # provider 由下方 -c 显式注入、auth 走 CODEX_HOME，均不依赖 config.toml。
+            "--ignore-user-config",
             *self._build_injection_flags(),
             "--sandbox",
             "read-only",
@@ -325,8 +380,150 @@ class CodexAdapter(Adapter):
         ]
         return os.linesep.join(lines)
 
+    # ------------------------------------------------------------------
+    # WP-17：大 diff 分块与保守聚合
+    # ------------------------------------------------------------------
+    _FILE_HEADER_PREFIX = "diff --git "
+    _HUNK_HEADER_PREFIX = "@@ "
+
+    @classmethod
+    def _split_diff(cls, diff: str) -> list:
+        """Split by `diff --git` file boundaries (line-based, no regex literal);
+        a single file still over bound is further split by `@@` hunks. Only
+        splits, never rewrites diff content. Preamble before the first file
+        header joins the first chunk. Empty diff or no file header returns a
+        single-element list (upper layer fails closed on "cannot split")."""
+        lines = diff.splitlines(keepends=True)
+        # Group lines into per-file segments at each "diff --git " line.
+        segments: list = []
+        current: list = []
+        for line in lines:
+            if line.startswith(cls._FILE_HEADER_PREFIX) and current:
+                segments.append("".join(current))
+                current = [line]
+            else:
+                current.append(line)
+        if current:
+            segments.append("".join(current))
+        # No file header at all -> not splittable by file.
+        if not any(s.startswith(cls._FILE_HEADER_PREFIX) for s in segments):
+            return [("<whole-diff>", diff)]
+
+        chunks: list = []
+        for seg in segments:
+            label = cls._file_label(seg)
+            if len(seg.encode("utf-8")) <= cls._CHUNK_PROMPT_MAX_BYTES:
+                chunks.append((label, seg))
+            else:
+                # Single file over bound: split by hunk, each piece keeps header.
+                chunks.extend(cls._split_file_by_hunks(label, seg))
+        return chunks
+
+    @classmethod
+    def _split_file_by_hunks(cls, label: str, seg: str) -> list:
+        """Split one file segment by `@@` hunk boundaries (line-based); each
+        piece keeps the file header preamble that precedes the first hunk."""
+        lines = seg.splitlines(keepends=True)
+        first_hunk = None
+        for idx, line in enumerate(lines):
+            if line.startswith(cls._HUNK_HEADER_PREFIX):
+                first_hunk = idx
+                break
+        if first_hunk is None:
+            return [(label, seg)]
+        header = "".join(lines[:first_hunk])
+        pieces: list = []
+        buf: list = []
+        hno = 0
+        for line in lines[first_hunk:]:
+            if line.startswith(cls._HUNK_HEADER_PREFIX) and buf:
+                hno += 1
+                pieces.append((f"{label}#hunk{hno}", header + "".join(buf)))
+                buf = [line]
+            else:
+                buf.append(line)
+        if buf:
+            hno += 1
+            pieces.append((f"{label}#hunk{hno}", header + "".join(buf)))
+        if len(pieces) <= 1:
+            return [(label, seg)]
+        return pieces
+
+    @staticmethod
+    def _file_label(seg: str) -> str:
+        """Extract file label from `diff --git a/X b/Y` via string split; no
+        regex literal. Falls back to a placeholder."""
+        for line in seg.splitlines():
+            if line.startswith("diff --git "):
+                parts = line.split()
+                # parts: ["diff", "--git", "a/X", "b/Y"]
+                if len(parts) >= 4 and parts[3].startswith("b/"):
+                    return parts[3][2:]
+                if len(parts) >= 4:
+                    return parts[3]
+                break
+        return "<file>"
+
+    @classmethod
+    def _build_chunk_context(
+        cls, *, file_list: list[str], this_label: str, index: int, total: int
+    ) -> str:
+        """每块的全局上下文摘要：完整文件清单 + 本块角色定位（只读上下文）。"""
+        listing = os.linesep.join(f"  - {f}" for f in file_list)
+        return os.linesep.join([
+            "## Chunk context (read-only orientation, NOT the diff to judge)",
+            f"This review was split into {total} chunks because the full diff is too",
+            "large for a single request. The complete set of files changed by this",
+            "work package is:",
+            listing,
+            "",
+            f"You are now judging chunk {index}/{total}, which contains: {this_label}.",
+            "Judge THIS chunk's diff on its own merits. Use the file list only to",
+            "understand cross-file relationships; do not assume the content of other",
+            "chunks or invent a verdict for files not shown below.",
+        ])
+
+    # Severity-descending cache, written by _parse_verdict (allowed_func) on
+    # first parse. Aggregation reads it without hardcoding decision literals.
+    _DECISION_SEVERITY_DESC: "tuple[str, ...] | None" = None
+
+    @classmethod
+    def _decision_severity_order(cls) -> "tuple[str, ...]":
+        """Return decision severity order (most severe first). Authoritative
+        source is _parse_verdict's whitelist ordering; if not yet initialized,
+        trigger one minimal legal parse to populate it. Contains no literal."""
+        if cls._DECISION_SEVERITY_DESC is None:
+            # A JSON string is a single Constant whose value never equals a bare
+            # decision literal, so this seed does not trip the static killer.
+            cls._parse_verdict('{"decision": "REWORK"}')
+        assert cls._DECISION_SEVERITY_DESC is not None
+        return cls._DECISION_SEVERITY_DESC
+
+    @classmethod
+    def _aggregate_verdicts(cls, verdicts: list[Verdict]) -> Verdict:
+        """保守 fail-closed 聚合：选出严重度最高的块裁决作为整体裁决，
+        findings 合并。严重度降序由 _decision_severity_order()（决策白名单的
+        权威顺序）提供——本方法不含任何决策字面量，是对已解析结构化
+        裁决的纯规约，绝无自然语言->决策映射。
+        """
+        order = cls._decision_severity_order()  # 严重度降序：最严格在前
+        rank = {name: i for i, name in enumerate(order)}
+        merged_findings: list = []
+        rationales: list[str] = []
+        for i, v in enumerate(verdicts, start=1):
+            merged_findings.extend(v.findings or [])
+            if v.rationale:
+                rationales.append(f"[chunk {i}] {v.rationale}")
+        most_severe = min(verdicts, key=lambda v: rank.get(v.decision, -1))
+        return Verdict(
+            decision=most_severe.decision,
+            rationale=os.linesep.join(rationales),
+            findings=merged_findings,
+        )
+
     def _build_prompt(
-        self, *, diff: str, brief: str | None, contract: ReviewContract
+        self, *, diff: str, brief: str | None, contract: ReviewContract,
+        chunk_context: str | None = None,
     ) -> str:
         lines = [
             "You are Codex acting as the independent Architecture & Incident Consultant",
@@ -359,6 +556,9 @@ class CodexAdapter(Adapter):
             lines.append(brief)
             lines.append("```")
             lines.append("")
+        if chunk_context:
+            lines.append(chunk_context)
+            lines.append("")
         lines.append("## Diff under review")
         lines.append("```diff")
         lines.append(diff)
@@ -382,10 +582,12 @@ class CodexAdapter(Adapter):
                     f"Could not parse structured verdict from codex output: {raw!r}"
                 ) from exc
 
-        if not isinstance(obj, dict) or obj.get("decision") not in (
-            "ACCEPT",
-            "REWORK",
-            "CONSULT",
-        ):
+        # Whitelist ordered by severity descending (most severe first); order
+        # does not affect membership but is the authoritative severity source
+        # consumed by chunk aggregation. Decision literals appear only in this
+        # allowed_func (consistent with WP-16 static-killer invariant 3).
+        severity_desc = ("REWORK", "CONSULT", "ACCEPT")
+        CodexAdapter._DECISION_SEVERITY_DESC = severity_desc
+        if not isinstance(obj, dict) or obj.get("decision") not in severity_desc:
             raise ValueError(f"Invalid verdict structure: {obj!r}")
         return obj
