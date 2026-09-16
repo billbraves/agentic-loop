@@ -3,7 +3,7 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -51,7 +51,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp26-brief-source-of-truth",
     "worktree": "../wp26-brief-source-of-truth",
-    "commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
+    "commit": "57cd572",
     "dispatch_commit": "0a12bed",
     "commit_rev2_impl": "0b4deb28458098e6db055a3601d971702ab8b1af"
   },
@@ -355,23 +355,53 @@
       "sha256": "df31529085a3bc939851646030af4754ae4dbf81b5a4ac6e474a5b6a7c36f95f",
       "rev": 2,
       "covers": "B21：sha256 校验被固定命名回退分支跳过。主体已修复并经双签名确认，rev3 不回退这部分。"
+    },
+    "rev3": {
+      "commit": "57cd572",
+      "base": "16bfdf3",
+      "message": "test(dispatch-lint): tighten failure-output contract to continuation content (B25)",
+      "files_touched": [
+        "tests/test_dispatch_lint_brief_source.py"
+      ],
+      "diff_stat": "1 file changed, 195 insertions(+), 16 deletions(-)",
+      "scope_verified": "编排者独立核验 git diff --name-only 16bfdf3..57cd572 只含唯一 allowed 文件；dispatch_lint.sh / redispatch.py 零 diff（sha256 ca5d34de… / 5ef6f064… 未变）",
+      "tests_reproduced_by_orchestrator": [
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_dispatch_lint_brief_source.py -q",
+          "result": "20 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests -q",
+          "result": "4 failed, 626 passed, 4 skipped",
+          "exit_code": 1,
+          "note": "4 条失败全为 tests/test_finalize_merge_triple_sign.py 既有失败；620→626 = +6 == 新增用例数，零回归"
+        },
+        {
+          "cmd": "uv 3.13 targeted",
+          "result": "20 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "uv 3.14 targeted",
+          "result": "20 passed",
+          "exit_code": 0
+        }
+      ],
+      "orchestrator_probe_revert_helper": "把 helper 还原成 16bfdf3 形态（stdout.strip() + 无续行断言）→ 4 failed / 16 passed，转红的恰是三条逃逸用例 + forbidden 变异用例；探针后 git diff 为空（逐字节还原）。证明新断言承重。",
+      "orchestrator_probe_over_tighten": "把 codex 上一轮被证伪的全局判据 len(lines)==1 塞进 helper → 2 failed，转红的恰是两条正当路径（multi_error + accepts_declared_continuations）。证明严格默认值未误伤合法多错路径，且判据方向双向可辨。",
+      "measured_at": "2026-09-16T11:29:37Z"
     }
   },
   "review": {
-    "decision": "REWORK",
-    "reviewer": "orchestrator (claude)",
-    "reviewed_at": "2026-09-16T05:58:00Z",
-    "reviewed_commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
-    "rev": "2+harden",
-    "basis": "编排者撤回本 WP 上一轮对加固补丁 16bfdf3 的 ACCEPT。codex 复签提出的两条缺口（C1 任意非 token 续行未受约束、C2 `stdout.strip()==\"\"` 放过纯空白 stdout）均由编排者独立实测**证实**，且其提议的替代判据经实测可实施、无假红。加固补丁的目标恰是收紧输出契约，故这两条属于目标之内的有界缺陷，合入前必须修。",
-    "blocking_defect": [
-      "C1",
-      "C2"
-    ],
-    "what_still_holds": "rev2 主体（B21 修复本体）不受影响：sha256 校验脱离 path 在场、四种在场组合矩阵含正控制、变异测试在 scratch 副本、redispatch.py 零 diff、3.11/3.13/3.14 全绿、零回归（620 passed，4 条既有失败集不变）。本次 REWORK 只针对加固补丁的断言强度，不回退 rev2 已验证的行为。",
-    "supersedes": "review.decision=ACCEPT @ 16bfdf3（2026-09-16T13:20:00Z 起算，本次撤回；漏判理由见 consult.findings_blocking_claimed[0].why_my_previous_adjudication_was_incomplete）",
-    "merge_gate": "BLOCKED — 三项全部未过：(1) 加固补丁被复签驳回，需再次返工 ❌；(2) codex 复签结论为 REWORK ❌；(3) 用户批准未取得且**本轮不应请求** ⏳。state 由 READY_FOR_REVIEW 退回 CHANGES_REQUESTED。",
-    "orchestrator_self_finding": "本轮暴露编排者自身的判据生长盲点：我用「关切的一部分」冒充「关切的全部」，并据此判 ACCEPT。第二签名连续两轮在同一子句上捕获我的漏判（上轮 B21 的 sha256 回退、本轮 C1 的续行未约束），两次都是我先判绿。"
+    "decision": "ACCEPT",
+    "reviewer": "claude (orchestrator, independent)",
+    "reviewed_at": "2026-09-16T11:29:37Z",
+    "reviewed_commit": "57cd572",
+    "basis": "逐条核对冻结 rev3 brief 的 5 项交付物；独立重跑全部测试命令，数字逐一吻合；两条反向探针（还原 helper / 过度收紧）双向证明判据承重且不误红。C1（续行内容未受约束）与 C2（strip 放过纯空白 stdout）均已按 codex 处方的形式修复：stdout 逐字节断言、普通路径续行元组恒等于 ()、多错路径显式声明精确续行元组。",
+    "b25_closed": "是。B25 的反例集合（token 后任意非 token 续行 / stdout=' ' / stdout='\\n'）与新断言拒绝的集合一致 —— 三条逃逸各有独立用例且实测转红。",
+    "merge_gate": "① 编排者独立重测通过 ✅  ② codex 第二签名（对 57cd572）⏳  ③ 用户明确批准合入 ⏳",
+    "orchestrator_self_finding": "B26：我在 rev3 brief 里写「基线 16bfdf3 targeted = 23 passed」是错的，实测 collect 为 14。执行者在 [CONCERNS] 里指出并给出实测值，核验属实。派发 prompt 未含该数字，故未污染交付。"
   },
   "consult": {
     "requested": true,

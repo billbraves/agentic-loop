@@ -3,7 +3,7 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -35,7 +35,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp25-protocol-disciplines",
     "worktree": "../wp25-protocol-disciplines",
-    "commit": "359cb1a2399f72d306641405139ab5ac0468e6ab",
+    "commit": "284e223",
     "dispatch_commit": "58c7624"
   },
   "scope": {
@@ -199,13 +199,62 @@
       "reason": "本 WP 的 status.evidence.brief.path 现指向 WP-25-brief-rev2.md，而主仓活树 dispatch_lint.sh 仍按固定命名推出 WP-25-brief.md（缺陷 B16 本体，其修复者正是 WP-26）。直接派发等于拿 rev1 判 rev2。",
       "measured": "以 WP-26 status 实测：活树 dispatch_lint.sh 解析出 brief_file=…/WP-26-brief.md 并给出 DISPATCH_LINT_PASS —— 声明的 rev2 路径完全不参与。",
       "workaround_if_dispatched_early": "已执行判据切片直跑（rev2 修正后 rc=1 通过）；但门禁本身仍会读 rev1 正文，故派发时必须在 prompt 里给出 rev2 的主仓绝对路径，且不得依赖门禁校验 brief 内容。"
+    },
+    "rev2": {
+      "commit": "284e223",
+      "base": "359cb1a",
+      "message": "♻️ rework(2026-09-13-parallel-throughput): WP-25 rev2 纪律锚点钉入可操作子句（B20 返工）",
+      "files_touched": [
+        "tests/test_orchestrator_protocol_disciplines.py"
+      ],
+      "diff_stat": "1 file changed, 103 insertions(+), 12 deletions(-)",
+      "scope_verified": "CLAUDE.md.tmpl 未改（sha256 保持 0746351e…acba122a）；contract_render.py 未碰，CONTRACT_TEMPLATE_VERSION 仍为 \"7\" 未再 bump；三份渲染产物零行 diff",
+      "anchors_added": {
+        "negative_assertion": [
+          "flip exactly one input",
+          "flip with it"
+        ],
+        "read_face_pinning": [
+          "consumer channel",
+          "-revN"
+        ]
+      },
+      "tests_reproduced_by_orchestrator": [
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+          "result": "10 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests -q",
+          "result": "4 failed, 607 passed, 4 skipped",
+          "exit_code": 1,
+          "note": "606→607 = +1 == 新增守卫用例，零回归"
+        },
+        {
+          "cmd": "uv 3.13 targeted",
+          "result": "10 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "uv 3.14 targeted",
+          "result": "10 passed",
+          "exit_code": 0
+        }
+      ],
+      "orchestrator_probe_b20_reversal": "在**活树**模板上原样施加 B20 的两处掏空（保留 label 锚点 'differential pair'/'historical snapshot'）→ 4 failed，失败措辞分别为 missing anchor 'flip exactly one input' 与 missing anchor 'consumer channel'（原因特异，互不相同），另含渲染产物用例同步转红。rev1 下同一变换为 9 passed。B20 反转成立。探针后 sha256 还原为 0746351e…acba122a。",
+      "orchestrator_probe_b10_no_brittleness": "反向探针：只改写锚点**周边**措辞（'hold everything else constant' → 'keep every other input fixed' 等）而保留全部六个锚点短语 → 九条锚点断言全绿，未误红。证明锚点仍是短语级、未锁整段（修 B20 未反踩 B10）。",
+      "measured_at": "2026-09-16T11:29:37Z"
     }
   },
   "review": {
-    "decision": "REWORK",
-    "reviewer": "claude",
-    "at": "2026-09-16T11:55:00Z",
-    "reason": "B20: anchors survive deletion of the semantics they name; see evidence.orchestrator_independent_review.blocking_defect"
+    "decision": "ACCEPT",
+    "reviewer": "claude (orchestrator, independent)",
+    "reviewed_at": "2026-09-16T11:29:37Z",
+    "reviewed_commit": "284e223",
+    "basis": "3 项交付物齐备：锚点已补到可操作子句（差分对方法的「只翻一个输入 / 红绿随之翻转」、rev 改名的「消费通道 / -revN」）、掏空守卫用例存在且两处各自独立转红且措辞互不相同、每条负面断言带 oracle 三项。编排者双向探针：B20 变换必红、周边改写不红。rev1 已核验的七项全部保留。",
+    "merge_gate": "① 编排者独立重测通过 ✅  ② codex 第二签名（对 284e223）⏳  ③ 用户明确批准合入 ⏳",
+    "residual_non_blocking": "B27（非阻塞）：守卫用例的两条 evisceration 正则锚在**非锚点**措辞上，改写周边措辞会让正则匹配不到，用例报 'discipline-N evisceration produced no change' 而红。编排者实测确认这是 fail-closed（响亮失败 + 自解释措辞，迫使改写者重新确认锚点），不是空过，故不阻塞合入；已记入缺陷账。"
   },
   "consult": {
     "decision": null,
