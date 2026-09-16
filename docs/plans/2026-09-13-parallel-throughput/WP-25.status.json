@@ -3,11 +3,11 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": ""
+    "session": "e38b7640-6b4f-418c-9456-3ea6c0c1cd15"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -22,7 +22,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp25-protocol-disciplines",
     "worktree": "../wp25-protocol-disciplines",
-    "commit": "",
+    "commit": "359cb1a2399f72d306641405139ab5ac0468e6ab",
     "dispatch_commit": "58c7624"
   },
   "scope": {
@@ -58,21 +58,41 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief.md",
-      "sha256": "a84d74409003477bb70a2f5af9eeba2b1a11601c1b75d7106c87b3a758622b69",
-      "rev": 1,
-      "covers": "任务 #12（B11 冻结前自检进协议）+ 任务 #14（B14 agentic 源码路径/协议示例）合并；同时纳入 B16/B17 的读取面纪律",
-      "prefreeze_check": {
-        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）；切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py",
-        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
-        "discriminating_power": "同一切片对 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-24-brief-rev2.md 与 WP-25-brief.md 返回 rc=1 —— 切片有区分力，不是恒绿",
-        "checked_at": "2026-09-16T00:00:00Z"
-      },
-      "gate_alignment": {
-        "note": "B16 仍未修：门禁与 redispatch 都按固定命名 WP-25-brief.md 读，本 brief 已用该固定名，无需 workaround"
-      }
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev2.md",
+      "sha256": "ebf8e12c5387b9638e3c9749aff281cb362d3ff717025c8e62a986046064989a",
+      "rev": 2,
+      "refreeze_reason": "B20 rework: anchors must pin the operative clauses, not the label words"
     },
-    "tests": [],
+    "tests": [
+      {
+        "name": "orchestrator_protocol_disciplines + contract_render + init_contract (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py tests/test_contract_render.py tests/test_init_contract.py -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "full suite (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest -q",
+        "result": "4 failed, 606 passed, 4 skipped — +9 passed vs baseline 597, delta == new test count, zero regression",
+        "exit_code": 1,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.13)",
+        "cmd": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest python -m pytest <targeted> -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.14)",
+        "cmd": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest python -m pytest <targeted> -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      }
+    ],
     "baseline": {
       "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
       "measured_at": "2026-09-16T08:30:00Z",
@@ -100,19 +120,68 @@
       },
       "round1_leftover_verified_by_orchestrator": "round-1 残留经编排者独立核验成立：contract_render.py 6→7、CLAUDE.md.tmpl +28/-1、未跟踪 tests/test_orchestrator_protocol_disciplines.py(155 行/9 用例)。3.11 全量 4 failed/606 passed/4 skipped（基线 597 passed，+9 == 新增用例数，零回归成立）；3.13/3.14 经 uv run 跑新测试+两个版本守卫用例 39 passed；渲染产物零行 diff 成立；两次禁忌变异（differential pair / historical snapshot）各自转红且失败措辞互不相同，还原后字节一致（sha256 0746351e…）。执行者是在 git commit 之前被杀的，代码本身基本可交付。",
       "redispatch_reason": "执行者模型由 kimi-for-coding 切换为 deepseek；不续跑旧 session（避免同一 WP 中途换模型、执行记录归属不清），改为在同一工作树新派发，round-1 残留如实告知执行者。"
-    }
+    },
+    "orchestrator_independent_review": {
+      "scope": "diff touches exactly 3 allowed paths: contract_render.py (version bump only), CLAUDE.md.tmpl (+29/-1), tests/test_orchestrator_protocol_disciplines.py (new, 155 lines); zero forbidden-path writes",
+      "rendered_artifacts_zero_line_diff": "git status --porcelain -- CLAUDE.md AGENTS.md docs/agentic/OPERATING_MODEL.md is empty in the worktree",
+      "oracle_item_1_positive_control": "test_template_carries_control_anchor asserts '## Dispatch'/'## Review' present on the same fixture",
+      "oracle_item_2_cause_specificity": "orchestrator re-ran both mutations: 'differential pair'->'differential couple' fails with \"missing anchor 'differential pair' for discipline 'negative_assertion'\"; 'historical snapshot'->'stale copy' fails with \"missing anchor 'historical snapshot' for discipline 'read_face_pinning'\" — messages differ verbatim, so no differential pair is required here",
+      "oracle_item_3_forbidden_mutation": "both mutations turn 2 tests red (2 failed, 7 passed) and restore byte-identically: sha256 0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a before and after; worktree clean",
+      "deliverable_2_self_consistency": "chose the warn-in-place option on both examples; test_preflight_example_carries_frozen_copy_warning and test_health_check_example_carries_frozen_copy_warning pin it by window search, not whole-line equality",
+      "verdict": "REWORK",
+      "note": "executor re-ran its own evidence as required by the r2 dispatch; every number recorded here is the orchestrator's own run, not a transcription of the executor's",
+      "superseded_earlier_verdict": "an earlier ACCEPT in this same field was written before the anchor-vs-semantics probe below; it is wrong and is retained only as a record",
+      "blocking_defect": {
+        "id": "B20",
+        "summary": "the six semantic anchors do not pin the semantics they are named for: the 'how' of discipline 2 and the whole rev-rename clause of discipline 3 can be deleted while every anchor string survives, and all 9 tests stay green",
+        "found_by": "codex (its last successful probe before it crashed), independently reproduced by the orchestrator",
+        "reproduction": "keep 'file:line' and 'differential pair'; replace 'use a differential pair instead: hold everything else constant, flip exactly one input, and require the red/green verdict to flip with it.' with 'use a differential pair instead.'; and delete the entire 'When a frozen artifact is renamed (-revN), verify that every consumer channel follows the new name (a gate that reads a fixed filename does not).' clause -> pytest tests/test_orchestrator_protocol_disciplines.py -q => 9 passed",
+        "why_it_matters": "this WP's own subject is brittle/vacuous assertions (B11, B19). A template gutted of its 'how' still renders into every adopting project and still passes its own guard, so the discipline reaches projects as a slogan without a method.",
+        "required_fix": "add anchors for the operative clauses themselves, not only the label words: the differential-pair method (hold-everything-constant / flip-one-input / verdict-flips) and the rev-rename consumer-channel check. Keep them semantic, not whole-paragraph."
+      },
+      "what_did_hold": {
+        "scope": "diff touches exactly 3 allowed paths; zero forbidden-path writes; rendered artifacts zero-line diff",
+        "version_bump": "6 -> 7, matches the template text change (codex confirmed both sides of the commit)",
+        "cause_specificity": "the two anchor mutations do fail with verbatim-different messages naming anchor and discipline",
+        "restore_fidelity": "template sha256 0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a before and after every mutation",
+        "tests": "39 passed on 3.11/3.13/3.14; full 3.11 = 4 failed, 606 passed, 4 skipped (+9 vs baseline 597, zero regression)"
+      }
+    },
+    "brief_rev1": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief.md",
+      "sha256": "a84d74409003477bb70a2f5af9eeba2b1a11601c1b75d7106c87b3a758622b69",
+      "rev": 1,
+      "covers": "任务 #12（B11 冻结前自检进协议）+ 任务 #14（B14 agentic 源码路径/协议示例）合并；同时纳入 B16/B17 的读取面纪律",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）；切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-24-brief-rev2.md 与 WP-25-brief.md 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T00:00:00Z"
+      },
+      "gate_alignment": {
+        "note": "B16 仍未修：门禁与 redispatch 都按固定命名 WP-25-brief.md 读，本 brief 已用该固定名，无需 workaround"
+      }
+    },
+    "refreeze_count": 2
   },
   "review": {
-    "decision": null
+    "decision": "REWORK",
+    "reviewer": "claude",
+    "at": "2026-09-16T11:55:00Z",
+    "reason": "B20: anchors survive deletion of the semantics they name; see evidence.orchestrator_independent_review.blocking_defect"
   },
   "consult": {
-    "decision": null
+    "decision": null,
+    "note": "codex run crashed on its own final probe (exit 1) before emitting a verdict; its last successful probe is the source of B20. Re-consult after the rework."
   },
   "timestamps": {
     "created_at": "2026-09-16T00:00:00Z",
     "updated_at": "2026-09-16T11:30:00Z",
     "dispatched_at": "2026-09-16T08:35:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
-    "redispatched_at": "2026-09-16T11:30:00Z"
+    "redispatched_at": "2026-09-16T11:30:00Z",
+    "ready_for_review_at": "2026-09-16T11:40:00Z",
+    "changes_requested_at": "2026-09-16T11:55:00Z",
+    "refrozen_at": "2026-09-16T12:05:00Z"
   }
 }

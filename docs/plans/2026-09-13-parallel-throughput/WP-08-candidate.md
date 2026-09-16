@@ -2750,3 +2750,47 @@ the write-back transport` 诊断。—— 注意这条修法本身又是一次�
 **建议修法**：补一条紧凑 JSON fixture 的用例（同一载荷、`json.dumps` 无 `indent`），
 让「仅传输编码回退」这一变异有一条能复现突破的用例钉住。已记入
 `WP-22.status.json` 的 `evidence.remaining_risks`。
+
+---
+
+## B20 · 语义锚点钉住的是**标签词**，不是它命名的**可操作子句**（WP-25 实测）
+
+**发现者**：codex（第二签名咨询中，它崩溃前最后一个成功探针）；编排者独立复现。
+
+**位置**：`tests/test_orchestrator_protocol_disciplines.py` 的 `DISCIPLINE_ANCHORS`
+（WP-25 commit `359cb1a`）。
+
+```python
+DISCIPLINE_ANCHORS = {
+    "criteria_sourcing": ["authoritative source itself", "retype"],
+    "negative_assertion": ["file:line", "differential pair"],
+    "read_face_pinning": ["PYTHONPATH=src bash src/agentic_loop/wrappers/", "historical snapshot"],
+}
+```
+
+**实测**：保留全部六个锚点字串不动，只做两处删除 ——
+
+1. 纪律 2 的方法整句：
+   `use a differential pair instead: hold everything else constant, flip exactly one
+   input, and require the red/green verdict to flip with it.`
+   → `use a differential pair instead.`
+2. 纪律 3 的 rev 改名子句整段删除：
+   `When a frozen artifact is renamed (-revN), verify that every consumer channel
+   follows the new name (a gate that reads a fixed filename does not).`
+
+结果：`pytest tests/test_orchestrator_protocol_disciplines.py -q` → **9 passed**，全绿。
+
+**为什么这是缺陷而非风格问题**：本 WP 的主题恰恰是「判据来源」与「负面断言不得空验证」
+（B11 / B19）。锚点只钉住了纪律的**名字**，没钉住它的**做法**。一份被掏空 how 的模板
+仍然会渲染进每个接入项目、仍然通过自己的守卫 —— 纪律以口号形态到达项目，方法丢失。
+这是 A19/B10「锚点缺失」的**下一层**：锚点存在，但钉的位置不承重。
+
+**教训**：语义锚点的选取要落在**可操作子句**上，而不是该子句的标题词。
+判断标准：假想有人把这段话压缩成一句口号，你的锚点还在不在？在，就说明没钉住。
+
+**修法**（WP-25 rev2）：为两处可操作子句各补语义锚点 ——
+差分对方法（恒定其余 / 只翻一个输入 / 红绿随之翻转）与 rev 改名的消费通道核验；
+仍用短语锚点，不锁整段措辞（避免反向踩 B10 的脆断言）。
+
+> 关联：本条与 B10（锚点缺失）、B11（判据来自副本）、B19（红的原因未必是你钉的那层）
+> 同属「断言看起来成立、实际没钉住判据」这一族。
