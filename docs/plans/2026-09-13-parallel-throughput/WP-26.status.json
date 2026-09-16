@@ -3,7 +3,7 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -73,13 +73,22 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md",
-      "sha256": "df31529085a3bc939851646030af4754ae4dbf81b5a4ac6e474a5b6a7c36f95f",
-      "rev": 2,
-      "refreeze_count": 2,
-      "covers": "B21：dispatch_lint.sh 的固定命名回退分支在 sha256 校验之前 SystemExit(0)，于是「声明了 sha256、未声明 path」静默跳过校验；同时 redispatch.py 对同一形态拒收，两个消费者裁决相反，违反 rev1 交付物 3 的同口径要求。",
-      "scope_note": "rev2 只修 B21 + 补四种在场组合 + 变异改 scratch copytree + 清空诊断行；rev1 已验证的七项行为不得改动，redispatch.py 零 diff。",
-      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md"
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev3.md",
+      "sha256": "1fe6ed28ab70fab3cb6fc1dd031c9a4057fe7b82c8a6ba2964bd722f19796bbd",
+      "rev": 3,
+      "refreeze_count": 3,
+      "covers": "B25 (= consult C1+C2)：加固补丁只约束失败输出续行的**起点**（首行是 token），未约束续行**内容**，故「token 行 + 任意非 token 续行」逃逸；且 `stdout.strip()==\"\"` 与其 docstring 宣称的 'stdout is empty' 不等价，放过纯空白 stdout。",
+      "scope_note": "rev3 只动 tests/test_dispatch_lint_brief_source.py 一个文件，纯断言强度收紧。dispatch_lint.sh 与 redispatch.py 均零 diff——脚本当前行为已正确（9 条路径实测恰 1 行、stdout 逐字节空），要收紧的是测试对它的约束。",
+      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md",
+      "prefreeze_check": {
+        "method": "把活树 dispatch_lint.sh 的 section 判据 heredoc 按内容定位切片出来直跑（B11 修法 1：判据只能来自真脚本）。注意 rev2 改动了脚本行号，旧的 :69-101 切片边界已失效——本次按 grep 定位到 :151-183，并 diff 证明与活树逐字节相同。",
+        "slice": "/Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred_rev3.py (dispatch_lint.sh:151-183)",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "caught_before_dispatch": "首版 rev3 用了中文标题 `## 完成定义（DoD）`，判据实测 rc=0 报 \"brief missing section 'Completion definition'\" —— 即 B23 同一形态在我自己的 brief 上第二次复发。已改回英文锚点并复测通过。",
+        "discriminating_power": "同一切片：rev2 brief → rc=1（PASS）；首版 rev3 → rc=0 缺 'Completion definition'；已知不合规的 WP-20-brief.md → rc=0 缺 'Acceptance tests'。三种不同结果证明切片有区分力，非恒绿。",
+        "checked_at": "2026-09-16T06:05:00Z"
+      },
+      "third_refreeze_review": "本 WP 已第 3 次 re-freeze，按自订规则（任务 #24）触发计划复核。编排者复核结论：继续而非停手——范围极小（1 文件、纯断言强度）、根因明确（B25）、且判据形式已由编排者在冻结前实测可实施（三条逃逸全捕获、两条正当路径不误红）。复核结论同时写进 rev3 brief 正文附注。"
     },
     "tests": [
       {
@@ -327,67 +336,82 @@
       ],
       "worktree_clean_after_runs": true,
       "measured_at": "2026-09-16T14:05:00Z"
+    },
+    "brief_rev2": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md",
+      "sha256": "df31529085a3bc939851646030af4754ae4dbf81b5a4ac6e474a5b6a7c36f95f",
+      "rev": 2,
+      "covers": "B21：sha256 校验被固定命名回退分支跳过。主体已修复并经双签名确认，rev3 不回退这部分。"
     }
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "orchestrator (claude)",
-    "reviewed_at": "2026-09-16T13:20:00Z",
+    "reviewed_at": "2026-09-16T05:58:00Z",
     "reviewed_commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
-    "rev": 2,
-    "basis": "rev2 冻结 brief 四项交付物逐条实测通过（见 evidence.orchestrator_independent_review_rev2）：sha256 校验脱离 path 在场、四种在场组合矩阵齐备且含 no-path+correct-sha 正控制、变异改在 scratch 副本、每条失败路径恰一行 FAIL token。零回归成立（616 -> 619，失败集合不变）。3.11/3.13/3.14 全绿。redispatch.py 零 diff。",
-    "blocking_defect": null,
-    "non_blocking": [
-      "R1 内层 python 崩溃 fail-open 到 rc=1（A29 家族既有形态，判据外）",
-      "R2 fail message 单行约束（fail-closed 方向正确）"
+    "rev": "2+harden",
+    "basis": "编排者撤回本 WP 上一轮对加固补丁 16bfdf3 的 ACCEPT。codex 复签提出的两条缺口（C1 任意非 token 续行未受约束、C2 `stdout.strip()==\"\"` 放过纯空白 stdout）均由编排者独立实测**证实**，且其提议的替代判据经实测可实施、无假红。加固补丁的目标恰是收紧输出契约，故这两条属于目标之内的有界缺陷，合入前必须修。",
+    "blocking_defect": [
+      "C1",
+      "C2"
     ],
-    "next_gate": "需 codex 第二签名后才可提交用户批准合入；编排者不得自签自批（本轮 B21 正是编排者一审漏判、由第二签名捕获）。",
-    "supersedes": "review.decision=REWORK @ 0a12bed（B21）",
-    "merge_gate": "BLOCKED — (1) 加固补丁已落地 16bfdf3 并由编排者重测通过 ✅；(2) codex 对加固后的复签 ⏳未完成；(3) 用户明确批准 ⏳未取得。state 保持 READY_FOR_REVIEW，未置 APPROVED_FOR_MERGE。",
-    "consult_adjudication": "codex rev2 判 REWORK；编排者判其阻塞级别不成立（提议判据被多错并报实测证伪），但接受底层关切并派发最小加固补丁。合入仍需加固后重跑 + codex 复签 + 用户批准。",
-    "hardening_verified": "是 —— 编排者独立重测加固补丁（见 evidence.hardening_rev2），含两条反向探针证明新增不变量承重。加固未触碰被审脚本，仅测试文件。"
+    "what_still_holds": "rev2 主体（B21 修复本体）不受影响：sha256 校验脱离 path 在场、四种在场组合矩阵含正控制、变异测试在 scratch 副本、redispatch.py 零 diff、3.11/3.13/3.14 全绿、零回归（620 passed，4 条既有失败集不变）。本次 REWORK 只针对加固补丁的断言强度，不回退 rev2 已验证的行为。",
+    "supersedes": "review.decision=ACCEPT @ 16bfdf3（2026-09-16T13:20:00Z 起算，本次撤回；漏判理由见 consult.findings_blocking_claimed[0].why_my_previous_adjudication_was_incomplete）",
+    "merge_gate": "BLOCKED — 三项全部未过：(1) 加固补丁被复签驳回，需再次返工 ❌；(2) codex 复签结论为 REWORK ❌；(3) 用户批准未取得且**本轮不应请求** ⏳。state 由 READY_FOR_REVIEW 退回 CHANGES_REQUESTED。",
+    "orchestrator_self_finding": "本轮暴露编排者自身的判据生长盲点：我用「关切的一部分」冒充「关切的全部」，并据此判 ACCEPT。第二签名连续两轮在同一子句上捕获我的漏判（上轮 B21 的 sha256 回退、本轮 C1 的续行未约束），两次都是我先判绿。"
   },
   "consult": {
     "requested": true,
     "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
-    "session": "rev2 咨询（--output-schema 解析失败，原文已留痕）",
+    "session": "加固补丁复签（第 3 次咨询）；--output-schema 解析失败，原文逐字留痕",
     "verdict": "REWORK",
-    "rev": 2,
-    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-rev2-verdict.raw.txt",
-    "consulted_at": "2026-09-16T13:19:00Z",
-    "input": {
-      "brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-rev2-brief.md",
-      "diff": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-rev2.diff（0a12bed..0b4deb2，345 行）"
-    },
-    "disclosed_limitation": "沙箱只读、未自行跑测试，采用 brief 中编排者实测数字（与上一轮同）。",
-    "findings_confirmed_green": [
-      "sha256 校验确实位于 declared/fallback 汇合之后，且只有一份实现，满足单一口径",
-      "「无 path + 正确 sha256 → PASS」正控制能挡住「缺 path 一律拒收」的过度修复",
-      "两条变异用例都在 copytree scratch 副本上跑，中性化实验足以证明其有行为区分力，非装饰",
-      "R1（内层 python 崩溃 rc=1）保持非零退出、未造成绕过、属既有行为，同意另立 WP",
-      "R2（message 单行约束）仍 fail-closed，同意本 WP 内不阻塞",
-      "未发现其他 correctness/architecture/security 阻塞项"
-    ],
+    "rev": "2+harden",
+    "reviewed_commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
+    "reviewed_range": "0b4deb2..16bfdf3（仅 tests/test_dispatch_lint_brief_source.py）",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-harden-verdict.raw.txt",
+    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-harden.md",
+    "request_brief": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-harden-request.md",
+    "consulted_at": "2026-09-16T05:52:00Z",
+    "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字。",
+    "conceded_by_consultant": "(a) 编排者上一轮对 `len(stderr.splitlines()) == 1` 的驳回**成立** —— consultant 明确认可 validator 多错并报是正当路径、全局单行断言会误伤，并认可编排者的反向探针足以证明这一点。B24 的裁定因此被第二签名独立确认。",
     "findings_blocking_claimed": [
       {
-        "claim": "交付物 4 的 `_assert_single_fail_token()` 只查 `stderr.count(\"DISPATCH_LINT_FAIL:\") == 1`，不能排除额外的非 token 输出；建议改为 `len(stderr.splitlines()) == 1` 且首行以 token 开头，并断言 stdout 为空。",
-        "orchestrator_adjudication": "部分接受：**阻塞级别不成立，但底层关切接受并已派发加固。**",
-        "why_blocking_not_sustained": "codex 提议的具体判据 `len(stderr.splitlines()) == 1` 被编排者实测证伪：构造一份**两处**校验错误的 status（state 与 review.decision 同时非法）后实测 rc=2、stderr **2 行**、token 恰 1 次 —— 第 1 行 `DISPATCH_LINT_FAIL: STATUS_INVALID: invalid state: 'NOT_A_STATE'`，第 2 行 `STATUS_INVALID: review.decision is invalid: 'NOPE'`。这是 validator 多错并报的**正当**诊断续行，正是 codex 举的「unexpected diagnostic」形状。按其提议改判据会把这条正当路径判红。此外冻结 brief 交付物 4 的原文判据是「stderr 里 `DISPATCH_LINT_FAIL:` **恰好出现一次**」，现测试逐字满足；空重复 token 行会使 count 变 2，故该断言确实钉住了 B21 那个具体缺陷。以未写入判据、且其具体形式被实测证伪的标准驳回，等于让判据在执行后生长（B16 家族错误，与 B22 同一纪律）。",
-        "what_is_accepted": "stdout 未被断言为空、首行位置未被钉住，确属测试强度缺口。编排者实测全部 9 条失败路径（含多错并报）stdout 均为 0 行，故可安全加固为：stdout 为空 + token 计数恰 1 + `stderr.splitlines()[0].startswith(\"DISPATCH_LINT_FAIL:\")`。该形式对多错并报仍成立。",
-        "resolution": "不 re-freeze（这是交付物 4 同一子句内的强度加固，不是新判据；本 WP 已 refreeze_count=2，第 3 次会触发自订规则 #24 强制停手复核）。以同一 rev2 brief 派发最小补丁。"
+        "id": "C1",
+        "claim": "加固后的三条不变量仍不充分：`DISPATCH_LINT_FAIL: x` + 任意非 token 续行（如 `unexpected diagnostic`）仍全部通过 helper —— token 恰 1 次、位于首行、stdout 空。上一轮指出的「任意非 token 续行未受约束」并未被消除；新增的双错测试只证明了某些续行合法，却没有区分**合法续行**与**意外泄漏**。",
+        "orchestrator_adjudication": "**接受，阻塞成立。**",
+        "orchestrator_verification": "编排者直接 import 被审树自己的 `_assert_single_fail_token` 逐形状实测（B14 纪律）：`P(stdout='', stderr='DISPATCH_LINT_FAIL: brief sha256 mismatch\\nunexpected diagnostic\\n')` → **PASSES helper**。consultant 举的形状确实逃逸，与上一轮不同，这次其判断被实测**证实**而非证伪。",
+        "why_my_previous_adjudication_was_incomplete": "上一轮我把关切落在「stdout 必空 + token 首行位置」上，并判定这对多错并报仍成立——后半句对，但前半句并未覆盖 consultant 关切的本体。consultant 的关切是「续行内容不受约束」，我的加固只约束了续行的**起点**（首行必须是 token），没约束续行的**内容**。这是我这一轮判 ACCEPT 时的漏判。"
+      },
+      {
+        "id": "C2",
+        "claim": "`stdout.strip() == \"\"` 不等价于 stdout 为空：会放过 `\" \"`、`\"\\n\"` 等纯空白输出，与 docstring 宣称的 'stdout is empty' 及实测表的「stdout: 0 行」不一致。应改为 `assert proc.stdout == \"\"`。",
+        "orchestrator_adjudication": "**接受，阻塞成立（且这是我自己引入的判据与其自身 docstring 不符）。**",
+        "orchestrator_verification": "实测：`P(stdout=' ', ...)` 与 `P(stdout='\\n', ...)` 两种纯空白 stdout 均 **PASSES helper**。而编排者本人的 10 条失败路径实测里 stdout 全部为**逐字节空串**（下方 measured_failure_paths），故逐字节断言不会引入假红。"
       }
     ],
-    "note": "本轮第二签名的阻塞项在结论方向上未被采纳，但其关切被实测细化后接受——这是本会话首次出现「第二签名的诊断正确、但其提议的判据被实测证伪」的情形，编排者的处置是取其关切、弃其形式，并把证伪实测留痕。"
+    "prescription_verified_this_round": {
+      "note": "与上一轮相反：这一次编排者在裁定前先实测了 consultant **提议判据本身**是否可实施（记忆 verify-the-remedy-not-just-the-finding 的直接应用）。",
+      "shape_tested": "assert proc.stdout == \"\"；stderr 首行必须是 token；token 计数恰 1；`tuple(lines[1:]) == tuple(expect_continuations)`（默认空元组 = 普通失败路径不得有任何续行；多错用例显式声明其两条续行）",
+      "result": "三条逃逸形状**全部被捕获**，两条正当路径（干净单行失败 / 多错并报且续行被精确声明）**均不误红**。consultant 的提议这一轮可实施、无假红。"
+    },
+    "measured_failure_paths": {
+      "method": "在被审树内对 helper 插桩，记录每个调用点实际的 stderr 行数与 stdout 原文；探针后删除临时文件，worktree 恢复 clean。",
+      "result": "10 次调用中 **9 次 stderr 恰 1 行、stdout 逐字节空**；唯一多行者是 test_multi_error_continuation_keeps_single_token（2 行，第 2 行为 `STATUS_INVALID: review.decision is invalid: 'NOPE'`），stdout 亦为空。",
+      "why_it_matters": "这组数字证明 consultant 的 (c) 建议（普通路径严格单行 + 多错路径精确声明续行）与现实行为完全吻合，落地不需要放宽任何现有用例。"
+    }
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
-    "updated_at": "2026-09-16T14:05:00Z",
+    "updated_at": "2026-09-16T06:05:00Z",
     "dispatched_at": "2026-09-16T12:40:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
     "redispatched_at": "2026-09-16T11:30:00Z",
     "reviewed_at": "2026-09-16T12:20:00Z",
     "refrozen_at": "2026-09-16T12:20:00Z",
     "reviewed_rev2": "2026-09-16T13:20:00Z",
-    "hardened_at": "2026-09-16T14:05:00Z"
+    "hardened_at": "2026-09-16T14:05:00Z",
+    "consult_harden_at": "2026-09-16T05:52:00Z",
+    "review_reversed_at": "2026-09-16T05:58:00Z",
+    "refrozen_rev3_at": "2026-09-16T06:05:00Z"
   }
 }
