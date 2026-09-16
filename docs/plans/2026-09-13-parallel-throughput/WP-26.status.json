@@ -3,11 +3,11 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "BLOCKED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "kimi -r 1abfd293-3944-42aa-ae08-6c8523f49745"
+    "session": ""
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -80,14 +80,25 @@
       "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
       "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
     },
-    "blocker": {
-      "reason": "kimi 账号周配额（7-day usage limit）耗尽",
-      "evidence": "HTTP 403 access_terminated_error：\"You've reached your weekly (7-day) usage limit. Your quota will reset when the current 7-day window ends.\" 三个执行者均在 StepBegin(n=1) 处 StepInterrupted()，日志各约 12KB。",
-      "not_a_dispatch_defect": "与派发形态无关。首轮 nohup 派发跑得更远（日志 102/32/55KB，读完 Brief，is_error=False 全程）是因为当时配额尚未耗尽；本轮 403 在第一步即触发。",
-      "resume_command": "kimi -r 1abfd293-3944-42aa-ae08-6c8523f49745",
-      "leftover_worktree_state": "工作树干净，无任何产出。",
-      "blocked_at": "2026-09-16T10:30:00Z",
-      "unblock_condition": "配额窗口重置，或购买额外用量/升级套餐后用 resume_command 续跑"
+    "blocker_resolved": {
+      "resolved_at": "2026-09-16T11:30:00Z",
+      "unblock_reason": "用户告知 kimi 执行者模型已切换为 deepseek；编排者实测探针通过。",
+      "probe": "kimi --afk --config-file ~/.kimi/deepseek.toml -p 'Reply with exactly: PROBE_OK' -> PROBE_OK",
+      "config_defects_found_by_orchestrator": [
+        "~/.kimi/config.toml 的 default_model='deepseek/v4-pro' 在 [models] 里不存在（实际定义为 deepseek/deepseek-reasoner），主配置整体 pydantic 校验失败，任何 kimi 调用（含 -m 覆盖）都起不来。绕法：--config-file ~/.kimi/deepseek.toml。",
+        "环境变量 OPENAI_BASE_URL / OPENAI_API_KEY 会把 deepseek provider 的请求劫到 kiro 端点，返回 400 kiro_api_error 'Invalid model ID or insufficient subscription level'。派发时须 env -u OPENAI_BASE_URL -u OPENAI_API_KEY。"
+      ],
+      "previous_blocker": {
+        "reason": "kimi 账号周配额（7-day usage limit）耗尽",
+        "evidence": "HTTP 403 access_terminated_error：\"You've reached your weekly (7-day) usage limit. Your quota will reset when the current 7-day window ends.\" 三个执行者均在 StepBegin(n=1) 处 StepInterrupted()，日志各约 12KB。",
+        "not_a_dispatch_defect": "与派发形态无关。首轮 nohup 派发跑得更远（日志 102/32/55KB，读完 Brief，is_error=False 全程）是因为当时配额尚未耗尽；本轮 403 在第一步即触发。",
+        "resume_command": "kimi -r 1abfd293-3944-42aa-ae08-6c8523f49745",
+        "leftover_worktree_state": "工作树干净，无任何产出。",
+        "blocked_at": "2026-09-16T10:30:00Z",
+        "unblock_condition": "配额窗口重置，或购买额外用量/升级套餐后用 resume_command 续跑"
+      },
+      "round1_leftover_verified_by_orchestrator": "round-1 无任何产出（工作树干净）。执行者读过 brief 即被打断。",
+      "redispatch_reason": "执行者模型由 kimi-for-coding 切换为 deepseek；不续跑旧 session（避免同一 WP 中途换模型、执行记录归属不清），改为在同一工作树新派发，round-1 残留如实告知执行者。"
     }
   },
   "review": {
@@ -98,8 +109,9 @@
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
-    "updated_at": "2026-09-16T10:45:00Z",
+    "updated_at": "2026-09-16T11:30:00Z",
     "dispatched_at": "2026-09-16T08:35:00Z",
-    "blocked_at": "2026-09-16T10:30:00Z"
+    "blocked_at": "2026-09-16T10:30:00Z",
+    "redispatched_at": "2026-09-16T11:30:00Z"
   }
 }
