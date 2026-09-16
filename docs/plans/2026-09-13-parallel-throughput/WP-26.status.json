@@ -3,7 +3,7 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -22,7 +22,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp26-brief-source-of-truth",
     "worktree": "../wp26-brief-source-of-truth",
-    "commit": "",
+    "commit": "0a12bed",
     "dispatch_commit": "58c7624"
   },
   "scope": {
@@ -56,20 +56,13 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md",
-      "sha256": "757aa64e12fd233eb315ce45f148a3f72005ff0dc8a39dd94c1967757b00b534",
-      "rev": 1,
-      "covers": "任务 #18（B16）：dispatch_lint.sh:60 与 redispatch.py:493-494 按固定命名推 brief 路径，既不读 evidence.brief.path 也不校验 evidence.brief.sha256；后果是 -revN 冻结不进门禁面，且重派会把 rev1 正文喂给执行者。",
-      "prefreeze_check": {
-        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑 agentic 冻结副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已用 diff 证明与活树 dispatch_lint.sh:69-101 逐字节相同；行 68/102 为 <<'PY' / PY，切片边界正确未截断。",
-        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
-        "discriminating_power": "同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-25/WP-26/WP-27 返回 rc=1 —— 切片有区分力，不是恒绿",
-        "checked_at": "2026-09-16T07:45:00Z"
-      },
-      "gate_alignment": {
-        "defect": "B16",
-        "note": "B16 是本 WP 要修的缺陷本体，所以门禁此刻仍按固定命名读 —— 本 brief 已用固定名 WP-26-brief.md，无需 rev 搬移 workaround。执行者交付后，验收须用「把 evidence.brief.path 改指不存在文件」的差分对复测修复生效。"
-      }
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md",
+      "sha256": "df31529085a3bc939851646030af4754ae4dbf81b5a4ac6e474a5b6a7c36f95f",
+      "rev": 2,
+      "refreeze_count": 2,
+      "covers": "B21：dispatch_lint.sh 的固定命名回退分支在 sha256 校验之前 SystemExit(0)，于是「声明了 sha256、未声明 path」静默跳过校验；同时 redispatch.py 对同一形态拒收，两个消费者裁决相反，违反 rev1 交付物 3 的同口径要求。",
+      "scope_note": "rev2 只修 B21 + 补四种在场组合 + 变异改 scratch copytree + 清空诊断行；rev1 已验证的七项行为不得改动，redispatch.py 零 diff。",
+      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md"
     },
     "tests": [],
     "baseline": {
@@ -99,19 +92,105 @@
       },
       "round1_leftover_verified_by_orchestrator": "round-1 无任何产出（工作树干净）。执行者读过 brief 即被打断。",
       "redispatch_reason": "执行者模型由 kimi-for-coding 切换为 deepseek；不续跑旧 session（避免同一 WP 中途换模型、执行记录归属不清），改为在同一工作树新派发，round-1 残留如实告知执行者。"
+    },
+    "brief_rev1": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md",
+      "sha256": "757aa64e12fd233eb315ce45f148a3f72005ff0dc8a39dd94c1967757b00b534",
+      "rev": 1,
+      "covers": "任务 #18（B16）：dispatch_lint.sh:60 与 redispatch.py:493-494 按固定命名推 brief 路径，既不读 evidence.brief.path 也不校验 evidence.brief.sha256；后果是 -revN 冻结不进门禁面，且重派会把 rev1 正文喂给执行者。",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑 agentic 冻结副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已用 diff 证明与活树 dispatch_lint.sh:69-101 逐字节相同；行 68/102 为 <<'PY' / PY，切片边界正确未截断。",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-25/WP-26/WP-27 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T07:45:00Z"
+      },
+      "gate_alignment": {
+        "defect": "B16",
+        "note": "B16 是本 WP 要修的缺陷本体，所以门禁此刻仍按固定命名读 —— 本 brief 已用固定名 WP-26-brief.md，无需 rev 搬移 workaround。执行者交付后，验收须用「把 evidence.brief.path 改指不存在文件」的差分对复测修复生效。"
+      }
+    },
+    "orchestrator_verification": {
+      "note": "以下数字全部来自编排者本人运行，未转抄执行者自报。",
+      "scope": "4 个 allowed_paths，零 forbidden 写入；worktree clean",
+      "tests_new": "19 passed on 3.11 / 3.13 / 3.14",
+      "tests_full_311": "4 failed, 616 passed, 4 skipped（+19，相对基线零回归；4 条是 tests/test_finalize_merge_triple_sign.py 的既有失败）",
+      "differential_pair": "构造正确：固定命名文件故意 BAD、声明 -rev2 文件 GOOD，PASS 只能来自读声明路径",
+      "refusals_confirmed": [
+        "声明路径不存在 -> brief not found",
+        "../ 逃逸 -> escapes main repo",
+        "symlink 逃出主仓 -> symlink",
+        "sha256 不匹配（path 在场）-> brief sha256 mismatch，双值都打印"
+      ],
+      "b16_real_cost_demonstrated": "以 WP-25 指向 rev2 的 status 实测：主仓活树 dispatch_lint.sh 解析出 WP-25-brief.md（rev1，错），WP-26 修补版解析出 WP-25-brief-rev2.md（对）"
     }
   },
   "review": {
-    "decision": null
+    "decision": "REWORK",
+    "reviewer": "claude (orchestrator, independent review)",
+    "reviewed_at": "2026-09-16T12:20:00Z",
+    "blocking_defect": {
+      "id": "B21",
+      "summary": "声明了 evidence.brief.sha256 但未声明 evidence.brief.path 时，固定命名回退分支在校验之前 SystemExit(0)，校验被静默跳过",
+      "location": "src/agentic_loop/wrappers/dispatch_lint.sh（内联 python 解析器的 fallback 分支）",
+      "reproduction": {
+        "case": "evidence.brief = {\"sha256\": \"0\"*64}（故意写错，无 path）",
+        "observed": "DISPATCH_LINT_PASS rc=0",
+        "control": "同一错 sha256 + 正确 path -> DISPATCH_LINT_FAIL: brief sha256 mismatch: computed=a84d7440… declared=000… rc=2",
+        "cross_consumer": "redispatch.py._brief_content() 对同一形态 refused: brief sha256 mismatch: computed=e3428210… declared=000… —— 两个消费者裁决相反",
+        "run_by": "claude (orchestrator), independently reproduced after codex flagged it"
+      },
+      "violates": [
+        "rev1 brief 交付物 2：evidence.brief.sha256 存在时必须校验",
+        "rev1 brief 陷阱注 4：sha256 的失败必须 fail-closed，算不出也要拒收，不得跳过",
+        "rev1 brief 交付物 3：redispatch.py 同口径 —— 口径分裂是第二重违规"
+      ],
+      "why_missed": "rev1 的 19 条用例只覆盖「path 与 sha256 同时存在」。两个可选字段有四种在场组合，用例只走两种。编排者第一轮测了三种拒收原因，但三种都落在 path 在场那一半 —— 按原因枚举而非按在场组合枚举，是这个洞的形状。",
+      "registered_as": "docs/plans/2026-09-13-parallel-throughput/WP-08-candidate.md §B21"
+    },
+    "non_blocking": [
+      {
+        "id": "empty-second-failure-line",
+        "summary": "内层 python 的 fail() 把消息写 stderr 后 SystemExit(0)，外层 brief_ok 读 stdout 第一行得空串，于是 fail \"$brief_ok\" 又打一行空的 DISPATCH_LINT_FAIL: ",
+        "adjudication": "非阻塞：rc=2 与原因特异的消息都已到 stderr；第二签名独立复核后同意（「未发现经 fail() 丢失原因的路径」）。已并入 rev2 交付物 4 顺手清理。"
+      },
+      {
+        "id": "in-place-live-mutation",
+        "summary": "test_forbidden_mutation_fixed_name_reverts_red 原地改写活树 dispatch_lint.sh，靠 finally 恢复",
+        "adjudication": "非阻塞但必须改：finally 覆盖不了 SIGKILL / 崩溃 / 并行读到坏脚本。已并入 rev2 交付物 3，改用 WP-27 的 scratch copytree。"
+      },
+      {
+        "id": "redispatch-double-read",
+        "summary": "redispatch.py:173 read_text() 后 :180 又 read_bytes()，校验的字节不必然是派发的字节（第二签名提出）",
+        "adjudication": "非阻塞：与 B22 同族（判定面与消费面分离），rev1 冻结 brief 未要求单次读取快照；据未写进判据的标准驳回等于让判据事后长出来。redispatch.py 在 rev2 中为零 diff，此项另立 WP 与 B22 一并收口。"
+      }
+    ],
+    "what_did_hold": "范围、差分对构造、三种逃逸拒收、双值打印、老 status 回退、19 条用例跨三版本、相对基线零回归 —— 全部由编排者独立实测通过，rev2 不得改动。",
+    "superseded_earlier_verdict": "an earlier ACCEPT on this WP was recorded before the presence-combination probe below; it covered only the path-present half and is wrong. It is retained as a record, not as a verdict."
   },
   "consult": {
-    "decision": null
+    "requested": true,
+    "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+    "session": "01a0a85a-299b-7a90-a988-8ba1845cb8d6",
+    "verdict": "REWORK",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp2627-verdict.raw.txt",
+    "findings_accepted": [
+      "阻塞：固定命名回退绕过已声明的 sha256（编排者独立复现，成为 B21）"
+    ],
+    "findings_deferred": [
+      "redispatch.py 两次读取的快照分裂 —— 与 B22 同族，rev1 判据未要求，另立 WP"
+    ],
+    "findings_agreed_non_blocking": [
+      "空的重复 DISPATCH_LINT_FAIL: 行是诊断噪声，不构成 REWORK 依据"
+    ],
+    "note": "第二签名先于任何实验写出结论行（本轮硬性格式要求），未再发生 WP-25 那次「崩在最后一个实验、结论丢失」。这是本会话第二次由第二签名发现编排者漏掉的阻塞项。"
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
     "updated_at": "2026-09-16T11:30:00Z",
     "dispatched_at": "2026-09-16T08:35:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
-    "redispatched_at": "2026-09-16T11:30:00Z"
+    "redispatched_at": "2026-09-16T11:30:00Z",
+    "reviewed_at": "2026-09-16T12:20:00Z",
+    "refrozen_at": "2026-09-16T12:20:00Z"
   }
 }

@@ -2794,3 +2794,89 @@ DISCIPLINE_ANCHORS = {
 
 > 关联：本条与 B10（锚点缺失）、B11（判据来自副本）、B19（红的原因未必是你钉的那层）
 > 同属「断言看起来成立、实际没钉住判据」这一族。
+
+---
+
+## B21 · 回退分支在校验之前就 `return`，于是「声明了 sha256」被静默跳过（WP-26 实测）
+
+**位置**：`src/agentic_loop/wrappers/dispatch_lint.sh`（WP-26 提交 `0a12bed` 引入的内联
+python 解析器）。`evidence.brief.path` 缺失时走固定命名回退，该分支直接
+`print("BRIEF_OK")` + `SystemExit(0)`，而 sha256 校验块在其后，永不执行。
+
+**实测**（WP-26 工作树，`state=DRAFT` 的 status 临时副本）：
+
+| status 的 `evidence.brief` | dispatch_lint 裁决 |
+|---|---|
+| `{"sha256": "0"*64}`（故意写错，无 `path`） | `DISPATCH_LINT_PASS` rc=0 |
+| 同一个错 sha256 + 正确 `path`（对照） | `DISPATCH_LINT_FAIL: brief sha256 mismatch: computed=a84d7440… declared=000…` rc=2 |
+
+**为什么是缺陷而非风格**：WP-26 冻结 brief 的陷阱注 4 写明
+「sha256 的失败必须 fail-closed。算不出（文件读不到、权限）也要拒收，不得跳过」，
+交付物 2 写明「`evidence.brief.sha256` 存在时**必须校验**」。声明了却不校验，
+是 brief 判据的直接反面。
+
+**同一提交里的对照实现是正确的**：`redispatch.py` 的 `_brief_content()` 把
+`if declared_sha:` 放在 declared/fallback 分支**之后**，两条路径都校验。
+实测同一形态（错 sha256、无 path）：
+
+```
+redispatch:    refused -> brief sha256 mismatch: computed=e3428210… declared=000…
+dispatch_lint: DISPATCH_LINT_PASS rc=0
+```
+
+即**两个消费者对同一 status 给出相反裁决**，而 brief 交付物 3 要求
+`redispatch.py`「同样以 `evidence.brief.path` 为权威」「同口径」。
+口径分裂本身独立于 fail-closed 那条，是第二重违规。
+
+**为什么一整轮没被发现**（含编排者自己的验收）：19 条用例只覆盖
+「`path` 与 `sha256` 同时存在」。缺失维度不是断言写错，而是**组合没被枚举**——
+两个可选字段有四种在场组合（都无 / 只有 path / 只有 sha256 / 都有），
+用例只走了两种。编排者第一轮验收测了三种拒收方向（路径不存在、`../` 逃逸、
+sha256 不匹配），全部落在「path 在场」这一半。
+
+**教训**：可选字段的守卫必须按**在场组合**枚举，不是按「拒收原因」枚举。
+按原因枚举会让「某原因在某组合下根本到不了」这种漏洞整齐地落在覆盖之外。
+
+**修法**（WP-26 rev2）：把 sha256 校验移出分支（或在回退分支内同样校验），
+使其只依赖 `sha256` 在场、与 `path` 是否在场无关；并补
+「无 `path`、有错误 `sha256` → 必须 FAIL」的用例，其正向对照为
+「无 `path`、有正确 `sha256` → PASS」。
+
+> 关联：与 B19（红的原因未必是你钉的那层）、B20（锚点钉不住语义）同族，
+> 但这一条的失效面是**覆盖的形状**，不是断言的强度。
+
+---
+
+## B22 · 判定面与消费面分离：拒收判据只 open 一次，后续消费各自 re-open（WP-27 观察）
+
+**位置**：`src/agentic_loop/wrappers/preflight.sh`（WP-27 提交 `a3264c0` 之后）。
+`$status_file` 被独立打开 **9 次**：`:40` 的工作树探针、`:56` 校验、
+`:58`/`:59`/`:60` 三次 `--field`、`:111` 的 `git ls-files`、`:120` 转交
+`dispatch_lint.sh`、`:134`/`:135` 两次 `--field`。每次各自 re-resolve 路径字符串。
+
+**已确认 fail-closed 的一路**：主仓路径本身是指向工作树副本的静态 symlink 时，
+`path_is_in_worktree` 解析后判 `WORKTREE`，被 `:47` 拒收（实测：
+main `state=APPROVED` / worktree `state=BLOCKED`，探针返回 `WORKTREE`）。
+即「一开始就是 symlink」这一形态不漏。
+
+**残留面**：探针通过之后路径被换掉，则判定与消费落在不同快照上；
+不同字段之间也可能来自不同快照。仓内 `finalize_merge.sh:54` 已按 A34 把
+「判定 + `os.open(O_NOFOLLOW)` + 读取 + 校验 + 取字段」收进**一次** open。
+
+**定级：非阻塞**。理由三条：
+1. WP-27 冻结 brief 只要求复用 `finalize_merge.sh` 的**拒收语义**
+   （陷阱注 2：「工作树拒收语义抄 `finalize_merge.sh` 的 `WORKTREE` 分支」），
+   从未要求复用 A34 的读取快照；brief 全文不含 TOCTOU/A34/单次 open 的要求。
+   按未写进冻结判据的标准驳回，等于让判据在执行后长出来 —— 这正是 B16 一族的反面错误。
+2. preflight 在**派发前**由编排者调用、路径由编排者给出，与 finalize 的处境
+   （合入后写回、路径来自更长的链路）blast radius 不同。
+3. 第二签名（codex）把它读成了 brief 要求，这一点超出冻结判据；结论记录分歧，
+   不据此驳回。
+
+**处置**：单独立 WP 收口（与任务 #7/A34 同族），不塞进 WP-27 返工。
+
+**教训（对编排者）**：同族缺陷在一处修好之后，其余读取面**不会**自动继承。
+A34 在 `finalize_merge.sh` 收口时，没有机制把「还有哪些 wrapper 是多次 open」
+登记成待办 —— 于是新写的 WP-27 又长出一处。这是任务 #23
+（学习回边机械化）要覆盖的形状：新 brief 的 DoD 应被强制核验
+是否覆盖了与其 `allowed_paths` 相交的既有缺陷。

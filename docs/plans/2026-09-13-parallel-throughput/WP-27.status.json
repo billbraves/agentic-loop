@@ -3,7 +3,7 @@
   "work_package_id": "WP-27",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -22,7 +22,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp27-preflight-status-source",
     "worktree": "../wp27-preflight-status-source",
-    "commit": "",
+    "commit": "a3264c0",
     "dispatch_commit": "58c7624"
   },
   "scope": {
@@ -55,20 +55,13 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-27-brief.md",
-      "sha256": "c3cbcecd26d029a053038ffc7fd736770bbb2d2e65cf4e7bed22210f008c42c8",
-      "rev": 1,
-      "covers": "任务 #19（B17）：preflight.sh:9 裸赋值接 status 路径，相对路径落 cwd，而协议强制 cwd 为次级工作树，故门禁判的是被 git 跟踪的历史快照；state/scope/risk 三类判断全部基于旧口径。",
-      "prefreeze_check": {
-        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑 agentic 冻结副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已用 diff 证明与活树 dispatch_lint.sh:69-101 逐字节相同；行 68/102 为 <<'PY' / PY，切片边界正确未截断。",
-        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
-        "discriminating_power": "同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-25/WP-26/WP-27 返回 rc=1 —— 切片有区分力，不是恒绿",
-        "checked_at": "2026-09-16T07:45:00Z"
-      },
-      "gate_alignment": {
-        "defect": "B17",
-        "note": "派发本 WP 时必须传主仓**绝对**路径以规避 B17 本身（本迭代 WP-22/WP-24 rev2 派发已如此处理）。验收须用三行差分对复测：只改工作树副本不应再影响裁决。"
-      }
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-27-brief-rev2.md",
+      "sha256": "37d9f7767cf6240c30a8bc402bfb2791f6870286a333b81fc0104b50b87c3472",
+      "rev": 2,
+      "refreeze_count": 2,
+      "covers": "rev1 的 test_scope_and_risk_divergence_follow_main_copy 构造方向与冻结判据相反：它证的是「工作树坏值没污染裁决」，而 brief 要求「只在主仓收紧的 scope/risk 必须绑定」。前者在 scope/risk 完全不被消费时也成立 —— 实测把 preflight.sh:120 的整个 dispatch_lint.sh 调用块删掉，该用例仍 1 passed。",
+      "scope_note": "rev2 只补 scope 方向与 risk 方向的差分对 + 各自独立正向对照 + 摘除变异转红；rev1 已验证的八项行为不得改动，preflight.sh 预期零 diff。",
+      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-27-brief.md"
     },
     "tests": [],
     "baseline": {
@@ -98,19 +91,94 @@
       },
       "round1_leftover_verified_by_orchestrator": "round-1 只有实现、没有测试：preflight.sh +29/-2（status_arg 改名 + 相对路径锚定主仓根 + path_is_in_worktree 拒收工作树副本 + PREFLIGHT_PASS 追加 status= 字段），brief 要求的 tests/test_preflight_status_source.py 不存在。实现方向与 brief 一致但未经任何用例锁定，且注释里混入一个中文词『口径』在英文句中，须执行者自行复核。",
       "redispatch_reason": "执行者模型由 kimi-for-coding 切换为 deepseek；不续跑旧 session（避免同一 WP 中途换模型、执行记录归属不清），改为在同一工作树新派发，round-1 残留如实告知执行者。"
+    },
+    "brief_rev1": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-27-brief.md",
+      "sha256": "c3cbcecd26d029a053038ffc7fd736770bbb2d2e65cf4e7bed22210f008c42c8",
+      "rev": 1,
+      "covers": "任务 #19（B17）：preflight.sh:9 裸赋值接 status 路径，相对路径落 cwd，而协议强制 cwd 为次级工作树，故门禁判的是被 git 跟踪的历史快照；state/scope/risk 三类判断全部基于旧口径。",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑 agentic 冻结副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已用 diff 证明与活树 dispatch_lint.sh:69-101 逐字节相同；行 68/102 为 <<'PY' / PY，切片边界正确未截断。",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-25/WP-26/WP-27 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T07:45:00Z"
+      },
+      "gate_alignment": {
+        "defect": "B17",
+        "note": "派发本 WP 时必须传主仓**绝对**路径以规避 B17 本身（本迭代 WP-22/WP-24 rev2 派发已如此处理）。验收须用三行差分对复测：只改工作树副本不应再影响裁决。"
+      }
+    },
+    "orchestrator_verification": {
+      "note": "以下数字全部来自编排者本人运行，未转抄执行者自报。",
+      "scope": "2 个 allowed_paths，零 forbidden 写入；worktree clean；新代码内无中文",
+      "tests_new": "6 passed on 3.11 / 3.13 / 3.14",
+      "tests_full_311": "4 failed, 603 passed, 4 skipped（+6，相对基线零回归）",
+      "state_differential_bidirectional": "main=APPROVED/wt=BLOCKED -> PASS；main=DRAFT/wt=APPROVED -> PREFLIGHT_FAIL: state DRAFT is not executable",
+      "worktree_refusal": "绝对工作树路径 fail-closed，诊断点名单一权威在主仓",
+      "static_symlink_probe": "本轮补测：把主仓 status 换成指向工作树副本的 symlink（main=APPROVED / wt=BLOCKED），path_is_in_worktree 解析后判 WORKTREE，被 :47 拒收 —— 这一形态不漏",
+      "mutation_isolation": "变异在 scratch copytree 上做，活树 preflight.sh 逐字节未变"
     }
   },
   "review": {
-    "decision": null
+    "decision": "REWORK",
+    "reviewer": "claude (orchestrator, independent review)",
+    "reviewed_at": "2026-09-16T12:25:00Z",
+    "blocking_defect": {
+      "id": "scope-risk-differential-direction",
+      "summary": "scope / risk 的差分对方向与冻结判据相反：rev1 断言的是「主仓宽松 + 工作树收紧 -> PASS」，只证明工作树坏值未污染裁决；brief 要求的是「只在主仓收紧必须绑定」",
+      "location": "tests/test_preflight_status_source.py:302 test_scope_and_risk_divergence_follow_main_copy",
+      "reproduction": {
+        "method": "沿用 rev1 自己的 scratch copytree 手法，把 preflight.sh:120 的整个 dispatch_lint.sh 调用块替换为注释后跑该用例",
+        "observed": "1 passed —— scope/risk 的唯一消费者被整段摘除，用例察觉不到；PREFLIGHT_PASS 与 status=<主仓路径> 两个表面症状都还在",
+        "run_by": "claude (orchestrator), independently reproduced after codex flagged it"
+      },
+      "violates": [
+        "rev1 brief Acceptance tests：a scope.allowed_paths narrowed only in the main copy must bind, and a risk.* value tightened only in the main copy must bind",
+        "rev1 brief DoD：state / scope / risk 三类都验证了跟随主仓，不只 state"
+      ],
+      "family": "B20 的同构表现 —— 锚点/断言看起来覆盖了那条判据，实际钉的是它的镜像命题",
+      "test_for_next_time": "把消费者整段删掉，你的用例会不会红？不会，就说明证的是「坏值没被读」而不是「严值被读」。"
+    },
+    "non_blocking": [
+      {
+        "id": "B22",
+        "summary": "preflight.sh 对 $status_file 有 9 次独立 open（:40 探针、:56、:58/:59/:60、:111、:120、:134/:135），判定面与消费面分离；finalize_merge.sh:54 已按 A34 收进一次 os.open(O_NOFOLLOW)",
+        "adjudication": "非阻塞。三条理由：(1) rev1 冻结 brief 只要求复用 finalize_merge.sh 的『拒收语义』（陷阱注 2），全文不含 TOCTOU/A34/单次 open 的要求 —— 据未写进判据的标准驳回，等于让判据在执行后长出来，正是 B16 一族的反面错误；(2) preflight 在派发前由编排者调用、路径由编排者给出，blast radius 与 finalize 不同；(3) 静态 symlink 形态已实测 fail-closed，残留面只是探针通过后被换掉。",
+        "disposition": "已登记 WP-08-candidate.md §B22，另立 WP 与任务 #7/A34 同族收口；不塞进本 rev2",
+        "disagreement_with_consult": "第二签名将其判为阻塞并读作 brief 要求；编排者不同意该读法，分歧如实记录，不据此驳回，也不据此推翻 codex 的另一条阻塞项"
+      }
+    ],
+    "what_did_hold": "范围、主仓根锚定同口径、state 双向差分对、工作树拒收、静态 symlink fail-closed、探针 fail-closed、PREFLIGHT_PASS 输出 status=、scratch 变异隔离、6 条用例跨三版本、相对基线零回归 —— 全部由编排者独立实测通过，rev2 不得改动。",
+    "superseded_earlier_verdict": "an earlier ACCEPT on this WP was recorded before the consumer-removal mutation below; it accepted the scope/risk test at face value from its docstring instead of testing whether it could detect the consumer's absence. It is retained as a record, not as a verdict."
   },
   "consult": {
-    "decision": null
+    "requested": true,
+    "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+    "session": "01a0a85a-299b-7a90-a988-8ba1845cb8d6",
+    "verdict": "REWORK",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp2627-verdict.raw.txt",
+    "findings_accepted": [
+      "阻塞：scope/risk 测试方向与冻结要求相反，删掉整个 dispatch_lint.sh 调用仍全绿（编排者独立复现，成为本次 REWORK 依据）"
+    ],
+    "findings_disputed": [
+      "TOCTOU 判为阻塞 —— 编排者定级非阻塞（登记为 B22 另立 WP）：rev1 冻结 brief 只要求复用拒收语义，未要求复用 A34 的读取快照"
+    ],
+    "findings_confirming": [
+      "state 双向差分对有效",
+      "|| echo PROBE_FAIL 是 fail-closed（MAIN\\nPROBE_FAIL 不等于单行 MAIN）",
+      "工作树绝对路径拒收与 finalize_merge.sh 口径一致，编排者传主仓绝对路径仍是合法用法",
+      "变异在 scratch copytree 中执行，未改写活树脚本"
+    ],
+    "limitation_disclosed_by_consultant": "只读 sandbox 无可写临时目录，pytest 无法独立复跑；测试数字采用编排者提供的结果。其 REWORK 由代码控制流与测试构造直接确认，不依赖测试执行。",
+    "note": "本会话第二次由第二签名发现编排者漏掉的阻塞项（第一次是 WP-25 的 B20）。注意：编排者先前从未写完的输出片段中曾读到 WP-27: ACCEPT，那是文件未写完时的误读；完整结论为 REWORK。"
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
     "updated_at": "2026-09-16T11:30:00Z",
     "dispatched_at": "2026-09-16T08:35:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
-    "redispatched_at": "2026-09-16T11:30:00Z"
+    "redispatched_at": "2026-09-16T11:30:00Z",
+    "reviewed_at": "2026-09-16T12:25:00Z",
+    "refrozen_at": "2026-09-16T12:25:00Z"
   }
 }
