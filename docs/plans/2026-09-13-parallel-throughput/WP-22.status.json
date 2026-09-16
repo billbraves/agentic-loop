@@ -3,7 +3,7 @@
   "work_package_id": "WP-22",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -24,7 +24,8 @@
     "dispatch_commit": "b72e9c4",
     "branch": "feature/wp22-finalize-toctou",
     "worktree": "../wp22-finalize-toctou",
-    "commit": "b216b50"
+    "commit": "b216b50",
+    "merged_commit": "5afeb4fd9c3459e717bceda1f30bc6d175b7da55"
   },
   "scope": {
     "allowed_paths": [
@@ -209,7 +210,13 @@
         "reviewed_by": "claude-code",
         "basis": "independent PoC with rev1/rev2 differential + 2 reviewer mutations + reviewer's own bypass attempt disproved + cross-version green + zero regression + validate_wp_status.py zero diff + scope clean"
       }
-    ]
+    ],
+    "merge_approval": {
+      "approved_by": "user",
+      "approved_at": "2026-09-16T08:00:00Z",
+      "instruction": "合并WP-22/WP-24",
+      "note": "用户批准即合入授权；第二签名为 codex rev2 ACCEPT（逐字转录，见 verdict_file）。本地 merge --no-ff，不 push。"
+    }
   },
   "consult": {
     "decision": "ACCEPT",
@@ -236,9 +243,10 @@
   "timestamps": {
     "created_at": "2026-09-15T00:00:00Z",
     "dispatched_at": "2026-09-16T00:30:00Z",
-    "updated_at": "2026-09-16T07:40:00Z",
+    "updated_at": "2026-09-16T01:23:49Z",
     "review_completed_at": "2026-09-16T00:00:00Z",
     "consulted_at": "2026-09-16T07:30:00Z",
-    "rev2_frozen_at": "2026-09-16T00:05:00Z"
+    "rev2_frozen_at": "2026-09-16T00:05:00Z",
+    "approved_for_merge_at": "2026-09-16T08:00:00Z"
   }
 }
