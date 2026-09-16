@@ -2880,3 +2880,87 @@ A34 在 `finalize_merge.sh` 收口时，没有机制把「还有哪些 wrapper �
 登记成待办 —— 于是新写的 WP-27 又长出一处。这是任务 #23
 （学习回边机械化）要覆盖的形状：新 brief 的 DoD 应被强制核验
 是否覆盖了与其 `allowed_paths` 相交的既有缺陷。
+
+## B23 · 冻结者自己漏段：rev2 正文丢掉了 rev1 有的**门禁锚点段**（WP-25 实测）
+
+**位置**：`docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev2.md`（冻结时刻的版本，
+sha256 `ebf8e12c…`）。
+
+**现象**：该 rev2 只写了中文的 `## 范围`，丢掉了 rev1 有的英文段
+`## Allowed and forbidden paths`。而活树 `dispatch_lint.sh:66-104` 的 section 判据要求三个
+**英文**锚点段同时在场且非空：
+
+```
+required = ["Acceptance tests", "Allowed and forbidden paths", "Completion definition"]
+```
+
+**实测**（把该判据 heredoc 按行号原文切片直跑，B11 修法 1）：
+
+| 输入 | rc | 输出 |
+|---|---|---|
+| `WP-25-brief-rev2.md`（冻结版） | 0 | `brief missing section 'Allowed and forbidden paths'` |
+| `WP-25-brief.md`（rev1） | 1 | 无输出（通过） |
+| `WP-26-brief-rev2.md` / `WP-27-brief-rev2.md` | 1 | 无输出（通过） |
+| `WP-20-brief.md`（已知坏样本，区分力对照） | 0 | `brief missing section 'Acceptance tests'` |
+
+即：同一批冻结的三份 rev2 里，**只有 WP-25 那份**漏了段。这不是执行者的问题，
+是编排者自己在 re-freeze 时把中文小标题当成了那段的替代品。
+
+**为什么能漏掉**：rev2 的写法是「先列 rev1 已核验通过不要动的部分，再写增量」，
+于是那些**只服务于门禁、对人类读者冗余**的英文段落最容易在重写时蒸发——它们在人眼里
+是重复的（中文「范围」已经说过了），在门禁眼里是唯一判据。
+
+**与 B16 的关系**：B16 是「门禁不读 status 声明的路径」，所以本缺陷在 B16 修好之前
+**不会被门禁抓到**——门禁去读固定命名的 `WP-25-brief.md`（rev1，有那段，能过），
+声明的 rev2 完全不参与。两个缺陷叠加的结果是：一份过不了门禁的 brief 可以顺利派发，
+而且派发时门禁还会给出 PASS。
+
+**处置**：补回该段（与中文段的反引号路径集合做差为空集，避免制造第二口径），
+sha256 由 `ebf8e12c…` 变为 `9d19fbe7…`，status 的 `evidence.brief` 同步重指，
+旧值留痕在 `evidence.brief.superseded_sha256`。纠正发生在派发之前，无执行者读过旧版。
+
+**教训（可机械化）**：冻结前必须用**判据本身**（原文切片，不 retype）跑一遍待冻结的
+brief，而不是靠人眼比对。这条已并入任务 #23（学习回边机械化）：`dispatch_lint` 应当
+在 brief 冻结时刻就能被调用，而不是只在派发时刻。
+
+## B24 · 第二签名的**诊断正确、但其提议的判据被实测证伪**（WP-26 rev2 实测）
+
+**背景**：codex 对 WP-26 rev2 判 REWORK，唯一阻塞项是交付物 4 的断言强度：
+
+```python
+stderr.count("DISPATCH_LINT_FAIL:") == 1   # 现状
+```
+
+它指出这不能排除额外的非 token 输出，并**提议**改为
+`len(stderr.splitlines()) == 1` 且首行以 token 开头。
+
+**诊断部分成立**：该断言确实没有钉住 stdout 为空、也没钉住 token 的位置。
+
+**但提议的判据被实测证伪**。构造一份 `state` 与 `review.decision` **同时**非法的 status，
+活树脚本实测：
+
+```
+rc=2
+stderr 第 1 行: DISPATCH_LINT_FAIL: STATUS_INVALID: invalid state: 'NOT_A_STATE'
+stderr 第 2 行: STATUS_INVALID: review.decision is invalid: 'NOPE'
+token 计数: 1
+stdout: 0 行
+```
+
+这是 validator **多错并报**的正当续行诊断——正是 codex 举的「unexpected diagnostic」形状，
+但它是合法输出。按行数判会把这条正当路径判红。
+
+**编排者处置**：取其关切、弃其形式。加固为三条并存——stdout 为空 + token 计数恰 1 +
+`stderr.splitlines()[0].startswith("DISPATCH_LINT_FAIL:")`，并新增一条「多错并报」用例，
+把「不得按行数判」这条纪律钉进测试，防止后人照原提议改回去。
+阻塞级别不成立（未写入判据、且其具体形式被证伪），故不 re-freeze，以同一 rev2 brief
+派发最小加固补丁。
+
+**教训**：审核者的 finding 与其 prescription 是**两个独立的断言**，只有前者是从证据推出的。
+读不到运行时（只读沙箱）的审核者在「缺口在哪」上可靠，在「换成什么判据」上没有经过任何
+真实输入。凡是带 prescription 的 finding，都要把 prescription 对**当前全部通过的输入**
+跑一遍再采纳，并把证伪输入留痕在 status 里，否则同一形式会被反复提出。
+
+**与 B22 同一纪律**：以未写入判据的标准驳回 = 让判据在执行后生长（B16 家族错误）。
+区别在于：B22 是编排者不接受 codex 的阻塞级别**且不接受其关切**（另立 WP）；
+本条是不接受级别**但接受关切**（同 rev 内加固）。两者都必须把分歧原文留在 status 里。

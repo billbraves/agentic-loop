@@ -23,7 +23,8 @@
     "branch": "feature/wp27-preflight-status-source",
     "worktree": "../wp27-preflight-status-source",
     "commit": "a3264c0",
-    "dispatch_commit": "58c7624"
+    "dispatch_commit": "58c7624",
+    "dispatch_commit_pending_rev2": "a3264c0"
   },
   "scope": {
     "allowed_paths": [
@@ -66,11 +67,11 @@
     "tests": [],
     "baseline": {
       "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-      "measured_at": "2026-09-16T08:30:00Z",
-      "measured_at_commit": "58c7624",
-      "result": "4 failed, 597 passed, 4 skipped",
-      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
-      "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
+      "measured_at": "2026-09-16T12:52:00Z",
+      "measured_at_commit": "a3264c0",
+      "result": "4 failed, 603 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py 的 4 条是既有失败，不要修",
+      "note": "rev2 是叠在 rev1 提交 a3264c0 上的返工，零回归的参照系是 rev1 的 HEAD，不是 rev1 派发前的 58c7624。编排者本人在 WP-27 工作树重测得出，与 rev1 验收数字一致。"
     },
     "blocker_resolved": {
       "resolved_at": "2026-09-16T11:30:00Z",
@@ -117,6 +118,20 @@
       "worktree_refusal": "绝对工作树路径 fail-closed，诊断点名单一权威在主仓",
       "static_symlink_probe": "本轮补测：把主仓 status 换成指向工作树副本的 symlink（main=APPROVED / wt=BLOCKED），path_is_in_worktree 解析后判 WORKTREE，被 :47 拒收 —— 这一形态不漏",
       "mutation_isolation": "变异在 scratch copytree 上做，活树 preflight.sh 逐字节未变"
+    },
+    "baseline_rev1_dispatch": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-16T08:30:00Z",
+      "measured_at_commit": "58c7624",
+      "result": "4 failed, 597 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
+      "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
+    },
+    "dispatch_ordering_constraint": {
+      "constraint": "本 WP rev2 的派发必须排在 WP-26 rev2 合入之后，或对 rev2 brief 重复手工判据切片核验。",
+      "reason": "本 WP 的 status.evidence.brief.path 现指向 WP-27-brief-rev2.md，而主仓活树 dispatch_lint.sh 仍按固定命名推出 WP-27-brief.md（缺陷 B16 本体，其修复者正是 WP-26）。直接派发等于拿 rev1 判 rev2。",
+      "measured": "以 WP-26 status 实测：活树 dispatch_lint.sh 解析出 brief_file=…/WP-26-brief.md 并给出 DISPATCH_LINT_PASS —— 声明的 rev2 路径完全不参与。",
+      "workaround_if_dispatched_early": "用真脚本 :69-101 的判据切片直跑 rev2 brief（编排者已核：WP-27-brief-rev2.md rc=1 通过；同一切片对 WP-20-brief.md 返回 rc=0 报缺段，证明有区分力）。"
     }
   },
   "review": {

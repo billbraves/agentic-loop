@@ -57,6 +57,28 @@ rev1 把三条纪律写进了 `CLAUDE.md.tmpl` 且方向正确，但它的守卫
   - `src/agentic_loop/validate_wp_status.py`、`gate/__init__.py`、`redispatch.py`
   - `docs/plans/`（含本 brief 自身）、`.agentic/config.toml`、`.agentic/locks/`、`.env`、`.context/`
 
+## Allowed and forbidden paths
+
+**allowed_paths**
+
+- `tests/test_orchestrator_protocol_disciplines.py`
+- `src/agentic_loop/templates/CLAUDE.md.tmpl` (**only** if the added anchors
+  genuinely require rewording; any change must be justified and the three
+  rendered artifacts must still show a zero-line diff)
+
+**forbidden_paths**
+
+- `src/agentic_loop/contract_render.py` — the version is already `"7"`; do
+  **not** bump again (rev1 already delivered that bump; rev2 is rework of the
+  same delivery, not a second template change)
+- `CLAUDE.md`, `AGENTS.md`, `docs/agentic/OPERATING_MODEL.md` — rendered
+  artifacts, **zero-line diff**
+- every other `.tmpl` under `src/agentic_loop/templates/`
+- every `.sh` under `src/agentic_loop/wrappers/`
+- `src/agentic_loop/validate_wp_status.py`, `gate/__init__.py`, `redispatch.py`
+- `docs/plans/` (including this brief), `.agentic/config.toml`,
+  `.agentic/locks/`, `.env`, `.context/`
+
 ## 交付物清单
 
 1. `DISCIPLINE_ANCHORS`（或等价结构）补上钉住**可操作子句**的锚点：

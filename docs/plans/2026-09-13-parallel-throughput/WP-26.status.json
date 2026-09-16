@@ -3,11 +3,27 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": ""
+    "session": "",
+    "round": 3,
+    "rev": 2,
+    "model_note": "deepseek via --config-file ~/.kimi/deepseek.toml；派发须 env -u OPENAI_BASE_URL -u OPENAI_API_KEY（否则请求被劫到 kiro 端点返 400）",
+    "probe": "kimi --afk --config-file ~/.kimi/deepseek.toml -p 'Reply with exactly: PROBE_OK' -> PROBE_OK, rc=0 @ 2026-09-16T12:38Z",
+    "config_drift_noted": ".agentic/config.toml 已被会话外改动（deepseek provider 整段换为本地 kiro 网关 127.0.0.1:18080/18090）。该改动未提交、与本 WP 无关；执行者仍走 ~/.kimi/deepseek.toml，探针已复测通过。",
+    "dispatch": {
+      "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp26-rev2-prompt.md",
+      "prompt_sha256": "b2a74cfecd42f14713b4c4e3abaf5c4749136ed0b549f258894ad7bd0c89763a",
+      "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp26-rev2.log",
+      "background_task_id": "b8kry5suz",
+      "dispatched_at": "2026-09-16T12:45:00Z",
+      "cwd": "/Users/admin/vibe/wp26-brief-source-of-truth",
+      "brief_handoff": "prompt 里给的是主仓绝对路径 + rev2 的 sha256，并明确告知工作树内同名文件是历史快照不可作判据（规避 B16/B17）",
+      "gate_note": "主仓活树 dispatch_lint.sh 仍按固定命名读 brief（B16 本体，正是本 WP 要修的），实测它 lint 的是 WP-26-brief.md（rev1）而非 rev2 —— 该 PASS 对 rev2 无效力。编排者已用真脚本 :69-101 的判据切片手工核过 rev2：rc=1 通过；同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 报缺段，证明切片有区分力。",
+      "preflight": "PREFLIGHT_PASS branch=feature/wp26-brief-source-of-truth state=DISPATCHED worktree=/Users/admin/vibe/wp26-brief-source-of-truth（从工作树内以主仓绝对路径调用；PASS 行无 status= 字段属正常，那是 WP-27 rev1 新增、尚未合入主仓）"
+    }
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -22,8 +38,8 @@
     "base_commit": "58c7624",
     "branch": "feature/wp26-brief-source-of-truth",
     "worktree": "../wp26-brief-source-of-truth",
-    "commit": "0a12bed",
-    "dispatch_commit": "58c7624"
+    "commit": "0b4deb28458098e6db055a3601d971702ab8b1af",
+    "dispatch_commit": "0a12bed"
   },
   "scope": {
     "allowed_paths": [
@@ -64,14 +80,60 @@
       "scope_note": "rev2 只修 B21 + 补四种在场组合 + 变异改 scratch copytree + 清空诊断行；rev1 已验证的七项行为不得改动，redispatch.py 零 diff。",
       "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md"
     },
-    "tests": [],
+    "tests": [
+      {
+        "name": "targeted rev2 (py3.11)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_dispatch_lint_brief_source.py tests/test_redispatch_brief_source.py -q",
+        "result": "22 passed",
+        "exit_code": 0,
+        "measured_at": "2026-09-16T13:10:00Z",
+        "measured_at_commit": "0b4deb2",
+        "measured_by": "orchestrator"
+      },
+      {
+        "name": "targeted rev2 (py3.13)",
+        "command": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest --no-project python -m pytest tests/test_dispatch_lint_brief_source.py tests/test_redispatch_brief_source.py -q",
+        "result": "22 passed",
+        "exit_code": 0,
+        "measured_at": "2026-09-16T13:14:00Z",
+        "measured_at_commit": "0b4deb2",
+        "measured_by": "orchestrator"
+      },
+      {
+        "name": "targeted rev2 (py3.14)",
+        "command": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest --no-project python -m pytest tests/test_dispatch_lint_brief_source.py tests/test_redispatch_brief_source.py -q",
+        "result": "22 passed",
+        "exit_code": 0,
+        "measured_at": "2026-09-16T13:14:00Z",
+        "measured_at_commit": "0b4deb2",
+        "measured_by": "orchestrator"
+      },
+      {
+        "name": "full suite (py3.11)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 619 passed, 4 skipped — 失败集合与基线 0a12bed 完全一致（test_finalize_merge_triple_sign.py 4 条既有失败），零回归",
+        "exit_code": 1,
+        "measured_at": "2026-09-16T13:08:00Z",
+        "measured_at_commit": "0b4deb2",
+        "measured_by": "orchestrator"
+      },
+      {
+        "name": "mutation discrimination check",
+        "command": "把两条 forbidden-mutation 用例的变异串中性化后重跑 -k forbidden_mutation",
+        "result": "2 failed（两条同时转红）— 变异用例非恒绿；还原后 tests 文件字节一致",
+        "exit_code": 1,
+        "measured_at": "2026-09-16T13:18:00Z",
+        "measured_at_commit": "0b4deb2",
+        "measured_by": "orchestrator"
+      }
+    ],
     "baseline": {
       "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-      "measured_at": "2026-09-16T08:30:00Z",
-      "measured_at_commit": "58c7624",
-      "result": "4 failed, 597 passed, 4 skipped",
-      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
-      "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
+      "measured_at": "2026-09-16T12:40:00Z",
+      "measured_at_commit": "0a12bed",
+      "result": "4 failed, 616 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py 的 4 条是既有失败，不要修",
+      "note": "rev2 是叠在 rev1 提交 0a12bed 上的返工，零回归的参照系是 rev1 的 HEAD，不是 rev1 派发前的 58c7624。编排者本人在 WP-26 工作树重测得出。"
     },
     "blocker_resolved": {
       "resolved_at": "2026-09-16T11:30:00Z",
@@ -122,75 +184,168 @@
         "sha256 不匹配（path 在场）-> brief sha256 mismatch，双值都打印"
       ],
       "b16_real_cost_demonstrated": "以 WP-25 指向 rev2 的 status 实测：主仓活树 dispatch_lint.sh 解析出 WP-25-brief.md（rev1，错），WP-26 修补版解析出 WP-25-brief-rev2.md（对）"
-    }
+    },
+    "baseline_rev1_dispatch": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-16T08:30:00Z",
+      "measured_at_commit": "58c7624",
+      "result": "4 failed, 597 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
+      "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
+    },
+    "tests_rev2": {
+      "targeted": "PYTHONPATH=src python3.11 -m pytest tests/test_dispatch_lint_brief_source.py tests/test_redispatch_brief_source.py -q -> 22 passed",
+      "full_3_11": "PYTHONPATH=src python3.11 -m pytest tests -q -> 4 failed, 619 passed, 4 skipped",
+      "cross_version": "PYTHONPATH=src uv run --quiet --python 3.13|3.14 --with pytest --no-project python -m pytest <targeted> -q -> 22 passed each",
+      "regression": "基线 rev1 HEAD 0a12bed = 4 failed, 616 passed, 4 skipped -> rev2 = 4 failed, 619 passed, 4 skipped：+3 新用例，失败集合不变（仍是 test_finalize_merge_triple_sign.py 那 4 条既有失败），零回归成立。",
+      "measured_by": "orchestrator (claude) 本人在 WP-26 工作树实测，非转录执行者自报",
+      "measured_at": "2026-09-16T13:20:00Z",
+      "worktree_clean_after": "git status --porcelain 空；无 uv.lock 产出"
+    },
+    "orchestrator_independent_review_rev2": {
+      "method": "不看执行者自报，直接构造 status 变体跑活树脚本（B14：不用 agentic CLI 冻结副本）",
+      "presence_matrix_measured": [
+        {
+          "case": "no path + wrong sha256",
+          "rc": 2,
+          "stderr": "DISPATCH_LINT_FAIL: brief sha256 mismatch: computed=757aa64e… declared=000…0",
+          "verdict": "B21 已修"
+        },
+        {
+          "case": "no path + correct sha256",
+          "rc": 0,
+          "stderr": "DISPATCH_LINT_PASS",
+          "verdict": "回退分支未被过度收紧（关键正控制）"
+        },
+        {
+          "case": "path + wrong sha256",
+          "rc": 2,
+          "stderr": "…computed=df315290… declared=000…0",
+          "verdict": "rev1 行为保持"
+        },
+        {
+          "case": "path + correct sha256",
+          "rc": 0,
+          "stderr": "DISPATCH_LINT_PASS",
+          "verdict": "rev1 行为保持"
+        },
+        {
+          "case": "no path + no sha256",
+          "rc": 0,
+          "stderr": "DISPATCH_LINT_PASS",
+          "verdict": "老 status 零回归"
+        }
+      ],
+      "b21_differential_inverts": "同一份 no-path+wrong-sha status：rev1 脚本（0a12bed 取出直跑）rc=0 DISPATCH_LINT_PASS；rev2 脚本 rc=2 报 sha256 mismatch。方向正确、可区分。",
+      "escape_refusals_still_hold": [
+        {
+          "case": "../outside.md",
+          "rc": 2,
+          "msg": "brief path escapes main repo: ../outside.md"
+        },
+        {
+          "case": "absolute /etc/hosts",
+          "rc": 2,
+          "msg": "brief path escapes main repo: /etc/hosts"
+        },
+        {
+          "case": "absolute symlink -> /etc/hosts",
+          "rc": 2,
+          "msg": "brief path escapes main repo"
+        },
+        {
+          "case": "仓内 symlink -> /etc/hosts",
+          "rc": 2,
+          "msg": "brief path escapes main repo (symlink): docs/plans/…/_probe-inrepo-symlink.md"
+        },
+        {
+          "case": "declared path 不存在",
+          "rc": 2,
+          "msg": "brief not found at …/DOES-NOT-EXIST.md"
+        }
+      ],
+      "single_fail_line_verified": "交付物 4 成立：每条失败路径 stderr 恰好 1 行 DISPATCH_LINT_FAIL:，stdout 0 行；实测 path+wrong-sha 用例 stderr 1 行、stdout 0 行；含换行的恶意 path 也只出 1 个 token（handshake 只取第 1 行，退化为 brief not found，仍 fail-closed）。",
+      "mutation_tests_discriminate": "把两条 mutation 用例里的变异串中性化（mutated = original_text）后重跑：两条同时转红（一条实测 rc=0 期望非 0，一条 rc=2 期望 0）——变异用例不是恒绿装饰。还原后 tests 文件字节一致。",
+      "in_place_mutation_removed": "rev1 的非阻塞项已修：变异改在 shutil.copytree 出来的 scratch 目录上，活树 dispatch_lint.sh 全程 sha256 不变（ca5d34de…），不再 write_text 活脚本。",
+      "redispatch_zero_diff": "git diff 0a12bed..0b4deb2 -- src/agentic_loop/redispatch.py -> 0 行，rev2 forbidden_paths 要求成立（参考实现未被改动）。",
+      "scope_respected": "本次仅 2 个文件：src/agentic_loop/wrappers/dispatch_lint.sh、tests/test_dispatch_lint_brief_source.py，均在 allowed_paths 内；无 docs/plans/ 写入、无主仓写入。",
+      "structural_alignment": "sha256 校验块位于 declared/fallback 两分支汇合之后（:123），与 redispatch.py:184 的 `if declared_sha:` 同构——这正是 rev2 brief 指定的结构位置。"
+    },
+    "residual_findings_rev2": [
+      {
+        "id": "R1",
+        "severity": "NON_BLOCKING",
+        "title": "内层 python 块崩溃仍 fail-open 到 rc=1",
+        "measured": "在 dispatch_lint.sh 的内层 heredoc 注入 raise RuntimeError 后：rc=1，只有 Traceback，无 DISPATCH_LINT_FAIL token。",
+        "why_non_blocking": "这是 A29 家族的既有形态、rev1 与 rev2 同构未变、也不在本 WP 的 brief 判据内；rc=1 非 0 故调用方仍会拒收（preflight 用 `if ! …` 判定）。不因未写入判据的标准驳回（与 B22 同一纪律）。",
+        "followup": "归入任务 #14/#3 的 wrapper 健壮性面，或新立 WP。"
+      },
+      {
+        "id": "R2",
+        "severity": "INFORMATIONAL",
+        "title": "failure 信息经 stdout 第 1 行传递，含换行的 message 会被截断",
+        "measured": "path 里塞 \\n 后，报错退化为 `brief not found at …/docs/plans/x`（截断后的路径），仍 rc=2 fail-closed。",
+        "why_non_blocking": "fail-closed 方向正确，只是措辞不够精确；且现有全部 fail() message 均为单行。"
+      }
+    ]
   },
   "review": {
-    "decision": "REWORK",
-    "reviewer": "claude (orchestrator, independent review)",
-    "reviewed_at": "2026-09-16T12:20:00Z",
-    "blocking_defect": {
-      "id": "B21",
-      "summary": "声明了 evidence.brief.sha256 但未声明 evidence.brief.path 时，固定命名回退分支在校验之前 SystemExit(0)，校验被静默跳过",
-      "location": "src/agentic_loop/wrappers/dispatch_lint.sh（内联 python 解析器的 fallback 分支）",
-      "reproduction": {
-        "case": "evidence.brief = {\"sha256\": \"0\"*64}（故意写错，无 path）",
-        "observed": "DISPATCH_LINT_PASS rc=0",
-        "control": "同一错 sha256 + 正确 path -> DISPATCH_LINT_FAIL: brief sha256 mismatch: computed=a84d7440… declared=000… rc=2",
-        "cross_consumer": "redispatch.py._brief_content() 对同一形态 refused: brief sha256 mismatch: computed=e3428210… declared=000… —— 两个消费者裁决相反",
-        "run_by": "claude (orchestrator), independently reproduced after codex flagged it"
-      },
-      "violates": [
-        "rev1 brief 交付物 2：evidence.brief.sha256 存在时必须校验",
-        "rev1 brief 陷阱注 4：sha256 的失败必须 fail-closed，算不出也要拒收，不得跳过",
-        "rev1 brief 交付物 3：redispatch.py 同口径 —— 口径分裂是第二重违规"
-      ],
-      "why_missed": "rev1 的 19 条用例只覆盖「path 与 sha256 同时存在」。两个可选字段有四种在场组合，用例只走两种。编排者第一轮测了三种拒收原因，但三种都落在 path 在场那一半 —— 按原因枚举而非按在场组合枚举，是这个洞的形状。",
-      "registered_as": "docs/plans/2026-09-13-parallel-throughput/WP-08-candidate.md §B21"
-    },
+    "decision": "ACCEPT",
+    "reviewer": "orchestrator (claude)",
+    "reviewed_at": "2026-09-16T13:20:00Z",
+    "reviewed_commit": "0b4deb28458098e6db055a3601d971702ab8b1af",
+    "rev": 2,
+    "basis": "rev2 冻结 brief 四项交付物逐条实测通过（见 evidence.orchestrator_independent_review_rev2）：sha256 校验脱离 path 在场、四种在场组合矩阵齐备且含 no-path+correct-sha 正控制、变异改在 scratch 副本、每条失败路径恰一行 FAIL token。零回归成立（616 -> 619，失败集合不变）。3.11/3.13/3.14 全绿。redispatch.py 零 diff。",
+    "blocking_defect": null,
     "non_blocking": [
-      {
-        "id": "empty-second-failure-line",
-        "summary": "内层 python 的 fail() 把消息写 stderr 后 SystemExit(0)，外层 brief_ok 读 stdout 第一行得空串，于是 fail \"$brief_ok\" 又打一行空的 DISPATCH_LINT_FAIL: ",
-        "adjudication": "非阻塞：rc=2 与原因特异的消息都已到 stderr；第二签名独立复核后同意（「未发现经 fail() 丢失原因的路径」）。已并入 rev2 交付物 4 顺手清理。"
-      },
-      {
-        "id": "in-place-live-mutation",
-        "summary": "test_forbidden_mutation_fixed_name_reverts_red 原地改写活树 dispatch_lint.sh，靠 finally 恢复",
-        "adjudication": "非阻塞但必须改：finally 覆盖不了 SIGKILL / 崩溃 / 并行读到坏脚本。已并入 rev2 交付物 3，改用 WP-27 的 scratch copytree。"
-      },
-      {
-        "id": "redispatch-double-read",
-        "summary": "redispatch.py:173 read_text() 后 :180 又 read_bytes()，校验的字节不必然是派发的字节（第二签名提出）",
-        "adjudication": "非阻塞：与 B22 同族（判定面与消费面分离），rev1 冻结 brief 未要求单次读取快照；据未写进判据的标准驳回等于让判据事后长出来。redispatch.py 在 rev2 中为零 diff，此项另立 WP 与 B22 一并收口。"
-      }
+      "R1 内层 python 崩溃 fail-open 到 rc=1（A29 家族既有形态，判据外）",
+      "R2 fail message 单行约束（fail-closed 方向正确）"
     ],
-    "what_did_hold": "范围、差分对构造、三种逃逸拒收、双值打印、老 status 回退、19 条用例跨三版本、相对基线零回归 —— 全部由编排者独立实测通过，rev2 不得改动。",
-    "superseded_earlier_verdict": "an earlier ACCEPT on this WP was recorded before the presence-combination probe below; it covered only the path-present half and is wrong. It is retained as a record, not as a verdict."
+    "next_gate": "需 codex 第二签名后才可提交用户批准合入；编排者不得自签自批（本轮 B21 正是编排者一审漏判、由第二签名捕获）。",
+    "supersedes": "review.decision=REWORK @ 0a12bed（B21）",
+    "merge_gate": "BLOCKED — 待 (1) 断言加固补丁落地并由编排者重测；(2) codex 对加固后的复签；(3) 用户明确批准。state 保持 READY_FOR_REVIEW，未置 APPROVED_FOR_MERGE。",
+    "consult_adjudication": "codex rev2 判 REWORK；编排者判其阻塞级别不成立（提议判据被多错并报实测证伪），但接受底层关切并派发最小加固补丁。合入仍需加固后重跑 + codex 复签 + 用户批准。"
   },
   "consult": {
     "requested": true,
     "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
-    "session": "01a0a85a-299b-7a90-a988-8ba1845cb8d6",
+    "session": "rev2 咨询（--output-schema 解析失败，原文已留痕）",
     "verdict": "REWORK",
-    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp2627-verdict.raw.txt",
-    "findings_accepted": [
-      "阻塞：固定命名回退绕过已声明的 sha256（编排者独立复现，成为 B21）"
+    "rev": 2,
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-rev2-verdict.raw.txt",
+    "consulted_at": "2026-09-16T13:19:00Z",
+    "input": {
+      "brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-rev2-brief.md",
+      "diff": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-rev2.diff（0a12bed..0b4deb2，345 行）"
+    },
+    "disclosed_limitation": "沙箱只读、未自行跑测试，采用 brief 中编排者实测数字（与上一轮同）。",
+    "findings_confirmed_green": [
+      "sha256 校验确实位于 declared/fallback 汇合之后，且只有一份实现，满足单一口径",
+      "「无 path + 正确 sha256 → PASS」正控制能挡住「缺 path 一律拒收」的过度修复",
+      "两条变异用例都在 copytree scratch 副本上跑，中性化实验足以证明其有行为区分力，非装饰",
+      "R1（内层 python 崩溃 rc=1）保持非零退出、未造成绕过、属既有行为，同意另立 WP",
+      "R2（message 单行约束）仍 fail-closed，同意本 WP 内不阻塞",
+      "未发现其他 correctness/architecture/security 阻塞项"
     ],
-    "findings_deferred": [
-      "redispatch.py 两次读取的快照分裂 —— 与 B22 同族，rev1 判据未要求，另立 WP"
+    "findings_blocking_claimed": [
+      {
+        "claim": "交付物 4 的 `_assert_single_fail_token()` 只查 `stderr.count(\"DISPATCH_LINT_FAIL:\") == 1`，不能排除额外的非 token 输出；建议改为 `len(stderr.splitlines()) == 1` 且首行以 token 开头，并断言 stdout 为空。",
+        "orchestrator_adjudication": "部分接受：**阻塞级别不成立，但底层关切接受并已派发加固。**",
+        "why_blocking_not_sustained": "codex 提议的具体判据 `len(stderr.splitlines()) == 1` 被编排者实测证伪：构造一份**两处**校验错误的 status（state 与 review.decision 同时非法）后实测 rc=2、stderr **2 行**、token 恰 1 次 —— 第 1 行 `DISPATCH_LINT_FAIL: STATUS_INVALID: invalid state: 'NOT_A_STATE'`，第 2 行 `STATUS_INVALID: review.decision is invalid: 'NOPE'`。这是 validator 多错并报的**正当**诊断续行，正是 codex 举的「unexpected diagnostic」形状。按其提议改判据会把这条正当路径判红。此外冻结 brief 交付物 4 的原文判据是「stderr 里 `DISPATCH_LINT_FAIL:` **恰好出现一次**」，现测试逐字满足；空重复 token 行会使 count 变 2，故该断言确实钉住了 B21 那个具体缺陷。以未写入判据、且其具体形式被实测证伪的标准驳回，等于让判据在执行后生长（B16 家族错误，与 B22 同一纪律）。",
+        "what_is_accepted": "stdout 未被断言为空、首行位置未被钉住，确属测试强度缺口。编排者实测全部 9 条失败路径（含多错并报）stdout 均为 0 行，故可安全加固为：stdout 为空 + token 计数恰 1 + `stderr.splitlines()[0].startswith(\"DISPATCH_LINT_FAIL:\")`。该形式对多错并报仍成立。",
+        "resolution": "不 re-freeze（这是交付物 4 同一子句内的强度加固，不是新判据；本 WP 已 refreeze_count=2，第 3 次会触发自订规则 #24 强制停手复核）。以同一 rev2 brief 派发最小补丁。"
+      }
     ],
-    "findings_agreed_non_blocking": [
-      "空的重复 DISPATCH_LINT_FAIL: 行是诊断噪声，不构成 REWORK 依据"
-    ],
-    "note": "第二签名先于任何实验写出结论行（本轮硬性格式要求），未再发生 WP-25 那次「崩在最后一个实验、结论丢失」。这是本会话第二次由第二签名发现编排者漏掉的阻塞项。"
+    "note": "本轮第二签名的阻塞项在结论方向上未被采纳，但其关切被实测细化后接受——这是本会话首次出现「第二签名的诊断正确、但其提议的判据被实测证伪」的情形，编排者的处置是取其关切、弃其形式，并把证伪实测留痕。"
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
     "updated_at": "2026-09-16T11:30:00Z",
-    "dispatched_at": "2026-09-16T08:35:00Z",
+    "dispatched_at": "2026-09-16T12:40:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
     "redispatched_at": "2026-09-16T11:30:00Z",
     "reviewed_at": "2026-09-16T12:20:00Z",
-    "refrozen_at": "2026-09-16T12:20:00Z"
+    "refrozen_at": "2026-09-16T12:20:00Z",
+    "reviewed_rev2": "2026-09-16T13:20:00Z"
   }
 }
