@@ -3,7 +3,7 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -248,17 +248,53 @@
     }
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "claude (orchestrator, independent)",
-    "reviewed_at": "2026-09-16T11:29:37Z",
+    "reviewed_at": "2026-09-16T14:05:00Z",
     "reviewed_commit": "284e223",
-    "basis": "3 项交付物齐备：锚点已补到可操作子句（差分对方法的「只翻一个输入 / 红绿随之翻转」、rev 改名的「消费通道 / -revN」）、掏空守卫用例存在且两处各自独立转红且措辞互不相同、每条负面断言带 oracle 三项。编排者双向探针：B20 变换必红、周边改写不红。rev1 已核验的七项全部保留。",
-    "merge_gate": "① 编排者独立重测通过 ✅  ② codex 第二签名（对 284e223）⏳  ③ 用户明确批准合入 ⏳",
-    "residual_non_blocking": "B27（非阻塞）：守卫用例的两条 evisceration 正则锚在**非锚点**措辞上，改写周边措辞会让正则匹配不到，用例报 'discipline-N evisceration produced no change' 而红。编排者实测确认这是 fail-closed（响亮失败 + 自解释措辞，迫使改写者重新确认锚点），不是空过，故不阻塞合入；已记入缺陷账。"
+    "retracted_self_accept": "编排者一审曾判 ACCEPT（2026-09-16T11:29:37Z，记于 commit 41b5b1f）。第二签名 REWORK 后，编排者逐条实测，**确认阻塞项成立并撤回自评 ACCEPT**。这是本会话第三次由第二签名捕获编排者漏判（前两次：WP-25 的 B20、WP-27 的差分方向）。",
+    "basis": "codex 指出的 B28（存在性锚点检测不到语义反转）经编排者实测证实：把纪律 2 正文改成语义完全相反的措辞、保留全部 6 个锚点短语，`tests/test_orchestrator_protocol_disciplines.py` **10 passed 全绿**。锚点存在性无法承载「纪律说的是哪个方向」，与 B20 是同一根因的下一层：B20 是「标签词钉不住方法」，B28 是「方法短语钉不住极性」。",
+    "merge_gate": "① 编排者独立重测 ✅（但结论已由第二签名推翻）② codex 第二签名 = **REWORK** ③ 用户批准 —— 未取得，且现在不应取得"
   },
   "consult": {
-    "decision": null,
-    "note": "codex run crashed on its own final probe (exit 1) before emitting a verdict; its last successful probe is the source of B20. Re-consult after the rework."
+    "requested": true,
+    "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+    "verdict": "REWORK",
+    "rev": 2,
+    "reviewed_commit": "284e223",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-verdict.raw.txt",
+    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev.md",
+    "request_brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-brief.md",
+    "consulted_at": "2026-09-16T13:47:10Z",
+    "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字；自述 REWORK 结论来自代码结构、可静态确认。",
+    "findings": [
+      {
+        "id": "C1",
+        "claim": "存在性锚点检测不到**语义反转**。保留 `differential pair` / `flip exactly one input` / `flip with it` 三个锚点，把纪律正文改写成「do not flip exactly one input, and do not require the verdict to flip with it」，锚点测试全绿，掏空守卫也仍按预期转红（故守卫本身也通过），但纪律已表达相反规则。`read_face_pinning` 同理可用「`-revN` 后 consumer channel 不必跟随」反转。",
+        "orchestrator_adjudication": "**接受，阻塞成立。登记为 B28。**",
+        "orchestrator_verification": "两级实测。① 内存级：构造 codex 给的反转文本，`_assert_discipline_anchors` 对两条纪律**均 GREEN**，且掏空守卫的正则仍匹配、仍转红、witness 仍特异 —— 即反转文本能同时通过锚点断言与守卫断言。② 活树级：把纪律 2 正文替换为 `do not hold everything else constant, do not flip exactly one input, and do not require the red/green verdict to flip with it.`，整文件 `PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q` → **10 passed**。探针后逐字节还原，worktree clean。",
+        "why_my_accept_was_wrong": "我一审的双向探针只覆盖了「删/压缩」方向（掏空必红）与「改写周边措辞」方向（不误红），**没有覆盖「保留全部锚点但反转极性」方向**。B20 的教训我只吃了一半：我把「锚点要钉可操作子句」做到了，却没问「钉住子句在场之后，谁来钉住子句的极性」。这正是记忆 same-topic-is-not-same-extension 的形态——同一主题的下一层反例集合并未被覆盖。"
+      },
+      {
+        "id": "C2",
+        "claim": "B27 应升级为阻塞项：evisceration 正则间接锁定了整段周边措辞，只改写非锚点措辞就会让守卫因 `evisceration produced no change` 而红。fail-closed 只能证明它不静默空过，不能消除**错误拒绝**；实质上重新引入了 B10 所禁止的措辞耦合。",
+        "orchestrator_adjudication": "**接受升级为阻塞项。**",
+        "orchestrator_verification": "编排者一审已实测该形态存在（记为 B27 非阻塞）。codex 的论点补上了我漏掉的一半：我只权衡了「空过 vs 响亮失败」，没权衡「**误红**本身就是 B10 要禁的东西」。B10 的原意是「断言不得与措辞耦合」，而耦合发生在变异构造侧还是断言侧，对改写模板的人来说后果相同 —— 都是改了合法措辞却被判红。既然 C1 已要求返工，把 B27 一并收口成本极低。",
+        "prescription": "变异构造改为锚点驱动（例如「删掉包含锚点短语 X 的那个句子」），使变异构造与锚点共享同一份真值，不依赖固定句首、标点和从句边界。"
+      },
+      {
+        "id": "C3",
+        "claim": "守卫用例写活树文件，不满足并行测试隔离：`pytest -n` 下其他 worker 可能在模板处于变异态时读取它；SIGKILL / 解释器崩溃 / 恢复写入本身失败都可能留下被污染的 tracked 文件。建议完全取消 `CLAUDE_TMPL.write_text/write_bytes`，直接对内存文本调用 `_assert_discipline_anchors`。",
+        "orchestrator_adjudication": "**接受方向，但把「并行」这一条降级为次要理由。**",
+        "orchestrator_verification": "① 并行前提当前不成立：本仓未装 pytest-xdist（`import xdist` → ModuleNotFoundError），pyproject/setup.cfg/pytest.ini 均无 addopts 或 -n 配置。故 codex 举的 worker 竞态**当前无法发生**。② 但同仓另有 3 个测试文件读同一模板（test_init_contract.py / test_contract_render.py / test_wp_template_dispatch_lint.py），一旦引入 xdist 即成真隐患。③ 更强的理由是**这次写活树根本不必要**：编排者实测「纯内存变体」——不写文件、直接对 mutated 字符串调 `_assert_discipline_anchors` —— 两条纪律**都红且 witness 特异**（`flip exactly one input` / `consumer channel`），与写活树版本的判别力**完全等价**。既然等价，承担写 tracked 文件的风险就是净损失。",
+        "note": "`_template_text()` 只是 `CLAUDE_TMPL.read_text()`，不含任何额外逻辑，所以「必须经文件读取面」这个理由不成立。"
+      }
+    ],
+    "findings_confirming": [
+      "`pytest.raises(AssertionError)` 无 B19 式假绿路径：作用域内只有 `_assert_discipline_anchors` 主动抛 AssertionError，且随后检查了具体缺失短语，原因特异性足够。",
+      "版本一致性：累计 diff 已同时改 CONTRACT_TEMPLATE_VERSION 并断言其为 \"7\"，无新增阻塞项。"
+    ],
+    "orchestrator_note_on_B10_tension": "编排者补做了一项 codex 未涉及的实测，供 rev3 冻结时定形：把整条可操作从句当成一个锚点是**行不通的**——模板正文是折行的，`hold everything else constant, flip exactly one input` 这一串在原文里并不逐字存在（需先归一化空白），且把子句顺序做一次无害重排（`flip exactly one input while holding everything else constant`）就会让整句锚点失配、短语锚点却全部保留。所以 rev3 的极性判据**不能**靠加长锚点解决，必须换一种形式（例如禁忌反义词表 + 语义反转变异用例）。这一点须写进 rev3 brief，否则执行者极可能反踩 B10。"
   },
   "timestamps": {
     "created_at": "2026-09-16T00:00:00Z",

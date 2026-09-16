@@ -3,7 +3,7 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -394,53 +394,88 @@
     }
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "claude (orchestrator, independent)",
-    "reviewed_at": "2026-09-16T11:29:37Z",
+    "reviewed_at": "2026-09-16T14:05:00Z",
     "reviewed_commit": "57cd572",
-    "basis": "逐条核对冻结 rev3 brief 的 5 项交付物；独立重跑全部测试命令，数字逐一吻合；两条反向探针（还原 helper / 过度收紧）双向证明判据承重且不误红。C1（续行内容未受约束）与 C2（strip 放过纯空白 stdout）均已按 codex 处方的形式修复：stdout 逐字节断言、普通路径续行元组恒等于 ()、多错路径显式声明精确续行元组。",
-    "b25_closed": "是。B25 的反例集合（token 后任意非 token 续行 / stdout=' ' / stdout='\\n'）与新断言拒绝的集合一致 —— 三条逃逸各有独立用例且实测转红。",
-    "merge_gate": "① 编排者独立重测通过 ✅  ② codex 第二签名（对 57cd572）⏳  ③ 用户明确批准合入 ⏳",
-    "orchestrator_self_finding": "B26：我在 rev3 brief 里写「基线 16bfdf3 targeted = 23 passed」是错的，实测 collect 为 14。执行者在 [CONCERNS] 里指出并给出实测值，核验属实。派发 prompt 未含该数字，故未污染交付。"
+    "retracted_self_accept": "编排者一审曾判 ACCEPT（2026-09-16T11:29:37Z，记于 commit 41b5b1f）。第二签名 REWORK 后编排者实测确认阻塞项成立，**撤回自评 ACCEPT**。",
+    "b25_closed": "是 —— 这一点第二签名独立确认：C1/C2 均已关闭，普通路径精确要求 `lines[1:] == ()`，多错路径精确声明续行元组；空 stderr 会先在 `count(...)==1` 处 AssertionError（fail-closed，非 IndexError）；`stdout == \"\"` 拒绝空格/换行/JSON/任何非空内容。",
+    "basis": "本轮返工目标（B25）已达成，但第二签名在**累计 diff**（rev1 引入、前三轮双方均未发现）中查出一处 brief 完整性缺陷 B29：`redispatch._brief_content()` 双次读文件 —— `read_text()` 取派发内容、`read_bytes()` 另取一份算 sha256，两次读之间文件若变化，则**校验的是第二份、派发的是第一份**，「sha256 锚定实际派发 Brief」并不严格成立。编排者已构造实测确认可逃逸。",
+    "merge_gate": "① 编排者独立重测 ✅（rev3 目标达成）② codex 第二签名 = **REWORK**（阻塞项在累计面）③ 用户批准 —— 未取得，且现在不应取得"
   },
   "consult": {
     "requested": true,
     "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
-    "session": "加固补丁复签（第 3 次咨询）；--output-schema 解析失败，原文逐字留痕",
     "verdict": "REWORK",
-    "rev": "2+harden",
-    "reviewed_commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
-    "reviewed_range": "0b4deb2..16bfdf3（仅 tests/test_dispatch_lint_brief_source.py）",
-    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-harden-verdict.raw.txt",
-    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-harden.md",
-    "request_brief": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-harden-request.md",
-    "consulted_at": "2026-09-16T05:52:00Z",
+    "rev": 3,
+    "reviewed_commit": "57cd572",
+    "reviewed_range": "58c7624..57cd572（累计）+ 16bfdf3..57cd572（本轮增量）",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp26-verdict.raw.txt",
+    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-rev.md",
+    "request_brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp26-brief.md",
+    "consulted_at": "2026-09-16T13:49:14Z",
+    "consult_round": "第 4 次咨询本 WP（rev1 / rev2 / rev2+harden / rev3）",
     "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字。",
-    "conceded_by_consultant": "(a) 编排者上一轮对 `len(stderr.splitlines()) == 1` 的驳回**成立** —— consultant 明确认可 validator 多错并报是正当路径、全局单行断言会误伤，并认可编排者的反向探针足以证明这一点。B24 的裁定因此被第二签名独立确认。",
-    "findings_blocking_claimed": [
+    "closed_by_this_rev": "C1（续行内容未受约束）与 C2（strip 放过纯空白 stdout）均由第二签名独立确认关闭。B25 结案。",
+    "findings": [
       {
-        "id": "C1",
-        "claim": "加固后的三条不变量仍不充分：`DISPATCH_LINT_FAIL: x` + 任意非 token 续行（如 `unexpected diagnostic`）仍全部通过 helper —— token 恰 1 次、位于首行、stdout 空。上一轮指出的「任意非 token 续行未受约束」并未被消除；新增的双错测试只证明了某些续行合法，却没有区分**合法续行**与**意外泄漏**。",
-        "orchestrator_adjudication": "**接受，阻塞成立。**",
-        "orchestrator_verification": "编排者直接 import 被审树自己的 `_assert_single_fail_token` 逐形状实测（B14 纪律）：`P(stdout='', stderr='DISPATCH_LINT_FAIL: brief sha256 mismatch\\nunexpected diagnostic\\n')` → **PASSES helper**。consultant 举的形状确实逃逸，与上一轮不同，这次其判断被实测**证实**而非证伪。",
-        "why_my_previous_adjudication_was_incomplete": "上一轮我把关切落在「stdout 必空 + token 首行位置」上，并判定这对多错并报仍成立——后半句对，但前半句并未覆盖 consultant 关切的本体。consultant 的关切是「续行内容不受约束」，我的加固只约束了续行的**起点**（首行必须是 token），没约束续行的**内容**。这是我这一轮判 ACCEPT 时的漏判。"
-      },
-      {
-        "id": "C2",
-        "claim": "`stdout.strip() == \"\"` 不等价于 stdout 为空：会放过 `\" \"`、`\"\\n\"` 等纯空白输出，与 docstring 宣称的 'stdout is empty' 及实测表的「stdout: 0 行」不一致。应改为 `assert proc.stdout == \"\"`。",
-        "orchestrator_adjudication": "**接受，阻塞成立（且这是我自己引入的判据与其自身 docstring 不符）。**",
-        "orchestrator_verification": "实测：`P(stdout=' ', ...)` 与 `P(stdout='\\n', ...)` 两种纯空白 stdout 均 **PASSES helper**。而编排者本人的 10 条失败路径实测里 stdout 全部为**逐字节空串**（下方 measured_failure_paths），故逐字节断言不会引入假红。"
+        "id": "C3",
+        "claim": "`redispatch._brief_content()` 先 `read_text()` 取得将要派发的内容，随后再 `read_bytes()` 计算 sha256。若文件在两次读取之间变化，校验的是第二份内容、返回并派发的却是第一份。应只读一次字节：`raw = brief_path.read_bytes()`，对 `raw` 算 sha256 并从同一 `raw` 解码出返回内容；建议同时把解码失败规范化为 `BriefIntegrityError`。",
+        "orchestrator_adjudication": "**接受，阻塞成立。登记为 B29。**",
+        "orchestrator_verification": "编排者构造实测（import 被审树自己的 `_brief_content`，B14 纪律）：拦下 `Path.read_text` 使其返回 EVIL 内容、同时把磁盘文件还原为 GOOD 再让 `read_bytes` 读到 —— 结果 **sha256 校验通过（对 GOOD），函数返回并将派发 EVIL**。逃逸确证，非理论推测。基线对照（不拦截）返回 GOOD、校验通过。",
+        "code_site": "src/agentic_loop/redispatch.py:173-187（`content = brief_path.read_text(...)` 与 `digest = hashlib.sha256(brief_path.read_bytes())` 两次独立读）",
+        "introduced_in": "rev1 提交 0a12bed（`git log -L` 确认），即本 WP 自身引入；前三轮咨询与编排者三轮验收**均未发现**。",
+        "sibling_check_by_orchestrator": "编排者顺手核了同一 WP 的另一半 `dispatch_lint.sh`：其 sha256 段是 `open(real,'rb').read()` 单次读，且**只输出路径**给 bash（`print(real)`），brief 正文由后续 section 判据**另行按路径重读** —— 形态与 B13（finalize 写回段按路径重读）同族。即：同一 WP 的两个消费面都存在「校验对象与使用对象不是同一份快照」的缺口，只是表现层不同。rev4 应一并收口，否则修了 python 侧、bash 侧仍在。",
+        "severity_note": "利用条件是「两次读之间文件被换」。虽非常规路径，但本 WP 的**全部立意**就是「sha256 锚定实际派发的 Brief」（B16/B21 两轮返工皆为此），缺口正落在该立意的靶心上，故阻塞成立而非非阻塞。"
       }
     ],
-    "prescription_verified_this_round": {
-      "note": "与上一轮相反：这一次编排者在裁定前先实测了 consultant **提议判据本身**是否可实施（记忆 verify-the-remedy-not-just-the-finding 的直接应用）。",
-      "shape_tested": "assert proc.stdout == \"\"；stderr 首行必须是 token；token 计数恰 1；`tuple(lines[1:]) == tuple(expect_continuations)`（默认空元组 = 普通失败路径不得有任何续行；多错用例显式声明其两条续行）",
-      "result": "三条逃逸形状**全部被捕获**，两条正当路径（干净单行失败 / 多错并报且续行被精确声明）**均不误红**。consultant 的提议这一轮可实施、无假红。"
-    },
-    "measured_failure_paths": {
-      "method": "在被审树内对 helper 插桩，记录每个调用点实际的 stderr 行数与 stdout 原文；探针后删除临时文件，worktree 恢复 clean。",
-      "result": "10 次调用中 **9 次 stderr 恰 1 行、stdout 逐字节空**；唯一多行者是 test_multi_error_continuation_keeps_single_token（2 行，第 2 行为 `STATUS_INVALID: review.decision is invalid: 'NOPE'`），stdout 亦为空。",
-      "why_it_matters": "这组数字证明 consultant 的 (c) 建议（普通路径严格单行 + 多错路径精确声明续行）与现实行为完全吻合，落地不需要放宽任何现有用例。"
+    "findings_confirming": [
+      "本轮增量确实只改 tests/test_dispatch_lint_brief_source.py，无 .sh / 实现 .py 改动（第二签名独立核实）。",
+      "空 stderr 不触发 lines[0] 的 IndexError：前置 count 断言先以 AssertionError 失败，属 fail-closed。",
+      "三条 constructed-proc 测试不是同义反复：真实 subprocess 失败用例调用同一 helper，continuation mutation 连上了真脚本输出与断言。",
+      "三条逃逸测试无 B19 式假绿：各自满足目标断言之前的全部条件，失败原因可静态定位到 continuation / stdout 精确断言。",
+      "字面替换若因 fail() 重排失配，会在 `mutated != original_text` 处明确失败，属可接受的 fail-closed 维护信号。"
+    ],
+    "orchestrator_adjudication_on_hardcoded_sha": "关于硬编码 `DISPATCH_LINT_SHA256`：第二签名同意编排者的定级（不单列为阻塞项），理由是本次冻结 brief 明确要求该变更闸门，且 `live_before` 逐字节自比已足以证明活树未被变异。但它**建议移除该常量**。编排者采纳为 rev4 的非阻塞改进项：`live_before` 自比是承重断言，硬编码常量只是额外闸门，日后任何对 dispatch_lint.sh 的合法修改都会让它红（A30「锁实现不锁契约」的形态）。rev4 一并去掉。",
+    "previous_consult_rounds": {
+      "requested": true,
+      "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+      "session": "加固补丁复签（第 3 次咨询）；--output-schema 解析失败，原文逐字留痕",
+      "verdict": "REWORK",
+      "rev": "2+harden",
+      "reviewed_commit": "16bfdf32fd4acc37e3c8c3751c60735031707afc",
+      "reviewed_range": "0b4deb2..16bfdf3（仅 tests/test_dispatch_lint_brief_source.py）",
+      "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult/wp26-harden-verdict.raw.txt",
+      "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-harden.md",
+      "request_brief": "docs/plans/2026-09-13-parallel-throughput/WP-26-consult-codex-harden-request.md",
+      "consulted_at": "2026-09-16T05:52:00Z",
+      "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字。",
+      "conceded_by_consultant": "(a) 编排者上一轮对 `len(stderr.splitlines()) == 1` 的驳回**成立** —— consultant 明确认可 validator 多错并报是正当路径、全局单行断言会误伤，并认可编排者的反向探针足以证明这一点。B24 的裁定因此被第二签名独立确认。",
+      "findings_blocking_claimed": [
+        {
+          "id": "C1",
+          "claim": "加固后的三条不变量仍不充分：`DISPATCH_LINT_FAIL: x` + 任意非 token 续行（如 `unexpected diagnostic`）仍全部通过 helper —— token 恰 1 次、位于首行、stdout 空。上一轮指出的「任意非 token 续行未受约束」并未被消除；新增的双错测试只证明了某些续行合法，却没有区分**合法续行**与**意外泄漏**。",
+          "orchestrator_adjudication": "**接受，阻塞成立。**",
+          "orchestrator_verification": "编排者直接 import 被审树自己的 `_assert_single_fail_token` 逐形状实测（B14 纪律）：`P(stdout='', stderr='DISPATCH_LINT_FAIL: brief sha256 mismatch\\nunexpected diagnostic\\n')` → **PASSES helper**。consultant 举的形状确实逃逸，与上一轮不同，这次其判断被实测**证实**而非证伪。",
+          "why_my_previous_adjudication_was_incomplete": "上一轮我把关切落在「stdout 必空 + token 首行位置」上，并判定这对多错并报仍成立——后半句对，但前半句并未覆盖 consultant 关切的本体。consultant 的关切是「续行内容不受约束」，我的加固只约束了续行的**起点**（首行必须是 token），没约束续行的**内容**。这是我这一轮判 ACCEPT 时的漏判。"
+        },
+        {
+          "id": "C2",
+          "claim": "`stdout.strip() == \"\"` 不等价于 stdout 为空：会放过 `\" \"`、`\"\\n\"` 等纯空白输出，与 docstring 宣称的 'stdout is empty' 及实测表的「stdout: 0 行」不一致。应改为 `assert proc.stdout == \"\"`。",
+          "orchestrator_adjudication": "**接受，阻塞成立（且这是我自己引入的判据与其自身 docstring 不符）。**",
+          "orchestrator_verification": "实测：`P(stdout=' ', ...)` 与 `P(stdout='\\n', ...)` 两种纯空白 stdout 均 **PASSES helper**。而编排者本人的 10 条失败路径实测里 stdout 全部为**逐字节空串**（下方 measured_failure_paths），故逐字节断言不会引入假红。"
+        }
+      ],
+      "prescription_verified_this_round": {
+        "note": "与上一轮相反：这一次编排者在裁定前先实测了 consultant **提议判据本身**是否可实施（记忆 verify-the-remedy-not-just-the-finding 的直接应用）。",
+        "shape_tested": "assert proc.stdout == \"\"；stderr 首行必须是 token；token 计数恰 1；`tuple(lines[1:]) == tuple(expect_continuations)`（默认空元组 = 普通失败路径不得有任何续行；多错用例显式声明其两条续行）",
+        "result": "三条逃逸形状**全部被捕获**，两条正当路径（干净单行失败 / 多错并报且续行被精确声明）**均不误红**。consultant 的提议这一轮可实施、无假红。"
+      },
+      "measured_failure_paths": {
+        "method": "在被审树内对 helper 插桩，记录每个调用点实际的 stderr 行数与 stdout 原文；探针后删除临时文件，worktree 恢复 clean。",
+        "result": "10 次调用中 **9 次 stderr 恰 1 行、stdout 逐字节空**；唯一多行者是 test_multi_error_continuation_keeps_single_token（2 行，第 2 行为 `STATUS_INVALID: review.decision is invalid: 'NOPE'`），stdout 亦为空。",
+        "why_it_matters": "这组数字证明 consultant 的 (c) 建议（普通路径严格单行 + 多错路径精确声明续行）与现实行为完全吻合，落地不需要放宽任何现有用例。"
+      }
     }
   },
   "timestamps": {
