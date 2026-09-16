@@ -63,6 +63,24 @@ BRIEF = """# WP brief fixture
 # preflight.sh emits its verdicts to stderr; the final PASS line goes to stdout.
 STATE_NOT_EXECUTABLE = "PREFLIGHT_FAIL: state "
 
+# Passing risk baseline: every §4.1 risk flag false. dispatch_lint.sh refuses
+# dispatch when any flag is True (dispatch_lint.sh:108-126); these differentials
+# keep the non-tested risk dimension at this baseline so the two refusal causes
+# cannot mask one another (B19).
+PASSING_RISK = {
+    "production_writes_authorized": False,
+    "network_authorized": False,
+    "real_notifications_authorized": False,
+    "irreversible_actions_authorized": False,
+}
+
+# Cause-specific refusal witnesses: the exact substrings printed by
+# dispatch_lint.sh, which preflight.sh wraps as
+# ``PREFLIGHT_FAIL: dispatch-lint DISPATCH_LINT_FAIL: <reason>``. The two are
+# distinct from each other and from a ``state … is not executable`` refusal.
+SCOPE_REFUSAL_WITNESS = "scope.allowed_paths is empty"  # dispatch_lint.sh:136
+RISK_REFUSAL_WITNESS = "risk.network_authorized authorized"  # dispatch_lint.sh:120
+
 
 @pytest.fixture
 def session_env():
@@ -134,8 +152,8 @@ def _status(
     }
 
 
-def _make_repo(tmp_path: Path) -> Path:
-    repo = tmp_path / "repo"
+def _make_repo(tmp_path: Path, name: str = "repo") -> Path:
+    repo = tmp_path / name
     repo.mkdir()
     _run_git(repo, "init", "-q")
     _run_git(repo, "config", "user.email", "test@example.com")
@@ -226,6 +244,71 @@ def _diverged_fixture(
     }
 
 
+def _rewrite_main_status(fx: dict, *, allowed_paths=None, risk=None) -> None:
+    """Flip a field on the LIVE main-repo copy in place (it stays tracked)."""
+    status = json.loads(fx["main_status_path"].read_text(encoding="utf-8"))
+    if allowed_paths is not None:
+        status["scope"]["allowed_paths"] = allowed_paths
+    if risk is not None:
+        status["risk"] = risk
+    fx["main_status_path"].write_text(json.dumps(status, indent=2), encoding="utf-8")
+
+
+def _main_tight_fixture(
+    tmp_path: Path,
+    *,
+    wp: str,
+    main_allowed: list[str],
+    main_risk: dict,
+) -> dict:
+    """Main-repo copy carries the field(s) under test; worktree copy permissive.
+
+    The MAIN copy is the tight one (potentially refused by dispatch_lint.sh);
+    the worktree copy is always the passing shape (APPROVED, ``docs/`` allowed,
+    every risk flag false). A correct preflight reads the main copy and therefore
+    fails on the tight field; a buggy preflight reading the worktree copy would
+    pass. Returns the same shape as ``_diverged_fixture``.
+    """
+    repo = _make_repo(tmp_path, name=f"repo-{wp.lower()}")
+    branch = f"feature/{wp.lower()}"
+    wt = tmp_path / wp.lower()
+
+    main_status = _status(
+        repo,
+        wp,
+        branch=branch,
+        worktree=str(wt),
+        state="APPROVED",
+        allowed_paths=main_allowed,
+        risk=main_risk,
+    )
+    main_status_path = _write_status_and_brief(repo, wp, main_status)
+    _commit_all(repo, f"freeze {wp}")
+
+    _add_worktree(repo, wt, branch)
+
+    wt_status = _status(
+        repo,
+        wp,
+        branch=branch,
+        worktree=str(wt),
+        state="APPROVED",
+        allowed_paths=["docs/"],
+        risk=PASSING_RISK,
+    )
+    wt_status_path = wt / PLAN_DIR / f"{wp}.status.json"
+    wt_status_path.write_text(json.dumps(wt_status, indent=2), encoding="utf-8")
+    _commit_all(wt, f"{wp} permissive worktree copy")
+
+    return {
+        "repo": repo,
+        "wt": wt,
+        "main_status_path": main_status_path,
+        "wt_status_path": wt_status_path,
+        "rel": str(PLAN_DIR / f"{wp}.status.json"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Core B17 differential pairs: a RELATIVE status path must follow the MAIN copy
 # ---------------------------------------------------------------------------
@@ -300,13 +383,17 @@ def test_state_divergence_opposite_direction_fails_on_main(tmp_path, session_env
 
 
 def test_scope_and_risk_divergence_follow_main_copy(tmp_path, session_env) -> None:
-    """scope.allowed_paths / risk.* diverged only in the worktree copy.
+    """scope.allowed_paths / risk.* tightened ONLY in the worktree copy.
 
-    Both fields are owned by ``dispatch_lint.sh`` (the sibling preflight calls
-    with ``$status_file``). With the anchoring fix preflight passes the MAIN
-    path; the PASS line's ``status=`` must be the main copy, so scope/risk are
-    read from main. (A worktree-resolved status path is refused outright before
-    scope/risk can ever be consumed — the next test pins that refuse path.)
+    This is the "mirror image" half of the B17 differential: the worktree copy
+    carries a BAD value (``scope.allowed_paths=[]`` and
+    ``risk.network_authorized=True`` — either alone would make
+    dispatch_lint.sh:135 / :119 refuse), while the main copy is permissive.
+    Requiring PASS proves the worktree copy's bad values are never read. It
+    does NOT prove that a main-copy tight value binds — that half is covered by
+    ``test_scope_tightened_only_in_main_copy_fails`` and
+    ``test_risk_tightened_only_in_main_copy_fails`` (this mirror image holds
+    even when scope/risk are never consumed at all).
 
     Oracle:
     - positive control: PREFLIGHT_PASS with ``status=<main copy>``.
@@ -336,6 +423,80 @@ def test_scope_and_risk_divergence_follow_main_copy(tmp_path, session_env) -> No
     assert "PREFLIGHT_PASS" in res.stdout
     assert f"status={fx['main_status_path']}" in res.stdout
     assert str(fx["wt_status_path"]) not in res.stdout
+
+
+# ---------------------------------------------------------------------------
+# scope / risk differentials: tightening ONLY the main copy must bind (FAIL)
+# ---------------------------------------------------------------------------
+
+
+def test_scope_tightened_only_in_main_copy_fails(tmp_path, session_env) -> None:
+    """main scope.allowed_paths=[] (refused) vs worktree copy permissive.
+
+    The correct direction of the scope differential: tighten ``allowed_paths``
+    ONLY in the main copy and leave the worktree copy permissive. A buggy
+    preflight that read the worktree copy would pass; requiring FAIL proves the
+    main copy's tight value binds.
+
+    Oracle:
+    - positive control: flip ONLY the main copy's ``allowed_paths`` back to
+      ``["docs/"]`` on the same fixture and require PREFLIGHT_PASS.
+    - witness: ``scope.allowed_paths is empty`` — the single print point at
+      dispatch_lint.sh:136, distinct from the risk witness (dispatch_lint.sh:120)
+      and from a ``state … is not executable`` refusal.
+    - removal mutation: test_dispatch_lint_removal_turns_scope_and_risk_green
+      deletes the dispatch_lint call and this scenario flips to PASS.
+    """
+    fx = _main_tight_fixture(
+        tmp_path, wp="WP-SCOPE-TIGHT", main_allowed=[], main_risk=PASSING_RISK
+    )
+
+    res = _run_preflight(fx["wt"], fx["rel"], session_env)
+    assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
+    assert SCOPE_REFUSAL_WITNESS in res.stderr
+
+    # Positive control: flip ONLY the main allowed_paths back to passing.
+    _rewrite_main_status(fx, allowed_paths=["docs/"])
+    res_ok = _run_preflight(fx["wt"], fx["rel"], session_env)
+    assert res_ok.returncode == 0, (res_ok.returncode, res_ok.stdout, res_ok.stderr)
+    assert "PREFLIGHT_PASS" in res_ok.stdout
+    assert f"status={fx['main_status_path']}" in res_ok.stdout
+
+
+def test_risk_tightened_only_in_main_copy_fails(tmp_path, session_env) -> None:
+    """main risk.network_authorized=True (refused) vs worktree copy permissive.
+
+    The correct direction of the risk differential: tighten a ``risk.*`` value
+    ONLY in the main copy and leave the worktree copy permissive (and leave the
+    main scope passing), so a buggy preflight reading the worktree copy would
+    pass; requiring FAIL proves the main copy's tight value binds.
+
+    Oracle:
+    - positive control: flip ONLY the main copy's ``risk.network_authorized``
+      back to ``False`` on the same fixture and require PREFLIGHT_PASS.
+    - witness: ``risk.network_authorized authorized`` — the single print point
+      at dispatch_lint.sh:120, distinct from the scope witness
+      (dispatch_lint.sh:136) and from a ``state … is not executable`` refusal.
+    - removal mutation: test_dispatch_lint_removal_turns_scope_and_risk_green
+      deletes the dispatch_lint call and this scenario flips to PASS.
+    """
+    fx = _main_tight_fixture(
+        tmp_path,
+        wp="WP-RISK-TIGHT",
+        main_allowed=["docs/"],
+        main_risk={**PASSING_RISK, "network_authorized": True},
+    )
+
+    res = _run_preflight(fx["wt"], fx["rel"], session_env)
+    assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
+    assert RISK_REFUSAL_WITNESS in res.stderr
+
+    # Positive control: flip ONLY the main risk flag back to passing.
+    _rewrite_main_status(fx, risk=PASSING_RISK)
+    res_ok = _run_preflight(fx["wt"], fx["rel"], session_env)
+    assert res_ok.returncode == 0, (res_ok.returncode, res_ok.stdout, res_ok.stderr)
+    assert "PREFLIGHT_PASS" in res_ok.stdout
+    assert f"status={fx['main_status_path']}" in res_ok.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -466,3 +627,82 @@ def test_bare_status_assignment_reverts_to_worktree(tmp_path, session_env) -> No
     # Clean up the scratch copy; the authoritative script is untouched.
     shutil.rmtree(scratch)
     assert PREFLIGHT_SH.read_text(encoding="utf-8") != mutated
+
+
+def test_dispatch_lint_removal_turns_scope_and_risk_green(tmp_path, session_env) -> None:
+    """Oracle item 3 for both new differentials, end-to-end.
+
+    Delete the whole ``dispatch_lint.sh`` invocation (preflight.sh:120) on a
+    scratch copytree. The scope-tight and the risk-tight scenarios then each
+    flip from FAIL to PASS — i.e. ``test_scope_tightened_only_in_main_copy_fails``
+    and ``test_risk_tightened_only_in_main_copy_fails`` would each go red under
+    this mutation, independently. The authoritative script is untouched: its
+    sha256 is byte-identical before and after.
+    """
+    scope_fx = _main_tight_fixture(
+        tmp_path, wp="WP-SCOPE-MUT", main_allowed=[], main_risk=PASSING_RISK
+    )
+    risk_fx = _main_tight_fixture(
+        tmp_path,
+        wp="WP-RISK-MUT",
+        main_allowed=["docs/"],
+        main_risk={**PASSING_RISK, "network_authorized": True},
+    )
+
+    # Real script: each tight copy is refused by its own distinct cause.
+    res_scope_real = _run_preflight(scope_fx["wt"], scope_fx["rel"], session_env)
+    assert res_scope_real.returncode == 2, (
+        res_scope_real.returncode, res_scope_real.stdout, res_scope_real.stderr
+    )
+    assert SCOPE_REFUSAL_WITNESS in res_scope_real.stderr
+    assert RISK_REFUSAL_WITNESS not in res_scope_real.stderr
+
+    res_risk_real = _run_preflight(risk_fx["wt"], risk_fx["rel"], session_env)
+    assert res_risk_real.returncode == 2, (
+        res_risk_real.returncode, res_risk_real.stdout, res_risk_real.stderr
+    )
+    assert RISK_REFUSAL_WITNESS in res_risk_real.stderr
+    assert SCOPE_REFUSAL_WITNESS not in res_risk_real.stderr
+
+    live_before = PREFLIGHT_SH.read_bytes()
+
+    scratch = tmp_path / "mutated-wrappers"
+    shutil.copytree(WRAPPERS_DIR, scratch)
+    mutated_preflight = scratch / "preflight.sh"
+    text = mutated_preflight.read_text(encoding="utf-8")
+
+    # Delete the whole dispatch_lint invocation block (preflight.sh:120-123),
+    # leaving the "MUTATION" marker in its place.
+    lines = text.splitlines()
+    if_line = next(
+        i for i, line in enumerate(lines)
+        if 'if ! lint_reason=$("$here/dispatch_lint.sh"' in line
+    )
+    fi_line = next(
+        i for i in range(if_line + 1, len(lines)) if lines[i].strip() == "fi"
+    )
+    region = "\n".join(lines[if_line : fi_line + 1])
+    mutated = text.replace(region, "# MUTATION: dispatch_lint call deleted entirely")
+    assert mutated != text
+    mutated_preflight.write_text(mutated, encoding="utf-8")
+
+    # Under the mutation each tight scenario flips to PASS (the tests go red).
+    res_scope_mut = _run_preflight(
+        scope_fx["wt"], scope_fx["rel"], session_env, script=mutated_preflight
+    )
+    assert res_scope_mut.returncode == 0, (
+        res_scope_mut.returncode, res_scope_mut.stdout, res_scope_mut.stderr
+    )
+    assert "PREFLIGHT_PASS" in res_scope_mut.stdout
+
+    res_risk_mut = _run_preflight(
+        risk_fx["wt"], risk_fx["rel"], session_env, script=mutated_preflight
+    )
+    assert res_risk_mut.returncode == 0, (
+        res_risk_mut.returncode, res_risk_mut.stdout, res_risk_mut.stderr
+    )
+    assert "PREFLIGHT_PASS" in res_risk_mut.stdout
+
+    # Clean up the scratch copy; the authoritative script is byte-identical.
+    shutil.rmtree(scratch)
+    assert PREFLIGHT_SH.read_bytes() == live_before
