@@ -3,24 +3,24 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "e38b7640-6b4f-418c-9456-3ea6c0c1cd15",
-    "dispatched_at": "2026-09-16T11:09:34Z",
-    "dispatch_rev": 2,
-    "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev2-prompt.md)\"",
-    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev2-prompt.md",
-    "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev2-exec.log",
-    "background_task_id": "bt371mi1p",
+    "session": "",
+    "dispatched_at": "2026-09-17T00:05:00Z",
+    "dispatch_rev": 3,
+    "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md)\"",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md",
+    "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev3-exec.log",
+    "background_task_id": "bytxwid89",
     "dispatched_brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev2.md",
-      "sha256": "9d19fbe70e2f5b9dbbad757d18f9911777a7c7c8486ad02a33658bbb62aea66b",
-      "rev": 2
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
+      "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
+      "rev": 3
     },
-    "dispatch_base_commit": "359cb1a",
-    "dispatch_note": "rev2 返工派发（自 CHANGES_REQUESTED 状态转入）。派发前置：brief 过活树 dispatch_lint.sh:151-183 section 判据（rc=1），WP-20 反向对照 rc=0 证判据有区分力；status 内全部 path+sha256 MATCH；锁 owner=claude-53c58ab0；preflight 自工作树内发起 PREFLIGHT_PASS。三个 WP allowed_paths 互不相交，故并行派发，不再受原 dispatch_ordering_constraint 约束（该约束前提为 WP-26 rev2 合入，已因 rev2 加固补丁复签 REWORK 而失效）。"
+    "dispatch_base_commit": "284e223",
+    "dispatch_note": "rev3 返工派发（B28）。派发前置全部实测通过：① brief 过活树 dispatch_lint.sh:69-101 的 section 判据（切片逐字为活树脚本子串，rc=1；同切片对 WP-20-brief.md 仍 rc=0，非恒绿）；② status 过活树 validate_wp_status（STATUS_VALID）；③ 锁 owner=claude-53c58ab0 为本会话自身 id（LOCK_REACQUIRED，非抢占）；④ 执行者活性探针 PROBE_OK。⑤ preflight 必须用**主仓**脚本跑：工作树内的 preflight.sh 是 WP-27 合入前的历史快照，会读工作树自己的 status 快照（state=DRAFT）而判 PREFLIGHT_FAIL —— 这正是 WP-27 修掉的 B16/B17 本体。用主仓脚本 `PYTHONPATH=/Users/admin/vibe/agentic_loop/src bash /Users/admin/vibe/agentic_loop/src/agentic_loop/wrappers/preflight.sh <rel status>` 在工作树内发起 → PREFLIGHT_PASS state=APPROVED status=<主仓副本>。"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -326,10 +326,10 @@
   },
   "timestamps": {
     "created_at": "2026-09-16T00:00:00Z",
-    "updated_at": "2026-09-16T23:50:00Z",
+    "updated_at": "2026-09-17T00:05:00Z",
     "dispatched_at": "2026-09-16T08:35:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
-    "redispatched_at": "2026-09-16T11:30:00Z",
+    "redispatched_at": "2026-09-17T00:05:00Z",
     "ready_for_review_at": "2026-09-16T11:40:00Z",
     "changes_requested_at": "2026-09-16T11:55:00Z",
     "refrozen_at": "2026-09-16T23:50:00Z"
