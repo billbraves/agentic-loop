@@ -3,11 +3,11 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "BLOCKED",
   "role": "Developer",
   "executor": {
-    "tool": "unassigned",
-    "session": ""
+    "tool": "kimi-cli",
+    "session": "kimi -r 1abfd293-3944-42aa-ae08-6c8523f49745"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -19,10 +19,11 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "",
+    "base_commit": "58c7624",
     "branch": "feature/wp26-brief-source-of-truth",
     "worktree": "../wp26-brief-source-of-truth",
-    "commit": ""
+    "commit": "",
+    "dispatch_commit": "58c7624"
   },
   "scope": {
     "allowed_paths": [
@@ -70,7 +71,24 @@
         "note": "B16 是本 WP 要修的缺陷本体，所以门禁此刻仍按固定命名读 —— 本 brief 已用固定名 WP-26-brief.md，无需 rev 搬移 workaround。执行者交付后，验收须用「把 evidence.brief.path 改指不存在文件」的差分对复测修复生效。"
       }
     },
-    "tests": []
+    "tests": [],
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-16T08:30:00Z",
+      "measured_at_commit": "58c7624",
+      "result": "4 failed, 597 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
+      "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
+    },
+    "blocker": {
+      "reason": "kimi 账号周配额（7-day usage limit）耗尽",
+      "evidence": "HTTP 403 access_terminated_error：\"You've reached your weekly (7-day) usage limit. Your quota will reset when the current 7-day window ends.\" 三个执行者均在 StepBegin(n=1) 处 StepInterrupted()，日志各约 12KB。",
+      "not_a_dispatch_defect": "与派发形态无关。首轮 nohup 派发跑得更远（日志 102/32/55KB，读完 Brief，is_error=False 全程）是因为当时配额尚未耗尽；本轮 403 在第一步即触发。",
+      "resume_command": "kimi -r 1abfd293-3944-42aa-ae08-6c8523f49745",
+      "leftover_worktree_state": "工作树干净，无任何产出。",
+      "blocked_at": "2026-09-16T10:30:00Z",
+      "unblock_condition": "配额窗口重置，或购买额外用量/升级套餐后用 resume_command 续跑"
+    }
   },
   "review": {
     "decision": null
@@ -80,6 +98,8 @@
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
-    "updated_at": "2026-09-16T07:45:00Z"
+    "updated_at": "2026-09-16T10:45:00Z",
+    "dispatched_at": "2026-09-16T08:35:00Z",
+    "blocked_at": "2026-09-16T10:30:00Z"
   }
 }
