@@ -6,7 +6,7 @@ if [[ $# -ne 1 ]]; then
   exit 64
 fi
 
-status_file=$1
+status_arg=$1
 # Locate sibling wrappers relative to THIS script's own directory so a bundled
 # copy under agentic_loop/wrappers/ calls its co-located siblings — not an
 # absent scripts/agentic/ in an external pip-install project. macOS BSD readlink
@@ -22,6 +22,33 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
+
+# B17 (WP-27): a bare `status_file=$1` resolved a relative status path against
+# cwd — which §4.1 forces to be the secondary worktree — so the gate judged the
+# git-tracked historical snapshot in the worktree, not the live main-repo
+# status. Anchor relative paths to the MAIN repo root, exactly the same
+# anchoring as dispatch_lint.sh:26-29. Absolute paths are honoured unchanged.
+main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "PREFLIGHT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+case "$status_arg" in
+  /*) status_file="$status_arg" ;;
+  *) status_file="${main_root:+$main_root/}$status_arg" ;;
+esac
+
+# WP-19 single authority (agentic_loop.gate.path_is_in_worktree), same WORKTREE
+# refusal semantics as finalize_merge.sh: a status path that resolves inside a
+# linked worktree is refused — the main-repo copy is the single source of truth.
+wt_verdict=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY' 2>/dev/null || echo PROBE_FAIL
+import sys
+from pathlib import Path
+from agentic_loop.gate import path_is_in_worktree
+print("WORKTREE" if path_is_in_worktree(Path(sys.argv[1])) else "MAIN")
+PY
+)
+if [[ "$wt_verdict" != "MAIN" ]]; then
+  echo "PREFLIGHT_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy (single source of truth)" >&2
+  exit 2
+fi
+
 repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root current_worktree) || { echo "PREFLIGHT_FAIL: resolver failed to resolve current_worktree" >&2; exit 2; }
 branch=$(git branch --show-current)
 primary_worktree=$(git worktree list --porcelain | awk '/^worktree / {print substr($0, 10); exit}')
@@ -113,4 +140,4 @@ if ! lock_out=$("$here/lock.sh" acquire --kind wp --key "${iter}__${wp}"); then
 fi
 echo "LOCK: $lock_out" >&2
 
-echo "PREFLIGHT_PASS branch=$branch state=$state worktree=$repo_root"
+echo "PREFLIGHT_PASS branch=$branch state=$state worktree=$repo_root status=$status_file"
