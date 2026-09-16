@@ -391,6 +391,34 @@
       "orchestrator_probe_revert_helper": "把 helper 还原成 16bfdf3 形态（stdout.strip() + 无续行断言）→ 4 failed / 16 passed，转红的恰是三条逃逸用例 + forbidden 变异用例；探针后 git diff 为空（逐字节还原）。证明新断言承重。",
       "orchestrator_probe_over_tighten": "把 codex 上一轮被证伪的全局判据 len(lines)==1 塞进 helper → 2 failed，转红的恰是两条正当路径（multi_error + accepts_declared_continuations）。证明严格默认值未误伤合法多错路径，且判据方向双向可辨。",
       "measured_at": "2026-09-16T11:29:37Z"
+    },
+    "refreeze_count": 3,
+    "refreeze_stop_rule_check": {
+      "rule": "任务 #24：同一 WP 第 3 次 re-freeze 强制停手复核计划",
+      "semantics": "字段语义统一为「brief rev 号」；re-freeze 次数 = rev 号 - 1",
+      "sequence": "rev1 首冻 -> rev2 第 1 次 re-freeze -> rev3 第 2 次 -> rev4 将是第 3 次",
+      "fires": true,
+      "verdict_doc": "docs/plans/2026-09-13-parallel-throughput/WP-26-plan-review-before-rev4.md",
+      "gate": "rev4 的冻结被此复核阻塞；复核裁定（两个消费面一并收口、验收标的改写为不变式）须用户批准后才冻结",
+      "contrast_wp25": "WP-25 同期序列 rev1->rev2->rev3 只到第 2 次，规则不命中（记于 WP-25 status）",
+      "checked_at": "2026-09-17T02:10:00Z"
+    },
+    "b29_two_faces_reproduced": {
+      "reproduced_by": "orchestrator（独立，未采信第二签名或执行者转述）",
+      "python_face": {
+        "site": "src/agentic_loop/redispatch.py:173-187（工作树 HEAD 57cd572）",
+        "method": "拦 Path.read_text 使派发面返回 EVIL，磁盘保持 GOOD 供 read_bytes 读取",
+        "result": "sha256 对 GOOD 校验通过，函数返回并将派发 EVIL —— 校验对象 != 派发对象，缺陷成立",
+        "positive_control": "不拦截时返回 GOOD 且校验通过（正向可达）",
+        "pitfall_noted": "首次拦截因 macOS /var -> /private/var 的 realpath 差异未命中；按 realpath 比对后成立"
+      },
+      "bash_face": {
+        "site": "src/agentic_loop/wrappers/dispatch_lint.sh:125-160",
+        "method": "PATH 前置记录型 python3，实证该门禁读 brief 的进程数与传递物",
+        "result": "两个独立进程：进程 A 校验 sha256 后只 print(real) 交出路径；bash sed -n '2p' 取路径；进程 B 再 open(path).read() 重读做 section 判据。跨进程传路径而非已校验字节，同族缺口成立且窗口更宽",
+        "incidental": "实证中该门禁两次正确拒收越界 fixture（相对路径锚真实主仓、绝对路径触发 containment），fail-closed 行为顺手确认"
+      },
+      "scope_decision": "两面同族、同在 allowed_paths、只修一面则另一面仍在 -> rev4 一并收口（见复核文档 §5）"
     }
   },
   "review": {
