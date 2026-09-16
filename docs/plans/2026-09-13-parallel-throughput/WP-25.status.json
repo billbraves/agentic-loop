@@ -257,6 +257,7 @@
     "merge_gate": "① 编排者独立重测 ✅（但结论已由第二签名推翻）② codex 第二签名 = **REWORK** ③ 用户批准 —— 未取得，且现在不应取得"
   },
   "consult": {
+    "decision": "REWORK",
     "requested": true,
     "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
     "verdict": "REWORK",

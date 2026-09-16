@@ -3136,3 +3136,100 @@ bash 侧则应把已校验的内容本身传下去，或至少让 section 判据
 
 **自检问题**：我校验的那份字节，和我实际交出去的那份字节，是同一次读取的产物吗？
 中间隔了几次 I/O？
+
+---
+
+## B30 · 门禁读 `consult.decision`，而编排者三份 status 全写在 `consult.verdict` 上 —— 校验器对未知子字段完全不管（WP-27 合入时实测撞上）
+
+**现象**：给 WP-27 跑 `finalize_merge.sh` 时报
+`STATUS_INVALID: unknown field consult.decision` + `FINALIZE_FAIL: status probe failed`。
+原因不是 status 无效 —— 三份 status 各自 `STATUS_VALID` —— 而是我在本轮把第二签名判词
+写成了 `consult.verdict`，而 `finalize_merge.sh:90` 与 `validate_wp_status.py:417,480`
+两处消费面读的都是 `consult.decision`。
+
+**为什么校验器没拦住**：实测确证 —— 往 `consult` 里塞
+`"totally_bogus_field": "xyz"` 后校验器返回 **`STATUS_VALID`, 退出 0**。
+`consult` 块**只做「必须是 object」和「若 decision 存在则必须合法」两项检查**，
+对未知子字段零约束。所以「写错字段名」这一类错误在校验期完全静默，
+一路潜行到**终态门禁**才炸 —— 而终态门禁是最不该承担「发现拼写错误」职责的地方。
+
+**对照**：顶层字段是**有**白名单的（`unknown top-level fields: _notes` 就是本次误加
+`_notes` 时立刻被拦下的实证）。即同一个校验器对顶层严、对 `consult` 子层松，
+严格性不一致。历史上 WP-01/03/08/17/18/19/21/22/23/24 十份 status 用的都是
+`consult.decision`，只有我本轮新写的 25/26/27 三份用了 `verdict` —— 这是**新引入的偏离**，
+不是历史习惯。
+
+**修法**：① 立即修（已做）—— 三份 status 补 `consult.decision`，`verdict` 作为
+面向人的重复字段保留，不丢信息；② 机制层修 —— `consult`（以及 `review`/`evidence`/`git`
+等所有块）都应有子字段白名单，未知子字段一律 `STATUS_INVALID`，把这类错误提前到写入期。
+
+**族属**：与 B12（`evidence.baseline` 无机制强制存在）同族 —— **协议字段靠人记、
+无机制核**。B12 是「该有的没强制有」，B30 是「不该有的没强制无」，同一枚硬币两面。
+
+**自检问题**：我写进 status 的字段名，是从消费面代码里抄来的，还是我按印象拼的？
+校验器绿了，能证明消费面认得这个名字吗？
+
+---
+
+## B31 · pre-push 钩子的 `iterations_dir()` 覆盖会把**主仓**路径盖回来，钩子专为「链接工作树」写的定位随即失效（WP-27 合入后跑全量实测发现，非本次合入引入）
+
+**现象**：全量测试出现 5 个失败，其中
+`test_init_githooks.py::test_prepush_hook_targets_current_worktree_status_in_linked_worktree`
+在 `uv run python` 下红、在 `.venv/bin/python` 下绿；另 4 个
+`test_finalize_merge_triple_sign.py` 失败在两种解释器下都红。
+
+**归因（三段隔离实测）**：
+1. **不是本次合入引入的**：把 `b5e0be7`（合入前）检出到临时工作树，同一条用例在
+   `uv run` 下同样红、在 `.venv` 下同样绿。合入只改了 `preflight.sh` 与
+   `test_preflight_status_source.py`（`git diff --name-only b5e0be7 d8bb090` 实证），
+   两个失败文件与 `preflight.sh` **零引用关系**（grep 实证）。
+2. **4 个 finalize 失败是环境配置**：`init.defaultBranch=master`（本机全局配置），
+   而用例 fixture `git init -q` 后直接 `git checkout -q main`。
+   加 `GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main` 后 **5 passed**。
+   属用例对本机 git 配置的隐式依赖 —— 用例应显式 `git init -b main`（同仓
+   `test_init_githooks.py` 正是这么写的，`test_preflight_status_source.py` 亦然）。
+3. **githooks 那条是真缺陷**：差异根因是 `python3` 能否 import `agentic_loop`。
+   `uv run` 把 `.venv/bin` 放进 PATH 首位，钩子里的 `python3` 于是能 import；
+   裸 `.venv/bin/python` 跑 pytest 时 PATH 首位不是 venv，钩子的 `python3` 是系统的、
+   import 失败、走 fallback。
+
+**缺陷本体**（`src/agentic_loop/templates/pre-push.tmpl:50-56`）：
+```python
+iterations_dir = repo_root / "docs" / "plans"      # 正确：锚在被 push 的工作树
+try:
+    from agentic_loop.resolve_paths import iterations_dir as _iterations_dir
+    iterations_dir = _iterations_dir()             # 覆盖：无参，内部 main_repo()
+except Exception:
+    pass
+```
+`resolve_paths.iterations_dir()`（`resolve_paths.py:305-309`）**不接受 repo 参数**，
+内部固定 `main_repo()`。所以一旦框架可 import，`repo_root` 这个变量算出来**就被丢弃**。
+
+**实测确证**（独立构造 main + 链接工作树，运行钩子中同一段 python）：
+```
+fallback would be: /tmp/b30probe/wt/docs/plans
+IMPORT SUCCEEDED -> iterations_dir() = /private/tmp/b30probe/main/docs/plans
+is it inside the worktree being pushed? False
+```
+即：**能 import 时钩子看的是主仓，不是被 push 的工作树**。
+
+**为什么是靶心**：钩子顶部注释花了 6 行专门论证「用 `--show-toplevel` 而非
+`dirname(git-common-dir)`，因为链接工作树里后者会解析到主仓根，这正是本处要防的缺陷」，
+同文件里还有一条静态用例（`:144-146`）断言不得出现 `--git-common-dir`。
+`repo_root` 定位做对了，随后**在下面第 30 行被一句无参覆盖悄悄作废** ——
+本 WP 立意的靶心。后果是链接工作树 push 时 status 发现不到、门禁**静默跳过**（fail-open）。
+
+**族属**：与 B14（用别棵树的快照判本棵树）同族 —— **判定用的树 ≠ 目标树**。
+也与 A26（`resolve_paths` 环境未净化，`GIT_DIR`/`GIT_COMMON_DIR` 可改指主仓根，任务 #3）
+直接相邻：都是 `resolve_paths` 的 `main_repo()` 在需要「当前工作树」的场合被当成权威。
+
+**修法**：`iterations_dir()` 应接受 `repo` 参数（与同文件 `get_providers(repo=None)`、
+`get_roles_raw(repo=None)` 的既有形态一致），钩子传 `repo_root`；
+或钩子只用 `resolve_paths` 读**相对配置值**（`iterations_dir` 的 rel 部分），
+自己拼到 `repo_root` 上。**关键：绝不能让覆盖动作把 `repo_root` 丢掉。**
+外加一条用例：链接工作树 + 框架可 import 的组合下钩子必须找到工作树副本的 status
+（现有那条用例只在框架不可 import 时才走对分支 —— 它的绿是环境凑出来的，
+不是实现对了，属 `mem:test-must-detect-consumer-removal` 的变体）。
+
+**自检问题**：我算出来的那个路径变量，后面还活着吗？有没有被一句"更权威"的调用覆盖掉？
+这条用例在两种解释器/PATH 下都绿吗，还是只在一种下绿？

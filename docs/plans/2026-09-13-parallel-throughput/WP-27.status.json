@@ -3,7 +3,7 @@
   "work_package_id": "WP-27",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -37,7 +37,8 @@
     "worktree": "../wp27-preflight-status-source",
     "commit": "90fc603",
     "dispatch_commit": "58c7624",
-    "dispatch_commit_pending_rev2": "a3264c0"
+    "dispatch_commit_pending_rev2": "a3264c0",
+    "merged_commit": "d8bb090f1d29c598a52c5b5ba26090d77170be74"
   },
   "scope": {
     "allowed_paths": [
@@ -230,11 +231,18 @@
     "reviewed_at": "2026-09-16T11:29:37Z",
     "reviewed_commit": "90fc603",
     "basis": "5 项交付物逐条落地：scope/risk 两条差分对方向已翻正（只在主仓收紧 → FAIL）、各带独立正向对照（只翻回那一个字段 → PASS，另一维度全程保持可过，两个拒收原因互不遮蔽）、rev1 那条用例保留且 docstring 已如实改写为「只证工作树坏值未被读」、摘除变异使两条新用例各自转红、活树脚本 sha256 前后逐字节相同。编排者独立在活树上重做了那条摘除变异，结果与报告一致。",
-    "merge_gate": "① 编排者独立重测通过 ✅  ② codex 第二签名（对 90fc603）= **ACCEPT** ✅  ③ 用户明确批准合入 ⏳",
+    "merge_gate": "① 编排者独立重测通过 ✅  ② codex 第二签名（对 90fc603）= **ACCEPT** ✅  ③ 用户明确批准合入 ✅（2026-09-16，用户原话「合并WP27，然后继续修复WP25/26」）",
     "note": "PASSING_RISK 基线把四个 risk flag 全部显式置 false，是对 B19（红的原因未必是你钉的那层）的正确处置。",
-    "double_sign_complete": "双签名齐备：编排者独立重测 ACCEPT + codex 第二签名 ACCEPT。三个并行 WP 中唯一双签通过的一个（WP-25/WP-26 均被第二签名驳回并已撤回自评）。仍停在 READY_FOR_REVIEW，**未**置 APPROVED_FOR_MERGE —— 编排者不得自签自批。"
+    "double_sign_complete": "双签名齐备：编排者独立重测 ACCEPT + codex 第二签名 ACCEPT。三个并行 WP 中唯一双签通过的一个（WP-25/WP-26 均被第二签名驳回并已撤回自评）。仍停在 READY_FOR_REVIEW，**未**置 APPROVED_FOR_MERGE —— 编排者不得自签自批。",
+    "user_merge_approval": {
+      "approved": true,
+      "approved_at": "2026-09-16T15:06:43Z",
+      "quote": "合并WP27，然后继续修复WP25/26",
+      "note": "第三项门禁由用户明确批准满足；编排者据此才把 state 从 READY_FOR_REVIEW 推到 APPROVED_FOR_MERGE（此前刻意不自签自批）。"
+    }
   },
   "consult": {
+    "decision": "ACCEPT",
     "requested": true,
     "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
     "verdict": "ACCEPT",
@@ -281,11 +289,12 @@
   },
   "timestamps": {
     "created_at": "2026-09-16T07:45:00Z",
-    "updated_at": "2026-09-16T11:30:00Z",
+    "updated_at": "2026-09-16T15:07:50Z",
     "dispatched_at": "2026-09-16T08:35:00Z",
     "blocked_at": "2026-09-16T10:30:00Z",
     "redispatched_at": "2026-09-16T11:30:00Z",
     "reviewed_at": "2026-09-16T12:25:00Z",
-    "refrozen_at": "2026-09-16T12:25:00Z"
+    "refrozen_at": "2026-09-16T12:25:00Z",
+    "approved_for_merge_at": "2026-09-16T15:06:43Z"
   }
 }
