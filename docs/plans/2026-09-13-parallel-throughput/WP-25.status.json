@@ -3,7 +3,7 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -35,7 +35,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp25-protocol-disciplines",
     "worktree": "../wp25-protocol-disciplines",
-    "commit": "284e223",
+    "commit": "aa1e43b",
     "dispatch_commit": "58c7624"
   },
   "scope": {
@@ -96,30 +96,51 @@
     },
     "tests": [
       {
-        "name": "orchestrator_protocol_disciplines + contract_render + init_contract (3.11)",
-        "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py tests/test_contract_render.py tests/test_init_contract.py -q",
-        "result": "39 passed",
+        "name": "orchestrator_protocol_disciplines targeted (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+        "result": "19 passed（用例数 8 -> 15，参数化后 19）",
         "exit_code": 0,
         "run_by": "orchestrator"
       },
       {
         "name": "full suite (3.11)",
-        "cmd": "PYTHONPATH=src python3.11 -m pytest -q",
-        "result": "4 failed, 606 passed, 4 skipped — +9 passed vs baseline 597, delta == new test count, zero regression",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 616 passed, 4 skipped —— +9 passed vs 基线 607，零回归；4 条失败全在 tests/test_finalize_merge_triple_sign.py（本机 git init.defaultBranch=master 与 fixture 的 git checkout main 冲突），与基线同一组",
         "exit_code": 1,
         "run_by": "orchestrator"
       },
       {
         "name": "targeted (3.13)",
-        "cmd": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest python -m pytest <targeted> -q",
-        "result": "39 passed",
+        "cmd": "PYTHONPATH=src uv run --python 3.13 --with pytest python -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+        "result": "19 passed",
         "exit_code": 0,
         "run_by": "orchestrator"
       },
       {
         "name": "targeted (3.14)",
-        "cmd": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest python -m pytest <targeted> -q",
-        "result": "39 passed",
+        "cmd": "PYTHONPATH=src uv run --python 3.14 --with pytest python -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+        "result": "19 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "编排者自构反转变异：纪律 1 禁令反转为许可（rev2 六个锚点全保留）",
+        "cmd": "隔离树三路对照 /Users/admin/.claude/jobs/8a8bf01e/tmp/b28probe/{ctl,rev2,rev3}",
+        "result": "ctl（rev2 用例 x 未变异模板）9 passed；rev2 用例 x 本反转 9 passed = B28 缺陷复现；rev3 用例 x 本反转 4 failed = 判据钉住。差分成立",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "编排者自构尾句反转 x3（检验切块 off-by-one）",
+        "cmd": "对三块各自最后一句分别反转后跑 targeted",
+        "result": "read_face / negative_assertion / criteria_sourcing 三例均 4 failed，尾句都在切口之内，无漏口",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "空转检验 + 错层检验",
+        "cmd": "① 把 _assert_discipline_verbatim 改为无条件抛错后跑 targeted ② 逐条判定三条反转的红来自哪一层",
+        "result": "① 三条极性反转用例全部转红，非靠共享 helper 顺带过关 ② 三例 cut_ok=True，红来自 verbatim-drift 层而非 fail-closed 切块层",
         "exit_code": 0,
         "run_by": "orchestrator"
       }
@@ -272,16 +293,94 @@
         "checked_at": "2026-09-16T13:32:00Z"
       }
     },
-    "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**不触发**：WP-25 的冻结序列是 rev1（首冻）→ rev2（第 1 次 re-freeze）→ rev3（第 2 次 re-freeze）。refreeze_count 字段此前按「brief rev 号」记为 2，与「re-freeze 次数」差 1；本次一并把该字段口径统一为 brief rev 号（=3），并在此显式记录 re-freeze 次数为 2，避免下次误判。WP-26 的 rev4 才是那条规则的第一个实弹（任务 #30）。"
+    "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**不触发**：WP-25 的冻结序列是 rev1（首冻）→ rev2（第 1 次 re-freeze）→ rev3（第 2 次 re-freeze）。refreeze_count 字段此前按「brief rev 号」记为 2，与「re-freeze 次数」差 1；本次一并把该字段口径统一为 brief rev 号（=3），并在此显式记录 re-freeze 次数为 2，避免下次误判。WP-26 的 rev4 才是那条规则的第一个实弹（任务 #30）。",
+    "review_rev2": {
+      "decision": "REWORK",
+      "reviewer": "claude (orchestrator, independent)",
+      "reviewed_at": "2026-09-16T14:05:00Z",
+      "reviewed_commit": "284e223",
+      "retracted_self_accept": "编排者一审曾判 ACCEPT（2026-09-16T11:29:37Z，记于 commit 41b5b1f）。第二签名 REWORK 后，编排者逐条实测，**确认阻塞项成立并撤回自评 ACCEPT**。这是本会话第三次由第二签名捕获编排者漏判（前两次：WP-25 的 B20、WP-27 的差分方向）。",
+      "basis": "codex 指出的 B28（存在性锚点检测不到语义反转）经编排者实测证实：把纪律 2 正文改成语义完全相反的措辞、保留全部 6 个锚点短语，`tests/test_orchestrator_protocol_disciplines.py` **10 passed 全绿**。锚点存在性无法承载「纪律说的是哪个方向」，与 B20 是同一根因的下一层：B20 是「标签词钉不住方法」，B28 是「方法短语钉不住极性」。",
+      "merge_gate": "① 编排者独立重测 ✅（但结论已由第二签名推翻）② codex 第二签名 = **REWORK** ③ 用户批准 —— 未取得，且现在不应取得"
+    },
+    "tests_rev2": [
+      {
+        "name": "orchestrator_protocol_disciplines + contract_render + init_contract (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py tests/test_contract_render.py tests/test_init_contract.py -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "full suite (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest -q",
+        "result": "4 failed, 606 passed, 4 skipped — +9 passed vs baseline 597, delta == new test count, zero regression",
+        "exit_code": 1,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.13)",
+        "cmd": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest python -m pytest <targeted> -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.14)",
+        "cmd": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest python -m pytest <targeted> -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      }
+    ]
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "claude (orchestrator, independent)",
-    "reviewed_at": "2026-09-16T14:05:00Z",
-    "reviewed_commit": "284e223",
-    "retracted_self_accept": "编排者一审曾判 ACCEPT（2026-09-16T11:29:37Z，记于 commit 41b5b1f）。第二签名 REWORK 后，编排者逐条实测，**确认阻塞项成立并撤回自评 ACCEPT**。这是本会话第三次由第二签名捕获编排者漏判（前两次：WP-25 的 B20、WP-27 的差分方向）。",
-    "basis": "codex 指出的 B28（存在性锚点检测不到语义反转）经编排者实测证实：把纪律 2 正文改成语义完全相反的措辞、保留全部 6 个锚点短语，`tests/test_orchestrator_protocol_disciplines.py` **10 passed 全绿**。锚点存在性无法承载「纪律说的是哪个方向」，与 B20 是同一根因的下一层：B20 是「标签词钉不住方法」，B28 是「方法短语钉不住极性」。",
-    "merge_gate": "① 编排者独立重测 ✅（但结论已由第二签名推翻）② codex 第二签名 = **REWORK** ③ 用户批准 —— 未取得，且现在不应取得"
+    "reviewed_at": "2026-09-17T01:40:00Z",
+    "reviewed_commit": "aa1e43b",
+    "rev": 3,
+    "basis": "编排者在工作树内独立复现并加做了执行者没写的变异，逐条对齐 rev3 brief 的 Completion definition，全部成立。判定为编排者一方结论，不含第二签名。",
+    "scope_and_hygiene": {
+      "files_touched": "仅 tests/test_orchestrator_protocol_disciplines.py（284e223..aa1e43b，1 file changed, 312 insertions(+), 71 deletions(-)）",
+      "template_untouched": "CLAUDE.md.tmpl sha256 = 0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a，与 HEAD 逐字节一致（forbidden_paths 遵守）",
+      "contract_template_version": "\"7\"，未 bump",
+      "rendered_artifacts": "test_rendered_artifacts_zero_line_diff 单独跑通，零行 diff",
+      "no_write_to_live_tree": "grep write_text/write_bytes/open(...,'w')/shutil.copy|move 于用例文件 = 零命中，掏空守卫确认为纯内存",
+      "worktree_clean": "跑完 git status --porcelain 空。注：编排者自己用 uv run 产生的 uv.lock/.venv 已由编排者清除，非执行者产物"
+    },
+    "tests_reproduced_by_orchestrator": {
+      "targeted_3_11": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q -> 19 passed",
+      "targeted_3_13": "uv run --python 3.13 --with pytest -> 19 passed",
+      "targeted_3_14": "uv run --python 3.14 --with pytest -> 19 passed",
+      "full_3_11": "PYTHONPATH=src python3.11 -m pytest tests -q -> 4 failed / 616 passed / 4 skipped",
+      "regression_math": "616 = 基线 607 + 9；用例数 8 -> 15（+3 极性反转、+1 fail-closed、+2 反向探针、+1 逐字锁定参数化）。4 条失败全在 test_finalize_merge_triple_sign.py，与基线同一组 defaultBranch 冲突，非本轮引入"
+    },
+    "orchestrator_own_mutations": {
+      "note": "以下变异均由编排者自行构造，不在执行者写的三条反转之列，用于检验判据的真实钉力（不是复读执行者的自证）。",
+      "independent_inversion": "把纪律 1 的禁令反转为许可（'Never retype gate criteria into a throwaway helper' -> 'It is acceptable to retype ...'），rev2 全部 6 个锚点短语原样保留。在隔离树中三路对照：rev2 用例 x 未变异模板 = 9 passed（正向可达控制）；rev2 用例 x 本反转 = 9 passed（**B28 缺陷复现**）；rev3 用例 x 本反转 = 4 failed。差分成立。",
+      "tail_sentence_inversions": "边界标记切块的典型残余风险是尾句落在切口之外。对三块各自的**最后一句**分别做反转（read_face 的 -revN 子句、negative_assertion 的 flip-with-it 子句、criteria_sourcing 的 misleads 子句），三例全部转红，无 off-by-one 漏口。",
+      "vacuity_check": "把 _assert_discipline_verbatim 改为无条件抛 AssertionError 后，三条极性反转用例全部转红 —— 说明它们不是靠共享 helper 的既有失败'顺带过关'，判据是载荷承重的。",
+      "wrong_layer_check": "逐条确认三条反转的红来自 **verbatim-drift** 比较层，而非 fail-closed 切块失败层（三例 cut_ok=True）。pytest.raises(AssertionError) + 只含 discipline 名的断言本身无法区分这两层，故编排者单独验证（台账 mutation-red-may-come-from-wrong-layer 的同类风险）。",
+      "cut_tightness": "切出的归一化块长 criteria=392 / negative_assertion=386 / read_face=515，与 brief 冻结时记录的测量值一致；九个边界标记在模板中各自唯一（grep -F -c 均为 1），切口无歧义。"
+    },
+    "completion_definition_walkthrough": {
+      "verbatim_multiline_not_sha256": "PASS —— DISCIPLINE_EXPECTED 为多行字符串常量；全文件无 sha256 常量用于纪律正文（hashlib 已从 import 中移除）",
+      "fail_closed_on_uncuttable": "PASS —— _cut_discipline_block 捕获 ValueError 抛 AssertionError('cannot cut ... fail-closed')，并有 test_verbatim_pinning_fails_closed_when_block_marker_renamed 正面钉住",
+      "three_inversion_shapes_distinct_wording": "PASS —— 三条各自命名自己的 discipline，失败措辞互不相同",
+      "rev2_anchors_and_guard_preserved": "PASS —— rev2 的 8 个用例名一个不少（comm -23 空集），DISCIPLINE_ANCHORS 块与 284e223 逐字节无 diff",
+      "guard_pure_in_memory": "PASS —— 见 scope_and_hygiene.no_write_to_live_tree",
+      "mutation_anchor_driven_B27": "PASS —— _mutate_block 在归一化块内按被锁文本定位，_eviscerate_* 改为按 label/operable 锚点定位，rev2 的两条 re.compile 已删除",
+      "two_innocent_edit_probes_green": "PASS —— 纯重新折行、三纪律之外编辑，两条均绿",
+      "in_block_reorder_tradeoff_disclosed": "PASS —— 模块 docstring 'Design tradeoff, stated honestly' 段如实写明重排会红及其取舍理由",
+      "no_forbidden_path_writes": "PASS",
+      "no_prod_write_network_notify_push": "PASS —— 无 merge / 无 push / 未切分支，HEAD 仍在 feature/wp25-protocol-disciplines"
+    },
+    "residual_observations_non_blocking": [
+      "取舍如实：块内子句重排会红。这是 brief 冻结时选定并要求披露的代价，非缺陷；日后改写纪律措辞须同步改 DISCIPLINE_EXPECTED，diff 里可见 —— 这正是设计意图。",
+      "三条反转用例的断言只检查 str(exc.value) 含 discipline 名，无法区分 verbatim-drift 与 fail-closed 两层红。本轮由编排者在评审中单独验证为 drift 层；若日后加严，可让两层 witness 措辞进入断言。不阻塞本轮（brief 未要求，且判据本身已实测钉住）。"
+    ],
+    "merge_gate": "① 编排者独立重测 ✅ ACCEPT（本条）② codex 第二签名 —— **未取得** ③ 用户批准 —— **未取得**。按 §规范，编排者不得自签自批，合入须先取二、三两项。"
   },
   "consult": {
     "decision": "REWORK",
@@ -332,6 +431,7 @@
     "redispatched_at": "2026-09-17T00:05:00Z",
     "ready_for_review_at": "2026-09-16T11:40:00Z",
     "changes_requested_at": "2026-09-16T11:55:00Z",
-    "refrozen_at": "2026-09-16T23:50:00Z"
+    "refrozen_at": "2026-09-16T23:50:00Z",
+    "reviewed_at": "2026-09-17T01:40:00Z"
   }
 }
