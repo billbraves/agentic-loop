@@ -3,7 +3,7 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -86,22 +86,41 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev3.md",
-      "sha256": "1fe6ed28ab70fab3cb6fc1dd031c9a4057fe7b82c8a6ba2964bd722f19796bbd",
-      "rev": 3,
-      "refreeze_count": 3,
-      "covers": "B25 (= consult C1+C2)：加固补丁只约束失败输出续行的**起点**（首行是 token），未约束续行**内容**，故「token 行 + 任意非 token 续行」逃逸；且 `stdout.strip()==\"\"` 与其 docstring 宣称的 'stdout is empty' 不等价，放过纯空白 stdout。",
-      "scope_note": "rev3 只动 tests/test_dispatch_lint_brief_source.py 一个文件，纯断言强度收紧。dispatch_lint.sh 与 redispatch.py 均零 diff——脚本当前行为已正确（9 条路径实测恰 1 行、stdout 逐字节空），要收紧的是测试对它的约束。",
-      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md",
-      "prefreeze_check": {
-        "method": "把活树 dispatch_lint.sh 的 section 判据 heredoc 按内容定位切片出来直跑（B11 修法 1：判据只能来自真脚本）。注意 rev2 改动了脚本行号，旧的 :69-101 切片边界已失效——本次按 grep 定位到 :151-183，并 diff 证明与活树逐字节相同。",
-        "slice": "/Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred_rev3.py (dispatch_lint.sh:151-183)",
-        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
-        "caught_before_dispatch": "首版 rev3 用了中文标题 `## 完成定义（DoD）`，判据实测 rc=0 报 \"brief missing section 'Completion definition'\" —— 即 B23 同一形态在我自己的 brief 上第二次复发。已改回英文锚点并复测通过。",
-        "discriminating_power": "同一切片：rev2 brief → rc=1（PASS）；首版 rev3 → rc=0 缺 'Completion definition'；已知不合规的 WP-20-brief.md → rc=0 缺 'Acceptance tests'。三种不同结果证明切片有区分力，非恒绿。",
-        "checked_at": "2026-09-16T06:05:00Z"
+      "history": [
+        {
+          "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev3.md",
+          "sha256": "1fe6ed28ab70fab3cb6fc1dd031c9a4057fe7b82c8a6ba2964bd722f19796bbd",
+          "rev": 3,
+          "refreeze_count": 3,
+          "covers": "B25 (= consult C1+C2)：加固补丁只约束失败输出续行的**起点**（首行是 token），未约束续行**内容**，故「token 行 + 任意非 token 续行」逃逸；且 `stdout.strip()==\"\"` 与其 docstring 宣称的 'stdout is empty' 不等价，放过纯空白 stdout。",
+          "scope_note": "rev3 只动 tests/test_dispatch_lint_brief_source.py 一个文件，纯断言强度收紧。dispatch_lint.sh 与 redispatch.py 均零 diff——脚本当前行为已正确（9 条路径实测恰 1 行、stdout 逐字节空），要收紧的是测试对它的约束。",
+          "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md",
+          "prefreeze_check": {
+            "method": "把活树 dispatch_lint.sh 的 section 判据 heredoc 按内容定位切片出来直跑（B11 修法 1：判据只能来自真脚本）。注意 rev2 改动了脚本行号，旧的 :69-101 切片边界已失效——本次按 grep 定位到 :151-183，并 diff 证明与活树逐字节相同。",
+            "slice": "/Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred_rev3.py (dispatch_lint.sh:151-183)",
+            "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+            "caught_before_dispatch": "首版 rev3 用了中文标题 `## 完成定义（DoD）`，判据实测 rc=0 报 \"brief missing section 'Completion definition'\" —— 即 B23 同一形态在我自己的 brief 上第二次复发。已改回英文锚点并复测通过。",
+            "discriminating_power": "同一切片：rev2 brief → rc=1（PASS）；首版 rev3 → rc=0 缺 'Completion definition'；已知不合规的 WP-20-brief.md → rc=0 缺 'Acceptance tests'。三种不同结果证明切片有区分力，非恒绿。",
+            "checked_at": "2026-09-16T06:05:00Z"
+          },
+          "third_refreeze_review": "本 WP 已第 3 次 re-freeze，按自订规则（任务 #24）触发计划复核。编排者复核结论：继续而非停手——范围极小（1 文件、纯断言强度）、根因明确（B25）、且判据形式已由编排者在冻结前实测可实施（三条逃逸全捕获、两条正当路径不误红）。复核结论同时写进 rev3 brief 正文附注。"
+        }
+      ],
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev4.md",
+      "sha256": "b21f97d966a62fb5edeede508fc31798586e5a6eaeddb8d5d6ad8baf30814b16",
+      "rev": 4,
+      "refreeze_count": 4,
+      "refreeze_reason": "rev3 双签名 REWORK（B29：校验的快照 ≠ 派发的快照 —— _brief_content 先 read_text 取正文、再 read_bytes 算 sha256，两次独立 I/O；dispatch_lint.sh 同族，进程 A 校验后只交出路径，进程 B 重新 open 读一次做 section 判据）。rev4 把验收标的改写为不变式 INV-B，两个消费面一并收口。",
+      "invariant": "INV-B：经 sha256 校验的字节，必须与实际派发/消费的字节来自同一次读取；所有分支（声明路径 / 回退命名 / 两个消费面）都必须经过校验。",
+      "refreeze_stop_rule_check": {
+        "rule": "任务 #24 —— 同一 WP 第 3 次 re-freeze 强制停手复核计划",
+        "fired": true,
+        "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-26-plan-review-before-rev4.md",
+        "ruling": "rev4 一次性收口整条链的「读取同一性」环，python 侧与 bash 侧两个消费面同时处理；B22 不纳入（另立任务 #27）",
+        "user_approved": true,
+        "user_approved_at": "2026-09-17T10:55Z"
       },
-      "third_refreeze_review": "本 WP 已第 3 次 re-freeze，按自订规则（任务 #24）触发计划复核。编排者复核结论：继续而非停手——范围极小（1 文件、纯断言强度）、根因明确（B25）、且判据形式已由编排者在冻结前实测可实施（三条逃逸全捕获、两条正当路径不误红）。复核结论同时写进 rev3 brief 正文附注。"
+      "prev_rev": 3
     },
     "tests": [
       {
@@ -519,6 +538,7 @@
     "hardened_at": "2026-09-16T14:05:00Z",
     "consult_harden_at": "2026-09-16T05:52:00Z",
     "review_reversed_at": "2026-09-16T05:58:00Z",
-    "refrozen_rev3_at": "2026-09-16T06:05:00Z"
+    "refrozen_rev3_at": "2026-09-16T06:05:00Z",
+    "refrozen_rev4_at": "2026-09-17T10:55Z"
   }
 }

@@ -3,7 +3,7 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -71,29 +71,48 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
-      "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
-      "rev": 3,
-      "refreeze_reason": "B28 rework: 存在性锚点钉不住极性（保留全部六个锚点短语、把纪律改成语义相反的规则，十条用例全绿）。rev3 把判据换成修法 D —— 按块边界切出三条纪律正文块、空白归一化、断言逐字等于测试文件里的多行字符串常量（不用 sha256 常量）。同时收口 B27/C2：变异构造改为锚点驱动、守卫用例不再写活树模板。",
-      "correction": "2026-09-16T23:40Z 冻结前自查：rev3 初稿把范围段写成 `## 范围` + `### Allowed and forbidden paths`，而活树 dispatch_lint.sh:69-101 的 section 判据要求 `^##\\s+Allowed and forbidden paths\\s*$`（h2），h3 不匹配 —— 与 rev2 是同一形状的冻结缺陷（任务 #28 复发）。已把该标题提升为 h2 并删掉外层 `## 范围`。另修正 Acceptance tests 末条的既有失败口径：基线命令 `python3.11 -m pytest tests -q` 下是 4 条（全在 test_finalize_merge_triple_sign.py，defaultBranch 冲突），第 5 条 B31 本体只在 `uv run` 下现形。两处纠正均发生在派发之前，无执行者读过旧稿。",
-      "prefreeze_check": {
-        "method": "把活树 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片直跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred_rev3.py，并以 `pred in live` 逐字断言该切片是活树脚本的字面子串（VERBATIM_SUBSTRING 通过）。",
-        "result_before_correction": "FAIL — rc=0 \"brief missing section 'Allowed and forbidden paths'\"（h3 不匹配 h2 判据）",
-        "result_after_correction": "PASS — rc=1 无输出",
-        "discriminating_power": "同一切片对 WP-20-brief.md 仍返回 rc=0 \"brief missing section 'Acceptance tests'\" —— 非恒绿",
-        "checked_at": "2026-09-16T23:45:00Z"
+      "history": [
+        {
+          "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
+          "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
+          "rev": 3,
+          "refreeze_reason": "B28 rework: 存在性锚点钉不住极性（保留全部六个锚点短语、把纪律改成语义相反的规则，十条用例全绿）。rev3 把判据换成修法 D —— 按块边界切出三条纪律正文块、空白归一化、断言逐字等于测试文件里的多行字符串常量（不用 sha256 常量）。同时收口 B27/C2：变异构造改为锚点驱动、守卫用例不再写活树模板。",
+          "correction": "2026-09-16T23:40Z 冻结前自查：rev3 初稿把范围段写成 `## 范围` + `### Allowed and forbidden paths`，而活树 dispatch_lint.sh:69-101 的 section 判据要求 `^##\\s+Allowed and forbidden paths\\s*$`（h2），h3 不匹配 —— 与 rev2 是同一形状的冻结缺陷（任务 #28 复发）。已把该标题提升为 h2 并删掉外层 `## 范围`。另修正 Acceptance tests 末条的既有失败口径：基线命令 `python3.11 -m pytest tests -q` 下是 4 条（全在 test_finalize_merge_triple_sign.py，defaultBranch 冲突），第 5 条 B31 本体只在 `uv run` 下现形。两处纠正均发生在派发之前，无执行者读过旧稿。",
+          "prefreeze_check": {
+            "method": "把活树 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片直跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred_rev3.py，并以 `pred in live` 逐字断言该切片是活树脚本的字面子串（VERBATIM_SUBSTRING 通过）。",
+            "result_before_correction": "FAIL — rc=0 \"brief missing section 'Allowed and forbidden paths'\"（h3 不匹配 h2 判据）",
+            "result_after_correction": "PASS — rc=1 无输出",
+            "discriminating_power": "同一切片对 WP-20-brief.md 仍返回 rc=0 \"brief missing section 'Acceptance tests'\" —— 非恒绿",
+            "checked_at": "2026-09-16T23:45:00Z"
+          },
+          "modus_d_extraction_reverified": {
+            "note": "冻结前在工作树 284e223 的活模板上重跑 brief 指定的三组块边界标记，确认都切得出、且归一化后长度/摘要与 brief 设计期的实测一致（执行者若切不出块必须判红，见交付物 1 的 fail-closed 要求）。",
+            "template_sha256": "0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a",
+            "blocks": {
+              "criteria_sourcing": "len=392 norm_sha=a434bce6…2d2a82ad",
+              "read_face_pinning": "len=515 norm_sha=d86464d1…84f119ef",
+              "negative_assertion": "len=386 norm_sha=fec4586d…362c11b8"
+            },
+            "checked_at": "2026-09-16T23:50:00Z"
+          },
+          "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**触发**：rev1 首冻 → rev2 第 1 次 re-freeze → rev3 第 2 次 → rev4 将是第 3 次。已按规则停手复核计划而非继续冻结，结论见 docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md。实质结论：三轮失败点（B20 锚点粒度 → B28 语义极性 → D1 定位唯一性 → D2 结构完整性）是同一条链的四环，根因是编排者按台账编号冻结而非按不变式冻结（与 WP-26 §3 失误 1 同型）；另一条独立失误是判据自检的变异集由上一轮缺陷形状生成，而非由本轮判据的组成步骤生成。rev4 裁定：按 INV-P 一次性收口定位唯一性 + 结构完整性两环，范围仍限 1 个测试文件。**待用户批准该裁定后才冻结 rev4。**"
+        }
+      ],
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev4.md",
+      "sha256": "7cc047d9592d5fa44dbb23e80f1fb565581eff173237def7adbb8b5a5bc9d58f",
+      "rev": 4,
+      "refreeze_count": 3,
+      "refreeze_reason": "rev3 双签名 REWORK（D1 定位不唯一：逐字锁定用「首个标记出现位置」切块，在真实块前放一份完好冻结块即可让判据锁错文本；D2 结构被吞：_normalize 空白归一化把「删列表前缀 / 插空段 / 缩进成 code block」这类改变 Markdown 归属的结构变化抹平）。rev4 把验收标的从缺陷编号改写为不变式 INV-P，一次性收口定位唯一性与结构完整性两环。",
+      "invariant": "INV-P：三条协议纪律的任何弱化都必须让用例转红；而放行一次弱化必须以修改测试文件内的冻结常量为前提（在 diff 中可见）。",
+      "refreeze_stop_rule_check": {
+        "rule": "任务 #24 —— 同一 WP 第 3 次 re-freeze 强制停手复核计划",
+        "fired": true,
+        "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md",
+        "ruling": "rev4 按 INV-P 一次性收口定位唯一性 + 结构完整性；范围仍限单一测试文件；模板仍 forbidden",
+        "user_approved": true,
+        "user_approved_at": "2026-09-17T10:54Z"
       },
-      "modus_d_extraction_reverified": {
-        "note": "冻结前在工作树 284e223 的活模板上重跑 brief 指定的三组块边界标记，确认都切得出、且归一化后长度/摘要与 brief 设计期的实测一致（执行者若切不出块必须判红，见交付物 1 的 fail-closed 要求）。",
-        "template_sha256": "0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a",
-        "blocks": {
-          "criteria_sourcing": "len=392 norm_sha=a434bce6…2d2a82ad",
-          "read_face_pinning": "len=515 norm_sha=d86464d1…84f119ef",
-          "negative_assertion": "len=386 norm_sha=fec4586d…362c11b8"
-        },
-        "checked_at": "2026-09-16T23:50:00Z"
-      },
-      "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**触发**：rev1 首冻 → rev2 第 1 次 re-freeze → rev3 第 2 次 → rev4 将是第 3 次。已按规则停手复核计划而非继续冻结，结论见 docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md。实质结论：三轮失败点（B20 锚点粒度 → B28 语义极性 → D1 定位唯一性 → D2 结构完整性）是同一条链的四环，根因是编排者按台账编号冻结而非按不变式冻结（与 WP-26 §3 失误 1 同型）；另一条独立失误是判据自检的变异集由上一轮缺陷形状生成，而非由本轮判据的组成步骤生成。rev4 裁定：按 INV-P 一次性收口定位唯一性 + 结构完整性两环，范围仍限 1 个测试文件。**待用户批准该裁定后才冻结 rev4。**"
+      "prev_rev": 3
     },
     "tests": [
       {
@@ -523,6 +542,7 @@
     "changes_requested_at": "2026-09-16T11:55:00Z",
     "refrozen_at": "2026-09-16T23:50:00Z",
     "reviewed_at": "2026-09-17T01:40:00Z",
-    "changes_requested_rev3_at": "2026-09-17"
+    "changes_requested_rev3_at": "2026-09-17",
+    "refrozen_rev4_at": "2026-09-17T10:54Z"
   }
 }
