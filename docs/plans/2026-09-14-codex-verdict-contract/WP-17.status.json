@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "plan_id": "PLAN-CODEX",
   "phase": "P2",
-  "state": "READY_FOR_REVIEW",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "claude-code",
@@ -21,12 +21,13 @@
     "session": ""
   },
   "git": {
-    "base_branch": "fix/codex-config-isolation-chunking",
+    "base_branch": "main",
     "base_commit": "600c2f13662c9ac846d435e9ff3a466fa15e2cac",
     "dispatch_commit": "628d599",
     "branch": "fix/codex-config-isolation-chunking",
     "worktree": "/Users/admin/vibe/agentic-loop-wp17-codex-isolation",
-    "commit": "beb167b"
+    "commit": "beb167b",
+    "merged_commit": "2c71aa1eed1183556caa98997b2452cdd7b66981"
   },
   "scope": {
     "allowed_paths": [
@@ -179,7 +180,15 @@
       ],
       "why_not_rework": "两处逃逸均为**用例覆盖缺口，不是实现缺陷**：E1 的代码经我直接实测行为正确；E2 的 raise 就在源码里且可达。当前交付物的运行时行为满足 brief 全部 7 条必需行为。判 REWORK 会把一个行为正确的交付物退回去补测试，而其真实风险是未来回归而非当下错误裁决。故记为非阻塞缺口并单独立 WP 补钉。",
       "residual_risk_accepted_by": "待用户确认（用户已就 WP-17 给出合入批准）"
-    }
+    },
+    "merge_gate": {
+      "item_1_orchestrator_independent_review": "ACCEPT — 本会话编排者独立复核（commit c588426）：自做 8 项变异，6 项转红；2 项逃逸（E1 hunk 二次切分、E2 循环内 fail-closed）经实测确认为用例覆盖缺口而非实现缺陷，判非阻塞并立任务 #33 补钉。",
+      "item_2_consultant_second_signature": "ACCEPT — codex-cli（DeepSeek high-effort），commit 2988f87，2026-09-17T02:34:48Z。",
+      "item_3_user_approval": "已取得 —— 用户在收到本会话完整复核报告（含两处逃逸与非阻塞理由）后回复「合并」，即已知情接受残余风险。",
+      "all_three_obtained": true
+    },
+    "state_transition_note": "git.merged_commit 键原缺失（模板默认为空串），finalize 的 `field git.merged_commit` 因校验器对缺键报 STATUS_INVALID 而中断；编排者补入空串后 STATUS_VALID，值由 finalize 写入，不手填。",
+    "base_branch_correction": "原 status 把 git.base_branch 误记为 feature 分支自身（base_branch==branch），使 finalize 在错误历史里找合并提交（found 0）。实际基线是 main：git.base_commit 600c2f1 正是 main 的 tip（`git branch --contains 600c2f1` 含 main），合并也确实做在 main 上。编排者据此改正为 main，未改动任何 commit。"
   },
   "review": {
     "tool": "claude-code",
@@ -215,6 +224,6 @@
     "dispatched_at": "2026-09-16T15:38:00Z",
     "approved_at": "2026-09-16T15:35:00Z",
     "ready_at": "2026-09-16T15:55:00Z",
-    "updated_at": "2026-09-17T02:34:48Z"
+    "updated_at": "2026-09-17T03:27:27Z"
   }
 }
