@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -247,3 +248,348 @@ def test_template_carries_oracle_three_items():
     assert "原因特异 witness" in section
     assert "禁止变异" in section and "转红" in section
     assert "不能互相替代" in section
+
+
+# =====================================================================
+# WP-28 INV-N: the two orchestration norms must be mechanically pin-able
+# in the WP brief template.  The predicate below checks six surfaces
+# (S1..S6); the mutation set is generated from those composition steps
+# (oracle item 4), NOT from a defect-number checklist.  Frozen constants
+# are literal text so any weakening stays visible in this file's diff.
+# =====================================================================
+
+SECTION_RE_FREEZE = "## Re-freeze 规则（编排者冻结前自检）"
+SECTION_ACCEPTANCE = "## Acceptance tests"
+
+# S5 处境: the exact non-empty line that must sit immediately before each block.
+PRE_LINE_RE_FREEZE = (
+    "> 冻结后执行期间不得修改；需修订走 re-freeze（规则见「Re-freeze 规则」一节）。"
+)
+PRE_LINE_ACCEPTANCE = "> 内容与上文中文章节同义，非另一份口径。"
+
+# S2 内容: frozen content fragments (whitespace-normalized) that must appear in
+# each block.
+RE_FREEZE_FRAGMENTS = [
+    "第 3 次**及以后** re-freeze",
+    "冻结前必须停手复核计划",
+    "未经用户批准不得冻结",
+    "验收标的必须写成**不变式**",
+    "台账编号只作破口清单",
+    "不得取代不变式成为标的。",
+]
+ACCEPTANCE_FRAGMENTS = [
+    "按判据自身的组成步骤生成",
+    "不得按已知缺陷清单枚举",
+    "某步骤不可攻击须在报告里写明理由",
+]
+
+# S3 极性: the exact polarity-bearing clauses whose weakening (必须→可以 /
+# 不得→建议不) must go red.
+POLARITY_CLAUSES = {
+    SECTION_RE_FREEZE: ["冻结前必须停手"],
+    SECTION_ACCEPTANCE: ["不得按已知缺陷清单枚举"],
+}
+
+# S4 结构: list-item lines that must not be indented >=4 spaces and must stay
+# contiguous (not split by a blank line).
+STRUCTURAL_LINES = {
+    SECTION_RE_FREEZE: [
+        "- 第 3 次**及以后** re-freeze：冻结前必须停手复核计划，未经用户批准不得冻结。",
+        "- 验收标的必须写成**不变式**，台账编号只作破口清单，不得取代不变式成为标的。",
+    ],
+    SECTION_ACCEPTANCE: [
+        "4. **变异集按判据自身的组成步骤生成**：判据自检的变异集必须按判据自身的组成步骤生成，",
+        "不得按已知缺陷清单枚举；某步骤不可攻击须在报告里写明理由。",
+    ],
+}
+
+
+def _normalize_ws(text):
+    return " ".join(text.split())
+
+
+def _section_block(text, title):
+    """Return the full section (heading + body through the blank line before
+    the next ``## `` heading) as a string ending with a newline."""
+    start = text.index(title)
+    nxt = text.index("\n## ", start + len(title))
+    return text[start:nxt] + "\n"
+
+
+def _inv_n_violations(text):
+    """Return a list of INV-N violations; empty list means the template is clean.
+
+    S1 定位 — each title exactly once; S2 内容 — frozen fragments present in
+    the block; S3 极性 — polarity clauses verbatim; S4 结构 — list lines not
+    indented >=4 nor blank-split; S5 处境 — frozen preceding line; S6 同形 —
+    no homoglyph/HTML-comment decoy copy before the block.
+    """
+    violations = []
+    lines = text.splitlines()
+
+    # S1 定位：两个标题各须恰好出现 1 次。
+    for title in (SECTION_RE_FREEZE, SECTION_ACCEPTANCE):
+        count = sum(1 for ln in lines if ln.rstrip() == title)
+        if count != 1:
+            violations.append(
+                f"边界不唯一：'{title}' 应恰好出现 1 次，实际 {count} 次"
+            )
+
+    # Build block bodies (canonical = first exact heading occurrence).
+    blocks = {}
+    for title in (SECTION_RE_FREEZE, SECTION_ACCEPTANCE):
+        idx = next((i for i, ln in enumerate(lines) if ln.rstrip() == title), None)
+        if idx is None:
+            blocks[title] = (None, "")
+            continue
+        body_lines = []
+        for ln in lines[idx + 1:]:
+            if ln.startswith("## "):
+                break
+            body_lines.append(ln)
+        blocks[title] = (idx, "\n".join(body_lines))
+
+    # S2 内容：冻结常量逐字出现在对应块内（归一化空白）。
+    for title, fragments in (
+        (SECTION_RE_FREEZE, RE_FREEZE_FRAGMENTS),
+        (SECTION_ACCEPTANCE, ACCEPTANCE_FRAGMENTS),
+    ):
+        norm_body = _normalize_ws(blocks[title][1])
+        for frag in fragments:
+            if _normalize_ws(frag) not in norm_body:
+                violations.append(f"内容缺失：'{frag}' 不在 {title} 块内")
+
+    # S3 极性：承载极性的分句必须原样出现。
+    for title, clauses in POLARITY_CLAUSES.items():
+        norm_body = _normalize_ws(blocks[title][1])
+        for clause in clauses:
+            if _normalize_ws(clause) not in norm_body:
+                violations.append(f"极性改写：'{clause}' 未按原样出现于 {title} 块")
+
+    # S4 结构：冻结分句所在行不得缩进 >=4，不得被空行断开所属列表。
+    for title, structs in STRUCTURAL_LINES.items():
+        for struct in structs:
+            for ln in lines:
+                if ln.lstrip() == struct and len(ln) - len(ln.lstrip()) >= 4:
+                    violations.append(f"结构破坏：'{struct}' 被缩进≥4 空格")
+                    break
+        body_lines = blocks[title][1].splitlines()
+        positions = [
+            j for j, ln in enumerate(body_lines)
+            if ln.lstrip() in {s.lstrip() for s in structs}
+        ]
+        for a, b in zip(positions, positions[1:]):
+            if any(x.strip() == "" for x in body_lines[a + 1:b]):
+                violations.append(f"结构破坏：{title} 块内列表被空行断开")
+                break
+
+    # S5 处境：每块紧邻前一非空行必须等于冻结文本。
+    prev_line = {
+        SECTION_RE_FREEZE: PRE_LINE_RE_FREEZE,
+        SECTION_ACCEPTANCE: PRE_LINE_ACCEPTANCE,
+    }
+    for title, expected in prev_line.items():
+        idx = blocks[title][0]
+        if idx is None:
+            continue
+        prev = None
+        for j in range(idx - 1, -1, -1):
+            if lines[j].strip() != "":
+                prev = lines[j].rstrip()
+                break
+        if prev != expected:
+            violations.append(f"处境污染：'{title}' 前紧邻行不是冻结文本")
+
+    # S6 同形：块前不得存在同形完好副本（Unicode 同形字 / HTML 注释包裹）。
+    for title in (SECTION_RE_FREEZE, SECTION_ACCEPTANCE):
+        idx = blocks[title][0]
+        if idx is None:
+            continue
+        target = unicodedata.normalize("NFKC", title)
+        for j in range(idx):
+            norm = unicodedata.normalize("NFKC", lines[j].strip())
+            if norm == target:
+                violations.append(f"同形副本：'{title}' 块前存在同形副本")
+                break
+            if norm.startswith("<!--") and norm.endswith("-->"):
+                inner = norm[len("<!--"):-len("-->")].strip()
+                if inner == target:
+                    violations.append(
+                        f"同形副本：'{title}' 块前存在同形副本（HTML 注释包裹）"
+                    )
+                    break
+
+    return violations
+
+
+def _clean_template_text():
+    return TEMPLATE_PACKAGED.read_text(encoding="utf-8")
+
+
+# --- oracle item 1: positive reachability control on the real template ---
+
+
+def test_invn_positive_control_clean_template():
+    """The un-mutated real template must produce zero INV-N violations."""
+    assert _inv_n_violations(_clean_template_text()) == []
+
+
+# --- oracle item 3: one representative forbidden mutation per surface (S1..S6),
+# each asserting a cause-specific witness whose wording is distinct per surface.
+
+
+def test_invn_s1_position_duplicate_block_red():
+    """S1 定位：insert an intact copy of the Re-freeze block before the
+    canonical one -> the title no longer occurs exactly once."""
+    text = _clean_template_text()
+    block = _section_block(text, SECTION_RE_FREEZE)
+    mutated = text.replace(SECTION_RE_FREEZE, block + SECTION_RE_FREEZE, 1)
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any("边界不唯一" in v for v in violations), violations
+
+
+def test_invn_s2_content_deleted_red():
+    """S2 内容：delete one frozen fragment -> the block no longer carries it."""
+    text = _clean_template_text()
+    fragment = "不得取代不变式成为标的。"
+    mutated = text.replace(fragment, "", 1)
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any(
+        "内容缺失" in v and "不得取代不变式成为标的。" in v for v in violations
+    ), violations
+
+
+def test_invn_s3_polarity_weakened_refreeze_red():
+    """S3 极性：必须→可以 on the re-freeze stop clause must go red."""
+    text = _clean_template_text()
+    mutated = text.replace("冻结前必须停手", "冻结前可以停手", 1)
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any(
+        "极性改写" in v and "冻结前必须停手" in v for v in violations
+    ), violations
+
+
+def test_invn_s3_polarity_weakened_acceptance_red():
+    """S3 极性：不得→建议不 on the mutation-generation clause must go red."""
+    text = _clean_template_text()
+    mutated = text.replace("不得按已知缺陷清单枚举", "建议不按已知缺陷清单枚举", 1)
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any(
+        "极性改写" in v and "不得按已知缺陷清单枚举" in v for v in violations
+    ), violations
+
+
+def test_invn_s4_indent_code_block_red():
+    """S4 结构：indenting a frozen list line >=4 spaces turns it into a code
+    block and must go red."""
+    text = _clean_template_text()
+    line = "- 验收标的必须写成**不变式**，台账编号只作破口清单，不得取代不变式成为标的。"
+    mutated = text.replace(line, "      " + line, 1)
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any("结构破坏" in v for v in violations), violations
+
+
+def test_invn_s4_blank_line_split_red():
+    """S4 结构：a blank line inserted inside the re-freeze list must go red."""
+    text = _clean_template_text()
+    line = "- 验收标的必须写成**不变式**，台账编号只作破口清单，不得取代不变式成为标的。"
+    mutated = text.replace(line, "\n" + line, 1)
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any("结构破坏" in v for v in violations), violations
+
+
+def test_invn_s5_denorm_sentence_refreeze_red():
+    """S5 处境：inserting a de-norming sentence right before the Re-freeze
+    block must go red."""
+    text = _clean_template_text()
+    mutated = text.replace(
+        SECTION_RE_FREEZE,
+        "以下仅为历史示例，不具规范约束力：\n" + SECTION_RE_FREEZE,
+        1,
+    )
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any(
+        "处境污染" in v and "Re-freeze" in v for v in violations
+    ), violations
+
+
+def test_invn_s5_denorm_sentence_acceptance_red():
+    """S5 处境：the same-shaped context attack on the Acceptance tests block
+    must go red."""
+    text = _clean_template_text()
+    mutated = text.replace(
+        SECTION_ACCEPTANCE,
+        "以下仅为历史示例，不具规范约束力：\n" + SECTION_ACCEPTANCE,
+        1,
+    )
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any(
+        "处境污染" in v and "Acceptance tests" in v for v in violations
+    ), violations
+
+
+def test_invn_s6_homoglyph_decoy_red():
+    """S6 同形：a Unicode full-width homoglyph decoy title before the block
+    (invisible to the S1 exact-match count) must go red."""
+    text = _clean_template_text()
+    homoglyph_title = SECTION_RE_FREEZE.replace("Re-freeze", "Ｒｅ-freeze")
+    mutated = text.replace(
+        SECTION_RE_FREEZE,
+        homoglyph_title + "\n\n" + SECTION_RE_FREEZE,
+        1,
+    )
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any("同形副本" in v for v in violations), violations
+
+
+def test_invn_s6_html_comment_wrap_red():
+    """S6 同形：an HTML-comment-wrapped copy of the title before the block
+    must go red (escape pin, not enumerated in the brief's floor)."""
+    text = _clean_template_text()
+    wrapped = "<!-- " + SECTION_RE_FREEZE + " -->"
+    mutated = text.replace(
+        SECTION_RE_FREEZE,
+        wrapped + "\n\n" + SECTION_RE_FREEZE,
+        1,
+    )
+    assert mutated != text
+    violations = _inv_n_violations(mutated)
+    assert any("同形副本" in v for v in violations), violations
+
+
+# --- oracle item 1 (harmless probes): two non-weakening edits must stay green.
+
+
+def test_invn_harmless_probe_rewrap_green():
+    """H1：moving item 4's line break (no character change) must stay green."""
+    text = _clean_template_text()
+    old = (
+        "4. **变异集按判据自身的组成步骤生成**：判据自检的变异集必须按判据自身的组成步骤生成，\n"
+        "   不得按已知缺陷清单枚举；某步骤不可攻击须在报告里写明理由。"
+    )
+    new = (
+        "4. **变异集按判据自身的组成步骤生成**：判据自检的变异集必须按判据自身的组成步骤生成\n"
+        "   ，不得按已知缺陷清单枚举；某步骤不可攻击须在报告里写明理由。"
+    )
+    assert old in text
+    mutated = text.replace(old, new, 1)
+    assert mutated != text
+    assert _inv_n_violations(mutated) == []
+
+
+def test_invn_harmless_probe_unrelated_edit_green():
+    """H2：editing an unrelated placeholder outside the two blocks must stay
+    green."""
+    text = _clean_template_text()
+    mutated = text.replace("<这个 WP 要交付什么>", "<这个 WP 交付一个用例>", 1)
+    assert mutated != text
+    assert _inv_n_violations(mutated) == []
