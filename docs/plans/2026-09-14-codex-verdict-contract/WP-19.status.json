@@ -3,7 +3,7 @@
   "work_package_id": "WP-19",
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "phase": "P2",
-  "state": "DRAFT",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": { "tool": "unassigned" },
   "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
@@ -47,9 +47,10 @@
   "evidence": {
     "tests": [],
     "motivation_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-39-unlock-record.md Run 1 (gate log sha256 66679f50e582962ac2967575902360023cd4c48595a3cd6c98f5fc77a2d9ea8f): merged runtime chunking works but fail-closed on chunk 3/9, a 190KB single-hunk new file (.ci/tests/test_harness_release_gate.py, @@ -0,0 +1,4170 @@) that cannot be hunk-split.",
-    "goal": "Add lossless line-level sub-hunk splitting for a single over-bound hunk, scoped to safe pure-addition hunks only; mixed/context hunks stay fail-closed. Downstream: unblocks WP-39 Run 2."
+    "goal": "Add lossless line-level sub-hunk splitting for a single over-bound hunk, scoped to safe pure-addition hunks only; mixed/context hunks stay fail-closed. Downstream: unblocks WP-39 Run 2.",
+    "prefreeze_review": "Independent pre-freeze review verified: (1) motivation references match reality — chunk3 is genuinely a pure-addition single hunk (new file mode, @@ -0,0 +1,4170 @@, 0 context lines, 0 real deletions), WP-18 is MERGED, gate log sha256 matches; (2) two brief tightenings applied before freeze: the pure-addition predicate is now a strict whole-hunk test (deletion count==0 AND no context lines AND no deletion lines; local all-+ regions of mixed hunks explicitly forbidden), and the -X,0 header recompute is pinned (X held constant across sub-pieces, only +side start/count increments), with an added DoD test for the append-to-nonempty-file case (@@ -100,0 +101,N @@)."
   },
   "review": {},
   "consult": {},
-  "timestamps": { "drafted_at": "2026-09-15T22:00:00Z", "approved_at": "", "dispatched_at": "" }
+  "timestamps": { "drafted_at": "2026-09-15T22:00:00Z", "approved_at": "2026-09-15T22:30:00Z", "dispatched_at": "" }
 }
