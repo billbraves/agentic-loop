@@ -3,19 +3,19 @@
   "work_package_id": "WP-18",
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "phase": "P2",
-  "state": "APPROVED",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
-  "executor": { "tool": "unassigned" },
+  "executor": { "tool": "kiro-deepseek-harness", "note": "user chose option B: orchestrator implemented directly in the WP-18 worktree without kimi dispatch/agentic-preflight (agentic-loop primary checkout was occupied by another live session)" },
   "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
   "reviewer": { "tool": "claude-code", "session": "" },
   "git": {
     "base_branch": "main",
     "integration_branch": "main",
-    "base_commit": "d6fee35",
+    "base_commit": "2dbd36e",
     "branch": "fix/wp-18-codex-gate-capability-merge",
     "worktree": "/Users/admin/vibe/.worktrees/agentic-wp18-codex-merge",
-    "commit": "",
-    "reviewed_commit": "",
+    "commit": "282f3e3",
+    "reviewed_commit": "282f3e3",
     "merged_commit": "",
     "merge_method": "no-ff",
     "cherry_pick": null,
@@ -27,17 +27,19 @@
   "scope": {
     "allowed_paths": [
       "src/agentic_loop/adapters/codex.py",
-      "tests/test_codex_gate_capability_merge.py"
+      "tests/test_codex_gate_capability_merge.py",
+      "tests/test_codex_verdict_recovery.py",
+      "tests/test_codex_config_isolation_chunking.py",
+      "tests/test_gate_diff_start.py"
     ],
+    "allowed_paths_note": "re-freeze expanded scope: the 3 pre-existing test files moved from forbidden to allowed because the user-chosen JSONL-hardening capability is inseparable from their fake/stub upgrades (see WP-18 brief §Re-freeze).",
     "forbidden_paths": [
       ".env",
       ".context/",
       ".agentic/config.toml",
       "src/agentic_loop/gate/",
       "src/agentic_loop/wrappers/",
-      "src/agentic_loop/independence.py",
-      "tests/test_codex_verdict_recovery.py",
-      "tests/test_codex_config_isolation_chunking.py"
+      "src/agentic_loop/independence.py"
     ]
   },
   "risk": {
@@ -47,20 +49,38 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      { "cmd": "python3 -m pytest tests/test_codex_verdict_recovery.py -q", "python": "/opt/anaconda3/bin/python3 (3.12.7, pytest 8.3.3)", "result": "50 passed", "exit_code": 0 },
+      { "cmd": "python3 -m pytest tests/test_codex_config_isolation_chunking.py -q", "result": "14 passed", "exit_code": 0 },
+      { "cmd": "python3 -m pytest tests/test_codex_gate_capability_merge.py -q (post-rework)", "result": "8 passed (added 2 regression guards for rework findings 2/3)", "exit_code": 0 },
+      { "cmd": "python3 -m pytest tests/test_gate_diff_start.py -q", "result": "8 passed", "exit_code": 0 },
+      { "cmd": "python3 -m pytest tests/ -q (full suite, post-rework)", "result": "564 passed, 4 skipped, 4 deselected", "exit_code": 0, "baseline_failures": "4 deselected are tests/test_finalize_merge_triple_sign.py, all the same `git checkout -q main` CalledProcessError from the sandbox git environment; proven pre-existing by reproducing identical 4-failed/1-passed against the untouched base adapter (git show HEAD:...codex.py). Not exercised by codex adapter; unrelated to WP-18." }
+    ],
     "rootcause_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-34-native-gate-rootcause.md @ 3b1be2b",
-    "goal": "Merge chunking (beb167b) with file-backing/JSONL-hardening/finalization (f8eba27); neither branch contains both. Verified: 01312c5 not ancestor of main; chunking branch lacks candidate.diff/_read_thread_id/_resume_finalization; isolated-review branch lacks _split_diff/_CHUNK_PROMPT_MAX_BYTES."
+    "goal": "Merge chunking (beb167b) with file-backing/JSONL-hardening/finalization (f8eba27); neither branch contains both. Verified: 01312c5 not ancestor of main; chunking branch lacks candidate.diff/_read_thread_id/_resume_finalization; isolated-review branch lacks _split_diff/_CHUNK_PROMPT_MAX_BYTES.",
+    "design_decisions": [
+      "Outer review() dispatches on bound-diff byte size; <=150KiB single file-backed review, else lossless split by diff --git / @@ boundaries, per-chunk file-backed+JSONL review, conservative severity-descending aggregation.",
+      "Chunk-size bound measures _bound_payload_bytes = brief + (chunk) diff bytes (rework fix, finding 3), matching WP-17's joint brief+diff bound; _split_diff reserves brief bytes so files are split as far as possible before the outer fail-closed check. Still lossless, still fail-closed on unsplittable oversize.",
+      "Test-contract conflict resolved per user: JSONL hardening wins. test_codex_verdict_recovery.py = f8eba27 JSONL rewrite; chunking + gate_diff_start fakes upgraded to emit JSONL; behavior assertions preserved/strengthened (added losslessness + combined-capability invariants).",
+      "Static-killer invariants preserved: zero regex; decision literals only in _parse_verdict/_build_prompt; severity cache _DECISION_SEVERITY_DESC populated inside _parse_verdict; no phrase->decision mapping."
+    ],
+    "production_safety": "No production paths, network, notifications, or credentials touched. Change confined to codex adapter + tests. uv.lock/.venv local artifacts were removed, not committed.",
+    "deviation_from_dispatch_form": "Not dispatched via kimi + agentic preflight. agentic-loop primary checkout /Users/admin/vibe/agentic_loop was occupied by another live claude-opus-5 session with ~8 uncommitted files; per git-safety rules those were left untouched, and (user-chosen option B) the orchestrator implemented directly in the isolated WP-18 worktree. agentic preflight/quality-gate were NOT run (they resolve main_root to the occupied checkout); this is recorded honestly rather than worked around."
   },
-  "dispatch_blocker": {
-    "state_when_blocked": "APPROVED, worktree created, preflight not passed",
-    "worktree_created": "/Users/admin/vibe/.worktrees/agentic-wp18-codex-merge (branch fix/wp-18-codex-gate-capability-merge, clean, at 2dbd36e)",
-    "blocker": "agentic preflight dispatch-lint resolves main_root to the repo's true main checkout /Users/admin/vibe/agentic_loop (git-common-dir parent), where this WP-18 status file is not present on the currently checked-out branch plan/2026-09-13-parallel-throughput.",
-    "root_cause": "The agentic-loop git repo's primary checkout is /Users/admin/vibe/agentic_loop, not /Users/admin/vibe/agentic-loop-main-codex-merge (which is itself a worktree on branch main). The WP-18 freeze commit 2dbd36e is on branch main; the primary checkout is on a different branch (plan/2026-09-13-parallel-throughput) with ~8 uncommitted files that appear to belong to another active session.",
-    "not_done_because": "Resolving this would require switching the primary checkout's branch or touching another session's uncommitted work, which violates the git-safety rule to preserve unrelated changes. Paused per user decision to first reconcile the primary checkout.",
-    "next_action": "After the primary checkout /Users/admin/vibe/agentic_loop is reconciled (its branch/uncommitted work resolved by its owner) and can present WP-18 on the resolved base, re-run: cd /Users/admin/vibe/.worktrees/agentic-wp18-codex-merge && agentic preflight docs/plans/2026-09-14-codex-verdict-contract/WP-18.status.json ; on PREFLIGHT_PASS, dispatch kimi into that worktree.",
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer_role": "independent adversarial code review",
+    "reviewer_tool": "subagent (separate context, given only the diff + frozen invariants, not the implementation reasoning)",
+    "reviewed_commit_initial": "0ac9910",
+    "reviewed_commit_final": "282f3e3",
+    "history": "First pass on 0ac9910 returned REWORK with 3 findings. Adjudicated against actual source: (1) claimed invariant-2 violation in _build_finalization_prompt = FALSE POSITIVE — reviewer had no source access; the decision words are substrings of longer strings, not bare ast.Constant literals, and the static-killer test passes (verified). (2) probe_injection dropped --ignore-user-config = VALID regression, fixed. (3) chunk bound measured diff-only, not brief+diff = VALID, fixed via _bound_payload_bytes + _split_diff reserved_bytes. Two regression guards added. Post-rework 282f3e3: all invariants hold, 564 passed / 4 skipped / 4 deselected git-env baseline, static killers green.",
+    "note": "The reviewer is a subagent, not the native codex merge gate. This is an honest independent second read, but it is NOT the P2 contract's native Codex second signature — that native signature is exactly what the downstream WP-39 gate (using this merged runtime) is meant to produce. Human merge approval still required."
+  },
+  "dispatch_blocker_resolved": {
+    "status": "RESOLVED via user-chosen option B (orchestrator implemented directly in the isolated worktree; kimi dispatch + agentic preflight skipped because they resolve main_root to the occupied primary checkout /Users/admin/vibe/agentic_loop).",
+    "original_blocker": "agentic preflight dispatch-lint resolved main_root to the repo's true primary checkout /Users/admin/vibe/agentic_loop, which was on branch plan/2026-09-13-parallel-throughput with ~8 uncommitted files belonging to another live claude-opus-5 session; those were left untouched per git-safety rules.",
     "recorded_at": "2026-09-15T20:00:00Z"
   },
-  "review": {},
   "consult": {},
-  "timestamps": { "drafted_at": "2026-09-15T19:30:00Z", "approved_at": "2026-09-15T19:45:00Z", "dispatched_at": "" }
+  "timestamps": { "drafted_at": "2026-09-15T19:30:00Z", "approved_at": "2026-09-15T19:45:00Z", "dispatched_at": "", "ready_for_review_at": "2026-09-15T21:00:00Z", "reviewed_at": "2026-09-15T21:30:00Z" }
 }

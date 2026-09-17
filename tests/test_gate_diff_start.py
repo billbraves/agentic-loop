@@ -133,11 +133,23 @@ def make_codex_stub(
     ]
     if capture is not None:
         lines.append(f"cat > {capture}")
+        lines.append(f"cp candidate.diff {capture}.diff")
     lines.append(
         f"v='{{\"decision\":\"{decision}\",\"rationale\":\"stub\",\"findings\":[]}}'"
     )
     lines.append('[[ -n "$out" ]] && printf \'%s\' "$v" > "$out"')
-    lines.append('printf \'%s\' "$v"')
+    # WP-18: adapter 硬化后要求可信 JSONL 事件流，且最终 agent_message 与 -o
+    # artifact 逐字一致。stub 相应发 thread.started/turn.started/item.completed/
+    # turn.completed，最终消息与写入 -o 的 verdict 完全相同。
+    lines.append(
+        "printf '%s\\n' "
+        "'{\"type\":\"thread.started\",\"thread_id\":\"00000000-0000-0000-0000-000000000001\"}'"
+    )
+    lines.append("printf '%s\\n' '{\"type\":\"turn.started\"}'")
+    lines.append(
+        f"printf '%s\\n' '{{\"type\":\"item.completed\",\"item\":{{\"id\":\"item-final\",\"type\":\"agent_message\",\"text\":\"{{\\\"decision\\\":\\\"{decision}\\\",\\\"rationale\\\":\\\"stub\\\",\\\"findings\\\":[]}}\"}}}}'"
+    )
+    lines.append("printf '%s\\n' '{\"type\":\"turn.completed\"}'")
     stub.write_text("\n".join(lines) + "\n")
     stub.chmod(0o755)
     return bindir
@@ -266,7 +278,9 @@ def test_stale_base_commit_uses_merge_base_not_base_commit(tmp_repo, tmp_path):
     assert f"diff start = merge-base {fork_commit}" in res.stderr
     assert f"diff start = base_commit {stale_base}" not in res.stderr
     sent = capture.read_text()
-    diff_section = sent.split("## Diff under review")[1]
+    # WP-18: diff 不再内联 prompt，而是回填到 candidate.diff；prompt 只声明文件名。
+    assert "candidate.diff" in sent
+    diff_section = Path(f"{capture}.diff").read_text()
     assert "wp code change" in diff_section
     # The unrelated fork-adjacent commit would be present if diff_start were the
     # stale base (base..tip); it is absent because diff_start is the real fork.
@@ -305,7 +319,9 @@ def test_not_stale_merge_base_equals_base_commit(tmp_repo, tmp_path):
     assert res.returncode == 0, res.stderr
     assert f"diff start = merge-base {base}" in res.stderr
     sent = capture.read_text()
-    diff_section = sent.split("## Diff under review")[1]
+    # WP-18: diff 不再内联 prompt，而是回填到 candidate.diff；prompt 只声明文件名。
+    assert "candidate.diff" in sent
+    diff_section = Path(f"{capture}.diff").read_text()
     assert "wp code change" in diff_section
     assert "brief v0" not in diff_section
 
