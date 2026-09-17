@@ -37,12 +37,40 @@ tip `f8eba27`），叠加 (B) WP-17 的按文件/hunk 边界无损分块 + 按�
 - **allowed_paths**（白名单）：
   - `src/agentic_loop/adapters/codex.py`
   - `tests/test_codex_gate_capability_merge.py`（新增；合并后的组合行为测试）
+- **allowed_paths（补充，因 re-freeze 扩入）**：
+  - `tests/test_codex_verdict_recovery.py`（采用 f8eba27 的 JSONL-fake 重写版，见下方 §Re-freeze）
+  - `tests/test_codex_config_isolation_chunking.py`（fake 升级为发 JSONL，行为断言不削弱）
+  - `tests/test_gate_diff_start.py`（`make_codex_stub` 升级为发 JSONL + 从 `candidate.diff`
+    捕获；两处 diff 断言改从回填文件读取。采用 f8eba27 版本，见下方 §Re-freeze 第 4 点）
 - **forbidden_paths**（黑名单）：
   - `.env`、`.context/`、`.agentic/config.toml`
   - `src/agentic_loop/gate/`、`src/agentic_loop/wrappers/`、`src/agentic_loop/independence.py`
-  - `tests/test_codex_verdict_recovery.py`（WP-16 所有，不得改动）
-  - `tests/test_codex_config_isolation_chunking.py`（WP-17 所有；如需调整须显式说明且不得削弱）
   - 一切消费方仓库与未显式允许的文件
+
+## Re-freeze（2026-09-15，实现中发现的实质冲突，用户裁定）
+两支冻结测试契约**互斥**，原 brief「WP-16 测试不得改动」不可实现：
+- 当前 worktree（main/WP-17）的 `test_codex_verdict_recovery.py` 静态不变量 1
+  断言 `regex_patterns == {r"\{.*\}"}`（**要求**源码保留 loose regex 回退），
+  且其 fake 发**明文 stdout**、无 JSONL。
+- f8eba27 删除了 loose regex（`_parse_verdict` 改为严格单一完整 JSON + 闭合
+  schema + 拒重复键），`_read_verdict_output` 改为**要求合法 JSONL 且最终
+  agent_message 与 -o artifact 逐字一致**，并为此把 `test_codex_verdict_recovery.py`
+  重写 +305 行、无分块测试；其静态不变量 1 断言 `regex_patterns == set()`。
+- 二者对 invariant-1 的断言正相反，无法同时满足。
+
+**用户裁定：JSONL 硬化优先。** 因此：
+1. `test_codex_verdict_recovery.py` 采用 f8eba27 的 JSONL 重写版（governing 契约）。
+2. `test_codex_config_isolation_chunking.py` 的 fake 升级为发 JSONL；其分块/聚合/
+   fail-closed **行为断言全部保留、不削弱**。
+3. 合并源码遵守 f8eba27 静态不变量：无任何 regex、决策字面量仅限
+   `_parse_verdict`/`_build_prompt`；分块聚合仍靠 `_parse_verdict` 内填充的
+   严重度缓存 `_DECISION_SEVERITY_DESC`，不引入 phrase→decision 映射。
+4. 集成测试 `tests/test_gate_diff_start.py` 的 `make_codex_stub` 原为明文 stdout、
+   无 JSONL，会被硬化后的 adapter 判 "thread not unique" fail-closed。这是 JSONL
+   硬化不可分割的夹具更新——f8eba27 已同步更新该 stub 发 JSONL 事件流、并把 diff
+   捕获改到回填的 `candidate.diff` 文件、两处 diff 断言改从该文件读取。本 WP 采用
+   f8eba27 的该测试版本。已实测：该 4 个失败用例在采用 f8eba27 stub 后转绿，
+   行为断言（diff 端点、scope 过滤、stale base、brief-introducing）语义不变。
 
 ## Git 治理合同
 - 集成分支：`main`（本仓约定，与 WP-16/WP-17 一致）；native gate 后合入。
