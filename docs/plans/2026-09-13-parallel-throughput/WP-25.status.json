@@ -3,24 +3,44 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
+    "history": [
+      {
+        "tool": "kimi",
+        "session": "",
+        "dispatched_at": "2026-09-17T00:05:00Z",
+        "dispatch_rev": 3,
+        "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md)\"",
+        "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md",
+        "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev3-exec.log",
+        "background_task_id": "bytxwid89",
+        "dispatched_brief": {
+          "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
+          "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
+          "rev": 3
+        },
+        "dispatch_base_commit": "284e223",
+        "dispatch_note": "rev3 返工派发（B28）。派发前置全部实测通过：① brief 过活树 dispatch_lint.sh:69-101 的 section 判据（切片逐字为活树脚本子串，rc=1；同切片对 WP-20-brief.md 仍 rc=0，非恒绿）；② status 过活树 validate_wp_status（STATUS_VALID）；③ 锁 owner=claude-53c58ab0 为本会话自身 id（LOCK_REACQUIRED，非抢占）；④ 执行者活性探针 PROBE_OK。⑤ preflight 必须用**主仓**脚本跑：工作树内的 preflight.sh 是 WP-27 合入前的历史快照，会读工作树自己的 status 快照（state=DRAFT）而判 PREFLIGHT_FAIL —— 这正是 WP-27 修掉的 B16/B17 本体。用主仓脚本 `PYTHONPATH=/Users/admin/vibe/agentic_loop/src bash /Users/admin/vibe/agentic_loop/src/agentic_loop/wrappers/preflight.sh <rel status>` 在工作树内发起 → PREFLIGHT_PASS state=APPROVED status=<主仓副本>。"
+      }
+    ],
     "tool": "kimi",
+    "dispatched_at": "2026-09-17T11:08:47Z",
+    "dispatch_rev": 4,
+    "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev4-prompt.md)\"",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev4-prompt.md",
+    "dispatch_prompt_sha256": "227f81b3d2f70336a23edb618290d0f125b20c08b91bc65812aea102c81cca85",
+    "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev4-exec.log",
+    "background_task_id": "bswuuqzjp",
     "session": "",
-    "dispatched_at": "2026-09-17T00:05:00Z",
-    "dispatch_rev": 3,
-    "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md)\"",
-    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md",
-    "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev3-exec.log",
-    "background_task_id": "bytxwid89",
     "dispatched_brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
-      "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
-      "rev": 3
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev4.md",
+      "sha256": "7cc047d9592d5fa44dbb23e80f1fb565581eff173237def7adbb8b5a5bc9d58f",
+      "rev": 4
     },
-    "dispatch_base_commit": "284e223",
-    "dispatch_note": "rev3 返工派发（B28）。派发前置全部实测通过：① brief 过活树 dispatch_lint.sh:69-101 的 section 判据（切片逐字为活树脚本子串，rc=1；同切片对 WP-20-brief.md 仍 rc=0，非恒绿）；② status 过活树 validate_wp_status（STATUS_VALID）；③ 锁 owner=claude-53c58ab0 为本会话自身 id（LOCK_REACQUIRED，非抢占）；④ 执行者活性探针 PROBE_OK。⑤ preflight 必须用**主仓**脚本跑：工作树内的 preflight.sh 是 WP-27 合入前的历史快照，会读工作树自己的 status 快照（state=DRAFT）而判 PREFLIGHT_FAIL —— 这正是 WP-27 修掉的 B16/B17 本体。用主仓脚本 `PYTHONPATH=/Users/admin/vibe/agentic_loop/src bash /Users/admin/vibe/agentic_loop/src/agentic_loop/wrappers/preflight.sh <rel status>` 在工作树内发起 → PREFLIGHT_PASS state=APPROVED status=<主仓副本>。"
+    "dispatch_base_commit": "aa1e43b",
+    "dispatch_note": "rev4 派发（INV-P，定位唯一性 + 结构完整性两环一并收口，范围仍限单一测试文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 → PROBE_OK；brief 内三个 sha256 已与活树逐一核对一致（brief 7cc047d9 / 测试文件 727caa21 / 模板 0746351e）；prompt 已落盘并记 sha256，明确写入反向差分方向（变异用例：旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。与 WP-26 rev4 并行派发：两者 allowed_paths 互不相交（WP-25 只动 tests/test_orchestrator_protocol_disciplines.py，WP-26 动 redispatch.py / dispatch_lint.sh 及其两个测试文件）。"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -543,6 +563,7 @@
     "refrozen_at": "2026-09-16T23:50:00Z",
     "reviewed_at": "2026-09-17T01:40:00Z",
     "changes_requested_rev3_at": "2026-09-17",
-    "refrozen_rev4_at": "2026-09-17T10:54Z"
+    "refrozen_rev4_at": "2026-09-17T10:54Z",
+    "dispatched_rev4_at": "2026-09-17T11:08:47Z"
   }
 }
