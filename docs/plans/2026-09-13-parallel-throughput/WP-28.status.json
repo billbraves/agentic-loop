@@ -1,0 +1,108 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-28",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "APPROVED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "334fe60",
+    "branch": "feature/wp28-norms-into-template",
+    "worktree": "../wp28-norms-into-template",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+      "docs/agentic/templates/WORK_PACKAGE.md",
+      "tests/test_wp_template_dispatch_lint.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/contract_render.py",
+      "src/agentic_loop/templates/CLAUDE.md.tmpl",
+      "src/agentic_loop/templates/AGENTS.md.tmpl",
+      "src/agentic_loop/templates/OPERATING_MODEL.md.tmpl",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/agentic/OPERATING_MODEL.md",
+      "src/agentic_loop/wrappers/",
+      "tests/test_finalize_merge_triple_sign.py",
+      "tests/test_init_contract.py",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md",
+      "sha256": "24dc48cfefd3f226121a30a9643ffc095c706d2ec4054ff2a8e1b60bdfb04a2a",
+      "rev": 1,
+      "refreeze_count": 0,
+      "invariant": "INV-N（规范持久化不变式）：两条编排规范落入模板后，任何削弱其规范力的模板改动——删正文/改极性/改结构/改定位/改处境/同形新增——都必须使测试转红，且转红只能通过修改测试文件里的冻结常量来解除。",
+      "refreeze_stop_rule_check": {
+        "rule": "docs/agentic/templates/WORK_PACKAGE.md「Re-freeze 规则」（本 WP 正是要落成该规则）",
+        "semantics": "re-freeze 次数 = rev 号 - 1",
+        "fired": false,
+        "why": "rev1 首次冻结，re-freeze 计数 = 0，规则不命中。"
+      },
+      "prefreeze_check": {
+        "method": "用活树 dispatch_lint.sh 直跑合成外部工程（B11 修法1：判据只能来自真脚本；B14：不用 agentic CLI 冻结副本）",
+        "result": "PASS — DISPATCH_LINT_PASS rc=0",
+        "discriminating_power": "同一调用形态对已知不合规的 WP-20-brief.md → DISPATCH_LINT_FAIL: brief missing section 'Acceptance tests' rc=2，证判据非恒绿",
+        "checked_at": "2026-09-17T20:05:00Z"
+      },
+      "origin": "任务 #36（第 4 项变异规则，根因见 WP-25-review-rev4.md B38 + WP-26-review-rev4.md B35）+ 任务 #24（re-freeze 停手规则，本 WP 按用户本轮决定扩展到「第 3 次及以后」）"
+    },
+    "tests": [],
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-17T19:55:00Z",
+      "measured_at_commit": "334fe60",
+      "result": "4 failed, 608 passed, 4 skipped",
+      "targeted": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 7 passed",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py 的 4 条是既有环境失败（本机 git init.defaultBranch=master 与 fixture 的 git checkout main 冲突），不要修",
+      "measured_by": "orchestrator (claude) 本人实测，非转录执行者自报"
+    },
+    "orchestrator_feasibility_probe": {
+      "note": "冻结前先实测判据本身可实施（记忆 verify-the-remedy-not-just-the-finding），不把未验证的判据写进 brief。",
+      "probe": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28/probe.py（判据原型 + 按 S1..S6 六个面生成的变异集）",
+      "result": "FEASIBLE — 正向可达 PASS；7 条变异全 RED 且 witness 措辞互不相同；2 条无害探针全 GREEN",
+      "lint_cannot_cover": "现行模板（未加两条）也过 dispatch_lint rc=0，故 lint 管不到新条目，判据必须落在 pytest 侧——此结论已写进 brief §F 与 forbidden_paths 理由",
+      "self_caught_escape": "判据原型初版的冻结常量未含「冻结前必须停手」，致 S3 极性变异「必须→可以」全绿。按组成步骤生成变异集当场抓出，已补入常量后复测全红。这是本 WP 要落成的第 4 项规则在其自身上的实证。",
+      "marker_uniqueness": "两块标题与 6 条候选冻结常量在候选模板中各恰 1 次出现，标记不引入歧义",
+      "contract_version_decision": "CONTRACT_TEMPLATE_VERSION 保持 \"6\" 不 bump：WORK_PACKAGE.md.tmpl 是 init_cmd._REFERENCE_TEMPLATES 的 reference skeleton，grep -c '$' = 0 个占位符，不在 contract_render 渲染目标（AGENTS/CLAUDE/OPERATING_MODEL 三份）内"
+    }
+  },
+  "review": {
+    "decision": null
+  },
+  "consult": {},
+  "timestamps": {
+    "created_at": "2026-09-17T20:00:00Z",
+    "frozen_at": "2026-09-17T20:05:00Z",
+    "dispatched_at": ""
+  }
+}
