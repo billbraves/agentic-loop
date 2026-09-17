@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -171,6 +171,31 @@
             "empirical_value": "同一份判据，按缺陷清单自检全绿，按组成步骤自检漏三个面——这是模板第 4 项规则的第一份实证，建议写进 rev2 §F。"
           }
         }
+      },
+      {
+        "rev": 2,
+        "decision": "REWORK",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev2.md",
+        "reviewed_commit": "uncommitted worktree diff on b34deb9 (+228/-65, tests only)",
+        "verified": {
+          "positive_control": "GREEN",
+          "targeted": "25 passed",
+          "full": "624 passed / 4 failed / 4 skipped (4 pre-existing in test_finalize_merge_triple_sign.py)",
+          "reverse_differential": "5 failed / 20 passed on b34deb9 criterion (3 not red, 2 wrong face)",
+          "templates": "cmp IDENTICAL, 0 placeholders, untouched",
+          "attribution": "S6 decoy -> 同形副本; exact dup -> 边界不唯一",
+          "harmless_probes": "3/3 GREEN"
+        },
+        "escapes_found": {
+          "B44": "S4b only recognizes code fences; HTML-comment wrap of both blocks returns [] with every frozen byte and the S5 pre-line intact",
+          "B45": "S5b is a phrase blocklist; 6/6 unlisted de-normalizing synonyms inside the blocks return GREEN"
+        },
+        "remedies_verified": {
+          "B44": "comment-parity check mirroring the fence-parity shape: real template GREEN, escape RED on both blocks, 3 harmless probes GREEN",
+          "B45": "whole-block-body equality freeze: real template GREEN, 6/6 escapes RED, 4 harmless probes GREEN; per-face witnesses must be retained",
+          "rejected": "block-body whitelist -> false red on a legitimate non-frozen transition sentence in the Acceptance block"
+        },
+        "method": "mutation set regenerated from the criterion's own 9 composition steps (probe3/probe4), not from the rev1 defect list; one of my own mutations (NFD decoy) was invalid and is recorded as such"
       }
     ],
     "dispatch": {
@@ -192,5 +217,18 @@
     "dispatched_at": "",
     "dispatch_blocked_at": "2026-09-17T20:20:00Z"
   },
-  "review": {}
+  "review": {
+    "decision": "REWORK",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-18",
+    "rev": 2,
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev2.md",
+    "blockers": [
+      "B44",
+      "B45"
+    ],
+    "minor": [
+      "brief rev2 §A 表 9 行但正文写「八个面」——编排者自己的数错，rev3 由我改正"
+    ]
+  }
 }
