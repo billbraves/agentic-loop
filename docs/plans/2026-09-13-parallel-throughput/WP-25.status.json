@@ -3,7 +3,7 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -92,7 +92,8 @@
           "negative_assertion": "len=386 norm_sha=fec4586d…362c11b8"
         },
         "checked_at": "2026-09-16T23:50:00Z"
-      }
+      },
+      "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**触发**：rev1 首冻 → rev2 第 1 次 re-freeze → rev3 第 2 次 → rev4 将是第 3 次。已按规则停手复核计划而非继续冻结，结论见 docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md。实质结论：三轮失败点（B20 锚点粒度 → B28 语义极性 → D1 定位唯一性 → D2 结构完整性）是同一条链的四环，根因是编排者按台账编号冻结而非按不变式冻结（与 WP-26 §3 失误 1 同型）；另一条独立失误是判据自检的变异集由上一轮缺陷形状生成，而非由本轮判据的组成步骤生成。rev4 裁定：按 INV-P 一次性收口定位唯一性 + 结构完整性两环，范围仍限 1 个测试文件。**待用户批准该裁定后才冻结 rev4。**"
     },
     "tests": [
       {
@@ -335,7 +336,7 @@
     ]
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "claude (orchestrator, independent)",
     "reviewed_at": "2026-09-17T01:40:00Z",
     "reviewed_commit": "aa1e43b",
@@ -380,48 +381,137 @@
       "取舍如实：块内子句重排会红。这是 brief 冻结时选定并要求披露的代价，非缺陷；日后改写纪律措辞须同步改 DISCIPLINE_EXPECTED，diff 里可见 —— 这正是设计意图。",
       "三条反转用例的断言只检查 str(exc.value) 含 discipline 名，无法区分 verbatim-drift 与 fail-closed 两层红。本轮由编排者在评审中单独验证为 drift 层；若日后加严，可让两层 witness 措辞进入断言。不阻塞本轮（brief 未要求，且判据本身已实测钉住）。"
     ],
-    "merge_gate": "① 编排者独立重测 ✅ ACCEPT（本条）② codex 第二签名 —— **未取得** ③ 用户批准 —— **未取得**。按 §规范，编排者不得自签自批，合入须先取二、三两项。"
+    "merge_gate": "① 编排者独立重测 ✅ ACCEPT（本条）② codex 第二签名 —— **未取得** ③ 用户批准 —— **未取得**。按 §规范，编排者不得自签自批，合入须先取二、三两项。",
+    "decision_history": [
+      {
+        "decision": "ACCEPT",
+        "rev": 3,
+        "reviewed_commit": "aa1e43b",
+        "at": "2026-09-16",
+        "superseded_by": "orchestrator 自行撤回，见 reversal_reason"
+      },
+      {
+        "decision": "REWORK",
+        "rev": 3,
+        "reviewed_commit": "aa1e43b",
+        "at": "2026-09-17"
+      }
+    ],
+    "reversal_reason": "编排者原判 ACCEPT。第二签名（codex, strong independence）判 REWORK 并给出两条我漏掉的逃逸；我逐条独立实测（不采信转述），两条**全部复现成立**：D1 decoy 块使极性反转在逐字锁下 GREEN，D2 删列表前缀/插空行/缩进成 code block 四种结构变化在逐字锁下 GREEN。两条都直接推翻 rev3 的核心保证（『给反转开绿灯必须改测试里的冻结常量』），属阻塞缺陷而非覆盖间隙，故撤回 ACCEPT 改判 REWORK。我漏掉的原因是只测了『改正文内容』这一类变异，没测『改正文所处结构』和『增加同形正文』——即只验证了锁的内容强度，没验证锁的**定位唯一性**。"
   },
   "consult": {
     "decision": "REWORK",
     "requested": true,
     "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
     "verdict": "REWORK",
-    "rev": 2,
-    "reviewed_commit": "284e223",
-    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-verdict.raw.txt",
-    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev.md",
+    "rev": 3,
+    "reviewed_commit": "aa1e43b",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult3/wp25-verdict-rev3.raw.txt",
+    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev3.md",
     "request_brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-brief.md",
-    "consulted_at": "2026-09-16T13:47:10Z",
-    "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字；自述 REWORK 结论来自代码结构、可静态确认。",
+    "consulted_at": "2026-09-17",
+    "disclosed_limitation": "沙箱只读、未读仓库其他文件、未自行跑测试；测试数字采用 brief 中编排者实测值。两条修法自述「未实测」。",
     "findings": [
       {
-        "id": "C1",
-        "claim": "存在性锚点检测不到**语义反转**。保留 `differential pair` / `flip exactly one input` / `flip with it` 三个锚点，把纪律正文改写成「do not flip exactly one input, and do not require the verdict to flip with it」，锚点测试全绿，掏空守卫也仍按预期转红（故守卫本身也通过），但纪律已表达相反规则。`read_face_pinning` 同理可用「`-revN` 后 consumer channel 不必跟随」反转。",
-        "orchestrator_adjudication": "**接受，阻塞成立。登记为 B28。**",
-        "orchestrator_verification": "两级实测。① 内存级：构造 codex 给的反转文本，`_assert_discipline_anchors` 对两条纪律**均 GREEN**，且掏空守卫的正则仍匹配、仍转红、witness 仍特异 —— 即反转文本能同时通过锚点断言与守卫断言。② 活树级：把纪律 2 正文替换为 `do not hold everything else constant, do not flip exactly one input, and do not require the red/green verdict to flip with it.`，整文件 `PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q` → **10 passed**。探针后逐字节还原，worktree clean。",
-        "why_my_accept_was_wrong": "我一审的双向探针只覆盖了「删/压缩」方向（掏空必红）与「改写周边措辞」方向（不误红），**没有覆盖「保留全部锚点但反转极性」方向**。B20 的教训我只吃了一半：我把「锚点要钉可操作子句」做到了，却没问「钉住子句在场之后，谁来钉住子句的极性」。这正是记忆 same-topic-is-not-same-extension 的形态——同一主题的下一层反例集合并未被覆盖。"
+        "id": "D1",
+        "claim": "块定位不是唯一定位：_cut_discipline_block 用 text.index(start) 取首个出现点，未断言边界标记唯一。在真实纪律前插入一份完好的冻结正文作 decoy，再反转真实纪律，逐字锁读到 decoy 而保持 GREEN，DISCIPLINE_ANCHORS 也 GREEN。这推翻了 rev3 的核心保证「给反转开绿灯必须改测试里的冻结常量」。",
+        "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证，非采信转述。** 实测：取 criteria_sourcing 块，把真实块的 `may only` 改为 `may also`（极性反转），并在其前插入 `- ` + 原块 + 其 end marker 作为 decoy。结果 `_assert_discipline_verbatim` **GREEN**、`_assert_discipline_anchors` **GREEN**，而攻击后模板里真实纪律确实写着 `may also`。这正是 rev3 要防的形状，逃逸成立。",
+        "reachability": "当前活树三对边界标记各恰 1 次出现（criteria start/end=1/1、read_face=1/1、negative=1/1），三块区间 [2885,3288)/[3290,3820)/[4232,4629) 有序不重叠 —— 即当前模板未被此攻击命中。但唯一性未被编码成不变量，未来重复标题或复制纪律段即静默漂移。"
       },
       {
-        "id": "C2",
-        "claim": "B27 应升级为阻塞项：evisceration 正则间接锁定了整段周边措辞，只改写非锚点措辞就会让守卫因 `evisceration produced no change` 而红。fail-closed 只能证明它不静默空过，不能消除**错误拒绝**；实质上重新引入了 B10 所禁止的措辞耦合。",
-        "orchestrator_adjudication": "**接受升级为阻塞项。**",
-        "orchestrator_verification": "编排者一审已实测该形态存在（记为 B27 非阻塞）。codex 的论点补上了我漏掉的一半：我只权衡了「空过 vs 响亮失败」，没权衡「**误红**本身就是 B10 要禁的东西」。B10 的原意是「断言不得与措辞耦合」，而耦合发生在变异构造侧还是断言侧，对改写模板的人来说后果相同 —— 都是改了合法措辞却被判红。既然 C1 已要求返工，把 B27 一并收口成本极低。",
-        "prescription": "变异构造改为锚点驱动（例如「删掉包含锚点短语 X 的那个句子」），使变异构造与锚点共享同一份真值，不依赖固定句首、标点和从句边界。"
-      },
-      {
-        "id": "C3",
-        "claim": "守卫用例写活树文件，不满足并行测试隔离：`pytest -n` 下其他 worker 可能在模板处于变异态时读取它；SIGKILL / 解释器崩溃 / 恢复写入本身失败都可能留下被污染的 tracked 文件。建议完全取消 `CLAUDE_TMPL.write_text/write_bytes`，直接对内存文本调用 `_assert_discipline_anchors`。",
-        "orchestrator_adjudication": "**接受方向，但把「并行」这一条降级为次要理由。**",
-        "orchestrator_verification": "① 并行前提当前不成立：本仓未装 pytest-xdist（`import xdist` → ModuleNotFoundError），pyproject/setup.cfg/pytest.ini 均无 addopts 或 -n 配置。故 codex 举的 worker 竞态**当前无法发生**。② 但同仓另有 3 个测试文件读同一模板（test_init_contract.py / test_contract_render.py / test_wp_template_dispatch_lint.py），一旦引入 xdist 即成真隐患。③ 更强的理由是**这次写活树根本不必要**：编排者实测「纯内存变体」——不写文件、直接对 mutated 字符串调 `_assert_discipline_anchors` —— 两条纪律**都红且 witness 特异**（`flip exactly one input` / `consumer channel`），与写活树版本的判别力**完全等价**。既然等价，承担写 tracked 文件的风险就是净损失。",
-        "note": "`_template_text()` 只是 `CLAUDE_TMPL.read_text()`，不含任何额外逻辑，所以「必须经文件读取面」这个理由不成立。"
+        "id": "D2",
+        "claim": "起始标记排除了 Markdown 列表前缀 `- `，而 _normalize 用 ' '.join(text.split()) 抹除全部空白结构。故删除 `- **Criteria sourcing.**` 等的 `- ` 前缀、或插空行、或把部分规则缩进成 code block，逐字锁仍 GREEN —— 这些不是纯折行，而是协议渲染结构的变化。",
+        "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证。** 实测四种形状全部 verbatim=GREEN 且 anchors=GREEN：① 删 criteria_sourcing 的 `- ` 前缀 ② 删 read_face_pinning 的 ③ 删 negative_assertion 的 ④ 把块内一句缩进 6 空格变成 code block ⑤ 块内插空行。B10 的解药（折行免疫）被过度施用，连结构变化一并免疫了。",
+        "remedy_feasibility": "codex 提议把列表前缀纳入锁定，实测可行：`- **Criteria sourcing.**` / `- **Read-face pinning.**` / `- Every negative assertion` 三者在活树模板中各恰 1 次出现，作为起始标记不引入歧义。"
       }
     ],
     "findings_confirming": [
       "`pytest.raises(AssertionError)` 无 B19 式假绿路径：作用域内只有 `_assert_discipline_anchors` 主动抛 AssertionError，且随后检查了具体缺失短语，原因特异性足够。",
       "版本一致性：累计 diff 已同时改 CONTRACT_TEMPLATE_VERSION 并断言其为 \"7\"，无新增阻塞项。"
     ],
-    "orchestrator_note_on_B10_tension": "编排者补做了一项 codex 未涉及的实测，供 rev3 冻结时定形：把整条可操作从句当成一个锚点是**行不通的**——模板正文是折行的，`hold everything else constant, flip exactly one input` 这一串在原文里并不逐字存在（需先归一化空白），且把子句顺序做一次无害重排（`flip exactly one input while holding everything else constant`）就会让整句锚点失配、短语锚点却全部保留。所以 rev3 的极性判据**不能**靠加长锚点解决，必须换一种形式（例如禁忌反义词表 + 语义反转变异用例）。这一点须写进 rev3 brief，否则执行者极可能反踩 B10。"
+    "orchestrator_note_on_B10_tension": "编排者补做了一项 codex 未涉及的实测，供 rev3 冻结时定形：把整条可操作从句当成一个锚点是**行不通的**——模板正文是折行的，`hold everything else constant, flip exactly one input` 这一串在原文里并不逐字存在（需先归一化空白），且把子句顺序做一次无害重排（`flip exactly one input while holding everything else constant`）就会让整句锚点失配、短语锚点却全部保留。所以 rev3 的极性判据**不能**靠加长锚点解决，必须换一种形式（例如禁忌反义词表 + 语义反转变异用例）。这一点须写进 rev3 brief，否则执行者极可能反踩 B10。",
+    "history": [
+      {
+        "decision": "REWORK",
+        "requested": true,
+        "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+        "verdict": "REWORK",
+        "rev": 2,
+        "reviewed_commit": "284e223",
+        "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-verdict.raw.txt",
+        "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev.md",
+        "request_brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-brief.md",
+        "consulted_at": "2026-09-16T13:47:10Z",
+        "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字；自述 REWORK 结论来自代码结构、可静态确认。",
+        "findings": [
+          {
+            "id": "C1",
+            "claim": "存在性锚点检测不到**语义反转**。保留 `differential pair` / `flip exactly one input` / `flip with it` 三个锚点，把纪律正文改写成「do not flip exactly one input, and do not require the verdict to flip with it」，锚点测试全绿，掏空守卫也仍按预期转红（故守卫本身也通过），但纪律已表达相反规则。`read_face_pinning` 同理可用「`-revN` 后 consumer channel 不必跟随」反转。",
+            "orchestrator_adjudication": "**接受，阻塞成立。登记为 B28。**",
+            "orchestrator_verification": "两级实测。① 内存级：构造 codex 给的反转文本，`_assert_discipline_anchors` 对两条纪律**均 GREEN**，且掏空守卫的正则仍匹配、仍转红、witness 仍特异 —— 即反转文本能同时通过锚点断言与守卫断言。② 活树级：把纪律 2 正文替换为 `do not hold everything else constant, do not flip exactly one input, and do not require the red/green verdict to flip with it.`，整文件 `PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q` → **10 passed**。探针后逐字节还原，worktree clean。",
+            "why_my_accept_was_wrong": "我一审的双向探针只覆盖了「删/压缩」方向（掏空必红）与「改写周边措辞」方向（不误红），**没有覆盖「保留全部锚点但反转极性」方向**。B20 的教训我只吃了一半：我把「锚点要钉可操作子句」做到了，却没问「钉住子句在场之后，谁来钉住子句的极性」。这正是记忆 same-topic-is-not-same-extension 的形态——同一主题的下一层反例集合并未被覆盖。"
+          },
+          {
+            "id": "C2",
+            "claim": "B27 应升级为阻塞项：evisceration 正则间接锁定了整段周边措辞，只改写非锚点措辞就会让守卫因 `evisceration produced no change` 而红。fail-closed 只能证明它不静默空过，不能消除**错误拒绝**；实质上重新引入了 B10 所禁止的措辞耦合。",
+            "orchestrator_adjudication": "**接受升级为阻塞项。**",
+            "orchestrator_verification": "编排者一审已实测该形态存在（记为 B27 非阻塞）。codex 的论点补上了我漏掉的一半：我只权衡了「空过 vs 响亮失败」，没权衡「**误红**本身就是 B10 要禁的东西」。B10 的原意是「断言不得与措辞耦合」，而耦合发生在变异构造侧还是断言侧，对改写模板的人来说后果相同 —— 都是改了合法措辞却被判红。既然 C1 已要求返工，把 B27 一并收口成本极低。",
+            "prescription": "变异构造改为锚点驱动（例如「删掉包含锚点短语 X 的那个句子」），使变异构造与锚点共享同一份真值，不依赖固定句首、标点和从句边界。"
+          },
+          {
+            "id": "C3",
+            "claim": "守卫用例写活树文件，不满足并行测试隔离：`pytest -n` 下其他 worker 可能在模板处于变异态时读取它；SIGKILL / 解释器崩溃 / 恢复写入本身失败都可能留下被污染的 tracked 文件。建议完全取消 `CLAUDE_TMPL.write_text/write_bytes`，直接对内存文本调用 `_assert_discipline_anchors`。",
+            "orchestrator_adjudication": "**接受方向，但把「并行」这一条降级为次要理由。**",
+            "orchestrator_verification": "① 并行前提当前不成立：本仓未装 pytest-xdist（`import xdist` → ModuleNotFoundError），pyproject/setup.cfg/pytest.ini 均无 addopts 或 -n 配置。故 codex 举的 worker 竞态**当前无法发生**。② 但同仓另有 3 个测试文件读同一模板（test_init_contract.py / test_contract_render.py / test_wp_template_dispatch_lint.py），一旦引入 xdist 即成真隐患。③ 更强的理由是**这次写活树根本不必要**：编排者实测「纯内存变体」——不写文件、直接对 mutated 字符串调 `_assert_discipline_anchors` —— 两条纪律**都红且 witness 特异**（`flip exactly one input` / `consumer channel`），与写活树版本的判别力**完全等价**。既然等价，承担写 tracked 文件的风险就是净损失。",
+            "note": "`_template_text()` 只是 `CLAUDE_TMPL.read_text()`，不含任何额外逻辑，所以「必须经文件读取面」这个理由不成立。"
+          }
+        ],
+        "findings_confirming": [
+          "`pytest.raises(AssertionError)` 无 B19 式假绿路径：作用域内只有 `_assert_discipline_anchors` 主动抛 AssertionError，且随后检查了具体缺失短语，原因特异性足够。",
+          "版本一致性：累计 diff 已同时改 CONTRACT_TEMPLATE_VERSION 并断言其为 \"7\"，无新增阻塞项。"
+        ],
+        "orchestrator_note_on_B10_tension": "编排者补做了一项 codex 未涉及的实测，供 rev3 冻结时定形：把整条可操作从句当成一个锚点是**行不通的**——模板正文是折行的，`hold everything else constant, flip exactly one input` 这一串在原文里并不逐字存在（需先归一化空白），且把子句顺序做一次无害重排（`flip exactly one input while holding everything else constant`）就会让整句锚点失配、短语锚点却全部保留。所以 rev3 的极性判据**不能**靠加长锚点解决，必须换一种形式（例如禁忌反义词表 + 语义反转变异用例）。这一点须写进 rev3 brief，否则执行者极可能反踩 B10。"
+      }
+    ],
+    "rev3": {
+      "decision": "REWORK",
+      "requested": true,
+      "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+      "rev": 3,
+      "reviewed_commit": "aa1e43b",
+      "review_surface": "cumulative 58c7624..aa1e43b (3 files) + frozen rev3 brief + rev2->rev3 delta",
+      "consulted_at": "2026-09-17",
+      "independence": {
+        "rating": "strong",
+        "basis": "engine-observed models differ: consultant=gpt-5.6-sol (kirogpt) vs reviewer=claude-opus-5 (kiroopus)",
+        "note": "未经 agentic_loop.gate 路径 —— gate 要求 review.attestation，其 fresh_session=true 在本长会话中会是假声明，编排者拒绝伪造。改走历史一致的直接调用路径（与 WP-22/24/27 各轮相同），CodexAdapter 由 resolve_role_binding('consultant') 绑定，判定逐字转录。"
+      },
+      "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult3/wp25-verdict-rev3.raw.txt",
+      "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev3.md",
+      "disclosed_limitation": "沙箱只读、未读仓库其他文件、未自行跑测试；测试数字采用 brief 中编排者实测值。两条修法自述「未实测」。",
+      "findings": [
+        {
+          "id": "D1",
+          "claim": "块定位不是唯一定位：_cut_discipline_block 用 text.index(start) 取首个出现点，未断言边界标记唯一。在真实纪律前插入一份完好的冻结正文作 decoy，再反转真实纪律，逐字锁读到 decoy 而保持 GREEN，DISCIPLINE_ANCHORS 也 GREEN。这推翻了 rev3 的核心保证「给反转开绿灯必须改测试里的冻结常量」。",
+          "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证，非采信转述。** 实测：取 criteria_sourcing 块，把真实块的 `may only` 改为 `may also`（极性反转），并在其前插入 `- ` + 原块 + 其 end marker 作为 decoy。结果 `_assert_discipline_verbatim` **GREEN**、`_assert_discipline_anchors` **GREEN**，而攻击后模板里真实纪律确实写着 `may also`。这正是 rev3 要防的形状，逃逸成立。",
+          "reachability": "当前活树三对边界标记各恰 1 次出现（criteria start/end=1/1、read_face=1/1、negative=1/1），三块区间 [2885,3288)/[3290,3820)/[4232,4629) 有序不重叠 —— 即当前模板未被此攻击命中。但唯一性未被编码成不变量，未来重复标题或复制纪律段即静默漂移。"
+        },
+        {
+          "id": "D2",
+          "claim": "起始标记排除了 Markdown 列表前缀 `- `，而 _normalize 用 ' '.join(text.split()) 抹除全部空白结构。故删除 `- **Criteria sourcing.**` 等的 `- ` 前缀、或插空行、或把部分规则缩进成 code block，逐字锁仍 GREEN —— 这些不是纯折行，而是协议渲染结构的变化。",
+          "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证。** 实测四种形状全部 verbatim=GREEN 且 anchors=GREEN：① 删 criteria_sourcing 的 `- ` 前缀 ② 删 read_face_pinning 的 ③ 删 negative_assertion 的 ④ 把块内一句缩进 6 空格变成 code block ⑤ 块内插空行。B10 的解药（折行免疫）被过度施用，连结构变化一并免疫了。",
+          "remedy_feasibility": "codex 提议把列表前缀纳入锁定，实测可行：`- **Criteria sourcing.**` / `- **Read-face pinning.**` / `- Every negative assertion` 三者在活树模板中各恰 1 次出现，作为起始标记不引入歧义。"
+        }
+      ],
+      "non_blocking_agreements": [
+        "三个切割区间确实覆盖承载极性的正文（may only / Never / must / cannot / require），三类极性变异在无重复标记的当前文本上转红。",
+        "冻结长度 392/386/515 的对应关系已由编排者实测校正：criteria=392、negative=386、read_face=515（codex 的「按 criteria/negative/read-face 顺序理解」正确）。",
+        "rev2 锚点基线断言被逐字等价蕴含，但 B20 变异用例仍单独证明旧锚点层可承载，属 brief 明确要求保留的分层回归证据，不构成阻塞（与编排者 rev3 复核结论一致）。",
+        "变异均作用于一次读取后传入判据的同一字符串，无活树写入；普通路径未发现新的读取面分离（无 B29 同族缺口）。"
+      ]
+    },
+    "independence": "strong",
+    "independence_basis": "engine-observed models differ: consultant=gpt-5.6-sol (kirogpt) vs reviewer=claude-opus-5 (kiroopus)"
   },
   "timestamps": {
     "created_at": "2026-09-16T00:00:00Z",
@@ -432,6 +522,7 @@
     "ready_for_review_at": "2026-09-16T11:40:00Z",
     "changes_requested_at": "2026-09-16T11:55:00Z",
     "refrozen_at": "2026-09-16T23:50:00Z",
-    "reviewed_at": "2026-09-17T01:40:00Z"
+    "reviewed_at": "2026-09-17T01:40:00Z",
+    "changes_requested_rev3_at": "2026-09-17"
   }
 }
