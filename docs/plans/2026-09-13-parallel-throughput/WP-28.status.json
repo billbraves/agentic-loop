@@ -8,7 +8,24 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
+    "dispatch_prompt_sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca",
+    "dispatch_command": "cd /Users/admin/vibe/wp28-norms-into-template && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md)\"",
+    "dispatch_rev": 1,
+    "dispatch_base_commit": "7a30f50",
+    "dispatch_blocked": {
+      "reason": "派发被本会话的 auto mode classifier 拦下（Reason: [Create Unsafe Agents]），连 liveness 探针（kimi -p 'Reply with exactly: PROBE_OK'）都未获准执行。",
+      "blocked_at": "2026-09-17T20:20:00Z",
+      "not_a_wp_defect": "与 brief、status、门禁均无关：PREFLIGHT_PASS 已取得，锁已持有，brief 过活树 dispatch_lint。纯粹是本会话的工具权限边界。",
+      "orchestrator_did_not_work_around": "未尝试绕过（不改写命令形态、不换工具伪装、不自行代做执行者的实现工作）。三权分立要求编排者不兼任执行者：即便我能写这三个文件，也不应由我写。",
+      "unblock_options": [
+        "用户在本会话直接放行该 Bash 动作（settings 加 Bash 权限规则），编排者随即按 dispatch_command 派发",
+        "用户自行在终端执行 dispatch_command（工作树与 prompt 均已就绪），编排者接管监控与验收",
+        "用户指定改用其他已获准的执行者工具，编排者据此重写 dispatch_command 与 prompt 后再派发"
+      ],
+      "ready_state": "工作树 /Users/admin/vibe/wp28-norms-into-template 干净、HEAD=7a30f50；prompt 已落盘并记 sha256；WP 锁 owner=claude-53c58ab0 已持有；PREFLIGHT_PASS。"
+    }
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -20,7 +37,7 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "334fe60",
+    "base_commit": "7a30f50",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
     "commit": ""
@@ -84,7 +101,8 @@
       "result": "4 failed, 608 passed, 4 skipped",
       "targeted": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 7 passed",
       "known_failures": "tests/test_finalize_merge_triple_sign.py 的 4 条是既有环境失败（本机 git init.defaultBranch=master 与 fixture 的 git checkout main 冲突），不要修",
-      "measured_by": "orchestrator (claude) 本人实测，非转录执行者自报"
+      "measured_by": "orchestrator (claude) 本人实测，非转录执行者自报",
+      "note": "基线测于 334fe60（冻结提交 7a30f50 的父）；7a30f50 只新增 docs/plans/ 下的冻结产物，不含任何 src/ 或 tests/ 改动，故测试数字对 base_commit 同样成立。"
     },
     "orchestrator_feasibility_probe": {
       "note": "冻结前先实测判据本身可实施（记忆 verify-the-remedy-not-just-the-finding），不把未验证的判据写进 brief。",
@@ -93,8 +111,10 @@
       "lint_cannot_cover": "现行模板（未加两条）也过 dispatch_lint rc=0，故 lint 管不到新条目，判据必须落在 pytest 侧——此结论已写进 brief §F 与 forbidden_paths 理由",
       "self_caught_escape": "判据原型初版的冻结常量未含「冻结前必须停手」，致 S3 极性变异「必须→可以」全绿。按组成步骤生成变异集当场抓出，已补入常量后复测全红。这是本 WP 要落成的第 4 项规则在其自身上的实证。",
       "marker_uniqueness": "两块标题与 6 条候选冻结常量在候选模板中各恰 1 次出现，标记不引入歧义",
-      "contract_version_decision": "CONTRACT_TEMPLATE_VERSION 保持 \"6\" 不 bump：WORK_PACKAGE.md.tmpl 是 init_cmd._REFERENCE_TEMPLATES 的 reference skeleton，grep -c '$' = 0 个占位符，不在 contract_render 渲染目标（AGENTS/CLAUDE/OPERATING_MODEL 三份）内"
-    }
+      "contract_version_decision": "CONTRACT_TEMPLATE_VERSION 保持 \"6\" 不 bump：WORK_PACKAGE.md.tmpl 是 init_cmd._REFERENCE_TEMPLATES 的 reference skeleton，grep -c '$' = 0 个占位符，不在 contract_render 渲染目标（AGENTS/CLAUDE/OPERATING_MODEL 三份）内",
+      "worktree_note": "工作树建于 334fe60 后，编排者误发一次 `git merge origin/HEAD`，把无关分支 2026-09-14-codex-verdict-contract 的内容合了进来；当时分支上零工作产出、被合内容全部可从 main 抵达，已 reset --hard 到冻结提交 7a30f50，工作树干净。执行者看到的起点是干净的 7a30f50。"
+    },
+    "preflight": "PREFLIGHT_PASS branch=feature/wp28-norms-into-template state=APPROVED worktree=/Users/admin/vibe/wp28-norms-into-template（自工作树内以主仓绝对路径调用）"
   },
   "review": {
     "decision": null
@@ -103,6 +123,7 @@
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
-    "dispatched_at": ""
+    "dispatched_at": "",
+    "dispatch_blocked_at": "2026-09-17T20:20:00Z"
   }
 }
