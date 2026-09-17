@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import base64
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -25,7 +26,7 @@ from agentic_loop.adapters.codex import CodexAdapter
 from agentic_loop.provider_binding import ProviderBinding
 
 # fake 可执行文件：按调用次序读取 behavior-N.json，记录 argv/stdin 到
-# FAKE_RECORD_DIR，answer_mode 控制 answer 文件：write / empty / omit。
+# FAKE_RECORD_DIR，并模拟 Codex --json + -o 的双通道协议。
 _FAKE_SRC = r'''
 import json
 import os
@@ -47,6 +48,15 @@ with open(os.path.join(record, f"argv-{n}.json"), "w", encoding="utf-8") as f:
 stdin = sys.stdin.read()
 with open(os.path.join(record, f"prompt-{n}.md"), "w", encoding="utf-8") as f:
     f.write(stdin)
+with open(os.path.join(record, f"cwd-{n}.txt"), "w", encoding="utf-8") as f:
+    f.write(os.getcwd())
+for name in ("work-package-brief.md", "candidate.diff"):
+    path = os.path.join(os.getcwd(), name)
+    if os.path.isfile(path):
+        with open(path, "rb") as src, open(
+            os.path.join(record, f"{name}-{n}.bin"), "wb"
+        ) as dst:
+            dst.write(src.read())
 
 out_path = None
 if "-o" in argv:
@@ -56,15 +66,33 @@ with open(os.path.join(record, f"behavior-{n}.json"), encoding="utf-8") as f:
     beh = json.load(f)
 
 mode = beh.get("answer_mode", "write")
+data = beh.get("answer", "")
+if mode == "empty":
+    data = ""
 if out_path and mode != "omit":
-    data = beh.get("answer", "")
-    if mode == "empty":
-        data = ""
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(data)
 
-if beh.get("stdout"):
-    sys.stdout.write(beh["stdout"])
+if "stdout_raw" in beh:
+    sys.stdout.write(beh["stdout_raw"])
+else:
+    thread_id = beh.get("thread_id", "00000000-0000-0000-0000-000000000001")
+    events = beh.get("events")
+    if events is None:
+        events = [
+            {"type": "thread.started", "thread_id": thread_id},
+            {"type": "turn.started"},
+        ]
+        event_answer = beh.get("event_answer", data)
+        if event_answer or beh.get("emit_empty_message"):
+            events.append({
+                "type": "item.completed",
+                "item": {"id": "item-final", "type": "agent_message", "text": event_answer},
+            })
+        if not beh.get("omit_turn_completed"):
+            events.append({"type": beh.get("turn_event", "turn.completed")})
+    for event in events:
+        sys.stdout.write(json.dumps(event) + "\n")
 if beh.get("stderr"):
     sys.stderr.write(beh["stderr"])
 sys.exit(beh.get("rc", 0))
@@ -148,8 +176,16 @@ def read_argv(record: Path, n: int) -> list:
     return json.loads((record / f"argv-{n}.json").read_text(encoding="utf-8"))
 
 
+def _has_pair(argv: list[str], first: str, second: str) -> bool:
+    return any(a == first and b == second for a, b in zip(argv, argv[1:]))
+
+
 def read_prompt(record: Path, n: int) -> str:
     return (record / f"prompt-{n}.md").read_text(encoding="utf-8")
+
+
+def read_cwd(record: Path, n: int) -> Path:
+    return Path((record / f"cwd-{n}.txt").read_text(encoding="utf-8"))
 
 
 _BLOCK_END = CodexAdapter._NORMALIZATION_BLOCK_END
@@ -179,33 +215,54 @@ def test_valid_first_json_single_invocation(fake_codex):
     assert invocation_count(record) == 1
 
 
-# ---- 2. 首次 answer 文件与 stdout 均空：恰好一次完整重试 --------------------
+# ---- 2. 首次原生终态为空：同 thread 恰好一次 tool-free 收尾 ------------------
 
 
 @pytest.mark.parametrize("answer_mode", ["omit", "empty"])
-def test_empty_first_gets_exactly_one_full_retry(fake_codex, answer_mode):
+def test_empty_first_gets_exactly_one_same_thread_finalization(fake_codex, answer_mode):
     adapter, record, set_behavior = fake_codex
-    set_behavior(1, answer_mode=answer_mode, stdout="")
-    set_behavior(2, answer=verdict_json("ACCEPT"))
+    thread_id = "11111111-1111-1111-1111-111111111111"
+    set_behavior(1, answer_mode=answer_mode, thread_id=thread_id)
+    set_behavior(2, answer=verdict_json("ACCEPT"), thread_id=thread_id)
 
     v = run_review(adapter)
 
     assert v.decision == "ACCEPT"
     assert invocation_count(record) == 2
-    # 完整重试：原 brief+diff review + JSON-only 后缀。
-    retry_prompt = read_prompt(record, 2)
-    assert BRIEF in retry_prompt
-    assert "wp16 diff body" in retry_prompt
-    assert "exactly one JSON object" in retry_prompt
+    argv2 = read_argv(record, 2)
+    assert argv2[:2] == ["exec", "resume"]
+    assert thread_id in argv2
+    assert _has_pair(argv2, "--disable", "shell_tool")
+    assert _has_pair(argv2, "--disable", "unified_exec")
+    assert _has_pair(argv2, "--disable", "multi_agent")
+    assert _has_pair(argv2, "--disable", "multi_agent_v2")
+    assert _has_pair(argv2, "-c", "agents.enabled=false")
+    final_prompt = read_prompt(record, 2)
+    assert "FINALIZATION for the review you just completed" in final_prompt
+    assert "Do not use tools" in final_prompt
+    assert '"decision"' in final_prompt
+    # The finalization step must demand a verdict on the merits. The former
+    # "if this session did not reach a decision, return CONSULT" escape hatch is
+    # what produced a CONSULT for an already-completed review (measured A/B:
+    # same thread prefix, control=CONSULT vs revised=REWORK), so it must be gone.
+    assert "decision on the merits is" in final_prompt
+    assert "If this session did not reach" not in final_prompt
+    # The two legitimate fail-closed CONSULT paths must survive the tightening.
+    assert "genuine architectural or semantic question" in final_prompt
+    assert "could not read or verify" in final_prompt
+    assert BRIEF not in final_prompt
+    assert "wp16 diff body" not in final_prompt
+    assert not (record / "work-package-brief.md-2.bin").exists()
+    assert not (record / "candidate.diff-2.bin").exists()
 
 
-def test_empty_first_with_valid_stdout_no_retry(fake_codex):
+def test_missing_artifact_with_event_message_fails_protocol(fake_codex):
     adapter, record, set_behavior = fake_codex
-    set_behavior(1, answer_mode="omit", stdout=verdict_json("CONSULT"))
+    set_behavior(1, answer_mode="omit", event_answer=verdict_json("CONSULT"))
 
-    v = run_review(adapter)
+    with pytest.raises(RuntimeError, match="artifact/event missing"):
+        run_review(adapter)
 
-    assert v.decision == "CONSULT"
     assert invocation_count(record) == 1
 
 
@@ -234,10 +291,12 @@ def test_free_text_first_triggers_structure_only_normalization(fake_codex):
     assert "do NOT re-review" in norm_prompt
     assert "NOT change the decision, rationale, or findings" in norm_prompt
     assert "exactly one JSON object" in norm_prompt
-    # 不含原 diff / brief（structure-only）。
+    # 不含原 diff / brief（structure-only），且第二次调用 cwd 内已删除审查文件。
     assert BRIEF not in norm_prompt
     assert "wp16 diff body" not in norm_prompt
     assert "diff --git" not in norm_prompt
+    assert not (record / "work-package-brief.md-2.bin").exists()
+    assert not (record / "candidate.diff-2.bin").exists()
 
 
 # ---- 3b. 对抗 payload：终止符逃逸 / 伪造 ACCEPT 指令 / 密钥泄漏 --------------
@@ -344,14 +403,14 @@ def test_first_nonzero_no_retry_and_secret_redacted(fake_codex):
 
 
 def _second_attempt_fail_cases():
-    malformed = '{"decision": "ACCEPT", '  # 截断 JSON，连 regex 提取也失败
+    malformed = '{"decision": "ACCEPT", '
     return [
         pytest.param({"rc": 1, "stderr": "boom"}, id="second-nonzero"),
-        pytest.param({"answer_mode": "omit", "stdout": ""}, id="second-empty"),
+        pytest.param({"answer_mode": "omit"}, id="second-empty"),
         pytest.param({"answer": "not json at all"}, id="second-malformed"),
         pytest.param({"answer": malformed}, id="second-truncated-json"),
         pytest.param(
-            {"answer": json.dumps({"decision": "MAYBE"})},
+            {"answer": json.dumps({"decision": "MAYBE", "rationale": "x", "findings": []})},
             id="second-invalid-decision",
         ),
         pytest.param(
@@ -366,9 +425,9 @@ def _second_attempt_fail_cases():
 
 
 @pytest.mark.parametrize("beh2", _second_attempt_fail_cases())
-def test_full_retry_second_failure_fails_closed(fake_codex, beh2):
+def test_same_thread_finalization_second_failure_fails_closed(fake_codex, beh2):
     adapter, record, set_behavior = fake_codex
-    set_behavior(1, answer_mode="omit", stdout="")
+    set_behavior(1, answer_mode="omit")
     set_behavior(2, **beh2)
 
     with pytest.raises((RuntimeError, ValueError)):
@@ -409,10 +468,10 @@ def test_oversized_first_output_fails_closed_once_without_leak(fake_codex):
     assert invocation_count(record) == 1  # 超限不重试、不归一化
 
 
-# ---- 8. 每次调用 distinct -o，provider/sandbox/schema/effort 完全一致 ------
+# ---- 8. 两阶段 distinct -o，共享 provider/schema/effort 与安全边界 ----------
 
 
-def test_distinct_answer_files_and_command_parity(fake_codex):
+def test_distinct_answer_files_and_stage_security_contract(fake_codex):
     adapter, record, set_behavior = fake_codex
     set_behavior(1, answer="free text, not json")
     set_behavior(2, answer=verdict_json("ACCEPT"))
@@ -427,40 +486,71 @@ def test_distinct_answer_files_and_command_parity(fake_codex):
     assert out1 != out2
     assert "answer-1" in out1 and "answer-2" in out2
 
-    # 除 -o 路径外，两条命令逐参数一致（同一 provider/sandbox/schema/effort）。
-    stripped1 = [a for a in argv1 if a != out1]
-    stripped2 = [a for a in argv2 if a != out2]
-    assert stripped1 == stripped2
-    joined = " ".join(argv1)
-    assert "--sandbox read-only" in joined
-    assert "--skip-git-repo-check" in joined
-    assert "model_reasoning_effort=high" in joined
-    assert "--output-schema" in argv1
-    assert "model_provider=deepseek" in joined
-    assert "model_providers.deepseek.env_key=DEEPSEEK_API_KEY" in joined
-    assert CANARY not in joined  # key never in argv
+    for argv in (argv1, argv2):
+        joined = " ".join(argv)
+        assert "--ignore-user-config" in argv
+        assert "--skip-git-repo-check" in joined
+        assert "model_reasoning_effort=high" in joined
+        assert "--output-schema" in argv
+        assert "--json" in argv
+        assert "model_provider=deepseek" in joined
+        assert "model_providers.deepseek.env_key=DEEPSEEK_API_KEY" in joined
+        assert _has_pair(argv, "-c", "agents.enabled=false")
+        assert _has_pair(argv, "--disable", "multi_agent")
+        assert _has_pair(argv, "--disable", "multi_agent_v2")
+        assert CANARY not in joined
+    assert "--sandbox read-only" in " ".join(argv1)
+    assert _has_pair(argv2, "--disable", "shell_tool")
+    assert _has_pair(argv2, "--disable", "unified_exec")
+
+    first_prompt = read_prompt(record, 1)
+    assert BRIEF not in first_prompt
+    assert "wp16 diff body" not in first_prompt
+    assert "work-package-brief.md" in first_prompt
+    assert "candidate.diff" in first_prompt
+    assert hashlib.sha256(BRIEF.encode("utf-8")).hexdigest() in first_prompt
+    assert hashlib.sha256(DIFF.encode("utf-8")).hexdigest() in first_prompt
+    assert (record / "work-package-brief.md-1.bin").read_bytes() == BRIEF.encode()
+    assert (record / "candidate.diff-1.bin").read_bytes() == DIFF.encode()
+
+    cwd1 = read_cwd(record, 1)
+    cwd2 = read_cwd(record, 2)
+    assert cwd1 == cwd2
+    assert cwd1 != Path.cwd()
+    assert Path(out1).parent.resolve() == cwd1.resolve()
+    assert Path(out2).parent.resolve() == cwd1.resolve()
+    schema = Path(argv1[argv1.index("--output-schema") + 1])
+    assert schema.parent.resolve() == cwd1.resolve()
 
 
-# ---- 8b. 输出来源语义：answer 文件优先 / 空白回退 stdout / 防陈旧复用 -------
+# ---- 8b. 输出来源：artifact/event 一致，禁止单边、污染或陈旧兜底 ------------
 
 
-def test_answer_file_takes_precedence_over_conflicting_stdout(fake_codex):
+def test_artifact_event_conflict_fails_closed(fake_codex):
     adapter, record, set_behavior = fake_codex
-    set_behavior(1, answer=verdict_json("ACCEPT"), stdout=verdict_json("REWORK"))
+    set_behavior(1, answer=verdict_json("ACCEPT"), event_answer=verdict_json("REWORK"))
 
-    v = run_review(adapter)
-
-    assert v.decision == "ACCEPT"  # answer 文件胜出，stdout 仅作兜底
+    with pytest.raises(RuntimeError, match="artifact/event differ"):
+        run_review(adapter)
     assert invocation_count(record) == 1
 
 
-def test_whitespace_answer_file_falls_back_to_stdout(fake_codex):
+def test_artifact_without_event_message_fails_closed(fake_codex):
     adapter, record, set_behavior = fake_codex
-    set_behavior(1, answer="  \n\t \n", stdout=verdict_json("CONSULT"))
+    set_behavior(1, answer=verdict_json("CONSULT"), event_answer="")
 
-    v = run_review(adapter)
+    with pytest.raises(RuntimeError, match="artifact/event missing"):
+        run_review(adapter)
+    assert invocation_count(record) == 1
 
-    assert v.decision == "CONSULT"
+
+def test_non_jsonl_stdout_invalidates_output_channel(fake_codex):
+    adapter, record, set_behavior = fake_codex
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer=answer, stdout_raw=answer)
+
+    with pytest.raises(RuntimeError, match="thread not unique"):
+        run_review(adapter)
     assert invocation_count(record) == 1
 
 
@@ -478,6 +568,166 @@ def test_distinct_answer_files_prevent_stale_first_output(fake_codex):
     argv1 = read_argv(record, 1)
     argv2 = read_argv(record, 2)
     assert argv1[argv1.index("-o") + 1] != argv2[argv2.index("-o") + 1]
+
+
+def test_turn_must_be_uniquely_completed(fake_codex):
+    adapter, record, set_behavior = fake_codex
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer=answer, turn_event="turn.failed")
+
+    with pytest.raises(RuntimeError, match="invalid turn lifecycle"):
+        run_review(adapter)
+    assert invocation_count(record) == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "```json\n" + verdict_json("ACCEPT") + "\n```",
+        verdict_json("ACCEPT") + " trailing",
+        json.dumps({"decision": "ACCEPT", "rationale": "x"}),
+        json.dumps({"decision": "ACCEPT", "rationale": "x", "findings": [], "extra": 1}),
+        json.dumps({"decision": "ACCEPT", "rationale": 1, "findings": []}),
+        json.dumps({"decision": "ACCEPT", "rationale": "x", "findings": [1]}),
+    ],
+)
+def test_strict_parser_rejects_non_schema_outputs(raw):
+    with pytest.raises(ValueError):
+        CodexAdapter._parse_verdict(raw)
+
+
+def _message_event(answer: str) -> dict:
+    return {
+        "type": "item.completed",
+        "item": {"id": "item-final", "type": "agent_message", "text": answer},
+    }
+
+
+@pytest.mark.parametrize(
+    "events,match",
+    [
+        (
+            [
+                {"type": "thread.started", "thread_id": "00000000-0000-0000-0000-000000000001"},
+                {"type": "turn.started"},
+                {"type": "turn.completed"},
+                _message_event(verdict_json("ACCEPT")),
+            ],
+            "invalid turn lifecycle",
+        ),
+        (
+            [
+                {"type": "thread.started", "thread_id": "00000000-0000-0000-0000-000000000001"},
+                {"type": "turn.started"},
+                _message_event(verdict_json("ACCEPT")),
+                {"type": "turn.completed"},
+                {"type": "error", "message": "late"},
+            ],
+            "invalid turn lifecycle",
+        ),
+        (
+            [
+                {"type": "thread.started", "thread_id": "00000000-0000-0000-0000-000000000001"},
+                {"type": "turn.started"},
+                {"type": "turn.started"},
+                _message_event(verdict_json("ACCEPT")),
+                {"type": "turn.completed"},
+            ],
+            "invalid turn lifecycle",
+        ),
+        (
+            [
+                {"type": "turn.started"},
+                _message_event(verdict_json("ACCEPT")),
+                {"type": "turn.completed"},
+            ],
+            "thread not unique",
+        ),
+    ],
+)
+def test_event_state_machine_rejects_malformed_lifecycle(fake_codex, events, match):
+    adapter, record, set_behavior = fake_codex
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer=answer, events=events)
+
+    with pytest.raises(RuntimeError, match=match):
+        run_review(adapter)
+    assert invocation_count(record) == 1
+
+
+@pytest.mark.parametrize("thread_id", ["--last", "-", "not-a-uuid", " 00000000-0000-0000-0000-000000000001"])
+def test_empty_final_rejects_noncanonical_thread_id(fake_codex, thread_id):
+    adapter, record, set_behavior = fake_codex
+    set_behavior(1, answer_mode="omit", thread_id=thread_id)
+
+    with pytest.raises(RuntimeError, match="invalid thread id"):
+        run_review(adapter)
+    assert invocation_count(record) == 1
+
+
+def test_resume_response_must_match_requested_thread(fake_codex):
+    adapter, record, set_behavior = fake_codex
+    set_behavior(1, answer_mode="omit", thread_id="11111111-1111-1111-1111-111111111111")
+    set_behavior(2, answer=verdict_json("ACCEPT"), thread_id="22222222-2222-2222-2222-222222222222")
+
+    with pytest.raises(RuntimeError, match="resumed wrong thread"):
+        run_review(adapter)
+    assert invocation_count(record) == 2
+
+
+def test_tool_free_finalization_allows_reasoning_item(fake_codex):
+    adapter, record, set_behavior = fake_codex
+    thread_id = "11111111-1111-1111-1111-111111111111"
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer_mode="omit", thread_id=thread_id)
+    set_behavior(
+        2,
+        answer=answer,
+        events=[
+            {"type": "thread.started", "thread_id": thread_id},
+            {"type": "turn.started"},
+            {"type": "item.completed", "item": {"id": "thought", "type": "reasoning", "text": ""}},
+            _message_event(answer),
+            {"type": "turn.completed"},
+        ],
+    )
+
+    assert run_review(adapter).decision == "ACCEPT"
+    assert invocation_count(record) == 2
+
+
+def test_tool_free_finalization_rejects_any_tool_or_unknown_item(fake_codex):
+    adapter, record, set_behavior = fake_codex
+    thread_id = "11111111-1111-1111-1111-111111111111"
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer_mode="omit", thread_id=thread_id)
+    set_behavior(
+        2,
+        answer=answer,
+        events=[
+            {"type": "thread.started", "thread_id": thread_id},
+            {"type": "turn.started"},
+            {"type": "item.completed", "item": {"id": "tool", "type": "command_execution", "command": "true"}},
+            _message_event(answer),
+            {"type": "turn.completed"},
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="tool or unknown item"):
+        run_review(adapter)
+    assert invocation_count(record) == 2
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"decision":"REWORK","decision":"ACCEPT","rationale":"x","findings":[]}',
+        '{"decision":"ACCEPT","rationale":"x","findings":[],"findings":["hidden"]}',
+    ],
+)
+def test_strict_parser_rejects_duplicate_keys(raw):
+    with pytest.raises(ValueError, match="duplicate keys"):
+        CodexAdapter._parse_verdict(raw)
 
 
 # ---- 9. 结构性 killer：不得用自然语言文本比较/短语映射推导决策 --------------
@@ -500,8 +750,7 @@ def test_no_phrase_to_decision_mapping_introduced():
     for snippet in ('"APPROVE"', '"PASS"', '"LGTM"', '"APPROVED"'):
         assert snippet not in src
 
-    # 结构性不变量 1：正则模式常量只允许是既有的 JSON 提取 r"\{.*\}"；
-    # 不得新增针对自然语言的 regex（phrase matching）。
+    # 结构性不变量 1：不得用任何 regex 从自由文本提取或推断 JSON/decision。
     regex_patterns = set()
     for node in ast.walk(tree):
         if (
@@ -514,7 +763,7 @@ def test_no_phrase_to_decision_mapping_introduced():
             and isinstance(node.args[0].value, str)
         ):
             regex_patterns.add(node.args[0].value)
-    assert regex_patterns == {r"\{.*\}"}
+    assert regex_patterns == set()
 
     # 结构性不变量 2：不得存在 phrase -> decision 的映射 dict。
     for node in ast.walk(tree):
