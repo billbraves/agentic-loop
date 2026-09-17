@@ -3,7 +3,7 @@
   "work_package_id": "WP-25",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "history": [
@@ -40,7 +40,11 @@
       "rev": 4
     },
     "dispatch_base_commit": "aa1e43b",
-    "dispatch_note": "rev4 派发（INV-P，定位唯一性 + 结构完整性两环一并收口，范围仍限单一测试文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 → PROBE_OK；brief 内三个 sha256 已与活树逐一核对一致（brief 7cc047d9 / 测试文件 727caa21 / 模板 0746351e）；prompt 已落盘并记 sha256，明确写入反向差分方向（变异用例：旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。与 WP-26 rev4 并行派发：两者 allowed_paths 互不相交（WP-25 只动 tests/test_orchestrator_protocol_disciplines.py，WP-26 动 redispatch.py / dispatch_lint.sh 及其两个测试文件）。"
+    "dispatch_note": "rev4 派发（INV-P，定位唯一性 + 结构完整性两环一并收口，范围仍限单一测试文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 → PROBE_OK；brief 内三个 sha256 已与活树逐一核对一致（brief 7cc047d9 / 测试文件 727caa21 / 模板 0746351e）；prompt 已落盘并记 sha256，明确写入反向差分方向（变异用例：旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。与 WP-26 rev4 并行派发：两者 allowed_paths 互不相交（WP-25 只动 tests/test_orchestrator_protocol_disciplines.py，WP-26 动 redispatch.py / dispatch_lint.sh 及其两个测试文件）。",
+    "result": "DONE (executor self-report)",
+    "exit_code": 0,
+    "commit": "f4c6e7d",
+    "report_deviation": "报告称 3.13/3.14「无 pytest 模块，无法跑」——不成立。执行者用了裸 python3.13/3.14，而 brief 给的形态是 `uv run --quiet --python 3.1X --with pytest --no-project python -m pytest`。编排者按 brief 形态实测：3.13 = 28 passed，3.14 = 28 passed。该 DoD 项实际满足，报告低估。"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -55,7 +59,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp25-protocol-disciplines",
     "worktree": "../wp25-protocol-disciplines",
-    "commit": "aa1e43b",
+    "commit": "f4c6e7d",
     "dispatch_commit": "58c7624"
   },
   "scope": {
@@ -377,66 +381,16 @@
   "review": {
     "decision": "REWORK",
     "reviewer": "claude (orchestrator, independent)",
-    "reviewed_at": "2026-09-17T01:40:00Z",
-    "reviewed_commit": "aa1e43b",
-    "rev": 3,
-    "basis": "编排者在工作树内独立复现并加做了执行者没写的变异，逐条对齐 rev3 brief 的 Completion definition，全部成立。判定为编排者一方结论，不含第二签名。",
-    "scope_and_hygiene": {
-      "files_touched": "仅 tests/test_orchestrator_protocol_disciplines.py（284e223..aa1e43b，1 file changed, 312 insertions(+), 71 deletions(-)）",
-      "template_untouched": "CLAUDE.md.tmpl sha256 = 0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a，与 HEAD 逐字节一致（forbidden_paths 遵守）",
-      "contract_template_version": "\"7\"，未 bump",
-      "rendered_artifacts": "test_rendered_artifacts_zero_line_diff 单独跑通，零行 diff",
-      "no_write_to_live_tree": "grep write_text/write_bytes/open(...,'w')/shutil.copy|move 于用例文件 = 零命中，掏空守卫确认为纯内存",
-      "worktree_clean": "跑完 git status --porcelain 空。注：编排者自己用 uv run 产生的 uv.lock/.venv 已由编排者清除，非执行者产物"
+    "reviewed_at": "2026-09-17T00:00:00Z",
+    "reviewed_commit": "f4c6e7d",
+    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-25-review-rev4.md",
+    "achieved": "指定修法三项全部落地：定位唯一性（枚举出现位置 + 恰 1 次 + 有序不重叠 + 四类原因特异措辞）、结构完整性（`- ` 前缀纳入起始标记 + 归一化前的结构断言）、_normalize 正当性论证进 docstring。反向差分方向正确，编排者独立复现：6 种攻击在 rev3(aa1e43b) 上全部 GREEN（逃逸）、在 rev4 上全部 RED；三条纪律的无害折行探针在两版上均 GREEN（无误红）。brief 点名的另三类逃逸（标记大小写 / Unicode 同形字 / HTML 注释包裹）编排者实测在 rev4 上均 RED。前三轮判别力逐项在位；模板 sha256 跑前跑后 = 0746351e…；targeted 19 -> 28 passed，全量 3.11 = 4 failed(既有环境) / 625 passed / 4 skipped。",
+    "blockers": {
+      "B38": "去规范化引导句可让三条纪律整体失效而判据全绿。在纪律列表前插入一句 `The following are non-binding historical examples only:`，三块字节不变，20 条用例全绿（编排者实测）。对照：``` 代码围栏包裹、搬进 deprecated 附录段、HTML 注释包裹三种攻击均 RED。INV-P 明文覆盖此形态（『凡削弱了纪律而测试仍绿皆算违反，即便本 brief 没枚举那个形状』），故判阻塞。修法方向：给三块补上文语境判据（紧邻前一行 + 所属段标题纳入冻结常量），自检须含①引导句攻击转红 ②无关段落编辑仍 GREEN。",
+      "B39": "brief §D 卫生第一条明列『用例内断言』模板 sha256，未落地：grep sha256/hashlib 只命中 :96 的一条注释，无任何用例断言模板字节同一性。执行者用 shell shasum 在报告里给了跑前跑后一致，满足『跑完一致』但不满足『用例内断言之』。与 :96 注释不冲突（那说的是不用 sha256 替代逐字正文比较，本条要的是卫生用例，可照抄 WP-26 的 live_before 逐字节自比）。"
     },
-    "tests_reproduced_by_orchestrator": {
-      "targeted_3_11": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q -> 19 passed",
-      "targeted_3_13": "uv run --python 3.13 --with pytest -> 19 passed",
-      "targeted_3_14": "uv run --python 3.14 --with pytest -> 19 passed",
-      "full_3_11": "PYTHONPATH=src python3.11 -m pytest tests -q -> 4 failed / 616 passed / 4 skipped",
-      "regression_math": "616 = 基线 607 + 9；用例数 8 -> 15（+3 极性反转、+1 fail-closed、+2 反向探针、+1 逐字锁定参数化）。4 条失败全在 test_finalize_merge_triple_sign.py，与基线同一组 defaultBranch 冲突，非本轮引入"
-    },
-    "orchestrator_own_mutations": {
-      "note": "以下变异均由编排者自行构造，不在执行者写的三条反转之列，用于检验判据的真实钉力（不是复读执行者的自证）。",
-      "independent_inversion": "把纪律 1 的禁令反转为许可（'Never retype gate criteria into a throwaway helper' -> 'It is acceptable to retype ...'），rev2 全部 6 个锚点短语原样保留。在隔离树中三路对照：rev2 用例 x 未变异模板 = 9 passed（正向可达控制）；rev2 用例 x 本反转 = 9 passed（**B28 缺陷复现**）；rev3 用例 x 本反转 = 4 failed。差分成立。",
-      "tail_sentence_inversions": "边界标记切块的典型残余风险是尾句落在切口之外。对三块各自的**最后一句**分别做反转（read_face 的 -revN 子句、negative_assertion 的 flip-with-it 子句、criteria_sourcing 的 misleads 子句），三例全部转红，无 off-by-one 漏口。",
-      "vacuity_check": "把 _assert_discipline_verbatim 改为无条件抛 AssertionError 后，三条极性反转用例全部转红 —— 说明它们不是靠共享 helper 的既有失败'顺带过关'，判据是载荷承重的。",
-      "wrong_layer_check": "逐条确认三条反转的红来自 **verbatim-drift** 比较层，而非 fail-closed 切块失败层（三例 cut_ok=True）。pytest.raises(AssertionError) + 只含 discipline 名的断言本身无法区分这两层，故编排者单独验证（台账 mutation-red-may-come-from-wrong-layer 的同类风险）。",
-      "cut_tightness": "切出的归一化块长 criteria=392 / negative_assertion=386 / read_face=515，与 brief 冻结时记录的测量值一致；九个边界标记在模板中各自唯一（grep -F -c 均为 1），切口无歧义。"
-    },
-    "completion_definition_walkthrough": {
-      "verbatim_multiline_not_sha256": "PASS —— DISCIPLINE_EXPECTED 为多行字符串常量；全文件无 sha256 常量用于纪律正文（hashlib 已从 import 中移除）",
-      "fail_closed_on_uncuttable": "PASS —— _cut_discipline_block 捕获 ValueError 抛 AssertionError('cannot cut ... fail-closed')，并有 test_verbatim_pinning_fails_closed_when_block_marker_renamed 正面钉住",
-      "three_inversion_shapes_distinct_wording": "PASS —— 三条各自命名自己的 discipline，失败措辞互不相同",
-      "rev2_anchors_and_guard_preserved": "PASS —— rev2 的 8 个用例名一个不少（comm -23 空集），DISCIPLINE_ANCHORS 块与 284e223 逐字节无 diff",
-      "guard_pure_in_memory": "PASS —— 见 scope_and_hygiene.no_write_to_live_tree",
-      "mutation_anchor_driven_B27": "PASS —— _mutate_block 在归一化块内按被锁文本定位，_eviscerate_* 改为按 label/operable 锚点定位，rev2 的两条 re.compile 已删除",
-      "two_innocent_edit_probes_green": "PASS —— 纯重新折行、三纪律之外编辑，两条均绿",
-      "in_block_reorder_tradeoff_disclosed": "PASS —— 模块 docstring 'Design tradeoff, stated honestly' 段如实写明重排会红及其取舍理由",
-      "no_forbidden_path_writes": "PASS",
-      "no_prod_write_network_notify_push": "PASS —— 无 merge / 无 push / 未切分支，HEAD 仍在 feature/wp25-protocol-disciplines"
-    },
-    "residual_observations_non_blocking": [
-      "取舍如实：块内子句重排会红。这是 brief 冻结时选定并要求披露的代价，非缺陷；日后改写纪律措辞须同步改 DISCIPLINE_EXPECTED，diff 里可见 —— 这正是设计意图。",
-      "三条反转用例的断言只检查 str(exc.value) 含 discipline 名，无法区分 verbatim-drift 与 fail-closed 两层红。本轮由编排者在评审中单独验证为 drift 层；若日后加严，可让两层 witness 措辞进入断言。不阻塞本轮（brief 未要求，且判据本身已实测钉住）。"
-    ],
-    "merge_gate": "① 编排者独立重测 ✅ ACCEPT（本条）② codex 第二签名 —— **未取得** ③ 用户批准 —— **未取得**。按 §规范，编排者不得自签自批，合入须先取二、三两项。",
-    "decision_history": [
-      {
-        "decision": "ACCEPT",
-        "rev": 3,
-        "reviewed_commit": "aa1e43b",
-        "at": "2026-09-16",
-        "superseded_by": "orchestrator 自行撤回，见 reversal_reason"
-      },
-      {
-        "decision": "REWORK",
-        "rev": 3,
-        "reviewed_commit": "aa1e43b",
-        "at": "2026-09-17"
-      }
-    ],
-    "reversal_reason": "编排者原判 ACCEPT。第二签名（codex, strong independence）判 REWORK 并给出两条我漏掉的逃逸；我逐条独立实测（不采信转述），两条**全部复现成立**：D1 decoy 块使极性反转在逐字锁下 GREEN，D2 删列表前缀/插空行/缩进成 code block 四种结构变化在逐字锁下 GREEN。两条都直接推翻 rev3 的核心保证（『给反转开绿灯必须改测试里的冻结常量』），属阻塞缺陷而非覆盖间隙，故撤回 ACCEPT 改判 REWORK。我漏掉的原因是只测了『改正文内容』这一类变异，没测『改正文所处结构』和『增加同形正文』——即只验证了锁的内容强度，没验证锁的**定位唯一性**。"
+    "root_cause_note": "B38 不是执行者的实现缺陷 —— 执行者严格照 brief 的『指定修法』三项做完，两环确已收口。B38 是编排者的 brief 缺陷：INV-P 写得足够宽（宽到覆盖 B38），但『指定修法』只枚举定位与结构两类，未把『处境/语境』列为第三类，执行者照清单收工是合理的。与 WP-26 §B35 同型：不变式写宽了、修法清单按已知形状收窄，执行者照清单做就够不着不变式。rev5 前应先落任务 #36（变异集按判据组成维度生成）。",
+    "merge_gate": "① 编排者独立复核 = REWORK ② codex 第二签名 —— 未取，本轮不必取 ③ 用户批准 —— 未取，且现在不应取"
   },
   "consult": {
     "decision": "REWORK",

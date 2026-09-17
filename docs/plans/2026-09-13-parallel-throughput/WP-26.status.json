@@ -3,7 +3,7 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "history": [
@@ -56,7 +56,11 @@
       "rev": 4
     },
     "dispatch_base_commit": "57cd572",
-    "dispatch_note": "rev4 派发（INV-B，两个消费面一并收口，含实现改动，4 文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 kimi --afk -p 'Reply with exactly: PROBE_OK' → PROBE_OK rc=0；prompt 已落盘并记 sha256，明确写入反向差分方向（旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。"
+    "dispatch_note": "rev4 派发（INV-B，两个消费面一并收口，含实现改动，4 文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 kimi --afk -p 'Reply with exactly: PROBE_OK' → PROBE_OK rc=0；prompt 已落盘并记 sha256，明确写入反向差分方向（旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。",
+    "result": "DONE (executor self-report)",
+    "exit_code": 0,
+    "commit": "eea0130",
+    "report_deviation": "报告称 Full 3.13/3.14「not runnable — No module named pytest」——不成立。执行者用了裸 python3.13/3.14，而 brief 给的形态是 `uv run --quiet --python 3.1X --with pytest --no-project python -m pytest`。编排者按 brief 形态实测：3.13 = 37 passed，3.14 = 37 passed。该 DoD 项实际满足，报告低估。"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -71,7 +75,7 @@
     "base_commit": "58c7624",
     "branch": "feature/wp26-brief-source-of-truth",
     "worktree": "../wp26-brief-source-of-truth",
-    "commit": "57cd572",
+    "commit": "eea0130",
     "dispatch_commit": "0a12bed",
     "commit_rev2_impl": "0b4deb28458098e6db055a3601d971702ab8b1af"
   },
@@ -463,12 +467,18 @@
   "review": {
     "decision": "REWORK",
     "reviewer": "claude (orchestrator, independent)",
-    "reviewed_at": "2026-09-16T14:05:00Z",
-    "reviewed_commit": "57cd572",
-    "retracted_self_accept": "编排者一审曾判 ACCEPT（2026-09-16T11:29:37Z，记于 commit 41b5b1f）。第二签名 REWORK 后编排者实测确认阻塞项成立，**撤回自评 ACCEPT**。",
-    "b25_closed": "是 —— 这一点第二签名独立确认：C1/C2 均已关闭，普通路径精确要求 `lines[1:] == ()`，多错路径精确声明续行元组；空 stderr 会先在 `count(...)==1` 处 AssertionError（fail-closed，非 IndexError）；`stdout == \"\"` 拒绝空格/换行/JSON/任何非空内容。",
-    "basis": "本轮返工目标（B25）已达成，但第二签名在**累计 diff**（rev1 引入、前三轮双方均未发现）中查出一处 brief 完整性缺陷 B29：`redispatch._brief_content()` 双次读文件 —— `read_text()` 取派发内容、`read_bytes()` 另取一份算 sha256，两次读之间文件若变化，则**校验的是第二份、派发的是第一份**，「sha256 锚定实际派发 Brief」并不严格成立。编排者已构造实测确认可逃逸。",
-    "merge_gate": "① 编排者独立重测 ✅（rev3 目标达成）② codex 第二签名 = **REWORK**（阻塞项在累计面）③ 用户批准 —— 未取得，且现在不应取得"
+    "reviewed_at": "2026-09-17T00:00:00Z",
+    "reviewed_commit": "eea0130",
+    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-26-review-rev4.md",
+    "achieved": "python 侧 INV-B 收口到位：单次 read_bytes，sha256 与 decode 同取 raw，新增 `cannot decode brief` 措辞与既有 5 条互不相同；A1 差分方向正确且强度足够（钉 state['calls']==1，编排者实测在旧实现 57cd572 上 FAIL、rev4 上 PASS，且对『同进程二次读取』变异转红）。bash 侧 process B 已整体删除，brief_file 变量与 sed -n '2p' 路径交接均消失，preflight.sh 零 diff。重复措辞 #2/#3、#5/#6 已改为 (absolute)/(fallback)，8 个原枚举出口各有首行逐字相等的原因特异 witness。rev3 四条输出契约 + 5 条 helper 用例 + 拒用理由 docstring 全部保留；DISPATCH_LINT_SHA256 常量已删、改 live_before 逐字节自比。targeted 29 -> 37 passed，全量 3.11 = 4 failed(既有环境) / 634 passed / 4 skipped。",
+    "blockers": {
+      "B35": "bash 面的 INV-B 只被『旧形态』钉住。A2 的拦截手法是在内层 python 进程退出后污染文件，因此只能判别『校验与消费是否跨越进程边界』。编排者实测：把 rev4 的 `text = raw.decode(...)` 变异为 `text = open(real,'rb').read().decode(...)`（同进程内先校验后重读，INV-B 定义下同族缺口），tests/test_dispatch_lint_brief_source.py 全部 25 passed —— 含 A2 自己。对照 python 面同一变异：expected exactly one read, got 2 -> 1 failed。DoD 第 3 条要求两面各给『实测计数』，bash 一行给的是读代码数出的静态计数，brief §A 加粗禁止。不适用 BLOCKED：编排者已实测一条可行补法（PYTHONPATH 注入 sitecustomize 包 builtins.open 计数器、按 realpath 比对、AGENTIC_PYTHON shim 传递，实测 real=1 / mutated=2，对该变异转红且不依赖进程拓扑）。执行者可另择实现，但 bash 面必须钉读取次数或等价字节同一性，而非『process B 是否存在』。",
+      "B36": "section 判据的两个出口措辞逐字相同，且其中一个无任何用例。rev4 合并 process B 后 fail() 出口从 8 增至 10：出口9『标题整段缺失』与出口10『标题在正文空』都输出 `brief missing section '{heading}'`（编排者实测两条路径输出逐字相同）。唯一的 section 用例 test_brief_missing_section_fails_closed 用 _bad_brief()（标题在正文空）命中出口10；出口9 无任何 fixture（_valid_brief/_bad_brief 都带全三标题），且因措辞相同即使补用例也无法区分。与 brief 点名要修的 #2/#3、#5/#6 同类，只是由本 rev 的合并动作新产生。要求：两出口各补可区分措辞 + 各配只触发自己那一个出口的 fixture。"
+    },
+    "minor": {
+      "B37": "五条新增 bash 用例与两条新增 python 用例均无 copytree scratch 变异（grep -c 'copytree|mutated' = 0），缺 oracle 第③项。①②具备。A1 的 state['calls']==1 天然对多读一次敏感（编排者已实测转红），但 DoD 要求变异证据落在用例集里，而非靠复核者临时构造。"
+    },
+    "merge_gate": "① 编排者独立复核 = REWORK ② codex 第二签名 —— 未取，本轮不必取 ③ 用户批准 —— 未取，且现在不应取"
   },
   "consult": {
     "decision": "REWORK",
