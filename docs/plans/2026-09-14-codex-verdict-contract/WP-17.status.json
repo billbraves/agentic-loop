@@ -89,13 +89,96 @@
           "::test_v2_without_qoder_finalizes_double_sign"
         ],
         "count": 4,
-        "note": "冻结基线 600c2f1 既有失败(git checkout main 返回非零)；已 stash WP-17 改动后在基线复现坐实与本 WP 无关；与 codex adapter 无关(WP-17 只改 codex.py + 新测试)"
+        "note": "冻结基线 600c2f1 既有失败(git checkout main 返回非零)；已 stash WP-17 改动后在基线复现坐实与本 WP 无关；与 codex adapter 无关(WP-17 只改 codex.py + 新测试)",
+        "orchestrator_verified": "已独立复现：在 600c2f1 的临时 detached 工作树上跑 test_finalize_merge_triple_sign.py 得 4 failed, 1 passed，失败集合与记录完全一致。根因 init.defaultBranch=master vs fixture 的 `git checkout main`，与 codex adapter 无关。"
       }
     ],
     "quality_gate": {
       "ran": false,
       "reason": "agentic quality-gate 包装器读主仓 checkout 的 .agentic/config.toml，期望 WP-02 的统一 [[gate]] schema；WP-17 从 main(600c2f1) 切出，main 的 config 仍是 pre-WP-02 的 [quality_gate]+[[quality_gate.rule]] schema。[[gate]] 段目前只存在于 plan/2026-09-13-parallel-throughput 分支(该 session 的 config-schema 迁移 WIP)。.agentic/config.toml 在 WP-17 forbidden_paths 内，不得改动。",
       "equivalent_command_passed": "config 规则映射(src/agentic_loop/** 与 tests/** -> python3 -m pytest tests -q)所对应的实质命令已直接运行通过(见 tests[2] 533 passed)"
+    },
+    "orchestrator_independent_review": {
+      "by": "claude-code orchestrator (this session)",
+      "at": "2026-09-17T02:56Z",
+      "decision": "ACCEPT_WITH_NON_BLOCKING_GAPS",
+      "method": "从 WP-17 自身工作树复现测试（主仓 detached HEAD b0f1f90 早于实现，故此前 file-not-found 是检出树问题而非缺件）；随后在 scratch 副本上自行做 8 项变异，不采信已记录的通过数。",
+      "reproduced": [
+        {
+          "cmd": "pytest tests/test_codex_config_isolation_chunking.py -q",
+          "result": "13 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "pytest tests/ -q",
+          "result": "534 passed, 4 skipped, 4 failed",
+          "exit_code": 1,
+          "note": "4 failed 全在 tests/test_finalize_merge_triple_sign.py；已在冻结基线 600c2f1 的独立临时工作树上原样复现（4 failed, 1 passed）→ 与 WP-17 无关。根因为环境：本机 init.defaultBranch=master，fixture 却 `git checkout main`。与 status 记录的 baseline_failures 一致。"
+        }
+      ],
+      "code_drift_check": "git diff --name-only beb167b HEAD 仅两个编排者文档文件；实现与测试自记录 commit 起零漂移。",
+      "scope_check": "7 条 forbidden_paths 全为 0 文件改动；beb167b 只碰 allowed_paths 两个文件；brief/status 为独立编排者提交 3df4fa3/628d599。",
+      "quality_gate_claim_verified": "独立核实：600c2f1 的 config 是 [quality_gate]+[[quality_gate.rule]]，[[gate]] 只在 plan/2026-09-13-parallel-throughput 上（HEAD 确认）。ran=false 的理由属实，且 config.toml 在 forbidden_paths 内不可动。",
+      "my_own_mutations": [
+        {
+          "id": "M1",
+          "mutation": "删去 review exec 的 --ignore-user-config",
+          "result": "2 failed → 转红，钉住"
+        },
+        {
+          "id": "M2",
+          "mutation": "聚合改为总取首块 verdict（严重度失效）",
+          "result": "3 failed → 转红，钉住"
+        },
+        {
+          "id": "M3",
+          "mutation": "阈值放大 1e4 倍（分块永不触发）",
+          "result": "6 failed → 转红，钉住"
+        },
+        {
+          "id": "M5",
+          "mutation": "不可切分的超限 diff 改为静默继续单次评审",
+          "result": "1 failed → 转红，钉住"
+        },
+        {
+          "id": "M6",
+          "mutation": "块级失败被 except 吞掉",
+          "result": "1 failed → 转红，钉住"
+        },
+        {
+          "id": "M7",
+          "mutation": "丢弃 chunk_context 全局摘要",
+          "result": "1 failed → 转红，钉住"
+        },
+        {
+          "id": "E1",
+          "mutation": "删除 hunk 二次切分（chunks.extend(_split_file_by_hunks) → append 整段）",
+          "result": "13 passed → 未转红，逃逸"
+        },
+        {
+          "id": "E2",
+          "mutation": "循环内『单块含摘要仍超阈值』的 fail-closed raise 改为静默截断 chunk_prompt",
+          "result": "13 passed → 未转红，逃逸"
+        }
+      ],
+      "escapes_non_blocking": [
+        {
+          "id": "E1",
+          "required_behavior": "brief 必需行为 3（单文件仍超阈值时在 @@ 边界二次切分）",
+          "why_escaped": "唯一相关用例 test_single_file_over_bound_after_hunk_split_fails_closed 用的是**单 hunk** 文件；单 hunk 时 _split_file_by_hunks 本就返回 [(label, seg)]，所以删掉整个二次切分调用后该用例的 raise 依然发生，断言照绿。名字承诺了 after_hunk_split，实际只覆盖了『切不动就 fail-closed』。",
+          "code_is_correct": "我另行直接调用 _split_diff 实测：1 文件 3 hunk 共 192121 bytes（>153600）→ 正确切成 3 块，各 64077 bytes，均保留文件头、各含 1 个 hunk、全部低于阈值。功能实现正确，仅缺用例钉。",
+          "blast_radius": "仅在『单文件 diff 超 150KB 且含多 hunk』时才与 E2 合流；今日不产生错误裁决，但该行为无回归防护。"
+        },
+        {
+          "id": "E2",
+          "required_behavior": "brief 必需行为 5 尾句（绝不截断，fail-closed）与 §3『分块只切 diff，绝不改写 diff 内容』",
+          "why_escaped": "该 raise 位于分块循环内（块含 brief+摘要后仍超阈值），与被覆盖的循环外 raise（整体不可切分）是两个不同 print point。现有 fail-closed 用例只命中循环外那个。",
+          "reachability": "我实测可达：a.py 段 153465 bytes ≤ 阈值，但拼上 brief 与 chunk_context 后必然越界，触发循环内 raise。",
+          "risk_if_regressed": "若该分支被改成截断，codex 会对被悄悄截断的 diff 出 ACCEPT——正是 PLAN 冻结决策 1-7『fail-closed 不可削弱』要禁的降级，且无任何用例会响。"
+        }
+      ],
+      "why_not_rework": "两处逃逸均为**用例覆盖缺口，不是实现缺陷**：E1 的代码经我直接实测行为正确；E2 的 raise 就在源码里且可达。当前交付物的运行时行为满足 brief 全部 7 条必需行为。判 REWORK 会把一个行为正确的交付物退回去补测试，而其真实风险是未来回归而非当下错误裁决。故记为非阻塞缺口并单独立 WP 补钉。",
+      "residual_risk_accepted_by": "待用户确认（用户已就 WP-17 给出合入批准）"
     }
   },
   "review": {
