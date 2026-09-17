@@ -3,40 +3,60 @@
   "work_package_id": "WP-26",
   "iteration_id": "2026-09-13-parallel-throughput",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
+    "history": [
+      {
+        "tool": "kimi",
+        "session": "",
+        "round": 3,
+        "rev": 2,
+        "model_note": "deepseek via --config-file ~/.kimi/deepseek.toml；派发须 env -u OPENAI_BASE_URL -u OPENAI_API_KEY（否则请求被劫到 kiro 端点返 400）",
+        "probe": "kimi --afk --config-file ~/.kimi/deepseek.toml -p 'Reply with exactly: PROBE_OK' -> PROBE_OK, rc=0 @ 2026-09-16T12:38Z",
+        "config_drift_noted": ".agentic/config.toml 已被会话外改动（deepseek provider 整段换为本地 kiro 网关 127.0.0.1:18080/18090）。该改动未提交、与本 WP 无关；执行者仍走 ~/.kimi/deepseek.toml，探针已复测通过。",
+        "dispatch": {
+          "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp26-rev2-prompt.md",
+          "prompt_sha256": "b2a74cfecd42f14713b4c4e3abaf5c4749136ed0b549f258894ad7bd0c89763a",
+          "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp26-rev2.log",
+          "background_task_id": "b8kry5suz",
+          "dispatched_at": "2026-09-16T12:45:00Z",
+          "cwd": "/Users/admin/vibe/wp26-brief-source-of-truth",
+          "brief_handoff": "prompt 里给的是主仓绝对路径 + rev2 的 sha256，并明确告知工作树内同名文件是历史快照不可作判据（规避 B16/B17）",
+          "gate_note": "主仓活树 dispatch_lint.sh 仍按固定命名读 brief（B16 本体，正是本 WP 要修的），实测它 lint 的是 WP-26-brief.md（rev1）而非 rev2 —— 该 PASS 对 rev2 无效力。编排者已用真脚本 :69-101 的判据切片手工核过 rev2：rc=1 通过；同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 报缺段，证明切片有区分力。",
+          "preflight": "PREFLIGHT_PASS branch=feature/wp26-brief-source-of-truth state=DISPATCHED worktree=/Users/admin/vibe/wp26-brief-source-of-truth（从工作树内以主仓绝对路径调用；PASS 行无 status= 字段属正常，那是 WP-27 rev1 新增、尚未合入主仓）"
+        },
+        "dispatched_at": "2026-09-16T11:09:34Z",
+        "dispatch_rev": 3,
+        "dispatch_command": "cd /Users/admin/vibe/wp26-brief-source-of-truth && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev3-prompt.md)\"",
+        "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev3-prompt.md",
+        "log": "~/.claude/jobs/8a8bf01e/tmp/wp26-rev3-exec.log",
+        "background_task_id": "by2ur76ts",
+        "dispatched_brief": {
+          "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev3.md",
+          "sha256": "1fe6ed28ab70fab3cb6fc1dd031c9a4057fe7b82c8a6ba2964bd722f19796bbd",
+          "rev": 3
+        },
+        "dispatch_base_commit": "16bfdf3",
+        "dispatch_note": "rev3 返工派发（自 CHANGES_REQUESTED 状态转入）。派发前置：brief 过活树 dispatch_lint.sh:151-183 section 判据（rc=1），WP-20 反向对照 rc=0 证判据有区分力；status 内全部 path+sha256 MATCH；锁 owner=claude-53c58ab0；preflight 自工作树内发起 PREFLIGHT_PASS。三个 WP allowed_paths 互不相交，故并行派发，不再受原 dispatch_ordering_constraint 约束（该约束前提为 WP-26 rev2 合入，已因 rev2 加固补丁复签 REWORK 而失效）。"
+      }
+    ],
     "tool": "kimi",
+    "dispatched_at": "2026-09-17T11:00:10Z",
+    "dispatch_rev": 4,
+    "dispatch_command": "cd /Users/admin/vibe/wp26-brief-source-of-truth && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev4-prompt.md)\"",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev4-prompt.md",
+    "dispatch_prompt_sha256": "e04749a9c05289161e0c2e8a7a703a154d93593b6c85d2a3489173df9878e694",
+    "log": "~/.claude/jobs/8a8bf01e/tmp/wp26-rev4-exec.log",
+    "background_task_id": "bd5auoo2d",
     "session": "",
-    "round": 3,
-    "rev": 2,
-    "model_note": "deepseek via --config-file ~/.kimi/deepseek.toml；派发须 env -u OPENAI_BASE_URL -u OPENAI_API_KEY（否则请求被劫到 kiro 端点返 400）",
-    "probe": "kimi --afk --config-file ~/.kimi/deepseek.toml -p 'Reply with exactly: PROBE_OK' -> PROBE_OK, rc=0 @ 2026-09-16T12:38Z",
-    "config_drift_noted": ".agentic/config.toml 已被会话外改动（deepseek provider 整段换为本地 kiro 网关 127.0.0.1:18080/18090）。该改动未提交、与本 WP 无关；执行者仍走 ~/.kimi/deepseek.toml，探针已复测通过。",
-    "dispatch": {
-      "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp26-rev2-prompt.md",
-      "prompt_sha256": "b2a74cfecd42f14713b4c4e3abaf5c4749136ed0b549f258894ad7bd0c89763a",
-      "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp26-rev2.log",
-      "background_task_id": "b8kry5suz",
-      "dispatched_at": "2026-09-16T12:45:00Z",
-      "cwd": "/Users/admin/vibe/wp26-brief-source-of-truth",
-      "brief_handoff": "prompt 里给的是主仓绝对路径 + rev2 的 sha256，并明确告知工作树内同名文件是历史快照不可作判据（规避 B16/B17）",
-      "gate_note": "主仓活树 dispatch_lint.sh 仍按固定命名读 brief（B16 本体，正是本 WP 要修的），实测它 lint 的是 WP-26-brief.md（rev1）而非 rev2 —— 该 PASS 对 rev2 无效力。编排者已用真脚本 :69-101 的判据切片手工核过 rev2：rc=1 通过；同一切片对已知不合规的 WP-20-brief.md 返回 rc=0 报缺段，证明切片有区分力。",
-      "preflight": "PREFLIGHT_PASS branch=feature/wp26-brief-source-of-truth state=DISPATCHED worktree=/Users/admin/vibe/wp26-brief-source-of-truth（从工作树内以主仓绝对路径调用；PASS 行无 status= 字段属正常，那是 WP-27 rev1 新增、尚未合入主仓）"
-    },
-    "dispatched_at": "2026-09-16T11:09:34Z",
-    "dispatch_rev": 3,
-    "dispatch_command": "cd /Users/admin/vibe/wp26-brief-source-of-truth && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev3-prompt.md)\"",
-    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp26-rev3-prompt.md",
-    "log": "~/.claude/jobs/8a8bf01e/tmp/wp26-rev3-exec.log",
-    "background_task_id": "by2ur76ts",
     "dispatched_brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev3.md",
-      "sha256": "1fe6ed28ab70fab3cb6fc1dd031c9a4057fe7b82c8a6ba2964bd722f19796bbd",
-      "rev": 3
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev4.md",
+      "sha256": "b21f97d966a62fb5edeede508fc31798586e5a6eaeddb8d5d6ad8baf30814b16",
+      "rev": 4
     },
-    "dispatch_base_commit": "16bfdf3",
-    "dispatch_note": "rev3 返工派发（自 CHANGES_REQUESTED 状态转入）。派发前置：brief 过活树 dispatch_lint.sh:151-183 section 判据（rc=1），WP-20 反向对照 rc=0 证判据有区分力；status 内全部 path+sha256 MATCH；锁 owner=claude-53c58ab0；preflight 自工作树内发起 PREFLIGHT_PASS。三个 WP allowed_paths 互不相交，故并行派发，不再受原 dispatch_ordering_constraint 约束（该约束前提为 WP-26 rev2 合入，已因 rev2 加固补丁复签 REWORK 而失效）。"
+    "dispatch_base_commit": "57cd572",
+    "dispatch_note": "rev4 派发（INV-B，两个消费面一并收口，含实现改动，4 文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 kimi --afk -p 'Reply with exactly: PROBE_OK' → PROBE_OK rc=0；prompt 已落盘并记 sha256，明确写入反向差分方向（旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -539,6 +559,7 @@
     "consult_harden_at": "2026-09-16T05:52:00Z",
     "review_reversed_at": "2026-09-16T05:58:00Z",
     "refrozen_rev3_at": "2026-09-16T06:05:00Z",
-    "refrozen_rev4_at": "2026-09-17T10:55Z"
+    "refrozen_rev4_at": "2026-09-17T10:55Z",
+    "dispatched_rev4_at": "2026-09-17T11:00:10Z"
   }
 }
