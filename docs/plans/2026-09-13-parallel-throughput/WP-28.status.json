@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -29,10 +29,7 @@
       "resolved_by": "option_1_user_directed_settings_change",
       "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
     },
-    "dispatched_at": "2026-09-17T23:18:20+08:00",
     "rev": 1,
-    "pid": 60380,
-    "background_task_id": "b0we9sl5n",
     "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-exec.log",
     "dispatch_script": {
       "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
@@ -49,10 +46,7 @@
       "log_growth_bytes": "2939588 -> 3727727",
       "note": "日志里的 termios.error (19, 'Operation not supported by device') 来自 kimi-cli 键盘监听线程无 tty，属无害；不是执行失败。",
       "result": "ALIVE"
-    },
-    "result": "DONE",
-    "finished_at": "2026-09-17T23:48:29+08:00",
-    "commit": "b34deb989d9d28d816a4df8504c40a98833721c9"
+    }
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -101,35 +95,36 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md",
-      "sha256": "24dc48cfefd3f226121a30a9643ffc095c706d2ec4054ff2a8e1b60bdfb04a2a",
-      "rev": 1,
-      "refreeze_count": 0,
-      "invariant": "INV-N（规范持久化不变式）：两条编排规范落入模板后，任何削弱其规范力的模板改动——删正文/改极性/改结构/改定位/改处境/同形新增——都必须使测试转红，且转红只能通过修改测试文件里的冻结常量来解除。",
-      "refreeze_stop_rule_check": {
-        "rule": "docs/agentic/templates/WORK_PACKAGE.md「Re-freeze 规则」（本 WP 正是要落成该规则）",
-        "semantics": "re-freeze 次数 = rev 号 - 1",
-        "fired": false,
-        "why": "rev1 首次冻结，re-freeze 计数 = 0，规则不命中。"
-      },
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md",
+      "sha256": "8fde249875d0a6fd7b8d588e5657e8b8feb721af638205d4ff0ea624674b78e9",
+      "rev": 2,
+      "refreeze_count": 1,
+      "invariant": "INV-N",
+      "frozen_at": "2026-09-18T06:57:42+08:00",
+      "stop_review_rule": "第 3 次及以后才命中；rev2 计数 = 1，不命中。",
+      "user_approval": "用户批准：rev2 冻结前先把「冻结前自检也须按组成步骤生成」补进 §F，而非直接重派。",
       "prefreeze_check": {
-        "method": "用活树 dispatch_lint.sh 直跑合成外部工程（B11 修法1：判据只能来自真脚本；B14：不用 agentic CLI 冻结副本）",
-        "result": "PASS — DISPATCH_LINT_PASS rc=0",
-        "discriminating_power": "同一调用形态对已知不合规的 WP-20-brief.md → DISPATCH_LINT_FAIL: brief missing section 'Acceptance tests' rc=2，证判据非恒绿",
-        "checked_at": "2026-09-17T20:05:00Z"
-      },
-      "origin": "任务 #36（第 4 项变异规则，根因见 WP-25-review-rev4.md B38 + WP-26-review-rev4.md B35）+ 任务 #24（re-freeze 停手规则，本 WP 按用户本轮决定扩展到「第 3 次及以后」）"
+        "gate": "DISPATCH_LINT_PASS rc=0",
+        "control": "WP-20-brief.md 无 '## Acceptance tests' 锚点 → 判据仍有判别力",
+        "criterion_prototype": "probe2.py（八个面 S1/S2/S3/S4/S4b/S5/S5b/S6/S7）",
+        "positive_control": "真实模板（b34deb9）GREEN",
+        "mutations": "按面生成 18 条，全红，escapes=0",
+        "harmless_probes": "3 条全绿（纯折行 / 无关占位符 / 块外新增小节）",
+        "attribution": "mis_attributed=[] —— 每条变异首条 witness 归因到其所攻击的面",
+        "self_caught": [
+          "极性常量跨行会让纯折行探针假阳性 → 极性常量必须单行单分句",
+          "S5 先于 S6 会让诱饵攻击被报成处境污染 → S6 须先判"
+        ],
+        "rule_now_binds_orchestrator": "rev1 冻结前我实测 7 条全红即放行，复核时按组成步骤重造 8 条立刻漏三个面。故本节规则对编排者自己生效。"
+      }
     },
     "tests": [],
     "baseline": {
-      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-      "measured_at": "2026-09-17T19:55:00Z",
-      "measured_at_commit": "334fe60",
-      "result": "4 failed, 608 passed, 4 skipped",
-      "targeted": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 7 passed",
-      "known_failures": "tests/test_finalize_merge_triple_sign.py 的 4 条是既有环境失败（本机 git init.defaultBranch=master 与 fixture 的 git checkout main 冲突），不要修",
-      "measured_by": "orchestrator (claude) 本人实测，非转录执行者自报",
-      "note": "基线测于 334fe60（冻结提交 7a30f50 的父）；7a30f50 只新增 docs/plans/ 下的冻结产物，不含任何 src/ 或 tests/ 改动，故测试数字对 base_commit 同样成立。"
+      "note": "rev2 起点是 rev1 的 commit b34deb9，不是主区 HEAD",
+      "dispatch_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
+      "targeted": "20 passed",
+      "full": "4 failed / 619 passed / 4 skipped",
+      "known_failures": "4 条全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，不得修）"
     },
     "orchestrator_feasibility_probe": {
       "note": "冻结前先实测判据本身可实施（记忆 verify-the-remedy-not-just-the-finding），不把未验证的判据写进 brief。",
@@ -143,42 +138,51 @@
     },
     "preflight": "PREFLIGHT_PASS branch=feature/wp28-norms-into-template state=APPROVED worktree=/Users/admin/vibe/wp28-norms-into-template（自工作树内以主仓绝对路径调用）"
   },
-  "review": {
-    "decision": "REWORK",
-    "reviewer": "claude (orchestrator, independent)",
-    "reviewed_at": "2026-09-17T23:48:29+08:00",
-    "rev": 1,
-    "doc": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev1.md",
-    "reviewed_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
-    "blockers": {
-      "B40": "S4 结构面失效：在标题后插入 ``` 把整节围栏成 code block，冻结分句一字未改、缩进未变、列表未断，判据全绿；规范条目降级为示例文本。",
-      "B41": "S5 处境面覆盖不足：判据只把「标题紧邻前一非空行」纳入冻结，块内任意位置插入去规范化引导句（如「（下列第 4 项为历史遗留，不再要求）」）全绿，第 4 项规范力被剥掉而测试 diff 为空。",
-      "B42": "数量口径未冻结：`oracle 校验四项证据` 的数量词不在任何冻结常量中，改回「三项证据」判据全绿，模板自我矛盾且第 4 项沦为死条文——直接击穿本 WP 目的。"
-    },
-    "minor": {
-      "B43": "`_section_block()` 用了 brief §A 明令禁止的 `text.index()`（第 314-315 行）。当前未逃逸，但仅靠 S1 先判红的执行顺序侥幸成立；S1 用逐行精确匹配而 index() 是子串匹配，两者匹配面不同。应改 re.finditer 与 S1 共用同一匹配面。"
-    },
-    "verified_true": {
-      "targeted": "20 passed（原 7 条保留 + 新增 13 条），编排者独立复跑",
-      "full_suite": "4 failed / 619 passed / 4 skipped（基线 4/608/4，+11 净增，零回归；4 条失败仍全在 test_finalize_merge_triple_sign.py 未被改动）",
-      "reverse_differential": "新用例放到 7a30f50 旧模板上 = 12 failed / 8 passed；新实现 20 passed。方向正确，编排者独立复现。",
-      "byte_identical": "cmp IDENTICAL；placeholder 数仍 0",
-      "contract_version": "CONTRACT_TEMPLATE_VERSION 保持 \"6\"；contract_render.py 与 wrappers/*.sh 零改动",
-      "b11_discipline": "判据读真实模板文件（TEMPLATE_PACKAGED / TEMPLATE_DOCS），非重抄副本",
-      "witness_specificity": "六面措辞互不相同，可归因；新增用例无 rc != 0 式真空断言（第 219/234 行的两处属 WP-24 既有用例）",
-      "worktree_clean": "跑完 git status 干净，变异未落盘",
-      "dod_text_present": "三条 re-freeze 明文 + oracle 第 4 项三条明文均就位；抬头第 5 行改为指向新节，无第二份口径"
-    },
-    "review_method": {
-      "note": "未以复跑执行者那 7 条变异作为结论依据。执行者 7 条确认全红，但只证明判据挡住了执行者列举的攻击。编排者另按判据六个组成步骤自行生成 8 条变异（O1-O8）：4 条红 + 1 条诱饵红 + 3 条全绿逃逸，逃逸即 B40/B41/B42。",
-      "empirical_value": "同一份判据，按缺陷清单自检全绿，按组成步骤自检漏三个面——这是模板第 4 项规则的第一份实证，建议写进 rev2 §F。"
-    }
-  },
   "consult": {},
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
     "dispatched_at": "",
     "dispatch_blocked_at": "2026-09-17T20:20:00Z"
-  }
+  },
+  "brief": {
+    "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md",
+    "sha256": "8fde249875d0a6fd7b8d588e5657e8b8feb721af638205d4ff0ea624674b78e9"
+  },
+  "history": [
+    {
+      "rev": 1,
+      "review": {
+        "decision": "REWORK",
+        "reviewer": "claude (orchestrator, independent)",
+        "reviewed_at": "2026-09-17T23:48:29+08:00",
+        "rev": 1,
+        "doc": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev1.md",
+        "reviewed_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
+        "blockers": {
+          "B40": "S4 结构面失效：在标题后插入 ``` 把整节围栏成 code block，冻结分句一字未改、缩进未变、列表未断，判据全绿；规范条目降级为示例文本。",
+          "B41": "S5 处境面覆盖不足：判据只把「标题紧邻前一非空行」纳入冻结，块内任意位置插入去规范化引导句（如「（下列第 4 项为历史遗留，不再要求）」）全绿，第 4 项规范力被剥掉而测试 diff 为空。",
+          "B42": "数量口径未冻结：`oracle 校验四项证据` 的数量词不在任何冻结常量中，改回「三项证据」判据全绿，模板自我矛盾且第 4 项沦为死条文——直接击穿本 WP 目的。"
+        },
+        "minor": {
+          "B43": "`_section_block()` 用了 brief §A 明令禁止的 `text.index()`（第 314-315 行）。当前未逃逸，但仅靠 S1 先判红的执行顺序侥幸成立；S1 用逐行精确匹配而 index() 是子串匹配，两者匹配面不同。应改 re.finditer 与 S1 共用同一匹配面。"
+        },
+        "verified_true": {
+          "targeted": "20 passed（原 7 条保留 + 新增 13 条），编排者独立复跑",
+          "full_suite": "4 failed / 619 passed / 4 skipped（基线 4/608/4，+11 净增，零回归；4 条失败仍全在 test_finalize_merge_triple_sign.py 未被改动）",
+          "reverse_differential": "新用例放到 7a30f50 旧模板上 = 12 failed / 8 passed；新实现 20 passed。方向正确，编排者独立复现。",
+          "byte_identical": "cmp IDENTICAL；placeholder 数仍 0",
+          "contract_version": "CONTRACT_TEMPLATE_VERSION 保持 \"6\"；contract_render.py 与 wrappers/*.sh 零改动",
+          "b11_discipline": "判据读真实模板文件（TEMPLATE_PACKAGED / TEMPLATE_DOCS），非重抄副本",
+          "witness_specificity": "六面措辞互不相同，可归因；新增用例无 rc != 0 式真空断言（第 219/234 行的两处属 WP-24 既有用例）",
+          "worktree_clean": "跑完 git status 干净，变异未落盘",
+          "dod_text_present": "三条 re-freeze 明文 + oracle 第 4 项三条明文均就位；抬头第 5 行改为指向新节，无第二份口径"
+        },
+        "review_method": {
+          "note": "未以复跑执行者那 7 条变异作为结论依据。执行者 7 条确认全红，但只证明判据挡住了执行者列举的攻击。编排者另按判据六个组成步骤自行生成 8 条变异（O1-O8）：4 条红 + 1 条诱饵红 + 3 条全绿逃逸，逃逸即 B40/B41/B42。",
+          "empirical_value": "同一份判据，按缺陷清单自检全绿，按组成步骤自检漏三个面——这是模板第 4 项规则的第一份实证，建议写进 rev2 §F。"
+        }
+      }
+    }
+  ]
 }
