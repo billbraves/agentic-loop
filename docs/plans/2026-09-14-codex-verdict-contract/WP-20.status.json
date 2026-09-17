@@ -1,0 +1,58 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-20",
+  "iteration_id": "2026-09-14-codex-verdict-contract",
+  "phase": "P2",
+  "state": "APPROVED",
+  "role": "Developer",
+  "executor": { "tool": "unassigned" },
+  "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
+  "reviewer": { "tool": "claude-code", "session": "" },
+  "git": {
+    "base_branch": "main",
+    "integration_branch": "main",
+    "base_commit": "c86b35c",
+    "branch": "fix/wp-20-codex-finalization-benign-warning",
+    "worktree": "",
+    "commit": "",
+    "reviewed_commit": "",
+    "merged_commit": "",
+    "merge_method": "no-ff",
+    "cherry_pick": null
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/adapters/codex.py",
+      "tests/test_codex_finalization_benign_warning.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/independence.py",
+      "tests/test_codex_verdict_recovery.py",
+      "tests/test_codex_config_isolation_chunking.py",
+      "tests/test_codex_gate_capability_merge.py",
+      "tests/test_gate_diff_start.py",
+      "tests/test_codex_line_level_split.py"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [],
+    "motivation_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-39-unlock-record.md Run 2 (gate log sha256 1e6ed451f3dd48db17d7821b91a2397ac8dc80850a1f8aaa7cf0eda87faa2c90): with WP-19 line-split runtime c86b35c the gate cleared the 190KB single-hunk file but fail-closed at finalization with 'tool-free turn emitted an unexpected event'. Real codex 0.154 + DeepSeek custom provider probe reproduced a benign item.type=='error' fallback-metadata warning ('Model metadata for deepseek-v4-pro not found. Defaulting to fallback metadata.') that the finalization item allowlist {reasoning, agent_message} rejects.",
+    "goal": "Strictly whitelist-tolerate codex's benign fallback-metadata warning item in the tool-free finalization JSONL validation so empty-terminal resume can return a verdict, WITHOUT relaxing fail-closed for any tool/command/unknown item. Downstream: unblocks WP-39 Run 3.",
+    "must_verify_first": "Run 2 printed the L545-556 'unexpected event' (top-level event-type) error, while the probe reproduced the L557-573 'tool or unknown item' (item-subtype) rejection. These differ. Step 0 of implementation MUST capture the real failing JSONL event stream and confirm exactly which validation point(s) fire before writing the tolerance, rather than guessing from the single-line Run 2 error.",
+    "prefreeze_note": "Frozen by user decision to open WP-20 and hand off to a fresh session. Brief is written to be fully self-reconstructable from tracked files per the context-recovery contract."
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": { "drafted_at": "2026-09-17T23:30:00Z", "approved_at": "2026-09-17T23:35:00Z", "dispatched_at": "" }
+}
