@@ -20,16 +20,29 @@ WP-39 Run 1 暴露的 fail-closed（190KB 单-hunk 新文件取不到 verdict）
 
 ## 范围
 - **allowed_paths**（白名单）：
-  - `src/agentic_loop/adapters/codex.py`（仅新增 `_split_hunk_by_lines` 及其在
-    `_split_file_by_hunks` 末端的调用；不改 review()/JSONL/文件回填/聚合语义）
+  - `src/agentic_loop/adapters/codex.py`（仅新增 `_split_hunk_by_lines`/`_parse_hunk_header`
+    及其在 `_split_file_by_hunks` 末端的调用；不改 review()/JSONL/文件回填/聚合语义）
   - `tests/test_codex_line_level_split.py`（新增，本 WP 专属测试）
+  - `tests/test_codex_config_isolation_chunking.py`（**re-freeze rev2 纳入**：见下方冲突裁定；
+    仅改动 1 个用例 `test_single_file_over_bound_after_hunk_split_fails_closed`，
+    使其反映 WP-19 新能力，其余用例不动）
 - **forbidden_paths**（黑名单）：
   - `.env`、`.context/`、`.agentic/config.toml`
   - `src/agentic_loop/gate/`、`src/agentic_loop/wrappers/`、`src/agentic_loop/independence.py`
-  - `tests/test_codex_verdict_recovery.py`、`tests/test_codex_config_isolation_chunking.py`、
-    `tests/test_codex_gate_capability_merge.py`、`tests/test_gate_diff_start.py`
-    （WP-16/17/18 冻结测试，不得改动；本 WP 只加新测试文件）
+  - `tests/test_codex_verdict_recovery.py`、`tests/test_codex_gate_capability_merge.py`、
+    `tests/test_gate_diff_start.py`（WP-16/18 冻结测试，不得改动）
   - 一切消费方仓库文件
+
+## 冲突裁定（re-freeze rev2，用户裁定）
+实现期发现 WP-17 冻结用例 `test_single_file_over_bound_after_hunk_split_fails_closed`
+断言「单文件单-hunk 纯新增（`@@ -0,0 +1,3000 @@`、全 `+`、240KB）必须 fail-closed」。
+该断言正是 WP-19 要通过无损行级切分改成**成功**的场景（且 WP-34 的 190KB 文件同属
+`-0,0` 纯新增），两者互斥。用户裁定：**WP-19 新能力优先**，改该单一用例——
+- 原「纯新增单-hunk 超界 → fail-closed」改为「纯新增单-hunk 超界 → 被无损行切成多段、
+  各段 ≤ 界、拼接 `+` 行无损」；
+- 另新增/保留一个**真正不可无损切**的 fail-closed 用例（单个 `+` 行本身超界 / 含上下文
+  或删除行的混合 hunk），确保 fail-closed 语义在其正确的适用面上仍被守护。
+其余该文件用例一律不动。此为对 WP-17 冻结面的最小必要修订，走 re-freeze rev2。
 
 ## 设计约束（关键——无损与安全优先）
 1. **只在安全可无损的场景切分单个超界 hunk**：
