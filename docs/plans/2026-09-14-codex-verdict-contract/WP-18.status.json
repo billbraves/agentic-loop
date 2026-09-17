@@ -1,0 +1,57 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-18",
+  "iteration_id": "2026-09-14-codex-verdict-contract",
+  "phase": "P2",
+  "state": "APPROVED",
+  "role": "Developer",
+  "executor": { "tool": "unassigned" },
+  "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
+  "reviewer": { "tool": "claude-code", "session": "" },
+  "git": {
+    "base_branch": "main",
+    "integration_branch": "main",
+    "base_commit": "d6fee35",
+    "branch": "fix/wp-18-codex-gate-capability-merge",
+    "worktree": "",
+    "commit": "",
+    "reviewed_commit": "",
+    "merged_commit": "",
+    "merge_method": "no-ff",
+    "cherry_pick": null,
+    "capability_sources": {
+      "chunking": "beb167b (main / WP-17 fix/codex-config-isolation-chunking)",
+      "file_backing_jsonl_finalization": "f8eba27 (fix/codex-isolated-review tip)"
+    }
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/adapters/codex.py",
+      "tests/test_codex_gate_capability_merge.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/independence.py",
+      "tests/test_codex_verdict_recovery.py",
+      "tests/test_codex_config_isolation_chunking.py"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [],
+    "rootcause_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-34-native-gate-rootcause.md @ 3b1be2b",
+    "goal": "Merge chunking (beb167b) with file-backing/JSONL-hardening/finalization (f8eba27); neither branch contains both. Verified: 01312c5 not ancestor of main; chunking branch lacks candidate.diff/_read_thread_id/_resume_finalization; isolated-review branch lacks _split_diff/_CHUNK_PROMPT_MAX_BYTES."
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": { "drafted_at": "2026-09-15T19:30:00Z", "approved_at": "2026-09-15T19:45:00Z", "dispatched_at": "" }
+}
