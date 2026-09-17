@@ -3,7 +3,7 @@
   "work_package_id": "WP-18",
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "phase": "P2",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": { "tool": "kiro-deepseek-harness", "note": "user chose option B: orchestrator implemented directly in the WP-18 worktree without kimi dispatch/agentic-preflight (agentic-loop primary checkout was occupied by another live session)" },
   "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
@@ -16,7 +16,8 @@
     "worktree": "/Users/admin/vibe/.worktrees/agentic-wp18-codex-merge",
     "commit": "282f3e3",
     "reviewed_commit": "282f3e3",
-    "merged_commit": "",
+    "merged_commit": "3d50ab7",
+    "merge_finalized_by": "manual (agentic finalize not run: it resolves main_root to the occupied primary checkout /Users/admin/vibe/agentic_loop; merge done in the main worktree agentic-loop-main-codex-merge via git merge --no-ff, merged_commit recorded manually)",
     "merge_method": "no-ff",
     "cherry_pick": null,
     "capability_sources": {
