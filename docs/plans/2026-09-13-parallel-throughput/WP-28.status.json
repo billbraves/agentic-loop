@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -24,7 +24,31 @@
         "用户自行在终端执行 dispatch_command（工作树与 prompt 均已就绪），编排者接管监控与验收",
         "用户指定改用其他已获准的执行者工具，编排者据此重写 dispatch_command 与 prompt 后再派发"
       ],
-      "ready_state": "工作树 /Users/admin/vibe/wp28-norms-into-template 干净、HEAD=7a30f50；prompt 已落盘并记 sha256；WP 锁 owner=claude-53c58ab0 已持有；PREFLIGHT_PASS。"
+      "ready_state": "工作树 /Users/admin/vibe/wp28-norms-into-template 干净、HEAD=7a30f50；prompt 已落盘并记 sha256；WP 锁 owner=claude-53c58ab0 已持有；PREFLIGHT_PASS。",
+      "resolved_at": "2026-09-17T23:18:20+08:00",
+      "resolved_by": "option_1_user_directed_settings_change",
+      "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
+    },
+    "dispatched_at": "2026-09-17T23:18:20+08:00",
+    "rev": 1,
+    "pid": 60380,
+    "background_task_id": "b0we9sl5n",
+    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-exec.log",
+    "dispatch_script": {
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
+      "sha256": "3df46a30d5c8b98353d55193feca0285fb40aedf2e0c1bdf80018b966cccb3b1",
+      "why": "编排者把复合命令收成一个固定脚本，好让放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。"
+    },
+    "prompt": {
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
+      "sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca"
+    },
+    "liveness_probe": {
+      "method": "pgrep -fl kimi + log byte growth over 20s",
+      "pid": 60380,
+      "log_growth_bytes": "2939588 -> 3727727",
+      "note": "日志里的 termios.error (19, 'Operation not supported by device') 来自 kimi-cli 键盘监听线程无 tty，属无害；不是执行失败。",
+      "result": "ALIVE"
     }
   },
   "orchestrator": {
