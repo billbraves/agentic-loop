@@ -334,3 +334,44 @@ def test_single_chunk_path_is_file_backed_and_jsonl(fake_codex):
     assert read_bound_brief(record, 1) == BRIEF
     # 单块路径无 chunk context（未分块）
     assert "Chunk context" not in read_prompt(record, 1)
+
+
+# ---------------------------------------------------------------------------
+# 7. REWORK 修复：分块阈值计入 brief 字节（大 brief 会把本可通过的 diff 推入分块）
+# ---------------------------------------------------------------------------
+
+def test_bound_counts_brief_bytes_not_diff_only(fake_codex):
+    adapter, record, _sb, set_default_map = fake_codex
+    set_default_map("ACCEPT")
+    # 单文件 diff 约 120KB（diff-only < 150KB 阈值，若只算 diff 则单次不分块），
+    # 但配一个 ~60KB 的 brief -> brief+diff > 150KB，必须触发分块。
+    one_file = big_multifile_diff(n_files=1, body_bytes=120 * 1024)
+    big_brief = "B" * (60 * 1024)
+    # 该单文件可按 hunk 进一步切分？此处只有一个 hunk，故会 fail-closed；
+    # 用多文件更贴近真实：两个 60KB 文件，diff-only=120KB<阈值，+60KB brief 超阈值。
+    two_files = big_multifile_diff(n_files=2, body_bytes=60 * 1024)
+    v = adapter.review(diff=two_files, brief=big_brief, contract=mk_contract(), effort="high")
+    assert v.decision == "ACCEPT"
+    # 若阈值只算 diff（120KB<150KB）会是单次调用；计入 brief 后应分块 -> >1 次。
+    assert invocation_count(record) >= 2
+    # 无损：各块绑定 diff 拼接 == 原 diff
+    n = invocation_count(record)
+    joined = "".join(read_bound_diff(record, i) for i in range(1, n + 1))
+    assert joined == two_files
+    _ = one_file  # 说明性变量，保留注释语义
+
+
+# ---------------------------------------------------------------------------
+# 8. REWORK 修复：探针与真实评审路径一致携带 --ignore-user-config
+# ---------------------------------------------------------------------------
+
+def test_probe_injection_carries_ignore_user_config(fake_codex, monkeypatch):
+    adapter, record, _sb, _dm = fake_codex
+    # probe_injection 会真正 exec fake；fake 记录 argv。让它回 sentinel。
+    monkeypatch.setenv("FAKE_RECORD_DIR", str(record))
+    # 直接断言命令构造：probe 与 _exec_attempt 一样带 --ignore-user-config。
+    ok = adapter.probe_injection()
+    # fake 不认识 probe prompt，不必求 True；关键是它被以隔离契约调用。
+    argv = read_argv(record, 1)
+    assert argv[0] == "exec"
+    assert "--ignore-user-config" in argv

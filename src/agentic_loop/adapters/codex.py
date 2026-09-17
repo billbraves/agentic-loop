@@ -149,7 +149,11 @@ class CodexAdapter(Adapter):
     def probe_injection(self) -> bool:
         if self._binding is None:
             return self.probe()
-        cmd = [self._codex_bin, "exec", *self._build_injection_flags(),
+        # WP-18: 探针必须与真实评审路径（_exec_attempt/_resume_finalization）走
+        # 一致的隔离契约，否则它认证的不是被硬化的那条路径。保留
+        # --ignore-user-config（f8eba27 版本的 probe 漏了它，属回归，已修复）。
+        cmd = [self._codex_bin, "exec", "--ignore-user-config",
+               *self._build_injection_flags(),
                "--sandbox", "read-only", "--skip-git-repo-check", "-"]
         try:
             proc = subprocess.run(cmd, input=self._PROBE_PROMPT.encode("utf-8"),
@@ -159,6 +163,15 @@ class CodexAdapter(Adapter):
         out = proc.stdout.decode("utf-8", errors="replace")
         return proc.returncode == 0 and self._SENTINEL in out
 
+    @staticmethod
+    def _bound_payload_bytes(brief: str | None, diff: str) -> int:
+        """本次评审绑定给 provider 读取的 brief + diff 的 UTF-8 字节数。
+
+        分块阈值对此设限，而非仅 diff：brief 随每块重复绑定，若不计入，一个大
+        brief 可能把本已在阈值内的 diff 推过 provider 单轮读取上限。
+        """
+        return len((brief or "").encode("utf-8")) + len(diff.encode("utf-8"))
+
     def review(
         self,
         *,
@@ -167,19 +180,26 @@ class CodexAdapter(Adapter):
         contract: ReviewContract,
         effort: str,
     ) -> Verdict:
-        """WP-18：绑定 diff 不超阈值走单次文件回填评审；超阈值则按文件/hunk
-        边界无损分块，每块走文件回填 + JSONL 硬化单次评审，最后保守聚合。
+        """WP-18：绑定 payload（brief + diff 字节）不超阈值走单次文件回填评审；
+        超阈值则按文件/hunk 边界无损分块，每块走文件回填 + JSONL 硬化单次评审，
+        最后保守聚合。
+
+        阈值度量对象为「本次绑定给 provider 读取的 brief + diff 字节」，与 WP-17
+        对 brief+diff 联合设限一致（brief 会随每块重复绑定，故必须计入，避免大
+        brief 把本可通过的 diff 推过 provider 单轮上限）。
         """
-        if len(diff.encode("utf-8")) <= self._CHUNK_PROMPT_MAX_BYTES:
+        if self._bound_payload_bytes(brief, diff) <= self._CHUNK_PROMPT_MAX_BYTES:
             return self._review_single(
                 diff=diff, brief=brief, contract=contract, effort=effort
             )
 
-        chunks = self._split_diff(diff)
+        chunks = self._split_diff(
+            diff, reserved_bytes=len((brief or "").encode("utf-8"))
+        )
         if len(chunks) <= 1:
             # 无法进一步按文件/hunk 切小（单块仍超阈值）：fail-closed，不截断 diff。
             raise RuntimeError(
-                "codex review diff exceeds chunk bound "
+                "codex review payload exceeds chunk bound "
                 f"({self._CHUNK_PROMPT_MAX_BYTES} bytes) but diff cannot be split "
                 "into smaller file/hunk chunks; failing closed without truncation"
             )
@@ -187,8 +207,8 @@ class CodexAdapter(Adapter):
         file_list = [label for label, _ in chunks]
         verdicts: list[Verdict] = []
         for idx, (label, chunk_diff) in enumerate(chunks, start=1):
-            if len(chunk_diff.encode("utf-8")) > self._CHUNK_PROMPT_MAX_BYTES:
-                # 单块（本块 diff）仍超阈值：fail-closed，绝不截断。
+            if self._bound_payload_bytes(brief, chunk_diff) > self._CHUNK_PROMPT_MAX_BYTES:
+                # 单块（brief + 本块 diff）仍超阈值：fail-closed，绝不截断。
                 raise RuntimeError(
                     f"codex review chunk {idx}/{len(chunks)} ({label}) still exceeds "
                     f"chunk bound ({self._CHUNK_PROMPT_MAX_BYTES} bytes) after "
@@ -706,12 +726,18 @@ class CodexAdapter(Adapter):
     _HUNK_HEADER_PREFIX = "@@ "
 
     @classmethod
-    def _split_diff(cls, diff: str) -> list:
+    def _split_diff(cls, diff: str, reserved_bytes: int = 0) -> list:
         """Split by `diff --git` file boundaries (line-based, no regex literal);
-        a single file still over bound is further split by `@@` hunks. Only
-        splits, never rewrites diff content. Preamble before the first file
-        header joins the first chunk. Empty diff or no file header returns a
-        single-element list (upper layer fails closed on "cannot split")."""
+        a single file whose bytes plus ``reserved_bytes`` still exceed the bound
+        is further split by `@@` hunks. Only splits, never rewrites diff content.
+        Preamble before the first file header joins the first chunk. Empty diff
+        or no file header returns a single-element list (upper layer fails closed
+        on "cannot split").
+
+        ``reserved_bytes`` accounts for the brief that is bound alongside each
+        chunk, so a file that fits alone but not with the brief is still split
+        as far as possible before the upper layer's fail-closed check."""
+        effective = cls._CHUNK_PROMPT_MAX_BYTES - reserved_bytes
         lines = diff.splitlines(keepends=True)
         # Group lines into per-file segments at each "diff --git " line.
         segments: list = []
@@ -731,7 +757,7 @@ class CodexAdapter(Adapter):
         chunks: list = []
         for seg in segments:
             label = cls._file_label(seg)
-            if len(seg.encode("utf-8")) <= cls._CHUNK_PROMPT_MAX_BYTES:
+            if len(seg.encode("utf-8")) <= effective:
                 chunks.append((label, seg))
             else:
                 # Single file over bound: split by hunk, each piece keeps header.
