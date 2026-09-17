@@ -13,7 +13,7 @@
     "integration_branch": "main",
     "base_commit": "d6fee35",
     "branch": "fix/wp-18-codex-gate-capability-merge",
-    "worktree": "",
+    "worktree": "/Users/admin/vibe/.worktrees/agentic-wp18-codex-merge",
     "commit": "",
     "reviewed_commit": "",
     "merged_commit": "",
@@ -50,6 +50,15 @@
     "tests": [],
     "rootcause_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-34-native-gate-rootcause.md @ 3b1be2b",
     "goal": "Merge chunking (beb167b) with file-backing/JSONL-hardening/finalization (f8eba27); neither branch contains both. Verified: 01312c5 not ancestor of main; chunking branch lacks candidate.diff/_read_thread_id/_resume_finalization; isolated-review branch lacks _split_diff/_CHUNK_PROMPT_MAX_BYTES."
+  },
+  "dispatch_blocker": {
+    "state_when_blocked": "APPROVED, worktree created, preflight not passed",
+    "worktree_created": "/Users/admin/vibe/.worktrees/agentic-wp18-codex-merge (branch fix/wp-18-codex-gate-capability-merge, clean, at 2dbd36e)",
+    "blocker": "agentic preflight dispatch-lint resolves main_root to the repo's true main checkout /Users/admin/vibe/agentic_loop (git-common-dir parent), where this WP-18 status file is not present on the currently checked-out branch plan/2026-09-13-parallel-throughput.",
+    "root_cause": "The agentic-loop git repo's primary checkout is /Users/admin/vibe/agentic_loop, not /Users/admin/vibe/agentic-loop-main-codex-merge (which is itself a worktree on branch main). The WP-18 freeze commit 2dbd36e is on branch main; the primary checkout is on a different branch (plan/2026-09-13-parallel-throughput) with ~8 uncommitted files that appear to belong to another active session.",
+    "not_done_because": "Resolving this would require switching the primary checkout's branch or touching another session's uncommitted work, which violates the git-safety rule to preserve unrelated changes. Paused per user decision to first reconcile the primary checkout.",
+    "next_action": "After the primary checkout /Users/admin/vibe/agentic_loop is reconciled (its branch/uncommitted work resolved by its owner) and can present WP-18 on the resolved base, re-run: cd /Users/admin/vibe/.worktrees/agentic-wp18-codex-merge && agentic preflight docs/plans/2026-09-14-codex-verdict-contract/WP-18.status.json ; on PREFLIGHT_PASS, dispatch kimi into that worktree.",
+    "recorded_at": "2026-09-15T20:00:00Z"
   },
   "review": {},
   "consult": {},
