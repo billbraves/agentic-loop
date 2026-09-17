@@ -760,14 +760,21 @@ class CodexAdapter(Adapter):
             if len(seg.encode("utf-8")) <= effective:
                 chunks.append((label, seg))
             else:
-                # Single file over bound: split by hunk, each piece keeps header.
-                chunks.extend(cls._split_file_by_hunks(label, seg))
+                # Single file over bound: split by hunk; WP-19 further splits a
+                # single over-budget pure-addition hunk at line granularity.
+                chunks.extend(cls._split_file_by_hunks(label, seg, effective))
         return chunks
 
     @classmethod
-    def _split_file_by_hunks(cls, label: str, seg: str) -> list:
+    def _split_file_by_hunks(cls, label: str, seg: str, effective: int | None = None) -> list:
         """Split one file segment by `@@` hunk boundaries (line-based); each
-        piece keeps the file header preamble that precedes the first hunk."""
+        piece keeps the file header preamble that precedes the first hunk.
+
+        WP-19: when ``effective`` (the per-chunk byte budget incl. brief reserve)
+        is given, any single hunk piece that still exceeds it is further split at
+        line granularity via ``_split_hunk_by_lines`` — but only for strictly
+        pure-addition hunks; any other hunk shape is left intact so the caller
+        fails closed (never truncates)."""
         lines = seg.splitlines(keepends=True)
         first_hunk = None
         for idx, line in enumerate(lines):
@@ -777,21 +784,138 @@ class CodexAdapter(Adapter):
         if first_hunk is None:
             return [(label, seg)]
         header = "".join(lines[:first_hunk])
-        pieces: list = []
+        # Group into per-hunk (label, hunk_text) pieces first.
+        raw: list = []
         buf: list = []
         hno = 0
         for line in lines[first_hunk:]:
             if line.startswith(cls._HUNK_HEADER_PREFIX) and buf:
                 hno += 1
-                pieces.append((f"{label}#hunk{hno}", header + "".join(buf)))
+                raw.append((f"{label}#hunk{hno}", "".join(buf)))
                 buf = [line]
             else:
                 buf.append(line)
         if buf:
             hno += 1
-            pieces.append((f"{label}#hunk{hno}", header + "".join(buf)))
-        if len(pieces) <= 1:
+            raw.append((f"{label}#hunk{hno}", "".join(buf)))
+
+        pieces: list = []
+        for plabel, hunk_text in raw:
+            full = header + hunk_text
+            if effective is not None and len(full.encode("utf-8")) > effective:
+                # Over budget: try lossless line-level split (pure-addition only).
+                pieces.extend(cls._split_hunk_by_lines(plabel, header, hunk_text, effective))
+            else:
+                pieces.append((plabel, full))
+        # A single unsplit hunk equal to the whole segment: return seg verbatim
+        # (identity), preserving prior single-hunk behavior for the caller.
+        if len(raw) == 1 and len(pieces) == 1 and pieces[0][1] == header + raw[0][1]:
             return [(label, seg)]
+        return pieces
+
+    @classmethod
+    def _parse_hunk_header(cls, line: str):
+        """Parse a `@@ -a,b +c,d @@` header via string ops (no regex literal).
+
+        Returns (old_start, old_count, new_start, new_count) as ints, or None if
+        the line is not a well-formed hunk header. `,b`/`,d` default to 1 when
+        omitted (unified-diff convention)."""
+        if not line.startswith("@@ "):
+            return None
+        rest = line[3:]
+        end = rest.find(" @@")
+        if end < 0:
+            return None
+        spec = rest[:end]  # e.g. "-0,0 +1,4170"
+        parts = spec.split(" ")
+        if len(parts) != 2 or not parts[0].startswith("-") or not parts[1].startswith("+"):
+            return None
+
+        def pair(tok: str):
+            body = tok[1:]
+            if "," in body:
+                a, b = body.split(",", 1)
+                return int(a), int(b)
+            return int(body), 1
+
+        try:
+            old_start, old_count = pair(parts[0])
+            new_start, new_count = pair(parts[1])
+        except ValueError:
+            return None
+        return old_start, old_count, new_start, new_count
+
+    @classmethod
+    def _split_hunk_by_lines(cls, label: str, header: str, hunk_text: str, effective: int) -> list:
+        """Lossless line-level split of ONE over-budget hunk, restricted to
+        strictly pure-addition hunks (WP-19).
+
+        Strict whole-hunk predicate (all must hold), else return the hunk intact
+        so the caller fails closed:
+          (a) header old-side count == 0 (form `@@ -a,0 +c,d @@`);
+          (b) every body line starts with '+' (no context lines, no deletions,
+              no `\\ No newline` markers).
+        On success, split the '+' body into contiguous runs each fitting
+        `effective` (file header + recomputed hunk header + run). The old-side
+        `-a,0` is held constant across sub-pieces (no real deletion → anchor
+        unchanged); only the '+' side start/count advances. Concatenating the
+        sub-pieces' '+' lines reproduces the original '+' lines exactly."""
+        lines = hunk_text.splitlines(keepends=True)
+        if not lines or not lines[0].startswith(cls._HUNK_HEADER_PREFIX):
+            return [(label, header + hunk_text)]
+        parsed = cls._parse_hunk_header(lines[0])
+        if parsed is None:
+            return [(label, header + hunk_text)]
+        old_start, old_count, new_start, _new_count = parsed
+        body = lines[1:]
+        # Predicate: old-side count 0 AND every body line is a pure addition.
+        if old_count != 0:
+            return [(label, header + hunk_text)]
+        if not body or any(not ln.startswith("+") for ln in body):
+            return [(label, header + hunk_text)]
+
+        header_bytes = len(header.encode("utf-8"))
+        pieces: list = []
+        run: list = []
+        run_start = new_start  # '+' side start line for the current run
+
+        def hunk_header_line(start: int, count: int) -> str:
+            return f"@@ -{old_start},0 +{start},{count} @@\n"
+
+        def flush():
+            if not run:
+                return
+            hh = hunk_header_line(run_start, len(run))
+            pieces.append(
+                (f"{label}#lines{run_start}-{run_start + len(run) - 1}",
+                 header + hh + "".join(run))
+            )
+
+        for ln in body:
+            tentative = run + [ln]
+            hh = hunk_header_line(run_start, len(tentative))
+            size = header_bytes + len(hh.encode("utf-8")) + \
+                len("".join(tentative).encode("utf-8"))
+            if size <= effective:
+                run = tentative
+                continue
+            # ln does not fit with the current run.
+            if not run:
+                # A single '+' line alone exceeds the budget: cannot split
+                # losslessly -> fail closed by returning the hunk intact.
+                return [(label, header + hunk_text)]
+            flush()
+            run_start += len(run)
+            run = [ln]
+            # Re-check: the single line alone might still be over budget.
+            hh1 = hunk_header_line(run_start, 1)
+            if header_bytes + len(hh1.encode("utf-8")) + \
+                    len(ln.encode("utf-8")) > effective:
+                return [(label, header + hunk_text)]
+        flush()
+        if len(pieces) <= 1:
+            # No actual reduction achieved: keep intact (caller fails closed).
+            return [(label, header + hunk_text)]
         return pieces
 
     @staticmethod

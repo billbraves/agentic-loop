@@ -361,11 +361,38 @@ def test_chunk_fail_closed_raises_not_accept(fake_codex):
 # 6. 单块仍超阈值 -> fail-closed，不截断
 # ---------------------------------------------------------------------------
 
-def test_single_file_over_bound_after_hunk_split_fails_closed(fake_codex):
+def test_single_file_pure_addition_hunk_is_line_split(fake_codex):
+    # WP-19 (re-freeze rev2): 单文件单-hunk 纯新增超界，原先 fail-closed；现被无损
+    # 行级切分成多段逐块评审。全 default-map ACCEPT -> 聚合 ACCEPT。
     adapter, record, _sb, set_default_map = fake_codex
     set_default_map("ACCEPT")
-    # 单文件单 hunk 且 > 阈值，无法再切 -> fail-closed
     huge = "diff --git a/big.py b/big.py\n--- a/big.py\n+++ b/big.py\n@@ -0,0 +1,3000 @@\n" + ("+" + "B" * 78 + "\n") * 3000
+    assert len(huge.encode("utf-8")) > CodexAdapter._CHUNK_PROMPT_MAX_BYTES
+    v = adapter.review(diff=huge, brief=BRIEF, contract=mk_contract(), effort="high")
+    assert v.decision == "ACCEPT"
+    assert invocation_count(record) >= 2, "纯新增超界 hunk 应被行切成多块逐块评审"
+
+
+def test_single_oversized_line_still_fails_closed(fake_codex):
+    # WP-19 边界：真正不可无损切的场景仍 fail-closed —— 单个 '+' 行本身即超界，
+    # 不能强切一行、绝不截断。
+    adapter, record, _sb, set_default_map = fake_codex
+    set_default_map("ACCEPT")
+    giant_line = "+" + ("Q" * (CodexAdapter._CHUNK_PROMPT_MAX_BYTES + 1000)) + "\n"
+    huge = "diff --git a/one.py b/one.py\nnew file mode 100644\n--- /dev/null\n+++ b/one.py\n@@ -0,0 +1,1 @@\n" + giant_line
+    assert len(huge.encode("utf-8")) > CodexAdapter._CHUNK_PROMPT_MAX_BYTES
+    with pytest.raises(RuntimeError) as exc:
+        adapter.review(diff=huge, brief=BRIEF, contract=mk_contract(), effort="high")
+    assert "failing closed without truncation" in str(exc.value)
+
+
+def test_mixed_over_bound_hunk_still_fails_closed(fake_codex):
+    # WP-19 边界：含上下文/删除行的混合超界 hunk 不可无损行切 -> fail-closed。
+    adapter, record, _sb, set_default_map = fake_codex
+    set_default_map("ACCEPT")
+    added = "".join("+a " + "z" * 80 + "\n" for _ in range(3000))
+    huge = ("diff --git a/mix.py b/mix.py\n--- a/mix.py\n+++ b/mix.py\n"
+            "@@ -1,2 +1,3001 @@\n context kept\n" + added)
     assert len(huge.encode("utf-8")) > CodexAdapter._CHUNK_PROMPT_MAX_BYTES
     with pytest.raises(RuntimeError) as exc:
         adapter.review(diff=huge, brief=BRIEF, contract=mk_contract(), effort="high")
