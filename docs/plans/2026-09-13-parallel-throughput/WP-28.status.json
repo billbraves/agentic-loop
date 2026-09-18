@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -524,6 +524,13 @@
       "decision": "ACCEPT",
       "prompt_bytes": 50298,
       "exit_code": 0
+    },
+    "rev6_merge_approval": {
+      "approved_by": "user",
+      "verbatim_user_message": "合并",
+      "at": "2026-09-18",
+      "gate": "orchestrator ACCEPT + codex consult ACCEPT + user approval",
+      "note": "另有一条待补：evidence.rev6_stop_and_review.user_approved / verbatim_user_message=\"2\" 在本会话中无对应用户消息，编排者已向用户提出，本次批准仅覆盖合入动作"
     }
   },
   "consult": {
@@ -570,6 +577,6 @@
       "B47（任务 #38）",
       "O2 形状：guard 的承重性需构造其真正触发条件，单看「删掉是否转红」会误判"
     ],
-    "merge_gate": "codex 第二签名已 ACCEPT；合入仍须用户明确批准（未获得）"
+    "merge_gate": "双签名齐（编排者 ACCEPT + codex ACCEPT）；用户已明确批准合入（本轮消息「合并」）"
   }
 }
