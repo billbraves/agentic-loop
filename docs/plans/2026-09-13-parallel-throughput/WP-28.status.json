@@ -7,8 +7,8 @@
   "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
-    "tool": "kimi-cli",
-    "session": "wp28-rev3-82444",
+    "tool": "kimi",
+    "session": "bg-bquopan4c",
     "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
     "dispatch_prompt_sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca",
     "dispatch_command": "bash /Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
@@ -30,7 +30,7 @@
       "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
     },
     "rev": 3,
-    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev3-exec.log",
+    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev4-kimi.log",
     "dispatch_script": {
       "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
       "sha256": "f7f1374ce73f7960ddcd8871412494e734b494c8b860db9192d7b89c7fab8153",
@@ -63,7 +63,10 @@
         "reported_tests": "3.11 targeted 29 passed / 3.11 全量 4 failed 628 passed 4 skipped / 3.13 targeted 29 passed / 3.14 targeted 29 passed",
         "session": "kimi -r 6c94e667-27d6-4e9d-8cac-a8ebc22bb2e4"
       }
-    }
+    },
+    "dispatched_at": "2026-09-18T05:53:05Z",
+    "command": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY -u ANTHROPIC_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_MODEL kimi --afk --print --config-file /Users/admin/.kimi/deepseek.toml -w /Users/admin/vibe/wp28-norms-into-template -p <rev4 prompt>",
+    "dispatch_note": "首次派发（bg-bokbosvar）rc=1 失败，非任务失败：编排者会话导出的 OPENAI_BASE_URL=http://127.0.0.1:18080/v1 被 kimi 的 openai_legacy 客户端优先于配置里的 base_url 采用，deepseek 流量被改指本机 kiro 网关，网关以 kiro_api_error 400 'Invalid model ID or insufficient subscription level' 拒收 deepseek-v4-pro。对照实验定因：带 OPENAI_* 时 --config-file deepseek.toml 同样 400；env -u 掉 OPENAI_BASE_URL/OPENAI_API_KEY 后同一命令 TurnEnd() 正常。已登记为缺陷 B51。"
   },
   "orchestrator": {
     "tool": "claude-code",
