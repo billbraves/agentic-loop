@@ -93,6 +93,49 @@ class CodexAdapter(Adapter):
     # 只是度量对象从「内联 prompt 字节」精确到「绑定 diff 字节」）。
     _CHUNK_PROMPT_MAX_BYTES = 150 * 1024
 
+    # ------------------------------------------------------------------
+    # WP-20：tool-free（finalization/normalization）分支的 JSONL 容忍白名单
+    # ------------------------------------------------------------------
+    # codex 0.154 在**自定义 provider**（本仓为 DeepSeek）下，会在 turn 之前发一个
+    # `item.completed`，其 `item.type == "error"`，内容是 provider metadata 缺失的
+    # **良性告警**：模型元数据表里没有该 model 名，于是退回 fallback metadata。
+    # 它无外部副作用、不代表任何工具/能力调用，也不代表 turn 失败（真实流里既没有
+    # 顶层 `error` 事件也没有 `turn.failed`）。
+    #
+    # 容忍必须**严格白名单化**：只有 item.type == "error" 且其 message 同时包含
+    # 下面两个具名特征子串（codex 该告警的固定措辞）才被视为该良性告警。任何其它
+    # error item（真实执行错误、伪装成 error 的消息）仍 fail-closed。
+    _BENIGN_WARNING_ITEM_TYPE = "error"
+    _BENIGN_METADATA_WARNING_MARKERS = (
+        "Model metadata for",
+        "Defaulting to fallback metadata",
+    )
+
+    # tool-free turn 允许的 item 子类型（不含上面那条严格白名单化的良性告警）。
+    # `reasoning` 是模型内部推理而非外部能力；`agent_message` 是最终裁决载体。
+    # command_execution / file_change / mcp_tool_call / web_search / todo_list
+    # 以及任何未知子类型都不在此集合内 —— 一律 fail-closed。
+    _TOOL_FREE_ITEM_TYPES = frozenset({"reasoning", "agent_message"})
+
+    # tool-free turn 允许的顶层 event type。
+    #
+    # WP-20：`item.started` 只是**同一个 item 的生命周期前半**（codex 0.154 对
+    # 每个 item 先发 started 再发 completed），本身不携带任何新增能力，因此加入
+    # 白名单；但它绝不能成为工具项的旁路 —— `item.started` 携带的 item 子类型走
+    # 与 `item.completed` **完全相同**的逐项校验（见 `_tool_free_item_rejected`）。
+    _TOOL_FREE_EVENT_TYPES = frozenset(
+        {
+            "thread.started",
+            "turn.started",
+            "item.started",
+            "item.completed",
+            "turn.completed",
+        }
+    )
+
+    # 携带 item 负载的事件类型：这两类的 item 都要逐项过 tool-free 子类型校验。
+    _ITEM_BEARING_EVENT_TYPES = frozenset({"item.started", "item.completed"})
+
     def __init__(self, codex_bin: str = "codex",
                  binding: ProviderBinding | None = None) -> None:
         self._codex_bin = codex_bin
@@ -377,6 +420,14 @@ class CodexAdapter(Adapter):
             "multi_agent",
             "--disable",
             "multi_agent_v2",
+            # WP-20：codex 0.154 内置 apps 特性会挂载 `codex_apps` MCP 工具
+            # （实测 `codex_document_control.*`）。它不来自用户 config.toml 的
+            # mcp_servers（那些已被 --ignore-user-config 隔离），必须显式关闭，
+            # 否则模型可能在**本应无工具**的收尾/归一化 turn 里发起 MCP 调用。
+            # 这是收紧执行契约（同 shell_tool/unified_exec/multi_agent），
+            # 而非在 JSONL 校验里放行工具项。
+            "--disable",
+            "apps",
         ]
         if not tools_enabled:
             tool_flags.extend(
@@ -439,6 +490,10 @@ class CodexAdapter(Adapter):
             "shell_tool",
             "--disable",
             "unified_exec",
+            # WP-20：同 _exec_attempt —— 关闭内置 apps/MCP 工具面。收尾 turn 明确
+            # 禁工具，绝不能留一个内置 MCP 通道。
+            "--disable",
+            "apps",
             "--skip-git-repo-check",
             "-c",
             'sandbox_mode="read-only"',
@@ -495,6 +550,38 @@ class CodexAdapter(Adapter):
         return canonical if ids[0] == canonical else None
 
     @classmethod
+    def _is_benign_metadata_warning_item(cls, item: object) -> bool:
+        """严格白名单：codex 在自定义 provider 下发的良性 fallback-metadata 告警。
+
+        必须同时满足：item 是 dict、``type == "error"``、``message`` 是 str，且
+        message **同时**包含两个具名特征子串。任何真实错误、其它 error 文案、
+        伪装成 error 的消息都不满足 —— 保持 fail-closed。纯子串判定，无 regex。
+        """
+        if not isinstance(item, dict):
+            return False
+        if item.get("type") != cls._BENIGN_WARNING_ITEM_TYPE:
+            return False
+        message = item.get("message")
+        if not isinstance(message, str):
+            return False
+        return all(
+            marker in message for marker in cls._BENIGN_METADATA_WARNING_MARKERS
+        )
+
+    @classmethod
+    def _tool_free_item_rejected(cls, item: object) -> bool:
+        """tool-free turn 的逐项 item 判定：True 表示必须 fail-closed。
+
+        非 dict、工具项、未知子类型一律拒绝；只有 ``reasoning`` /
+        ``agent_message`` 与严格白名单化的良性 metadata 告警放行。
+        """
+        if not isinstance(item, dict):
+            return True
+        if item.get("type") in cls._TOOL_FREE_ITEM_TYPES:
+            return False
+        return not cls._is_benign_metadata_warning_item(item)
+
+    @classmethod
     def _validated_final_message(
         cls,
         proc: subprocess.CompletedProcess,
@@ -543,30 +630,25 @@ class CodexAdapter(Adapter):
                 "codex final-message protocol mismatch: invalid turn ordering"
             )
         if tools_forbidden:
-            allowed_types = {
-                "thread.started",
-                "turn.started",
-                "item.completed",
-                "turn.completed",
-            }
-            if any(event_type not in allowed_types for event_type in types):
+            if any(
+                event_type not in cls._TOOL_FREE_EVENT_TYPES
+                for event_type in types
+            ):
                 raise RuntimeError(
                     "codex final-message protocol mismatch: tool-free turn emitted "
                     "an unexpected event"
                 )
-            completed_items = [
+            # 携带 item 的事件（item.started 与 item.completed）走同一套逐项校验：
+            # 只允许 reasoning / agent_message，以及严格白名单化的良性
+            # fallback-metadata 告警 item。工具项（command_execution/file_change/
+            # mcp_tool_call/web_search/todo_list）与未知子类型无论出现在哪一类
+            # 事件里都 fail-closed —— item.started 不得成为工具项的旁路。
+            carried_items = [
                 event.get("item")
                 for event in events
-                if event.get("type") == "item.completed"
+                if event.get("type") in cls._ITEM_BEARING_EVENT_TYPES
             ]
-            # Codex 0.154 可在无工具 turn 中完成 reasoning item；这是模型内部
-            # 推理而非外部能力。除此与最终 agent_message 外，未知/工具 item
-            # 一律 fail-closed（command_execution/file_change/MCP/web 等均被拒）。
-            if any(
-                not isinstance(item, dict)
-                or item.get("type") not in {"reasoning", "agent_message"}
-                for item in completed_items
-            ):
+            if any(cls._tool_free_item_rejected(item) for item in carried_items):
                 raise RuntimeError(
                     "codex final-message protocol mismatch: tool-free turn emitted "
                     "a tool or unknown item"
