@@ -54,8 +54,9 @@
     "session": "8a8bf01e"
   },
   "reviewer": {
-    "tool": "claude-code",
-    "session": ""
+    "tool": "codex",
+    "session": "",
+    "provider": "kirogpt"
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
@@ -171,6 +172,19 @@
       "dispatch_lint_upgraded_from_inference_to_measurement": "抽出 dispatch_lint.sh:68-99 的段落检查器直接对外包注释副本执行 → 输出为空、rc 与未变异对照相同，即该门禁同样不转红。原文档只做代码审查推断，现有实测背书",
       "option_b_cost_measured": "把 WP-28 rev3 的 4 条无害探针（brief §D 要求必绿）跑 (b) 的判据：改占位符 / 追加无关节 / 改 allowed_paths 措辞 / 改冻结日期——4/4 全被 (b) 判红，rev3 下 4/4 绿",
       "baseline_B48": "wp29 树(2e5f2c0)=606、wp28 树(b34deb9)=619；targeted 7 vs 20；20−7=13=619−606；三棵树测试文件数同为 41。零回归成立，619 是编排者抄错的跨 lane 数"
+    },
+    "stage1_consult": {
+      "request_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-request.md",
+      "request_sha256": "639728cc0a8a061b4c91988f0350c3c3465f91c04bd2073b7f8a386fc377d8b0",
+      "dispatched_at": "2026-09-18",
+      "inputs": {
+        "brief": "WP-29-brief.md sha256 1dfd72ac…",
+        "diff": "2e5f2c0..bd4ac7a (1 file +275/-0)"
+      },
+      "harness": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp29-stage1/run.py",
+      "env_note": "仅剥离 OPENAI_BASE_URL",
+      "state": "IN_FLIGHT",
+      "asks": "5 条特别检查：消费面是否穷尽 / 方言权威性 / 不采纳 (b) 的反证是否站得住 / 文首文末哨兵是否有一句话绕过的反例 / 五项必答是否足以支撑阶段 2 冻结"
     }
   },
   "review": {
