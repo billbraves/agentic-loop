@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import unicodedata
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -297,7 +298,9 @@ FROZEN_BODY_ACCEPTANCE = (
     "3. **代表性禁止变异转红**：至少一个代表性禁止变异（如改掉锚点标题、\n"
     "   删去关键守卫）必须使测试转红。\n"
     "4. **变异集按判据自身的组成步骤生成**：判据自检的变异集必须按判据自身的组成步骤生成，\n"
-    "   不得按已知缺陷清单枚举；某步骤不可攻击须在报告里写明理由。\n"
+    "   不得按已知缺陷清单枚举；某步骤不可攻击须在报告里写明理由。变异必须施加于判据\n"
+    "   真实的输入面（文件字节 / 进程边界 / 外部状态），不得只改判据已持有的内存表示。\n"
+    "   判别方式：把被修的缺陷还原成原状，该用例必须转红；仍绿则该用例不承重。\n"
     "\n"
     "注意：第 1 项证明「前置可达」，第 2 项证明「失败归因」，\n"
     "**两者不能互相替代**——「无注入时能到终点」并不排除「带注入时死在别处」。\n"
@@ -532,6 +535,39 @@ def _mutate_both(mutate):
     return _check_both(mutated_packaged, mutated_docs)
 
 
+@contextmanager
+def _mutate_on_disk(paths, mutate_bytes):
+    """Temporarily write mutated BYTES to real template files, then restore.
+
+    This is the M-T0 / M-T0b carrier.  The mutation is applied to the file's
+    bytes, so the criterion's read path (``_read_text_preserving_newlines``)
+    is the ONLY thing between the mutated bytes and the witness codes.  A
+    read-path regression (e.g. back to ``Path.read_text``) therefore flips
+    the result — which is exactly what makes these cases kill their own fix.
+
+    The no-op guard compares bytes (``mutated != original``), and ``finally``
+    restores every touched file and asserts the restore is byte-exact, so a
+    passing or failing test can never leave a dirty template behind.
+    """
+    originals = {p: p.read_bytes() for p in paths}
+    mutated = {p: mutate_bytes(data) for p, data in originals.items()}
+    for p, data in mutated.items():
+        assert data != originals[p], f"mutation must change bytes (no-op guard): {p}"
+        p.write_bytes(data)
+    try:
+        yield
+    finally:
+        for p, data in originals.items():
+            p.write_bytes(data)
+            assert p.read_bytes() == data, f"restore must be byte-exact: {p}"
+
+
+def _crlf_rewrap_bytes(data):
+    """Normalize then rewrap line endings so an already-CRLF file never becomes
+    ``\\r\\r\\n``: ``b"\\r\\n" -> b"\\n"`` first, then ``b"\\n" -> b"\\r\\n"``."""
+    return data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+
+
 # ---------------------------------------------------------------------
 # Positive control: the real templates carry exactly the frozen blocks.
 # ---------------------------------------------------------------------
@@ -547,28 +583,27 @@ def test_invn_positive_control_clean_template():
 # T0 — input fidelity: the criterion's input must be the file's bytes.
 # ---------------------------------------------------------------------
 def test_invn_t0_crlf_rewrap_both_red():
-    """M-T0: re-encoding BOTH templates LF->CRLF (no character change, frozen
-    constants untouched) must go red, with SECTION_MISSING as the specific
-    witness and NO REPLICA_MISMATCH (both replicas stay identical)."""
-
-    def mutate(text):
-        return text.replace("\n", "\r\n")
-
-    codes = _mutate_both(mutate)
+    """M-T0: re-encoding BOTH template FILES' bytes LF->CRLF (no character
+    change, frozen constants untouched) must go red, with SECTION_MISSING as
+    the specific witness and NO REPLICA_MISMATCH (both replicas stay
+    identical).  The mutation is written to disk and the criterion reads the
+    files itself, so a read-path regression flips this case red."""
+    with _mutate_on_disk([TEMPLATE_PACKAGED, TEMPLATE_DOCS], _crlf_rewrap_bytes):
+        packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
+        docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
+        codes = _check_both(packaged, docs)
     assert SECTION_MISSING in codes, codes
     assert REPLICA_MISMATCH not in codes, codes
 
 
 def test_invn_t0b_crlf_rewrap_one_side_red():
-    """M-T0b: mutating only ONE replica's line endings must surface as
-    REPLICA_MISMATCH (T7), proving M-T0's red comes from T0/T1 — not from
-    replica identity."""
-    packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
-    docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
-    assert packaged == docs
-    mutated_packaged = packaged.replace("\n", "\r\n")
-    assert mutated_packaged != packaged, "mutation must change the text (no-op guard)"
-    codes = _check_both(mutated_packaged, docs)
+    """M-T0b: mutating only ONE replica FILE's line-ending bytes must surface
+    as BOTH REPLICA_MISMATCH (T7) and SECTION_MISSING (T0/T1), proving M-T0's
+    red comes from T0/T1 — not from replica identity."""
+    with _mutate_on_disk([TEMPLATE_PACKAGED], _crlf_rewrap_bytes):
+        packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
+        docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
+        codes = _check_both(packaged, docs)
     assert REPLICA_MISMATCH in codes, codes
     assert SECTION_MISSING in codes, codes
 
