@@ -376,7 +376,27 @@
         "exit_code": 0,
         "run_by": "orchestrator"
       }
-    ]
+    ],
+    "refreeze_stop_rule_check_rev5": {
+      "rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 冻结前必须停手复核计划",
+      "verdict_doc": "docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev5.md",
+      "refreeze_seq": "rev1 首冻 -> rev2 第1次 -> rev3 第2次 -> rev4 第3次(已复核) -> rev5 第4次(本次)",
+      "fires": true,
+      "findings": [
+        "失误1：rev4 复核给出的三条修法方向(R1前一行/R2 240字符窗口/R3 h2 envelope)本轮全部实测，无一可用——R1/R2 漏插入位置，R3 把同段无关 bullet 改写误判为 RED（envelope 覆盖 1421/1826/182 字节活文本）",
+        "失误2：把「处境」当成一个位置，实为两维（结构插入 / 邻句改写）；两条腿的 R7 实测 8 攻击+7 无害零错判",
+        "失误3：R7 仍有 X1-X4 远距离逃逸，与 WP-29 的 E4 同族；rev5 须把承诺量词改为有界，而非继续加面"
+      ],
+      "measured_remedy": "R7 = 腿(i) h2标题->块起点的引导符种类序列 (HLLLLL/HLLLLLL/HLL) + 腿(ii) 紧邻前一单元的规范化正文",
+      "residual_out_of_scope": [
+        "X1 引导句并进同段更早 bullet",
+        "X2 引导句写进 h2 标题行",
+        "X3 引导句放另一段",
+        "X4 引导句放文档前言"
+      ],
+      "scope_ruling": "收窄：只做 B38(有界版) + B39 + 承诺边界明文化；不引 parser、不整份冻结、不扩 allowed_paths",
+      "gate": "未经用户批准不得冻结 rev5"
+    }
   },
   "review": {
     "decision": "REWORK",

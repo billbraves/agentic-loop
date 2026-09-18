@@ -462,6 +462,21 @@
         "incidental": "实证中该门禁两次正确拒收越界 fixture（相对路径锚真实主仓、绝对路径触发 containment），fail-closed 行为顺手确认"
       },
       "scope_decision": "两面同族、同在 allowed_paths、只修一面则另一面仍在 -> rev4 一并收口（见复核文档 §5）"
+    },
+    "refreeze_stop_rule_check_rev5": {
+      "rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 冻结前必须停手复核计划",
+      "verdict_doc": "docs/plans/2026-09-13-parallel-throughput/WP-26-plan-review-before-rev5.md",
+      "refreeze_seq": "rev1 首冻 -> rev2 第1次 -> rev3 第2次 -> rev4 第3次(已复核, 任务#30) -> rev5 第4次(本次)",
+      "fires": true,
+      "findings": [
+        "失误1：rev4 DoD 只要求「报告给出实测计数」，未要求该计数由用例运行时采集并断言，执行者给静态计数不算违约",
+        "失误2：只要求两个消费面都有用例，未要求两面判据钉同一个量；rev3 已记过同型失误一次",
+        "失误3：出口集合闭包要求未写进 brief，重构新引入的出口 9/10 逃过「每出口一用例+措辞可区分」规则"
+      ],
+      "measured_remedy": "sitecustomize 包 builtins.open 计数器 + realpath 比对 + AGENTIC_PYTHON shim；实测 real reads_of_brief=1 / mutated=2，两侧 stdout 同为 DISPATCH_LINT_PASS",
+      "probe_deviation": "第一版探针合成 fixture 的 brief 按主仓根解析导致两侧 reads=0（什么也没测到却同样「绿」）；改真 git 仓 + .agentic/config.toml 后才分离",
+      "scope_ruling": "收窄：只做 B35(运行时读取计数断言, 两面同变异同转红) + B36(出口 9/10 可区分措辞+各自 fixture) + B37(oracle 第③项)；不碰已达标的 python 面判据",
+      "gate": "未经用户批准不得冻结 rev5"
     }
   },
   "review": {
