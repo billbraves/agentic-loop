@@ -3,7 +3,7 @@
   "work_package_id": "WP-20",
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "phase": "P2",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kiro-dsh-orchestrator-direct",
@@ -19,7 +19,8 @@
     "worktree": "/Users/admin/vibe/.worktrees/agentic-wp20-benign-warning",
     "commit": "97b3bb4",
     "reviewed_commit": "97b3bb4",
-    "merged_commit": "",
+    "merged_commit": "d91bce7",
+    "merged_commit_note": "Manual finalize (not `agentic finalize`): the agentic CLI resolves the main repo root to the occupied checkout /Users/admin/vibe/agentic_loop, same deviation as WP-18/WP-19. Merge performed with `git merge --no-ff` inside the main worktree /Users/admin/vibe/agentic-loop-main-codex-merge with explicit user approval. Verified d91bce7 has parents 1c0ca63 (main tip) and 97b3bb4 (branch tip), i.e. the WP branch tip is a merge parent; no conflict occurred; post-merge re-verification on main ran tests/test_codex_finalization_benign_warning.py + test_codex_verdict_recovery.py + test_codex_line_level_split.py = 97 passed.",
     "merge_method": "no-ff",
     "cherry_pick": null
   },
