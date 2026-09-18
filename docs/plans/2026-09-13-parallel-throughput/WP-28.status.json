@@ -20,8 +20,9 @@
     "session": "8a8bf01e"
   },
   "reviewer": {
-    "tool": "claude-code",
-    "session": "8a8bf01e"
+    "tool": "codex",
+    "session": "",
+    "provider": "kirogpt"
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
@@ -212,6 +213,15 @@
         "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev6.md",
         "at_commit": "361b3ad",
         "blocker_closed": "B54 —— 载具不再写受保护制品，失败类消除而非加固；O3 证明同形回归会被自动挡下"
+      },
+      {
+        "rev": 6,
+        "decision": "ACCEPT",
+        "reviewer": "codex (second signature)",
+        "reviewed_at": "2026-09-18",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev6-verdict.json",
+        "at_commit": "361b3ad",
+        "blocking_findings": []
       }
     ],
     "dispatch": {
@@ -498,9 +508,37 @@
         "post_edit_sha256": "bf2cb2858e37c53202259c830be601c074f0e920d8e1d3ea91b59fdb701595e5（两份一致）"
       },
       "criterion_body_path_agnostic": "_read_text_preserving_newlines(path) 接受任意路径、_check_both(text, text) 接受任意文本，故副本载具无需改判据本体"
+    },
+    "rev6_consult": {
+      "request_doc": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev6-request.md",
+      "request_sha256": "bee426ae0f6eba19ad709e8f1845201ac30dd6ea956e06253b945375fcdb5e84",
+      "dispatched_at": "2026-09-18",
+      "inputs": {
+        "brief": "WP-28-brief-rev6.md sha256 ee57a96c…",
+        "cumulative_diff": "7a30f50..361b3ad",
+        "delta_diff": "2923255..361b3ad"
+      },
+      "harness": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp28-rev6/run.py（复用 rev5 形态：CodexAdapter._build_prompt + codex exec --sandbox read-only --output-schema）",
+      "env_note": "仅剥离 OPENAI_BASE_URL，不剥 OPENAI_API_KEY（记忆 strip-the-base-url-not-the-key）",
+      "state": "RETURNED",
+      "decision": "ACCEPT",
+      "prompt_bytes": 50298,
+      "exit_code": 0
     }
   },
-  "consult": {},
+  "consult": {
+    "decision": "ACCEPT",
+    "consultant": "codex",
+    "provider": "kirogpt",
+    "consulted_at": "2026-09-18",
+    "rev": 6,
+    "at_commit": "361b3ad",
+    "request": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev6-request.md",
+    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev6-verdict.json",
+    "blocking_findings": [],
+    "non_blocking_note": "末尾前后字节比较无法侦测「中途写入真实模板后又成功还原」的瞬时写入；rev5 形状理论上可绕过该断言。codex 判仍可 ACCEPT，因载具代码已完全取消真实路径写入、并由静态写入面约束补足。",
+    "orchestrator_cross_check": "该 non-blocking 与编排者 review 的遗留项同源；已实测：目标用例内无任何指向 TEMPLATE_PACKAGED/TEMPLATE_DOCS 的 write_bytes/write_text/open(...,'w')（全仓 grep 为 NONE），断言点在 588-604 / 612-626 两处末尾"
+  },
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
@@ -532,6 +570,6 @@
       "B47（任务 #38）",
       "O2 形状：guard 的承重性需构造其真正触发条件，单看「删掉是否转红」会误判"
     ],
-    "merge_gate": "需 codex 第二签名（consult.decision=ACCEPT）；合入本身仍须用户明确批准"
+    "merge_gate": "codex 第二签名已 ACCEPT；合入仍须用户明确批准（未获得）"
   }
 }

@@ -84,3 +84,21 @@ O3 是本轮的核心：rev5 的缺陷不是「恢复写得不够稳」，而是
 4. **O2 的形状值得记一笔**：一条 guard 在「删掉它仍全绿」下看似不承重，
    实际承的是另一维度（变异退化）。只做「删掉看是否转红」的承重性检查会误杀这类 guard，
    需要同时构造它真正的触发条件。
+
+## 第二签名（codex，2026-09-18）
+
+`consult.decision = ACCEPT`，无阻断项（`WP-28-consult-codex-rev6-verdict.json`，
+sha256 `cdf73f3a…`）。六条 evidence 与编排者独立结论一致：变异只写 `tmp_path` 副本、
+判据经 `_read_text_preserving_newlines(copy_path)` 重读、no-op guard 与
+`_crlf_rewrap_bytes()`/witness 断言未削弱、真实模板字节运行时快照对比而非硬编码
+sha256、oracle 两行三处一致、改动仅三个 allowed_paths。
+
+一条 non-blocking：末尾的前后字节比较无法侦测「中途写入真实模板后又成功还原」的瞬时
+写入，rev5 那类形状理论上可绕过该断言。编排者交叉核验：本轮载具代码已完全取消对真实
+路径的写入（全仓 grep `write_bytes`/`write_text`/`open(...,"w")` 指向
+`TEMPLATE_PACKAGED`/`TEMPLATE_DOCS` 为 NONE），静态写入面补足了这一点；该条与本文档
+遗留项同源，记入 follow-up 而非本轮阻断。
+
+**合入门禁**：双签名齐（编排者 ACCEPT + codex ACCEPT）。`state` 仍为
+`READY_FOR_REVIEW`——**尚未获得用户对合入的明确批准**，故未进 `APPROVED_FOR_MERGE`、
+未执行 `git merge --no-ff`、未 `agentic finalize`。

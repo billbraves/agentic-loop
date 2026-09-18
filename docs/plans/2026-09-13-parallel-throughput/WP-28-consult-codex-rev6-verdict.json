@@ -1,0 +1,13 @@
+{
+  "decision": "ACCEPT",
+  "blocking_findings": [],
+  "evidence": [
+    "M-T0/M-T0b 的变异只写入 tmp_path 下的副本；真实模板仅执行 read_bytes()，不存在对 TEMPLATE_PACKAGED 或 TEMPLATE_DOCS 的写调用，B54 的原地写入及异常恢复失败类已被移除。",
+    "判据确实通过 _read_text_preserving_newlines(copy_path) 重新读取变异后的副本，没有把已持有的 mutated bytes 直接传给 _check_both；撤销 B49 的 newline-preserving 读取后，两条测试会因 witness 消失而转红，承重链条成立。",
+    "no-op guard 仍以字节比较实现；_crlf_rewrap_bytes() 仍先归一 CRLF 再重包；M-T0 与 M-T0b 的 SECTION_MISSING/REPLICA_MISMATCH 精确 witness 断言均未削弱。",
+    "两条测试都在运行时采集真实模板字节，并在末尾逐份比较，没有硬编码 sha256。",
+    "oracle 新增两行与冻结 brief 逐字一致、缩进正确，两份模板一致，FROZEN_BODY_ACCEPTANCE 也同步了完全相同的文本；新增内容是在澄清等价输入载体，并不与原有“真实输入面”要求冲突。",
+    "改动仅涉及三个 allowed_paths；未见测试删除、阈值放宽、witness 语义削弱或判据本体变更。"
+  ],
+  "non_blocking_note": "末尾的前后字节比较本身无法侦测“中途写入真实模板后又成功还原”的瞬时写入，因此不能单独证明从未发生写操作；rev5 的写入+成功恢复形状理论上可绕过该断言。本轮仍可 ACCEPT，因为实际载具代码已完全取消真实路径写入，并由静态写入面约束补足这一点；冻结 brief 要求的运行时前后快照也已按原文兑现。"
+}
