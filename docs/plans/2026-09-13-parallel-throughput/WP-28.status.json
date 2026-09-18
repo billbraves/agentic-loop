@@ -4,14 +4,16 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "bg-bd962edap",
-    "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/bd962edap.output",
-    "command": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --print -w /Users/admin/vibe/wp28-norms-into-template -p <rev5 brief prompt>",
-    "dispatch_note": "OPENAI_BASE_URL/OPENAI_API_KEY 必须剥离，否则本地网关截获请求并回 kiro_api_error 400（B51，任务 #41：adapters/kimi.py 的 _run 不传 env=，引擎自身派发同样继承该重定向）。"
+    "session": "eac50c75-67fd-41de-aaab-f6827aa289f8",
+    "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/bblb7shnm.output",
+    "command": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --print -w /Users/admin/vibe/wp28-norms-into-template -p <rev6 brief prompt>",
+    "exit_status": 0,
+    "report_status": "DONE",
+    "dispatch_note": "OPENAI_BASE_URL/OPENAI_API_KEY 必须剥离（B51，任务 #41）"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -26,7 +28,7 @@
     "base_commit": "2923255",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
-    "commit": ""
+    "commit": "361b3ad"
   },
   "scope": {
     "allowed_paths": [
@@ -69,27 +71,32 @@
         "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
         "result": "32 passed",
         "exit_code": 0,
-        "provenance": "orchestrator-reproduced at 2923255"
+        "provenance": "orchestrator-reproduced at 361b3ad"
       },
       {
         "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "4 failed, 631 passed, 4 skipped；4 failed 全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，工作树内 git checkout -q main 失败）。零回归：def test_ 全仓 514->514，用例名集合不变，故 passed 不变",
+        "result": "4 failed, 631 passed, 4 skipped (103.60s)；4 failed 全在 tests/test_finalize_merge_triple_sign.py（既有环境失败）。零回归算术：def test_ 全仓 514->514、目标文件 31->31、用例名集合 diff 空",
         "exit_code": 1,
-        "provenance": "orchestrator-reproduced at 2923255"
+        "provenance": "orchestrator-reproduced at 361b3ad"
       },
       {
-        "command": "撤销 fix（_read_text_preserving_newlines -> Path.read_text）后 pytest -k t0",
-        "result": "2 failed（AssertionError: set()）—— 用例杀得掉自己的 fix；rev4 同一动作下是 2 passed（不承重）",
-        "exit_code": 1,
-        "provenance": "orchestrator's own probe: /Users/admin/.claude/jobs/8a8bf01e/tmp/verify-rev5.py"
+        "command": "自撰 5 条探针 verify-rev6.py（一次性 git archive 树）",
+        "result": "O0 32 passed / O1 2 failed / O2 2 passed / O3 2 failed / O4 7 failed / O5 2 failed",
+        "exit_code": 0,
+        "provenance": "orchestrator's own probe, executor never saw it"
+      },
+      {
+        "command": "三条边界逃逸探针（E1 整档注释 / E2 BOF 未闭合 <!-- / E3 附注内未闭合围栏）",
+        "result": "codes 均 []，仍 GREEN（与 rev4/rev5 声明一致）",
+        "exit_code": 0,
+        "provenance": "orchestrator's own probe"
       }
     ],
     "baseline": {
-      "note": "rev4 起点是 rev3 的 commit 2ba5ef5，不是主区 HEAD。本数字在该起点实测（B48 教训：禁跨 lane 抄数）",
-      "dispatch_commit": "2ba5ef5c87cf3378f2860232956cc047c755c519",
-      "targeted": "29 passed",
-      "full": "4 failed / 628 passed / 4 skipped",
-      "known_failures": "4 条全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，工作树内 git checkout -q main 失败所致，不得修）"
+      "at_commit": "2923255",
+      "full_suite": "4 failed / 631 passed / 4 skipped",
+      "targeted": "32 passed",
+      "measured_by": "orchestrator, this lane's own base"
     },
     "orchestrator_feasibility_probe": {
       "note": "冻结前先实测判据本身可实施（记忆 verify-the-remedy-not-just-the-finding），不把未验证的判据写进 brief。",
@@ -196,18 +203,28 @@
         "blocker": "B54 —— _mutate_on_disk 还原保证有洞（写入循环在 try 之外 + finally 内单点失败中止后续恢复）",
         "targets_themselves_met": "两个标的兑现：承重性实测转红、oracle 第 4 项逐字节相符。codex 5 条非阻断结论与编排者复核逐条一致。",
         "lifecycle_state": "CHANGES_REQUESTED"
+      },
+      {
+        "rev": 6,
+        "decision": "ACCEPT",
+        "reviewer": "claude (orchestrator, independent)",
+        "reviewed_at": "2026-09-18",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev6.md",
+        "at_commit": "361b3ad",
+        "blocker_closed": "B54 —— 载具不再写受保护制品，失败类消除而非加固；O3 证明同形回归会被自动挡下"
       }
     ],
     "dispatch": {
-      "rev": 2,
+      "rev": 6,
       "dispatched_at": "2026-09-18",
-      "prompt_sha256": "55aa491764ed597664a2f4ca1f5cf21b449ac33db53aabb11d39155f59dcdd5c",
-      "dispatch_script_sha256": "33b7945abf6bb03f2c215ed5211751fd0ff74c23df1688607ac9e2ed3aa43f12",
+      "prompt": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev6-prompt.txt",
+      "prompt_sha256": "ce21caf9268970844470d1eb7b69c2c43fc585143b083e0071660ed75ca55d44",
       "worktree": "/Users/admin/vibe/wp28-norms-into-template",
-      "baseline_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
-      "preflight": "PREFLIGHT_PASS branch=feature/wp28-norms-into-template state=APPROVED",
-      "liveness_probe": "pgrep pid=70712 (process name 'Kimi Code'); log 1853829->3021195 bytes over 15s",
-      "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev2-exec.log"
+      "baseline_commit": "2923255",
+      "preflight": "PREFLIGHT_PASS branch=feature/wp28-norms-into-template state=DISPATCHED",
+      "preflight_caveat": "段落门禁读的是 WP-28-brief.md 而非 rev6（B47，任务 #38）；rev6 三段由编排者独立核",
+      "health_monitor": "agentic health 每 60s；事件序列 PROGRESS baseline -> PROGRESS tail,dirty -> ... -> 执行者 exit 0",
+      "liveness_probe": "pgrep pid=6388 (process name 'Kimi Code')；log 120206 -> 323371 bytes"
     },
     "refreeze_stop_rule_check": {
       "refreeze_count": 2,
@@ -415,7 +432,8 @@
           "rev": 6,
           "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev6.md",
           "scope": "M-T0/M-T0b 改为变异临时副本 + 删除 _mutate_on_disk + 「真实模板字节前后一致」断言；oracle 第 4 项末尾追加两行（等价载体优先）+ FROZEN_BODY_ACCEPTANCE 同步",
-          "outcome": "DISPATCHED"
+          "outcome": "编排者 ACCEPT；待 codex 第二签名",
+          "commit": "361b3ad"
         }
       ]
     },
@@ -495,5 +513,25 @@
     "ready_for_review_at_rev5": "2026-09-18T04:05:00+08:00",
     "changes_requested_at_rev5": "2026-09-18T07:25:00Z"
   },
-  "review": {}
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-18",
+    "rev": 6,
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev6.md",
+    "at_commit": "361b3ad",
+    "basis": "自撰 5 条探针（按判据组成步骤生成，执行者未见过）：O1 撤销 B49 fix -> 2 failed（承重性保留）；O3 重新植入 B54 形状（载具改回写真实文件）-> 2 failed（新断言挡得住）；O4 常量脱同步 -> 7 failed；O5 变异退化为恒等 -> 2 failed（no-op guard 承重）；O2 删 guard -> 2 passed（预期，guard 承的是 O5 那一面）",
+    "scope_verified": "改动恰为 allowed_paths 三项；7 个判据函数体 sha 逐个未变；全仓无对受保护常量的写入调用",
+    "zero_regression": "目标 32 passed；全量 4 failed / 631 passed / 4 skipped；def test_ 514->514、目标文件 31->31、用例名集合 diff 空，故 passed 不变",
+    "boundary_escapes": "E1/E2/E3 自撰探针实测 codes 均 []，仍 GREEN；四条 harmless-green 仍绿",
+    "not_verified": [
+      "3.13 / 3.14 未装 pytest，未实测（与 rev5 同）"
+    ],
+    "follow_ups": [
+      "B52（任务 #42）",
+      "B47（任务 #38）",
+      "O2 形状：guard 的承重性需构造其真正触发条件，单看「删掉是否转红」会误判"
+    ],
+    "merge_gate": "需 codex 第二签名（consult.decision=ACCEPT）；合入本身仍须用户明确批准"
+  }
 }
