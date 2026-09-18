@@ -25,7 +25,6 @@ import re
 import subprocess
 import sys
 import unicodedata
-from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -301,6 +300,8 @@ FROZEN_BODY_ACCEPTANCE = (
     "   不得按已知缺陷清单枚举；某步骤不可攻击须在报告里写明理由。变异必须施加于判据\n"
     "   真实的输入面（文件字节 / 进程边界 / 外部状态），不得只改判据已持有的内存表示。\n"
     "   判别方式：把被修的缺陷还原成原状，该用例必须转红；仍绿则该用例不承重。\n"
+    "   同类输入面的等价载体（如临时副本）满足本项；若变异会写到被判据保护的制品\n"
+    "   本身，须优先选用不写该制品的等价载体。\n"
     "\n"
     "注意：第 1 项证明「前置可达」，第 2 项证明「失败归因」，\n"
     "**两者不能互相替代**——「无注入时能到终点」并不排除「带注入时死在别处」。\n"
@@ -535,31 +536,26 @@ def _mutate_both(mutate):
     return _check_both(mutated_packaged, mutated_docs)
 
 
-@contextmanager
-def _mutate_on_disk(paths, mutate_bytes):
-    """Temporarily write mutated BYTES to real template files, then restore.
+def _copy_bytes_to_tmp(src, tmp_path, name, mutate_bytes=None):
+    """Copy ``src``'s bytes into ``tmp_path``, mutating the COPY only.
 
-    This is the M-T0 / M-T0b carrier.  The mutation is applied to the file's
-    bytes, so the criterion's read path (``_read_text_preserving_newlines``)
-    is the ONLY thing between the mutated bytes and the witness codes.  A
-    read-path regression (e.g. back to ``Path.read_text``) therefore flips
-    the result — which is exactly what makes these cases kill their own fix.
+    This is the M-T0 / M-T0b carrier.  The real template file is read but
+    never written: the mutation lands on a temporary copy and the criterion
+    reads that copy, so ``_read_text_preserving_newlines`` is still the only
+    thing between the mutated bytes and the witness codes — a read-path
+    regression still flips the result — while B54's write-to-protected-
+    artifact failure class no longer exists.
 
-    The no-op guard compares bytes (``mutated != original``), and ``finally``
-    restores every touched file and asserts the restore is byte-exact, so a
-    passing or failing test can never leave a dirty template behind.
+    Returns ``(copy_path, original_bytes)``; callers can assert the real file
+    still holds ``original_bytes`` at the end of the test.
     """
-    originals = {p: p.read_bytes() for p in paths}
-    mutated = {p: mutate_bytes(data) for p, data in originals.items()}
-    for p, data in mutated.items():
-        assert data != originals[p], f"mutation must change bytes (no-op guard): {p}"
-        p.write_bytes(data)
-    try:
-        yield
-    finally:
-        for p, data in originals.items():
-            p.write_bytes(data)
-            assert p.read_bytes() == data, f"restore must be byte-exact: {p}"
+    original = src.read_bytes()
+    data = mutate_bytes(original) if mutate_bytes else original
+    if mutate_bytes:
+        assert data != original, f"mutation must change bytes (no-op guard): {src}"
+    copy = tmp_path / name
+    copy.write_bytes(data)
+    return copy, original
 
 
 def _crlf_rewrap_bytes(data):
@@ -582,30 +578,52 @@ def test_invn_positive_control_clean_template():
 # ---------------------------------------------------------------------
 # T0 — input fidelity: the criterion's input must be the file's bytes.
 # ---------------------------------------------------------------------
-def test_invn_t0_crlf_rewrap_both_red():
-    """M-T0: re-encoding BOTH template FILES' bytes LF->CRLF (no character
+def test_invn_t0_crlf_rewrap_both_red(tmp_path):
+    """M-T0: re-encoding BOTH template COPIES' bytes LF->CRLF (no character
     change, frozen constants untouched) must go red, with SECTION_MISSING as
-    the specific witness and NO REPLICA_MISMATCH (both replicas stay
-    identical).  The mutation is written to disk and the criterion reads the
-    files itself, so a read-path regression flips this case red."""
-    with _mutate_on_disk([TEMPLATE_PACKAGED, TEMPLATE_DOCS], _crlf_rewrap_bytes):
-        packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
-        docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
-        codes = _check_both(packaged, docs)
+    the specific witness and NO REPLICA_MISMATCH (both copies stay identical).
+    The mutation lands on temporary copies and the criterion reads those
+    copies, so a read-path regression still flips this case red; the real
+    templates are never written."""
+    real_before = {
+        TEMPLATE_PACKAGED: TEMPLATE_PACKAGED.read_bytes(),
+        TEMPLATE_DOCS: TEMPLATE_DOCS.read_bytes(),
+    }
+    packaged_copy, _ = _copy_bytes_to_tmp(
+        TEMPLATE_PACKAGED, tmp_path, "packaged-copy.md", _crlf_rewrap_bytes
+    )
+    docs_copy, _ = _copy_bytes_to_tmp(
+        TEMPLATE_DOCS, tmp_path, "docs-copy.md", _crlf_rewrap_bytes
+    )
+    packaged = _read_text_preserving_newlines(packaged_copy)
+    docs = _read_text_preserving_newlines(docs_copy)
+    codes = _check_both(packaged, docs)
     assert SECTION_MISSING in codes, codes
     assert REPLICA_MISMATCH not in codes, codes
+    for real, before in real_before.items():
+        assert real.read_bytes() == before, f"real template was written: {real}"
 
 
-def test_invn_t0b_crlf_rewrap_one_side_red():
-    """M-T0b: mutating only ONE replica FILE's line-ending bytes must surface
+def test_invn_t0b_crlf_rewrap_one_side_red(tmp_path):
+    """M-T0b: mutating only ONE replica COPY's line-ending bytes must surface
     as BOTH REPLICA_MISMATCH (T7) and SECTION_MISSING (T0/T1), proving M-T0's
-    red comes from T0/T1 — not from replica identity."""
-    with _mutate_on_disk([TEMPLATE_PACKAGED], _crlf_rewrap_bytes):
-        packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
-        docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
-        codes = _check_both(packaged, docs)
+    red comes from T0/T1 — not from replica identity.  The real templates are
+    never written."""
+    real_before = {
+        TEMPLATE_PACKAGED: TEMPLATE_PACKAGED.read_bytes(),
+        TEMPLATE_DOCS: TEMPLATE_DOCS.read_bytes(),
+    }
+    packaged_copy, _ = _copy_bytes_to_tmp(
+        TEMPLATE_PACKAGED, tmp_path, "packaged-copy.md", _crlf_rewrap_bytes
+    )
+    docs_copy, _ = _copy_bytes_to_tmp(TEMPLATE_DOCS, tmp_path, "docs-copy.md")
+    packaged = _read_text_preserving_newlines(packaged_copy)
+    docs = _read_text_preserving_newlines(docs_copy)
+    codes = _check_both(packaged, docs)
     assert REPLICA_MISMATCH in codes, codes
     assert SECTION_MISSING in codes, codes
+    for real, before in real_before.items():
+        assert real.read_bytes() == before, f"real template was written: {real}"
 
 
 # ---------------------------------------------------------------------
