@@ -8,65 +8,10 @@
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "bg-bquopan4c",
-    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
-    "dispatch_prompt_sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca",
-    "dispatch_command": "bash /Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
-    "dispatch_rev": 3,
-    "dispatch_base_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
-    "dispatch_blocked": {
-      "reason": "派发被本会话的 auto mode classifier 拦下（Reason: [Create Unsafe Agents]），连 liveness 探针（kimi -p 'Reply with exactly: PROBE_OK'）都未获准执行。",
-      "blocked_at": "2026-09-17T20:20:00Z",
-      "not_a_wp_defect": "与 brief、status、门禁均无关：PREFLIGHT_PASS 已取得，锁已持有，brief 过活树 dispatch_lint。纯粹是本会话的工具权限边界。",
-      "orchestrator_did_not_work_around": "未尝试绕过（不改写命令形态、不换工具伪装、不自行代做执行者的实现工作）。三权分立要求编排者不兼任执行者：即便我能写这三个文件，也不应由我写。",
-      "unblock_options": [
-        "用户在本会话直接放行该 Bash 动作（settings 加 Bash 权限规则），编排者随即按 dispatch_command 派发",
-        "用户自行在终端执行 dispatch_command（工作树与 prompt 均已就绪），编排者接管监控与验收",
-        "用户指定改用其他已获准的执行者工具，编排者据此重写 dispatch_command 与 prompt 后再派发"
-      ],
-      "ready_state": "工作树 /Users/admin/vibe/wp28-norms-into-template 干净、HEAD=7a30f50；prompt 已落盘并记 sha256；WP 锁 owner=claude-53c58ab0 已持有；PREFLIGHT_PASS。",
-      "resolved_at": "2026-09-17T23:18:20+08:00",
-      "resolved_by": "option_1_user_directed_settings_change",
-      "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
-    },
-    "rev": 3,
-    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev4-kimi.log",
-    "dispatch_script": {
-      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
-      "sha256": "f7f1374ce73f7960ddcd8871412494e734b494c8b860db9192d7b89c7fab8153",
-      "why": "复合命令收成固定脚本，放行规则精确匹配；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。rev3 只换 PROMPT 与 PROMPT_SHA，脚本路径不变故放行规则无需改动（rev2 版本备份为 dispatch-wp28.sh.rev2.bak）。"
-    },
-    "prompt": {
-      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev3-prompt.md",
-      "sha256": "a113da3155c4fc9b8b3dfcb0469b9647a334be4dd4f49b95a0208c3f181b0372"
-    },
-    "liveness_probe": {
-      "method": "pgrep -f kimi-cli/bin/python3 + log byte growth",
-      "pid": 82444,
-      "log_growth_bytes": "368002 -> 572754",
-      "result": "ALIVE"
-    },
-    "redispatch": {
-      "n": 1,
-      "why": "执行者实现完成且自测 29 passed，但收工停在「要不要 git add / commit」的提问上未提交；DoD 要求 commit。按 AGENTS.md §4.2 的续跑流程重派，默认保留半成品，不重做。",
-      "kept_work": true,
-      "prompt": {
-        "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev3-continue-prompt.md",
-        "sha256": "ec2676e7f7998f6d31a44eddaa83414a92f6c88218bbc2e5ddcc74701c6b11d3"
-      },
-      "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev3-continue.log",
-      "dispatched_at": "2026-09-18T00:20:00+08:00",
-      "result": {
-        "status": "DONE",
-        "commit": "2ba5ef5",
-        "message": "✅ test(2026-09-13-parallel-throughput): WP-28 rev3 判据收缩为 INV-N1/N3/N4 —— 块体逐字节冻结 + 诊断分类兜底",
-        "reported_tests": "3.11 targeted 29 passed / 3.11 全量 4 failed 628 passed 4 skipped / 3.13 targeted 29 passed / 3.14 targeted 29 passed",
-        "session": "kimi -r 6c94e667-27d6-4e9d-8cac-a8ebc22bb2e4"
-      }
-    },
-    "dispatched_at": "2026-09-18T05:53:05Z",
-    "command": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY -u ANTHROPIC_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_MODEL kimi --afk --print --config-file /Users/admin/.kimi/deepseek.toml -w /Users/admin/vibe/wp28-norms-into-template -p <rev4 prompt>",
-    "dispatch_note": "首次派发（bg-bokbosvar）rc=1 失败，非任务失败：编排者会话导出的 OPENAI_BASE_URL=http://127.0.0.1:18080/v1 被 kimi 的 openai_legacy 客户端优先于配置里的 base_url 采用，deepseek 流量被改指本机 kiro 网关，网关以 kiro_api_error 400 'Invalid model ID or insufficient subscription level' 拒收 deepseek-v4-pro。对照实验定因：带 OPENAI_* 时 --config-file deepseek.toml 同样 400；env -u 掉 OPENAI_BASE_URL/OPENAI_API_KEY 后同一命令 TurnEnd() 正常。已登记为缺陷 B51。"
+    "session": "bg-bd962edap",
+    "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/bd962edap.output",
+    "command": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --print -w /Users/admin/vibe/wp28-norms-into-template -p <rev5 brief prompt>",
+    "dispatch_note": "OPENAI_BASE_URL/OPENAI_API_KEY 必须剥离，否则本地网关截获请求并回 kiro_api_error 400（B51，任务 #41：adapters/kimi.py 的 _run 不传 env=，引擎自身派发同样继承该重定向）。"
   },
   "orchestrator": {
     "tool": "claude-code",
