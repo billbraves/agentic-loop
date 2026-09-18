@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -78,7 +78,7 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "7a30f50",
+    "base_commit": "5d94387",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
     "commit": "5d94387"
@@ -115,34 +115,22 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev4.md",
-      "sha256": "5cbfa77d04803e63f7481ed5fe9cf696ed24d479ccfb0a1e5368c4cb8d5840e2",
-      "rev": 4
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev5.md",
+      "sha256": "d96a7fa34ae0520bfe6e5b1d4e769916857cab4f0fd1eb9004278590a559bfd6",
+      "rev": 5
     },
     "tests": [
       {
         "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
-        "result": "29 passed",
+        "result": "32 passed",
         "exit_code": 0,
-        "provenance": "orchestrator-reproduced at 2ba5ef5"
+        "provenance": "orchestrator-reproduced at 5d94387"
       },
       {
         "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "4 failed, 628 passed, 4 skipped in 130.24s；4 failed 全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，未触碰该文件）",
+        "result": "4 failed, 631 passed, 4 skipped in 110.56s；4 failed 全在 tests/test_finalize_merge_triple_sign.py，base 上即已红（工作树内 git checkout -q main 失败），属环境问题",
         "exit_code": 1,
-        "provenance": "orchestrator-reproduced at 2ba5ef5"
-      },
-      {
-        "command": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest --no-project python -m pytest tests/test_wp_template_dispatch_lint.py -q",
-        "result": "29 passed",
-        "exit_code": 0,
-        "provenance": "executor-reported (rev3 continuation), 未由编排者复跑"
-      },
-      {
-        "command": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest --no-project python -m pytest tests/test_wp_template_dispatch_lint.py -q",
-        "result": "29 passed",
-        "exit_code": 0,
-        "provenance": "executor-reported (rev3 continuation), 未由编排者复跑"
+        "provenance": "orchestrator-reproduced at 5d94387"
       }
     ],
     "baseline": {
@@ -446,17 +434,5 @@
     "dispatched_at_rev3": "2026-09-18T00:10:00+08:00",
     "implementing_at_rev3": "2026-09-18T00:12:00+08:00"
   },
-  "review": {
-    "decision": "REWORK",
-    "reviewer": "claude-code",
-    "date": "2026-09-18",
-    "doc": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev4.md",
-    "summary": "B49 修法正确但 M-T0/M-T0b 变异内存字符串而非文件字节，fix 完整撤销后两条用例仍全绿，不承重；B50 已修且承重（删发射点即转红）。范围/零回归/pin 全部干净。",
-    "blocking": [
-      "B49-用例不承重"
-    ],
-    "non_blocking": [
-      "B52-截断谓词归因过宽（真前缀 vs 块边界移动），非逃逸"
-    ]
-  }
+  "review": {}
 }
