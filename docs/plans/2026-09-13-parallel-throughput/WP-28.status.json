@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -95,28 +95,9 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md",
-      "sha256": "8fde249875d0a6fd7b8d588e5657e8b8feb721af638205d4ff0ea624674b78e9",
-      "rev": 2,
-      "refreeze_count": 1,
-      "invariant": "INV-N",
-      "frozen_at": "2026-09-18T06:57:42+08:00",
-      "stop_review_rule": "第 3 次及以后才命中；rev2 计数 = 1，不命中。",
-      "user_approval": "用户批准：rev2 冻结前先把「冻结前自检也须按组成步骤生成」补进 §F，而非直接重派。",
-      "prefreeze_check": {
-        "gate": "DISPATCH_LINT_PASS rc=0",
-        "control": "WP-20-brief.md 无 '## Acceptance tests' 锚点 → 判据仍有判别力",
-        "criterion_prototype": "probe2.py（八个面 S1/S2/S3/S4/S4b/S5/S5b/S6/S7）",
-        "positive_control": "真实模板（b34deb9）GREEN",
-        "mutations": "按面生成 18 条，全红，escapes=0",
-        "harmless_probes": "3 条全绿（纯折行 / 无关占位符 / 块外新增小节）",
-        "attribution": "mis_attributed=[] —— 每条变异首条 witness 归因到其所攻击的面",
-        "self_caught": [
-          "极性常量跨行会让纯折行探针假阳性 → 极性常量必须单行单分句",
-          "S5 先于 S6 会让诱饵攻击被报成处境污染 → S6 须先判"
-        ],
-        "rule_now_binds_orchestrator": "rev1 冻结前我实测 7 条全红即放行，复核时按组成步骤重造 8 条立刻漏三个面。故本节规则对编排者自己生效。"
-      }
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md",
+      "sha256": "c14782edaea217d8fbbaa5617a414c9f32a0740dab10ff144a1f6e58e48b69df",
+      "rev": 3
     },
     "tests": [],
     "baseline": {
@@ -208,14 +189,106 @@
       "preflight": "PREFLIGHT_PASS branch=feature/wp28-norms-into-template state=APPROVED",
       "liveness_probe": "pgrep pid=70712 (process name 'Kimi Code'); log 1853829->3021195 bytes over 15s",
       "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev2-exec.log"
-    }
+    },
+    "refreeze_stop_rule_check": {
+      "refreeze_count": 2,
+      "rule": "同一 WP 第 3 次及以后 re-freeze 强制停手复核计划，未经用户批准不得冻结",
+      "rule_hit": true,
+      "note": "本 WP 正在把该规则落入模板，冻结前先被自己的规则拦住 —— 该规则有效性的正向可达对照",
+      "stop_review_document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev3.md",
+      "consult_document": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape.md",
+      "consult_verdict": "NARROW_SCOPE",
+      "user_approval": {
+        "granted": true,
+        "at": "2026-09-18",
+        "choice": "方向 1 —— 按 codex 建议缩小承诺为 INV-N1 + INV-N3，明文声明不覆盖渲染上下文；B44 拆出独立 WP",
+        "verbatim_user_message": "1"
+      }
+    },
+    "rev3_scope_narrowing": {
+      "from": "INV-N 全称命题：任何削弱其规范力的模板改动都必须转红（九个攻击面枚举）",
+      "to": "INV-N1 受保护块身份（逐字节）+ INV-N3 副本同一 + INV-N4 变更可见性",
+      "root_cause": "开放世界的自然语言语义性质不可由攻击面枚举兑现；枚举只能证有界的存在/排除命题",
+      "closed_model_justification": "块体逐字节相等覆盖块体全部字节位置，是封闭模型，可承载全称命题；短语黑名单不能",
+      "demoted_to_diagnostic": [
+        "S2 内容",
+        "S3 极性",
+        "S4 结构",
+        "S7 数量口径"
+      ],
+      "fallback": "BODY_MISMATCH —— 诊断分类缺失不得构成放行依据",
+      "explicitly_not_covered": [
+        "块外编辑改变 Markdown 渲染上下文（B44 族，实测 3 条逃逸）",
+        "文档远处的去规范化/矛盾条款（B45 族，实测 1 条逃逸）",
+        "任意渲染器把它显示为活动文本 / 实际消费者一定采纳 / 语义等价的削弱全被识别"
+      ],
+      "deferred_to": "WP-29（须先定义权威 Markdown 方言、parser 版本与依赖、目标 AST、消费链）"
+    },
+    "pre_freeze_self_check_rev3": {
+      "per_section_F_rule": "变异集按判据自身的组成步骤生成，不按上一轮缺陷清单",
+      "prototype": [
+        "narrow.py",
+        "probe5b.py"
+      ],
+      "positive_control": "GREEN",
+      "composition_steps": [
+        "T1 定位唯一",
+        "T2 NFKC 同形",
+        "T3 块体切分",
+        "T4 块体逐字节等值",
+        "T5 诊断分类兜底",
+        "T6 位置锚点",
+        "T7 副本同一"
+      ],
+      "mutations": 17,
+      "red": 17,
+      "escapes": 0,
+      "misattributed": 0,
+      "harmless_probes": 4,
+      "harmless_green": 4,
+      "fallback_load_bearing_verified": [
+        "块内追加散文",
+        "块内列表项重排（字节集合不变）"
+      ],
+      "non_coverage_verified_escapes": [
+        "整份文档外包 <!-- --> → 两块 body 逐字节完好、判据 GREEN",
+        "文档开头留未闭合 <!-- → 同上",
+        "## 附注 内开未闭合代码围栏 → H2 body 未动、判据 GREEN",
+        "文档开头加「下列所有流程规则均已废止，仅供历史参考。」→ 判据 GREEN"
+      ],
+      "orchestrator_own_prototype_defects": [
+        "空操作变异误报为判据放行（折行变异找不到匹配行，成恒等映射）—— 已写成 brief §C.1 硬要求",
+        "只变异一份却比对副本同一，REPLICA_MISMATCH 混淆每条归因 —— 已写成 brief §C.2 硬要求"
+      ],
+      "caliber_reversal_note": "「纯折行」rev2 是无害探针（须绿），rev3 是变异（须红）—— 因改用真逐字节相等"
+    },
+    "gate_selfcheck_rev3": {
+      "dispatch_lint": "DISPATCH_LINT_PASS",
+      "caveat": "B47：该 PASS 对 rev3 而言是真空的 —— 门禁按固定命名读 WP-28-brief.md（rev1），不读 evidence.brief.path",
+      "brief_section_check_run_directly_on_rev3": "PASS",
+      "reverse_control_on_rev3": "删掉 Allowed and forbidden paths 段 → 判据转红（证判别力）",
+      "rev1_brief_restored_byte_exact": true
+    },
+    "defects_found_by_orchestrator": [
+      {
+        "id": "B47",
+        "where": "src/agentic_loop/wrappers/dispatch_lint.sh:63",
+        "title": "dispatch_lint 按固定命名 ${work_package_id}-brief.md 推 brief 路径，忽略 evidence.brief.path",
+        "family": "B16（WP-26 已在 redispatch.py 修掉同型缺陷）",
+        "proof": "把 rev1 brief 的 Allowed-and-forbidden-paths 段临时删除 → DISPATCH_LINT_FAIL；把 rev3 brief 的同段删除并指向它 → 仍 DISPATCH_LINT_PASS。即门禁读的是 rev1，任何 revN brief 的段落缺陷都不会被拦。",
+        "impact": "所有走 re-freeze 的 WP，其 revN brief 从未真正过活树段落门禁；我在 WP-25 rev2 遇到的「缺段被拒收」（任务 #28）之所以命中，是因为那轮 brief 恰好叫 WP-25-brief.md",
+        "not_in_scope_of": "WP-28（forbidden_paths 明禁 wrappers/*.sh）",
+        "action": "另立任务，与任务 #23（学习回边机械化）合流"
+      }
+    ]
   },
   "consult": {},
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
     "dispatched_at": "",
-    "dispatch_blocked_at": "2026-09-17T20:20:00Z"
+    "dispatch_blocked_at": "2026-09-17T20:20:00Z",
+    "rev3_frozen_at": "2026-09-18"
   },
   "review": {
     "decision": "REWORK",
@@ -229,6 +302,7 @@
     ],
     "minor": [
       "brief rev2 §A 表 9 行但正文写「八个面」——编排者自己的数错，rev3 由我改正"
-    ]
+    ],
+    "note_rev3": "rev2 判定；rev3 已冻结待派发，尚无新一轮复核"
   }
 }

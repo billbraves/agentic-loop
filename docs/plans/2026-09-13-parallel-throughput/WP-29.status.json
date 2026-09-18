@@ -1,0 +1,144 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "role": "Developer",
+  "plan_id": "PLAN-01",
+  "work_package_id": "WP-29",
+  "state": "APPROVED",
+  "executor": {
+    "tool": "kimi-cli",
+    "session": "",
+    "dispatch_prompt": "",
+    "dispatch_prompt_sha256": "",
+    "dispatch_command": "",
+    "dispatch_rev": 1,
+    "dispatch_base_commit": "",
+    "dispatch_blocked": {
+      "reason": "派发被本会话的 auto mode classifier 拦下（Reason: [Create Unsafe Agents]），连 liveness 探针（kimi -p 'Reply with exactly: PROBE_OK'）都未获准执行。",
+      "blocked_at": "2026-09-17T20:20:00Z",
+      "not_a_wp_defect": "与 brief、status、门禁均无关：PREFLIGHT_PASS 已取得，锁已持有，brief 过活树 dispatch_lint。纯粹是本会话的工具权限边界。",
+      "orchestrator_did_not_work_around": "未尝试绕过（不改写命令形态、不换工具伪装、不自行代做执行者的实现工作）。三权分立要求编排者不兼任执行者：即便我能写这三个文件，也不应由我写。",
+      "unblock_options": [
+        "用户在本会话直接放行该 Bash 动作（settings 加 Bash 权限规则），编排者随即按 dispatch_command 派发",
+        "用户自行在终端执行 dispatch_command（工作树与 prompt 均已就绪），编排者接管监控与验收",
+        "用户指定改用其他已获准的执行者工具，编排者据此重写 dispatch_command 与 prompt 后再派发"
+      ],
+      "ready_state": "工作树 /Users/admin/vibe/wp28-norms-into-template 干净、HEAD=7a30f50；prompt 已落盘并记 sha256；WP 锁 owner=claude-53c58ab0 已持有；PREFLIGHT_PASS。",
+      "resolved_at": "2026-09-17T23:18:20+08:00",
+      "resolved_by": "option_1_user_directed_settings_change",
+      "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
+    },
+    "rev": 1,
+    "log": "",
+    "dispatch_script": {
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
+      "sha256": "3df46a30d5c8b98353d55193feca0285fb40aedf2e0c1bdf80018b966cccb3b1",
+      "why": "编排者把复合命令收成一个固定脚本，好让放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。"
+    },
+    "prompt": {
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
+      "sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca"
+    },
+    "liveness_probe": {
+      "method": "pgrep -fl kimi + log byte growth over 20s",
+      "pid": 60380,
+      "log_growth_bytes": "2939588 -> 3727727",
+      "note": "日志里的 termios.error (19, 'Operation not supported by device') 来自 kimi-cli 键盘监听线程无 tty，属无害；不是执行失败。",
+      "result": "ALIVE"
+    }
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "",
+    "branch": "feature/wp29-render-scope-decision",
+    "worktree": "../wp29-render-scope-decision",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md"
+    ],
+    "forbidden_paths": [
+      "src/**",
+      "tests/**",
+      "pyproject.toml",
+      "uv.lock",
+      ".agentic/**",
+      ".env",
+      ".context/**",
+      "docs/agentic/**",
+      "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md",
+      "docs/plans/2026-09-13-parallel-throughput/WP-28.status.json",
+      "docs/plans/2026-09-13-parallel-throughput/WP-29-brief.md",
+      "docs/plans/2026-09-13-parallel-throughput/WP-29.status.json"
+    ],
+    "forbidden_note": "scope 判据是前缀匹配，无法表达「docs/plans 下除某一文件外全禁」。故此处显式列出本 WP 相关的冻结输入文件；docs/plans 下其余历史文档由 brief 正文禁止改动，并由编排者在复核 diff 时核验（allowed_paths 只有一个文件，任何越界在 diff 里立刻可见）。"
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief.md",
+      "sha256": "1dfd72aceb3649efc449a75f3a8e7893a27c0fa5480970f763265e0a6d29efd6",
+      "rev": 1
+    },
+    "origin": {
+      "split_from": "WP-28 rev3 承诺收缩",
+      "ruling": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev3.md §5",
+      "consult": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape.md §2/§4",
+      "user_approval": "用户批准方向 1（缩小 WP-28 + B44 另立 WP），2026-09-18"
+    },
+    "inherited_escapes_to_answer": [
+      "整份文档外包 <!-- --> → 两块 body 逐字节完好、WP-28 判据 GREEN",
+      "文档开头留未闭合 <!-- → 同上",
+      "## 附注 内开未闭合代码围栏 → H2 body 未动、判据 GREEN",
+      "文档开头加「下列所有流程规则均已废止，仅供历史参考。」→ 判据 GREEN"
+    ],
+    "facts_forcing_the_split": [
+      "全仓无 Markdown parser 依赖",
+      "无文档声明权威 Markdown 方言",
+      "WORK_PACKAGE.md.tmpl 仓内唯一消费者 init_cmd.py:109 逐字节复制，不解析 markdown"
+    ],
+    "staging": {
+      "phase_1": "范围界定与可行性裁定，交付一份文档，零代码",
+      "phase_2": "范围由阶段 1 裁定决定，须另行冻结并经用户批准；本次不冻结"
+    }
+  },
+  "review": {
+    "decision": "CONSULT",
+    "reviewer": "",
+    "reviewed_at": "",
+    "rev": 2,
+    "document": "",
+    "blockers": [
+      "B44",
+      "B45"
+    ],
+    "minor": [
+      "brief rev2 §A 表 9 行但正文写「八个面」——编排者自己的数错，rev3 由我改正"
+    ]
+  },
+  "consult": {
+    "decision": "CONSULT"
+  },
+  "timestamps": {
+    "created_at": "",
+    "frozen_at": "2026-09-18",
+    "dispatched_at": "",
+    "dispatch_blocked_at": "",
+    "rev3_frozen_at": ""
+  }
+}
