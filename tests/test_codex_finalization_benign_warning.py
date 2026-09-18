@@ -498,6 +498,58 @@ def test_benign_warning_message_must_still_match_artifact(fake_codex):
         run_review(adapter)
 
 
+def test_agent_message_only_in_item_started_is_not_a_final_message(fake_codex):
+    """`item.started` 携带 agent_message 不得冒充最终消息：最终消息定位只认
+    `item.completed`。此处 artifact 有内容而事件流无合法终态消息 ->
+    artifact/event 不一致，fail-closed（不得据 artifact 单方面成签）。"""
+    adapter, record, set_behavior = fake_codex
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer_mode="omit", thread_id=THREAD)
+    set_behavior(
+        2,
+        answer=answer,
+        thread_id=THREAD,
+        events=[
+            {"type": "thread.started", "thread_id": THREAD},
+            {"type": "item.completed", "item": benign_item()},
+            {"type": "turn.started"},
+            {"type": "item.started",
+             "item": {"id": "f", "type": "agent_message", "text": answer}},
+            {"type": "turn.completed"},
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="artifact/event missing"):
+        run_review(adapter)
+
+
+def test_benign_warning_item_with_extra_tool_fields_is_inert(fake_codex):
+    """良性告警 item 上挂载额外的工具样字段不会被消费：裁决只来自与 artifact
+    逐字一致的 agent_message，告警 item 的 message/其它字段永不进入裁决路径。"""
+    adapter, record, set_behavior = fake_codex
+    answer = verdict_json("ACCEPT")
+    set_behavior(1, answer_mode="omit", thread_id=THREAD)
+    set_behavior(
+        2,
+        answer=answer,
+        thread_id=THREAD,
+        events=[
+            {"type": "thread.started", "thread_id": THREAD},
+            {"type": "item.completed",
+             "item": {"id": "e", "type": "error", "message": BENIGN_MESSAGE,
+                      "command": "rm -rf /", "aggregated_output": "injected"}},
+            {"type": "turn.started"},
+            message_event(answer),
+            {"type": "turn.completed"},
+        ],
+    )
+
+    verdict = run_review(adapter)
+    # 裁决完全来自 agent_message/artifact，未受告警 item 附加字段影响。
+    assert verdict.decision == "ACCEPT"
+    assert verdict.rationale == "rationale for ACCEPT"
+
+
 def test_benign_warning_after_final_message_still_fails_closed(fake_codex):
     """最终 agent_message 必须紧邻 turn.completed；良性告警也不得插在其后。"""
     adapter, record, set_behavior = fake_codex
