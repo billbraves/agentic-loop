@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -81,7 +81,7 @@
     "base_commit": "7a30f50",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
-    "commit": "2ba5ef5"
+    "commit": "5d94387"
   },
   "scope": {
     "allowed_paths": [
@@ -448,6 +448,15 @@
   },
   "review": {
     "decision": "REWORK",
-    "note": "rev3 的 ACCEPT 已撤回（见 WP-28-review-rev3.md 附录）；判定停留在 REWORK 直到 rev4 交付后重新复核。schema 无 PENDING 取值，故此处保留 REWORK 而非新造取值 —— state=DISPATCHED 已表达「等交付」。"
+    "reviewer": "claude-code",
+    "date": "2026-09-18",
+    "doc": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev4.md",
+    "summary": "B49 修法正确但 M-T0/M-T0b 变异内存字符串而非文件字节，fix 完整撤销后两条用例仍全绿，不承重；B50 已修且承重（删发射点即转红）。范围/零回归/pin 全部干净。",
+    "blocking": [
+      "B49-用例不承重"
+    ],
+    "non_blocking": [
+      "B52-截断谓词归因过宽（真前缀 vs 块边界移动），非逃逸"
+    ]
   }
 }
