@@ -5,15 +5,15 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "APPROVED",
+  "state": "READY_FOR_REVIEW",
   "executor": {
     "tool": "kimi-cli",
-    "session": "",
+    "session": "wp29-rev1-26806",
     "dispatch_prompt": "",
     "dispatch_prompt_sha256": "",
-    "dispatch_command": "",
+    "dispatch_command": "bash /Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
     "dispatch_rev": 1,
-    "dispatch_base_commit": "",
+    "dispatch_base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "dispatch_blocked": {
       "reason": "派发被本会话的 auto mode classifier 拦下（Reason: [Create Unsafe Agents]），连 liveness 探针（kimi -p 'Reply with exactly: PROBE_OK'）都未获准执行。",
       "blocked_at": "2026-09-17T20:20:00Z",
@@ -30,23 +30,24 @@
       "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
     },
     "rev": 1,
-    "log": "",
+    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp29-rev1-exec.log",
     "dispatch_script": {
-      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
-      "sha256": "3df46a30d5c8b98353d55193feca0285fb40aedf2e0c1bdf80018b966cccb3b1",
-      "why": "编排者把复合命令收成一个固定脚本，好让放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。"
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
+      "sha256": "d674c3aca237f65f09affcc39b34372f7259302e9bdce6257b0bb1b8782fce30",
+      "why": "复合命令收成固定脚本，放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。"
     },
     "prompt": {
-      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
-      "sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca"
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev1-prompt.md",
+      "sha256": "6449815c4578f4ee15d4f1b48601bdc9201e27be118c2e3bced199c972c5f224"
     },
     "liveness_probe": {
-      "method": "pgrep -fl kimi + log byte growth over 20s",
-      "pid": 60380,
-      "log_growth_bytes": "2939588 -> 3727727",
-      "note": "日志里的 termios.error (19, 'Operation not supported by device') 来自 kimi-cli 键盘监听线程无 tty，属无害；不是执行失败。",
+      "method": "pgrep -fl kimi + log byte growth",
+      "pid": 26806,
+      "log_growth_bytes": "120859 -> 122842",
       "result": "ALIVE"
-    }
+    },
+    "stage": 1,
+    "stage_note": "阶段 1 交付物是裁定文档 WP-29-scope-decision.md，零代码改动；阶段 2 未冻结。"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -58,10 +59,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "",
+    "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "branch": "feature/wp29-render-scope-decision",
-    "worktree": "../wp29-render-scope-decision",
-    "commit": ""
+    "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
+    "commit": "bd4ac7a"
   },
   "scope": {
     "allowed_paths": [
@@ -115,21 +116,75 @@
     "staging": {
       "phase_1": "范围界定与可行性裁定，交付一份文档，零代码",
       "phase_2": "范围由阶段 1 裁定决定，须另行冻结并经用户批准；本次不冻结"
+    },
+    "criterion_at_base_commit": {
+      "fact": "本树 HEAD=2e5f2c0 上的判据是 WP-28 rev1（7 passed，无 Re-freeze 块），rev3 判据尚未实现。",
+      "measured": [
+        "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 7 passed",
+        "grep -n 'Re-freeze' tests/test_wp_template_dispatch_lint.py -> 无命中",
+        "grep -n '^## Acceptance tests' src/agentic_loop/templates/WORK_PACKAGE.md.tmpl -> 50"
+      ],
+      "why_it_matters": "brief §Acceptance tests 第 3 项的实测只能证明 rev1 判据的表现；rev3 对 E1/E2/E3 的 GREEN 来自编排者原型实测（WP-28-plan-review-before-rev3.md §4.1）。已在派发 prompt §4.1 明确要求分别标注这两个来源，避免交付物把两者混为一谈。"
+    },
+    "baseline_correction_B48": {
+      "defect": "B48（编排者的 brief 缺陷，非执行者失误）：WP-29 brief 的 DoD 把零回归基线写成 '4 failed / 619 passed / 4 skipped'，但 619 是 WP-28 lane 的数字。",
+      "raised_by": "executor（报告里主动指出实测 606 与 brief 的 619 差 13，并请编排者裁定）",
+      "orchestrator_verification": [
+        "wp29 树（base 2e5f2c0）全量 -> 4 failed / 606 passed / 4 skipped",
+        "wp28 树（base b34deb9）全量 -> 4 failed / 619 passed / 4 skipped",
+        "wp29 targeted tests/test_wp_template_dispatch_lint.py -> 7 passed",
+        "wp28 targeted 同文件 -> 20 passed",
+        "20 - 7 = 13 == 619 - 606：差额恰是 WP-28 rev1 在 b34deb9 里给该文件新增的 13 条",
+        "三棵树 tests/*.py 文件数均 41，故不是文件缺失"
+      ],
+      "root_cause": "编排者冻结 WP-29 brief 时抄了 WP-28 lane 的基线数字。两个 WP 的 base commit 不同（2e5f2c0 vs b34deb9），基线本就不该共用。",
+      "ruling": "WP-29 的正确基线是 4 failed / 606 passed / 4 skipped。执行者实测 606 即零回归成立，不构成 DoD 未达成。执行者按 brief 禁止改 docs/plans/ 其余文件而未自行改 brief，处置正确。",
+      "executor_not_at_fault": true
+    },
+    "tests": [
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed / 606 passed / 4 skipped",
+        "source": "executor-reported AND orchestrator-reproduced independently",
+        "note": "4 条全在 tests/test_finalize_merge_triple_sign.py（既有环境失败）。606 是本树（base 2e5f2c0）的正确基线；brief DoD 写的 619 是编排者抄错的 WP-28 lane 数字，见 evidence.baseline_correction_B48。",
+        "exit_code": 1
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "7 passed",
+        "source": "orchestrator-measured",
+        "note": "本树 HEAD 上的判据是 WP-28 rev1；wp28 树（b34deb9）同文件为 20 passed，差 13 恰等于全量差额。",
+        "exit_code": 0
+      },
+      {
+        "command": "git diff --exit-code HEAD -- pyproject.toml uv.lock",
+        "result": "DEPS_UNCHANGED（零 diff）",
+        "source": "executor-reported",
+        "note": "编排者复核时会独立复现。",
+        "exit_code": 0
+      }
+    ],
+    "stage1_orchestrator_reproduction": {
+      "consumption_chain": "逐跳复核 init_cmd.py:109 → _write_asset:138 → load_template:148 → contract_render.py:250-255 read_text → write_text，全链无 Markdown 解析；load_template 调用点仅 2 处",
+      "render_surface": "补查执行者未查的一面：无 .gitlab-ci.yml / .pre-commit-config.yaml / markdownlint 配置；grep WORK_PACKAGE 于 wrappers/ 与 scripts/ 零命中——无 CI/hook/wrapper 读取模板",
+      "threat_construction": "git archive 到独立 scratch 复现：基线 7 passed exit 0 → 整份外包 <!-- --> 后 2889→2898 字节 → 仍 7 passed MUTATED_EXIT=0；活树 git status 空",
+      "dispatch_lint_upgraded_from_inference_to_measurement": "抽出 dispatch_lint.sh:68-99 的段落检查器直接对外包注释副本执行 → 输出为空、rc 与未变异对照相同，即该门禁同样不转红。原文档只做代码审查推断，现有实测背书",
+      "option_b_cost_measured": "把 WP-28 rev3 的 4 条无害探针（brief §D 要求必绿）跑 (b) 的判据：改占位符 / 追加无关节 / 改 allowed_paths 措辞 / 改冻结日期——4/4 全被 (b) 判红，rev3 下 4/4 绿",
+      "baseline_B48": "wp29 树(2e5f2c0)=606、wp28 树(b34deb9)=619；targeted 7 vs 20；20−7=13=619−606；三棵树测试文件数同为 41。零回归成立，619 是编排者抄错的跨 lane 数"
     }
   },
   "review": {
-    "decision": "CONSULT",
-    "reviewer": "",
-    "reviewed_at": "",
-    "rev": 2,
-    "document": "",
-    "blockers": [
-      "B44",
-      "B45"
-    ],
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-18",
+    "rev": 1,
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1.md",
+    "blockers": [],
     "minor": [
-      "brief rev2 §A 表 9 行但正文写「八个面」——编排者自己的数错，rev3 由我改正"
-    ]
+      "§0/§5 措辞：「(b) 覆盖 E1–E4」应为「(b) 对任何字节改动都红」——判别力 1、特异性 0",
+      "B48：WP-29 brief 的零回归基线 619 是 WP-28 lane 的数，WP-29 base 2e5f2c0 实测 606；编排者自己的缺陷"
+    ],
+    "verdict_note": "交付物 ACCEPT；其推荐的方案 (b) 整份逐字节冻结不采纳，编排者改判 (c′)：不引 parser（采纳其论证），不整份冻结（会把 WP-28 rev3 明文要求必绿的 4 条无害编辑全部判红），优先「文首/文末哨兵 + 承诺边界明文化」。阶段 2 仍未冻结，须用户批准本裁定后方可冻结。"
   },
   "consult": {
     "decision": "CONSULT"
@@ -137,8 +192,10 @@
   "timestamps": {
     "created_at": "",
     "frozen_at": "2026-09-18",
-    "dispatched_at": "",
+    "dispatched_at": "2026-09-18T00:00:00+08:00",
     "dispatch_blocked_at": "",
-    "rev3_frozen_at": ""
+    "rev3_frozen_at": "",
+    "implementing_at": "2026-09-18T00:01:00+08:00",
+    "ready_for_review_at": "2026-09-18T00:13:00+08:00"
   }
 }

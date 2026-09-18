@@ -4,16 +4,16 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
-    "session": "wp28-rev2-70712",
+    "session": "wp28-rev3-82444",
     "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
     "dispatch_prompt_sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca",
-    "dispatch_command": "cd /Users/admin/vibe/wp28-norms-into-template && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md)\"",
-    "dispatch_rev": 1,
-    "dispatch_base_commit": "7a30f50",
+    "dispatch_command": "bash /Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
+    "dispatch_rev": 3,
+    "dispatch_base_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
     "dispatch_blocked": {
       "reason": "派发被本会话的 auto mode classifier 拦下（Reason: [Create Unsafe Agents]），连 liveness 探针（kimi -p 'Reply with exactly: PROBE_OK'）都未获准执行。",
       "blocked_at": "2026-09-17T20:20:00Z",
@@ -29,23 +29,40 @@
       "resolved_by": "option_1_user_directed_settings_change",
       "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
     },
-    "rev": 1,
-    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-exec.log",
+    "rev": 3,
+    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev3-exec.log",
     "dispatch_script": {
       "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp28.sh",
-      "sha256": "3df46a30d5c8b98353d55193feca0285fb40aedf2e0c1bdf80018b966cccb3b1",
-      "why": "编排者把复合命令收成一个固定脚本，好让放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。"
+      "sha256": "f7f1374ce73f7960ddcd8871412494e734b494c8b860db9192d7b89c7fab8153",
+      "why": "复合命令收成固定脚本，放行规则精确匹配；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。rev3 只换 PROMPT 与 PROMPT_SHA，脚本路径不变故放行规则无需改动（rev2 版本备份为 dispatch-wp28.sh.rev2.bak）。"
     },
     "prompt": {
-      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev1-prompt.md",
-      "sha256": "8d1a4ca4375b2e2bf5854175369b85ae041e635462c700156c2aabceaaf72cca"
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev3-prompt.md",
+      "sha256": "a113da3155c4fc9b8b3dfcb0469b9647a334be4dd4f49b95a0208c3f181b0372"
     },
     "liveness_probe": {
-      "method": "pgrep -fl kimi + log byte growth over 20s",
-      "pid": 60380,
-      "log_growth_bytes": "2939588 -> 3727727",
-      "note": "日志里的 termios.error (19, 'Operation not supported by device') 来自 kimi-cli 键盘监听线程无 tty，属无害；不是执行失败。",
+      "method": "pgrep -f kimi-cli/bin/python3 + log byte growth",
+      "pid": 82444,
+      "log_growth_bytes": "368002 -> 572754",
       "result": "ALIVE"
+    },
+    "redispatch": {
+      "n": 1,
+      "why": "执行者实现完成且自测 29 passed，但收工停在「要不要 git add / commit」的提问上未提交；DoD 要求 commit。按 AGENTS.md §4.2 的续跑流程重派，默认保留半成品，不重做。",
+      "kept_work": true,
+      "prompt": {
+        "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp28-rev3-continue-prompt.md",
+        "sha256": "ec2676e7f7998f6d31a44eddaa83414a92f6c88218bbc2e5ddcc74701c6b11d3"
+      },
+      "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp28-rev3-continue.log",
+      "dispatched_at": "2026-09-18T00:20:00+08:00",
+      "result": {
+        "status": "DONE",
+        "commit": "2ba5ef5",
+        "message": "✅ test(2026-09-13-parallel-throughput): WP-28 rev3 判据收缩为 INV-N1/N3/N4 —— 块体逐字节冻结 + 诊断分类兜底",
+        "reported_tests": "3.11 targeted 29 passed / 3.11 全量 4 failed 628 passed 4 skipped / 3.13 targeted 29 passed / 3.14 targeted 29 passed",
+        "session": "kimi -r 6c94e667-27d6-4e9d-8cac-a8ebc22bb2e4"
+      }
     }
   },
   "orchestrator": {
@@ -61,7 +78,7 @@
     "base_commit": "7a30f50",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
-    "commit": "b34deb989d9d28d816a4df8504c40a98833721c9"
+    "commit": "2ba5ef5"
   },
   "scope": {
     "allowed_paths": [
@@ -99,7 +116,32 @@
       "sha256": "c14782edaea217d8fbbaa5617a414c9f32a0740dab10ff144a1f6e58e48b69df",
       "rev": 3
     },
-    "tests": [],
+    "tests": [
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "29 passed",
+        "exit_code": 0,
+        "provenance": "orchestrator-reproduced at 2ba5ef5"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 628 passed, 4 skipped in 130.24s；4 failed 全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，未触碰该文件）",
+        "exit_code": 1,
+        "provenance": "orchestrator-reproduced at 2ba5ef5"
+      },
+      {
+        "command": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest --no-project python -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "29 passed",
+        "exit_code": 0,
+        "provenance": "executor-reported (rev3 continuation), 未由编排者复跑"
+      },
+      {
+        "command": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest --no-project python -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "29 passed",
+        "exit_code": 0,
+        "provenance": "executor-reported (rev3 continuation), 未由编排者复跑"
+      }
+    ],
     "baseline": {
       "note": "rev2 起点是 rev1 的 commit b34deb9，不是主区 HEAD",
       "dispatch_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
@@ -177,6 +219,13 @@
           "rejected": "block-body whitelist -> false red on a legitimate non-frozen transition sentence in the Acceptance block"
         },
         "method": "mutation set regenerated from the criterion's own 9 composition steps (probe3/probe4), not from the rev1 defect list; one of my own mutations (NFD decoy) was invalid and is recorded as such"
+      },
+      {
+        "rev": 3,
+        "decision": "ACCEPT",
+        "reviewed_at": "2026-09-18",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev3.md",
+        "at_commit": "2ba5ef5"
       }
     ],
     "dispatch": {
@@ -280,7 +329,74 @@
         "not_in_scope_of": "WP-28（forbidden_paths 明禁 wrappers/*.sh）",
         "action": "另立任务，与任务 #23（学习回边机械化）合流"
       }
-    ]
+    ],
+    "rev3_dispatch_baseline": {
+      "base_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
+      "worktree_clean_at_dispatch": true,
+      "targeted": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 20 passed",
+      "full": "PYTHONPATH=src python3.11 -m pytest tests -q -> 4 failed / 619 passed / 4 skipped（4 条全在 tests/test_finalize_merge_triple_sign.py，既有环境失败）",
+      "templates_byte_identical": "cmp src/agentic_loop/templates/WORK_PACKAGE.md.tmpl docs/agentic/templates/WORK_PACKAGE.md -> IDENTICAL",
+      "protected_headings_present": "两份模板 line 7 '## Re-freeze 规则（编排者冻结前自检）'、line 55 '## Acceptance tests'",
+      "contract_template_version": "6（未 bump）"
+    },
+    "rev2_uncommitted_work_stashed": {
+      "what": "rev2 对 tests/test_wp_template_dispatch_lint.py 的未提交实现（+228/−65，九个面版本）",
+      "action": "git stash push -- tests/test_wp_template_dispatch_lint.py",
+      "stash_ref": "stash@{0}",
+      "stash_message": "WP-28 rev2 九个面判据（未提交，rev3 改形状后作废，留档备查）",
+      "why": "rev3 明确弃用该形状（九面按固定顺序跑、violations[0] 归因、S2/S3/S5b/S7 承担放行、_normalize_ws() 参与判定）。stash 而非丢弃：可逆、可追溯。派发 prompt §1.1 明确禁止执行者 stash pop，只允许 git stash show -p 只读参考。",
+      "reversible": true
+    },
+    "preflight_call_form_note": {
+      "fact": "从工作树内跑 preflight 时，status 参数必须用主仓相对路径（docs/plans/.../WP-28.status.json）。传绝对路径会被安装版 wrapper 判成 'status file resolves inside a worktree' 而 FAIL。",
+      "why": "安装版 agentic CLI 是别棵树的冻结快照（B14），其 preflight.sh 与本仓源码不同版；本仓源码那条判据的措辞是 'must be tracked before implementation'，安装版的是 'resolves inside a worktree'。两者都由 status_arg 的形态触发。",
+      "measured": "绝对路径 -> PREFLIGHT_FAIL；相对路径 -> PREFLIGHT_PASS + LOCK_ACQUIRED（同 WP-29 的调用形态）"
+    },
+    "rev3_orchestrator_reproduced_before_commit": {
+      "note": "编排者在续跑前独立复现执行者成果（非转述报告）。",
+      "measured": [
+        "git diff --stat -> tests/test_wp_template_dispatch_lint.py | 818 (+517/-301)，仅此一个文件",
+        "git diff --exit-code -- src/agentic_loop/templates/ docs/agentic/templates/ -> 零 diff（模板两份未改，符合 rev3 预期）",
+        "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 29 passed",
+        "grep -n '_normalize_ws|\\.split())' -> 无命中（确认无空白折叠参与放行判定，DoD 要求）",
+        "用例名覆盖 T1 x2 / T2 x1 / T3 x1 / T4 x8 / T5 兜底 x2 / T6 x2 / T7 x1 = 17 条变异；harmless x4",
+        "三条「明文不覆盖」已落进模块 docstring（DoD 要求）"
+      ],
+      "still_pending_at_that_point": "commit（执行者未提交，停在提问）"
+    },
+    "baseline_delta_628_explained": {
+      "baseline": "4 failed / 619 passed / 4 skipped @ b34deb9（WP-28 lane）",
+      "at_2ba5ef5": "4 failed / 628 passed / 4 skipped",
+      "arithmetic": "628 - 619 = 9 = 29 - 20（rev3 判据用例数 - rev1 的 20 条），失败集与跳过集不变，故零回归",
+      "provenance": "orchestrator-reproduced"
+    },
+    "rev3_orchestrator_independent_verification": {
+      "at_commit": "2ba5ef5",
+      "scope_check": "git diff --name-only 7a30f50..HEAD = 3 个文件，全在 allowed_paths；模板自 b34deb9 起零 diff；CONTRACT_TEMPLATE_VERSION 仍为 \"6\"；pyproject.toml 零 diff",
+      "worktree": "git status --porcelain 空",
+      "no_whitespace_folding": "grep _normalize_ws / .split()) / \" \".join( 全无命中",
+      "mutation_noop_guard": "21 条变异全部经 _mutate_both（内含 assert 变异后 != 变异前 + 两份模板同步施加）；T7 单独走内联 guard，是唯一考察副本同一的步骤",
+      "witness_codes": "结构化 code：SECTION_MISSING / SECTION_NOT_UNIQUE / SECTION_HOMOGLYPH_DUPLICATE / SECTION_ANCHOR_MOVED / BODY_MISMATCH / REPLICA_MISMATCH + 4 个诊断 code；不依赖 violations[0] 次序",
+      "fallback_load_bearing": "4 条变异（pure_rewrap / hard_break / append_prose / reorder_list）断言 BODY_MISMATCH in codes 且 not (codes & DIAGNOSTIC_CODES)，兜底真承重",
+      "orchestrator_own_escape_probes": {
+        "note": "9 条由编排者自撰、执行者未见过的探针，直接调判据的 _check_both",
+        "expected_green_because_out_of_promise": [
+          "P1 整份文档外包 <!-- -->",
+          "P2 文档顶部远距离去规范化句",
+          "P3 ## 附注 内未闭合围栏"
+        ],
+        "expected_red": [
+          "P4 块内插零宽空格",
+          "P5 块内行尾加空格",
+          "P6 块体换成语义等价改写",
+          "P7 只攻击 re-freeze 一块",
+          "P8 文末追加受保护块副本",
+          "P9 块内空格换 NBSP"
+        ],
+        "result": "9/9 与预期一致，0 意外逃逸；P1–P3 的绿正是模块 docstring 已声明的三条不保证，属承诺边界外，非缺陷"
+      },
+      "docstring_boundary": "模块 docstring 末尾 WP-28 (rev3) INV-N boundary 逐条写明三条不保证"
+    }
   },
   "consult": {},
   "timestamps": {
@@ -288,21 +404,20 @@
     "frozen_at": "2026-09-17T20:05:00Z",
     "dispatched_at": "",
     "dispatch_blocked_at": "2026-09-17T20:20:00Z",
-    "rev3_frozen_at": "2026-09-18"
+    "rev3_frozen_at": "2026-09-18",
+    "dispatched_at_rev3": "2026-09-18T00:10:00+08:00",
+    "implementing_at_rev3": "2026-09-18T00:12:00+08:00"
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-18",
-    "rev": 2,
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev2.md",
-    "blockers": [
-      "B44",
-      "B45"
-    ],
+    "rev": 3,
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev3.md",
+    "blockers": [],
     "minor": [
-      "brief rev2 §A 表 9 行但正文写「八个面」——编排者自己的数错，rev3 由我改正"
+      "B47 既有：dispatch_lint.sh 按固定命名读 brief，忽略 evidence.brief.path，故 rev3 brief 实际未过段落门禁——另 WP 处理（任务 #38），不阻断本 WP"
     ],
-    "note_rev3": "rev2 判定；rev3 已冻结待派发，尚无新一轮复核"
+    "note": "编排者独立复核 ACCEPT（9 条自撰探针 9/9 符合预期）。状态留在 READY_FOR_REVIEW 而非 APPROVED_FOR_MERGE：按 [review_policy] 进入合入态还需 consult.decision=ACCEPT（codex 第二签名），该咨询尚未派发。合入另需用户批准。"
   }
 }
