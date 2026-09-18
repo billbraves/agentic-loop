@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi-cli",
@@ -112,9 +112,9 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md",
-      "sha256": "c14782edaea217d8fbbaa5617a414c9f32a0740dab10ff144a1f6e58e48b69df",
-      "rev": 3
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev4.md",
+      "sha256": "5cbfa77d04803e63f7481ed5fe9cf696ed24d479ccfb0a1e5368c4cb8d5840e2",
+      "rev": 4
     },
     "tests": [
       {
@@ -143,11 +143,11 @@
       }
     ],
     "baseline": {
-      "note": "rev2 起点是 rev1 的 commit b34deb9，不是主区 HEAD",
-      "dispatch_commit": "b34deb989d9d28d816a4df8504c40a98833721c9",
-      "targeted": "20 passed",
-      "full": "4 failed / 619 passed / 4 skipped",
-      "known_failures": "4 条全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，不得修）"
+      "note": "rev4 起点是 rev3 的 commit 2ba5ef5，不是主区 HEAD。本数字在该起点实测（B48 教训：禁跨 lane 抄数）",
+      "dispatch_commit": "2ba5ef5c87cf3378f2860232956cc047c755c519",
+      "targeted": "29 passed",
+      "full": "4 failed / 628 passed / 4 skipped",
+      "known_failures": "4 条全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，工作树内 git checkout -q main 失败所致，不得修）"
     },
     "orchestrator_feasibility_probe": {
       "note": "冻结前先实测判据本身可实施（记忆 verify-the-remedy-not-just-the-finding），不把未验证的判据写进 brief。",
@@ -396,40 +396,44 @@
         "result": "9/9 与预期一致，0 意外逃逸；P1–P3 的绿正是模块 docstring 已声明的三条不保证，属承诺边界外，非缺陷"
       },
       "docstring_boundary": "模块 docstring 末尾 WP-28 (rev3) INV-N boundary 逐条写明三条不保证"
+    },
+    "refreeze": {
+      "count": 3,
+      "current_rev": 4,
+      "stop_and_review_gate": {
+        "rule": "第 3 次及以后 re-freeze：冻结前必须停手复核计划，未经用户批准不得冻结",
+        "hit": true,
+        "occurrence": 2,
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev4.md",
+        "user_approved": true
+      },
+      "history": [
+        {
+          "rev": 1,
+          "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev1.md",
+          "commit": "7a30f50"
+        },
+        {
+          "rev": 2,
+          "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md",
+          "commit": "b34deb9"
+        },
+        {
+          "rev": 3,
+          "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md",
+          "commit": "2ba5ef5",
+          "outcome": "双签名 REWORK：B49 换行归一化绕过逐字节冻结 + B50 T3 无步骤特异 witness"
+        },
+        {
+          "rev": 4,
+          "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev4.md",
+          "commit": null,
+          "scope": "只修 B49 + B50，不动 INV-N1/N3/N4 承诺边界，不碰 WP-29 的 active_embedding"
+        }
+      ]
     }
   },
-  "consult": {
-    "decision": "REWORK",
-    "reviewed_by": "codex",
-    "consulted_at": "2026-09-18T09:05:00Z",
-    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev3-verdict.json",
-    "request_file": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev3-request.md",
-    "basis": "内联 rev3 brief（sha256 c14782ed…）+ 累积 diff 7a30f50..2ba5ef5；咨询者另在 read-only sandbox 自行读 worktree、本地跑 INV-N 用例（22 passed）并做内存探针。",
-    "blockers": [
-      {
-        "id": "B49",
-        "summary": "read_text() 的 universal-newline 归一化使『逐字节』硬不变式可被绕过：两份模板同步 LF→CRLF 后受保护字节已变、冻结常量未改，判据仍 GREEN。",
-        "violates": [
-          "INV-N1 完整 body 逐字节相等",
-          "INV-N4 变更可见性",
-          "DoD『T4 用真逐字节相等』"
-        ],
-        "suggested_fix": "以 read_bytes() 为事实源（或显式 newline='' 读取），冻结常量相应改为 bytes；并补一条同步改两副本换行字节的负面变异，证明其触发 BODY_MISMATCH 而非仅靠单侧 REPLICA_MISMATCH。",
-        "orchestrator_status": "REPRODUCED"
-      },
-      {
-        "id": "B50",
-        "summary": "T3（块体切分）无步骤特异 witness：实测 T3=[BODY_CLAUSE_MISSING, BODY_MISMATCH, SECTION_ANCHOR_MOVED]，三个 code 分别属于诊断分类、T4/T5 兜底与 T6，无一能特异表示『块体被新 ## 截断』。",
-        "violates": [
-          "brief §E② 原因特异 witness",
-          "DoD『§B 七类步骤各有至少一条转红变异，结构化 code 互不相同』"
-        ],
-        "suggested_fix": "为 T3 增设独立硬 code（如 SECTION_BODY_TRUNCATED / BODY_BOUNDARY_CHANGED）并由 T3 用例显式断言；BODY_MISMATCH 保留为 T4/T5 的承重兜底。",
-        "orchestrator_status": "REPRODUCED"
-      }
-    ],
-    "non_blocking_confirmations": "咨询者确认：T1–T6 均经 _mutate_both 同步施加且统一跑 no-op guard，T7 单侧变异；T5 只产生 BODY_MISMATCH，兜底 load-bearing；诊断分类仅在 BODY_MISMATCH 后运行、不参与硬放行；模块 docstring 的边界声明与实现一致，未把 WP-29 的 active_embedding 重新当作本轮门槛。"
-  },
+  "consult": {},
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
@@ -441,14 +445,6 @@
   },
   "review": {
     "decision": "REWORK",
-    "reviewer": "claude-code",
-    "reviewed_at": "2026-09-18",
-    "rev": 3,
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev3.md",
-    "blockers": [],
-    "minor": [
-      "B47 既有：dispatch_lint.sh 按固定命名读 brief，忽略 evidence.brief.path，故 rev3 brief 实际未过段落门禁——另 WP 处理（任务 #38），不阻断本 WP"
-    ],
-    "note": "编排者撤回前次 ACCEPT（WP-28-review-rev3.md）。第二签名 codex 报两个阻断项 B49（read_text 换行归一化绕过逐字节冻结）与 B50（T3 无步骤特异 witness），编排者已逐条独立复现（探针见 WP-28-consult-codex-rev3-verdict.json.orchestrator_verification）。两项都落在我自己复核未覆盖的维度：9 条探针全在 LF 下构造；核对了『诊断兜底 load-bearing』却漏核『每步骤 code 互不相同』这条 DoD。双签名规则在此实弹生效——单签名会放行一个可被一次无害 diff 废掉的冻结判据。"
+    "note": "rev3 的 ACCEPT 已撤回（见 WP-28-review-rev3.md 附录）；判定停留在 REWORK 直到 rev4 交付后重新复核。schema 无 PENDING 取值，故此处保留 REWORK 而非新造取值 —— state=DISPATCHED 已表达「等交付」。"
   }
 }
