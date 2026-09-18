@@ -7,7 +7,7 @@ preflight`` uses). The predicate is never re-implemented: a copied checker
 would test the copy and stay silent when the real one drifts — defect B9's
 shape.
 
-WP-28 (rev3) INV-N boundary — 本判据只保证冻结块的 raw text 身份、唯一性与声明的
+WP-28 (rev3) INV-N boundary — 本判据只保证冻结块的 文件字节 身份、唯一性与声明的
 位置锚点不变。它不保证：
 
 1. 块外编辑不改变其 Markdown 渲染上下文。编排者已实测三条现成逃逸：整份文档外包
@@ -321,6 +321,7 @@ SECTION_MISSING = "SECTION_MISSING"
 SECTION_NOT_UNIQUE = "SECTION_NOT_UNIQUE"
 SECTION_HOMOGLYPH_DUPLICATE = "SECTION_HOMOGLYPH_DUPLICATE"
 BODY_MISMATCH = "BODY_MISMATCH"
+SECTION_BODY_TRUNCATED = "SECTION_BODY_TRUNCATED"
 SECTION_ANCHOR_MOVED = "SECTION_ANCHOR_MOVED"
 REPLICA_MISMATCH = "REPLICA_MISMATCH"
 
@@ -329,6 +330,7 @@ HARD_CODES = {
     SECTION_NOT_UNIQUE,
     SECTION_HOMOGLYPH_DUPLICATE,
     BODY_MISMATCH,
+    SECTION_BODY_TRUNCATED,
     SECTION_ANCHOR_MOVED,
     REPLICA_MISMATCH,
 }
@@ -470,6 +472,11 @@ def _inv_n_codes(text):
             body = _extract_body(text, exact[0].end(), h2)
             if body != frozen_body:
                 codes.add(BODY_MISMATCH)
+                # T3 — the block boundary was moved INTO the body (e.g. a new
+                # ``## `` line): the sliced body is a strict prefix of the
+                # frozen body, distinguishable from a mid-body clause deletion.
+                if frozen_body.startswith(body):
+                    codes.add(SECTION_BODY_TRUNCATED)
                 # T5 fallback attribution (diagnostic only).
                 codes.update(_classify_body_diff(title, body))
 
@@ -489,6 +496,22 @@ def _check_both(packaged_text, docs_text):
     return codes
 
 
+def _read_text_preserving_newlines(path):
+    """Read a template's text with newline translation DISABLED (B49).
+
+    ``Path.read_text()`` runs universal-newline translation, folding ``CRLF``
+    into ``LF`` before the frozen-byte comparison ever sees it.  A byte-level
+    change to line endings therefore passes silently.  The criterion's input
+    must be the file's actual bytes decoded without newline translation, so
+    ``\\r\\n`` and ``\\n`` remain distinguishable.  ``open(..., newline="")``
+    is the "decode but keep newline translation off" route (A.4 option 2); it
+    keeps the frozen constants as ``str`` literals while making the bytes the
+    source of truth.
+    """
+    with open(path, encoding="utf-8", newline="") as fh:
+        return fh.read()
+
+
 def _mutate_both(mutate):
     """Apply ``mutate`` to BOTH templates and return the combined witness codes.
 
@@ -496,8 +519,8 @@ def _mutate_both(mutate):
     only step that examines replica identity).  The no-op guard below is the
     uniform ``变异后 != 变异前`` assertion for every mutation function.
     """
-    packaged = TEMPLATE_PACKAGED.read_text(encoding="utf-8")
-    docs = TEMPLATE_DOCS.read_text(encoding="utf-8")
+    packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
+    docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
     assert packaged == docs, "both templates must be byte-identical before mutation"
     mutated_packaged = mutate(packaged)
     mutated_docs = mutate(docs)
@@ -513,11 +536,41 @@ def _mutate_both(mutate):
 # Positive control: the real templates carry exactly the frozen blocks.
 # ---------------------------------------------------------------------
 def test_invn_positive_control_clean_template():
-    packaged = TEMPLATE_PACKAGED.read_text(encoding="utf-8")
-    docs = TEMPLATE_DOCS.read_text(encoding="utf-8")
+    packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
+    docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
     assert packaged == docs, "both templates must be byte-identical"
     codes = _check_both(packaged, docs)
     assert codes == set(), f"clean template must produce no witness codes, got {codes}"
+
+
+# ---------------------------------------------------------------------
+# T0 — input fidelity: the criterion's input must be the file's bytes.
+# ---------------------------------------------------------------------
+def test_invn_t0_crlf_rewrap_both_red():
+    """M-T0: re-encoding BOTH templates LF->CRLF (no character change, frozen
+    constants untouched) must go red, with SECTION_MISSING as the specific
+    witness and NO REPLICA_MISMATCH (both replicas stay identical)."""
+
+    def mutate(text):
+        return text.replace("\n", "\r\n")
+
+    codes = _mutate_both(mutate)
+    assert SECTION_MISSING in codes, codes
+    assert REPLICA_MISMATCH not in codes, codes
+
+
+def test_invn_t0b_crlf_rewrap_one_side_red():
+    """M-T0b: mutating only ONE replica's line endings must surface as
+    REPLICA_MISMATCH (T7), proving M-T0's red comes from T0/T1 — not from
+    replica identity."""
+    packaged = _read_text_preserving_newlines(TEMPLATE_PACKAGED)
+    docs = _read_text_preserving_newlines(TEMPLATE_DOCS)
+    assert packaged == docs
+    mutated_packaged = packaged.replace("\n", "\r\n")
+    assert mutated_packaged != packaged, "mutation must change the text (no-op guard)"
+    codes = _check_both(mutated_packaged, docs)
+    assert REPLICA_MISMATCH in codes, codes
+    assert SECTION_MISSING in codes, codes
 
 
 # ---------------------------------------------------------------------
@@ -579,6 +632,21 @@ def test_invn_t3_body_slicing_truncated_red():
 
     codes = _mutate_both(mutate)
     assert BODY_MISMATCH in codes, codes
+    assert SECTION_BODY_TRUNCATED in codes, codes
+    assert REPLICA_MISMATCH not in codes, codes
+
+
+def test_invn_t3_neg_clause_deleted_not_truncated():
+    """Negative control for SECTION_BODY_TRUNCATED: a mid-body clause deletion
+    is a T4 edit, not a boundary move, so it must NOT carry the T3 code."""
+
+    def mutate(text):
+        assert "台账编号只作破口清单，" in text
+        return text.replace("台账编号只作破口清单，", "", 1)
+
+    codes = _mutate_both(mutate)
+    assert BODY_MISMATCH in codes, codes
+    assert SECTION_BODY_TRUNCATED not in codes, codes
     assert REPLICA_MISMATCH not in codes, codes
 
 
