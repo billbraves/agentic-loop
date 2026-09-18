@@ -6,6 +6,15 @@
 
 ## 判定
 
+**REWORK**（state=CHANGES_REQUESTED；编排者初判 ACCEPT，经 codex 第二签名 REWORK 后撤回）
+
+两个标的本身兑现，但 `_mutate_on_disk` 的还原保证有洞（**B54**，见文末）。
+下方 ACCEPT 段落是我的初判，保留原文不改，作为「我漏了什么」的留痕。
+
+---
+
+## 初判（已撤回）
+
 **ACCEPT** —— 两项标的均兑现，无阻断项。
 
 复核基于我自己的探针，不依赖执行者报告的任何断言。所复核的文件内容
@@ -106,3 +115,46 @@ sha256 `f3de4ac0332855ae335b5904cf4e3aec327de200da0292dc9667a3c622f2c988`
   （实测见 `B47-measurement.md`，18/22 个 WP 受影响）。**本 WP 的 PREFLIGHT_PASS
   校验的是 rev1 的段落**，不影响上述判定（我的复核未依赖该门禁），但需尽快修。
 - **合入前置**：按 `[review_policy]` 需 codex 第二签名；合入本身仍须用户批准。
+
+---
+
+## 第二签名结果：REWORK（B54）
+
+`WP-28-consult-codex-rev5-verdict.json` | codex `gpt-5.6-sol`, read-only, effort high
+
+codex 的 5 条非阻断结论与我的复核逐条一致 —— rev5 的两个标的确实兑现。阻断项在载具
+本身：**`_mutate_on_disk` 的还原保证只覆盖 yield 之后的失败**。
+
+我用交付源码里的 carrier（`exec` 原文，不重抄）对模板副本实测，三条全部复现：
+
+| 场景 | 结果 |
+|---|---|
+| 第二份的 no-op guard 失败 | 第一份留在变异态（`A restored: False / B restored: True`）—— 变异写入循环在 `try` 之前，`finally` 从不执行 |
+| `finally` 内第一份恢复写入抛错 | 第二份完全不获恢复尝试（两份都 False） |
+| 正常路径（控制组） | 两份都恢复 —— 探针有判别力 |
+
+**可达性不是理论的**：`_crlf_rewrap_bytes` 对已是 CRLF 的文件是恒等映射（实测 CRLF
+输入 `changed = False`）。一旦仓库里的模板某天以 CRLF 落盘（Windows 检出、
+`.gitattributes` 改动、编辑器改行尾），M-T0 的第一份写入成功、第二份 guard 失败，
+真实模板会被留在 CRLF 变异态 —— 而 CRLF 恰好正是这条不变式要抓的那种字节改动。
+
+brief §附注 2 明写「避免一条漏恢复污染另一条」，故 R1 落在本 rev 要求之内，非超范围。
+
+修法（四条，来自 codex，我认为完备）：
+
+1. 所有 `mutated != original` 校验在**任何落盘之前**完成。
+2. 全部变异写入移入 `try` 范围，使首个写入尝试之后必然进入恢复。
+3. `finally` 独立尝试恢复每个可能被写过或部分写过的路径；单个路径失败不得阻断后续路径。
+4. 全部恢复尝试完成后再逐字节校验，统一抛出恢复错误。
+5. 补故障注入证据：第二个文件写入失败时第一个仍恢复；首个恢复失败时后续仍获尝试。
+
+## 我自己漏了什么
+
+我测的是「yield 之后用例主体抛异常时能否恢复」（在 `with` 块内注入 `assert False`），
+那条路径确实安全。但**初始化阶段（`try` 之前的写入循环）与恢复阶段自身的失败，我一条
+都没测** —— 而 brief §附注 2 就写着「多文件间顺序」。这与 [[review-the-dod-not-your-own-concerns]]
+是同一个形状：我的探针盯着上一轮的缺陷（读路径承重性），漏掉了 brief 里从没人攻击过的那行。
+
+派发事故一并留痕：第一次派发我用 `env -u OPENAI_BASE_URL -u OPENAI_API_KEY`，把 codex
+binding 的 `env_key` 一起剥掉了，结果 `RC=0`、answer 空、`tokens used 0` —— **空结果长得
+像裁决**。只剥 `OPENAI_BASE_URL` 后正常返回。

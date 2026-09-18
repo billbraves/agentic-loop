@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -178,12 +178,24 @@
       },
       {
         "rev": 5,
-        "decision": "ACCEPT",
+        "decision": "ACCEPT_RETRACTED",
         "reviewer": "claude (orchestrator, independent)",
         "reviewed_at": "2026-09-18",
         "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev5.md",
         "at_commit": "2923255",
-        "basis": "自撰探针实测撤销 fix -> 2 failed；失败路径下模板字节恢复；oracle 第 4 项逐字节相符；零回归算术自洽"
+        "basis": "自撰探针实测撤销 fix -> 2 failed；失败路径下模板字节恢复；oracle 第 4 项逐字节相符；零回归算术自洽",
+        "retracted_because": "codex 第二签名判 REWORK（B54），编排者复现后同意，改判 CHANGES_REQUESTED"
+      },
+      {
+        "rev": 5,
+        "decision": "REWORK",
+        "reviewer": "claude (orchestrator) + codex (second signature)",
+        "reviewed_at": "2026-09-18",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev5.md",
+        "at_commit": "2923255",
+        "blocker": "B54 —— _mutate_on_disk 还原保证有洞（写入循环在 try 之外 + finally 内单点失败中止后续恢复）",
+        "targets_themselves_met": "两个标的兑现：承重性实测转红、oracle 第 4 项逐字节相符。codex 5 条非阻断结论与编排者复核逐条一致。",
+        "lifecycle_state": "CHANGES_REQUESTED"
       }
     ],
     "dispatch": {
@@ -419,9 +431,31 @@
         "第一版探针正则匹配读取实现，因 docstring 形状不同而 PROBE_INVALID —— guard 生效，未产出假结论",
         "验「失败路径是否恢复」时锚点在文件中出现 2 次，探针自行中止，我当时误把随后那句「模板完好」当结论；改用 with 块内唯一锚点重做后才拿到真结论"
       ]
+    },
+    "rev5_consult_reproduction": {
+      "probe": "/Users/admin/.claude/jobs/8a8bf01e/tmp/probe-r1.py（exec 交付源码里的 carrier 原文，不重抄；只动模板副本，不碰真实文件）",
+      "case1_second_guard_fails": "A restored: False / B restored: True —— 第一份留在变异态",
+      "case2_restore_write_fails": "A restored: False / B restored: False —— 后续路径不获恢复尝试",
+      "case3_control": "两份都恢复 —— 探针有判别力",
+      "reachability": "_crlf_rewrap_bytes 对已 CRLF 的文件是恒等映射（实测 changed=False）；模板一旦以 CRLF 落盘，M-T0 会让真实模板留在 CRLF 变异态，而 CRLF 正是本不变式要抓的字节改动",
+      "in_scope_because": "brief §附注 2 明写「避免一条漏恢复污染另一条」"
+    },
+    "rev5_dispatch_incident": "第一次派发 codex 用 env -u OPENAI_BASE_URL -u OPENAI_API_KEY，把 binding 的 env_key 一起剥掉：RC=0、answer 空、tokens used 0 —— 空结果长得像裁决。只剥 OPENAI_BASE_URL 后正常。编排者失误，已入记忆 strip-the-base-url-not-the-key。"
+  },
+  "consult": {
+    "decision": "REWORK",
+    "consultant": "codex",
+    "provider": "kirogpt",
+    "identity_model": "gpt-5.6-sol",
+    "independence": "strong",
+    "consulted_at": "2026-09-18T07:20:00Z",
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev5-verdict.json",
+    "request": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev5-request.md",
+    "at_commit": "2923255",
+    "blockers": {
+      "B54": "_mutate_on_disk 的还原保证只覆盖 yield 之后的失败：变异写入循环在 try 之前，第二份 no-op guard 或 write_bytes 失败时第一份留在变异态；finally 内单个路径恢复失败会中止循环，后续路径不获恢复尝试。编排者已用交付源码的 carrier 对模板副本三条全部复现。"
     }
   },
-  "consult": {},
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
@@ -431,20 +465,25 @@
     "dispatched_at_rev3": "2026-09-18T00:10:00+08:00",
     "implementing_at_rev3": "2026-09-18T00:12:00+08:00",
     "dispatched_at_rev5": "2026-09-18T03:20:00+08:00",
-    "ready_for_review_at_rev5": "2026-09-18T04:05:00+08:00"
+    "ready_for_review_at_rev5": "2026-09-18T04:05:00+08:00",
+    "changes_requested_at_rev5": "2026-09-18T07:25:00Z"
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-18",
     "rev": 5,
     "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev5.md",
     "at_commit": "2923255",
-    "blockers": [],
+    "blockers": [
+      "B54"
+    ],
     "follow_ups": [
       "B52 截断谓词归因过宽（任务 #42，本 rev 范围外）",
       "B47 段落门禁按固定命名读 brief，本 WP 五轮冻结的 PREFLIGHT_PASS 校验的都是 rev1 段落（任务 #38）；本判定未依赖该门禁"
     ],
-    "merge_gate": "需 codex 第二签名（consult.decision=ACCEPT）；合入本身仍须用户明确批准"
+    "merge_gate": "需 codex 第二签名（consult.decision=ACCEPT）；合入本身仍须用户明确批准",
+    "retracted_accept": "编排者初判 ACCEPT，经 codex 第二签名 REWORK 后撤回。撤回理由：我的探针只测了 yield 之后的失败路径，未测初始化阶段与恢复阶段自身的失败，而 brief §附注 2 明写「多文件间顺序」。",
+    "lifecycle_state": "CHANGES_REQUESTED"
   }
 }
