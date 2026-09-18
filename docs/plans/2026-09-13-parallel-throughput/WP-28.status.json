@@ -440,7 +440,23 @@
       "reachability": "_crlf_rewrap_bytes 对已 CRLF 的文件是恒等映射（实测 changed=False）；模板一旦以 CRLF 落盘，M-T0 会让真实模板留在 CRLF 变异态，而 CRLF 正是本不变式要抓的字节改动",
       "in_scope_because": "brief §附注 2 明写「避免一条漏恢复污染另一条」"
     },
-    "rev5_dispatch_incident": "第一次派发 codex 用 env -u OPENAI_BASE_URL -u OPENAI_API_KEY，把 binding 的 env_key 一起剥掉：RC=0、answer 空、tokens used 0 —— 空结果长得像裁决。只剥 OPENAI_BASE_URL 后正常。编排者失误，已入记忆 strip-the-base-url-not-the-key。"
+    "rev5_dispatch_incident": "第一次派发 codex 用 env -u OPENAI_BASE_URL -u OPENAI_API_KEY，把 binding 的 env_key 一起剥掉：RC=0、answer 空、tokens used 0 —— 空结果长得像裁决。只剥 OPENAI_BASE_URL 后正常。编排者失误，已入记忆 strip-the-base-url-not-the-key。",
+    "rev6_stop_and_review": {
+      "rule": "同一 WP 第 3 次及以后 re-freeze：冻结前必须停手复核计划，未经用户批准不得冻结",
+      "hit": true,
+      "occurrence": 4,
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev6.md",
+      "user_approved": false,
+      "awaiting": "用户在四个方向中择一（方向 2 为编排者建议）",
+      "root_cause": "编排者把「变异须落到真实输入面」直接翻译成「写真实仓库文件」——输入面指一个文件的字节，不是那两个特定路径。连续两轮根因均在计划侧。",
+      "remedies_measured_before_freeze": {
+        "note": "不把未验证的判据写进 brief（记忆 verify-the-remedy-not-just-the-finding）；两个方案均已实测，只动模板副本",
+        "option_A_hardened_in_place": "probe-optionA.py：第二份 guard 失败 -> 两份都恢复（硬化前 A 未恢复）；finally 内第一份写入抛错 -> B 已恢复、A 仍未恢复（磁盘真写不进去，无法可为）；主体抛异常与正常路径均恢复。codex 五条修法有效但风险面仍在。",
+        "option_B_mutate_copies": "probe-optionB.py（直接 import 交付的判据模块）：M-T0 fix 在场 ['SECTION_MISSING'] 且 REPLICA_MISMATCH 不在场、fix 撤销 [] 即转红；M-T0b fix 在场两码皆在、fix 撤销 [] 即转红；真实模板 sha256 前后一致 True。承重性完全保留，B54 整个失败类不存在。",
+        "recommendation": "方案 B —— 风险面消除优于风险面加固；该 carrier 保护的正是模板逐字节冻结，其失效模式与保护目标同向"
+      },
+      "optional_scope_extension": "oracle 第 4 项补一句：同类输入面的等价载体（如临时副本）满足要求；若变异会写到被判据保护的制品本身，须优先选用不写该制品的等价载体。此句由 B54 提炼，与 rev5 折进 B53 判别句同型，但会把 rev6 范围扩到再动一次模板，故列为方向 2 由用户定。"
+    }
   },
   "consult": {
     "decision": "REWORK",
