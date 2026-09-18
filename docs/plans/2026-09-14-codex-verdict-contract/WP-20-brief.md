@@ -2,6 +2,112 @@
 
 > 立项日期 <待冻结> | 编排者 Kiro（DeepSeek Harness）| 执行者 <待定，可 option B 直接实现>
 > 冻结后执行期间不得修改；需修订走 re-freeze。
+> **rev2（2026-09-18，用户批准 re-freeze）**：Step 0 实证推翻了 rev1 的根因假设。
+> 见下方「§0-实证 / rev2 修订」——范围从「单点容忍良性 error-item」扩为
+> 「三项对症修复」。rev1 正文保留在下方作为历史，凡与 §0-实证冲突处以 §0-实证为准。
+
+## §0-实证 / rev2 修订（唯一权威根因，取代 rev1「根因」节的推测）
+
+Step 0 用**真实 gate 重跑**（复现 Run 2 同一行 `GATE_FAIL: ... tool-free turn
+emitted an unexpected event`，`STATUS_UNCHANGED`，无生产写入）+ 观测-only 的
+`_jsonl_events` / `_validated_final_message` 挂钩 dump 了全部 6 条真实 JSONL 流
+（3 个 chunk × 各自的初审/二次调用），得到的事实：
+
+**事实 1 — Run 2 的 “unexpected event” 不是良性 error-item 造成的。**
+真实失败流 `stream-005.jsonl`（sha256
+`eb1fa51636c9668c6f190f89645138171379f4aa2953fe03e8e35655e3ea36b3`）事件序列为：
+
+```
+[0] thread.started
+[1] item.completed  item.type=error         <- 良性 fallback-metadata 告警
+[2] turn.started
+[3] item.started    item.type=mcp_tool_call <- server=codex_apps
+                                               tool=codex_document_control.list_document_sessions
+[4] item.completed  item.type=mcp_tool_call
+[5] item.completed  item.type=agent_message
+[6] turn.completed
+```
+
+- 顶层 event type 集合含 **`item.started`**，不在 L545–556 白名单
+  `{thread.started, turn.started, item.completed, turn.completed}` 中 →
+  **这才是 Run 2 “unexpected event” 的真实命中点**（`validate-005.txt` 实录）。
+- L527–534 生命周期检查**未**命中：真实流里没有顶层 `error` 事件，也没有
+  `turn.failed`（`"error" in types` 为 False——rev1 对此的怀疑被证伪）。
+- 若只按 rev1 容忍良性 error-item，剩余 offender 仍有顶层 `item.started` 与
+  item 子类型 `mcp_tool_call` → **Run 3 仍会 fail-closed，WP-34 拿不到第二签名**。
+
+**事实 2 — 失败发生在 normalization 分支，不是 resume finalization 分支。**
+失败流的 thread id（`01a0b1d8-…`）与同 chunk 初审流 `stream-003.jsonl` 的
+（`01a0b1d7-…`）**不同**，且初审的 agent_message 被 `_parse_verdict` 以
+`Codex verdict is not one complete JSON value` 拒绝（模型输出的 JSON 里
+rationale 混入了未转义的反引号+全角逗号）。即 `review()` 走的是
+`_exec_attempt(tools_enabled=False)` 归一化调用（新 thread），而非
+`_resume_finalization`。两者都以 `tools_forbidden=True` 进入同一校验函数，
+所以修复点仍在 `_validated_final_message`，但受影响面是**两条 tool-free 分支**。
+
+**事实 3 — resume finalization 分支确实也会被良性 error-item 挡住（rev1 的观察成立，只是不是 Run 2 那条）。**
+独立探针（真实 `_exec_attempt` + `_resume_finalization`，
+`wp20-step0-call2.jsonl` sha256
+`e6714b15ad093725abb7a91cb1b1ec767fc567b49f8d0a96483d6cb8fad32b1e`）复现：
+`[thread.started, item.completed(error), turn.started, item.completed(agent_message),
+turn.completed]` → `_validated_final_message` 抛
+`tool-free turn emitted a tool or unknown item`（L565–573）。
+注意该良性 error-item 出现在 **`turn.started` 之前**（index 1），
+因此 `started_at=2 / completed_at=4`，L541 ordering、L588 message-in-turn、
+L593 message-is-final-item 三项**均仍通过**——容忍它不需要改动那三处。
+
+**事实 4 — MCP 工具项可从源头消除，无需放宽任何工具语义。**
+`codex_apps` 的 MCP 工具**不来自** `~/.codex/config.toml` 的 `mcp_servers`
+（`--ignore-user-config` 已隔离那些），而来自 codex 0.154 内置的 apps 特性。
+A/B 实测（同 provider/flags，仅切换一个开关，强制诱导模型调用该工具）：
+
+| flags | 事件流 |
+|---|---|
+| 不加 | `… turn.started, item.started(mcp_tool_call), item.completed(mcp_tool_call), item.completed(agent_message), turn.completed` |
+| `--disable apps` | `… turn.started, item.completed(agent_message), turn.completed`（MCP 项消失） |
+
+即 `--disable apps` 使内置 apps/MCP 工具面**不存在**，属于**收紧**执行契约
+（与既有 `--disable shell_tool/unified_exec/multi_agent` 同族），不是放宽校验。
+
+### rev2 的三项对症修复（全部保持 fail-closed）
+
+1. **`--disable apps`**：加入 `_exec_attempt` 与 `_resume_finalization` 的 flags。
+   从源头消除 `mcp_tool_call` item，而不是在校验里放行它。
+2. **容忍顶层 `item.started`**：把 `item.started` 加入 tool-free 的 event-type
+   白名单，但**同时**对 `item.started` 的 item 子类型施加与 `item.completed`
+   **同一套**逐项校验（详见约束 2′）。理由：`item.started` 只是同一 item 的
+   生命周期前半，本身不携带新增能力；放行它而不校验其子类型才是漏洞。
+3. **严格白名单化容忍良性 fallback-metadata error-item**（rev1 原范围），
+   使 resume 分支（事实 3）也能取回 verdict。
+
+### rev2 追加的设计约束
+
+- **约束 2′（不得放宽工具/未知能力，收紧版）**：`item.started` 与
+  `item.completed` 的 item 子类型走**同一个**判定：只允许
+  `{reasoning, agent_message}` ∪ {良性 fallback-metadata error-item}；
+  `command_execution` / `file_change` / `mcp_tool_call` / `web_search` /
+  `todo_list` / 未知子类型，无论出现在 `item.started` 还是 `item.completed`，
+  **一律 fail-closed**。（即修复 2 不得成为工具项的旁路。）
+- **约束 7（新）**：`--disable apps` 只加在既有两处 exec flags；不改 sandbox、
+  不改 provider 注入、不改 `--ignore-user-config`。
+- **DoD 追加**：新测试必须覆盖
+  （a）真实失败流形状（含 `item.started` + 良性 error-item + 合法 agent_message，
+  但**无** MCP 项）→ 返回 verdict；
+  （b）`item.started` 携带 `mcp_tool_call`/`command_execution`/`file_change` →
+  **仍 fail-closed**（证明修复 2 未成旁路）；
+  （c）`item.started` 携带非 dict item → fail-closed；
+  （d）两处 exec flags 均含 `--disable apps`（argv 断言）。
+
+### rev2 范围变更（allowed_paths 不变，语义扩展）
+
+`src/agentic_loop/adapters/codex.py` 的可改动面从「仅
+`_validated_final_message` 容忍逻辑」扩为「`_validated_final_message` 容忍逻辑
++ `_exec_attempt`/`_resume_finalization` 各加一个 `--disable apps` flag」。
+仍不改 review()/分块/行切/文件回填/聚合/决策语义/`_parse_verdict`。
+
+---
+
+## 以下为 rev1 正文（历史，冲突处以 §0-实证为准）
 
 ## 目标（一句话）
 在 codex adapter 的**空终态 finalization / tool-free resume** JSONL 校验里，把
