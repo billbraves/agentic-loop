@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -23,10 +23,10 @@
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
-    "base_commit": "5d94387",
+    "base_commit": "2923255",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
-    "commit": "2923255"
+    "commit": ""
   },
   "scope": {
     "allowed_paths": [
@@ -60,9 +60,9 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev5.md",
-      "sha256": "d96a7fa34ae0520bfe6e5b1d4e769916857cab4f0fd1eb9004278590a559bfd6",
-      "rev": 5
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev6.md",
+      "sha256": "ee57a96c5f15157e70817ea9e4a99b520a214b3be874e7ae2e35e045229335fd",
+      "rev": 6
     },
     "tests": [
       {
@@ -368,17 +368,17 @@
       "docstring_boundary": "模块 docstring 末尾 WP-28 (rev3) INV-N boundary 逐条写明三条不保证"
     },
     "refreeze": {
-      "count": 4,
-      "current_rev": 5,
+      "count": 5,
+      "current_rev": 6,
       "stop_and_review_gate": {
         "rule": "第 3 次及以后 re-freeze：冻结前必须停手复核计划，未经用户批准不得冻结",
         "hit": true,
-        "occurrence": 3,
-        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev5.md",
+        "occurrence": 4,
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev6.md",
         "user_approved": true,
-        "user_choice": "方案 (a) —— rev5 范围锁为 M-T0/M-T0b 改落盘字节变异 + 报告给出撤销 fix 后转红的实测，并把 B53 判别句折进 WP-28 交付的条目",
-        "verbatim_user_message": "好的，按建议执行",
-        "root_cause": "编排者自己 rev4 §A.4 的措辞把变异载具默认成了内存值，缺陷在计划侧不在执行侧"
+        "user_choice": "方向 2 —— rev6 修载具（方案 B：M-T0/M-T0b 变异临时副本、删除 _mutate_on_disk、补「真实模板字节前后一致」断言）+ 两份模板 oracle 第 4 项末尾追加两行口径 + FROZEN_BODY_ACCEPTANCE 同步",
+        "verbatim_user_message": "2",
+        "root_cause": "编排者把「变异须落到判据真实的输入面」翻译成「写那两个真实路径」——输入面是一个文件的字节，不是特定路径。连续两轮根因均在计划侧。"
       },
       "history": [
         {
@@ -409,7 +409,13 @@
           "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev5.md",
           "commit": "2923255",
           "scope": "M-T0/M-T0b 改落盘字节变异 + oracle 第 4 项扩写判别句（B53）",
-          "outcome": "编排者 ACCEPT；待 codex 第二签名"
+          "outcome": "双签名 REWORK：B54 _mutate_on_disk 的还原保证只覆盖 yield 之后的失败（写入循环在 try 之前；finally 内单路径失败中止后续恢复）"
+        },
+        {
+          "rev": 6,
+          "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev6.md",
+          "scope": "M-T0/M-T0b 改为变异临时副本 + 删除 _mutate_on_disk + 「真实模板字节前后一致」断言；oracle 第 4 项末尾追加两行（等价载体优先）+ FROZEN_BODY_ACCEPTANCE 同步",
+          "outcome": "DISPATCHED"
         }
       ]
     },
@@ -446,8 +452,7 @@
       "hit": true,
       "occurrence": 4,
       "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev6.md",
-      "user_approved": false,
-      "awaiting": "用户在四个方向中择一（方向 2 为编排者建议）",
+      "user_approved": true,
       "root_cause": "编排者把「变异须落到真实输入面」直接翻译成「写真实仓库文件」——输入面指一个文件的字节，不是那两个特定路径。连续两轮根因均在计划侧。",
       "remedies_measured_before_freeze": {
         "note": "不把未验证的判据写进 brief（记忆 verify-the-remedy-not-just-the-finding）；两个方案均已实测，只动模板副本",
@@ -455,23 +460,29 @@
         "option_B_mutate_copies": "probe-optionB.py（直接 import 交付的判据模块）：M-T0 fix 在场 ['SECTION_MISSING'] 且 REPLICA_MISMATCH 不在场、fix 撤销 [] 即转红；M-T0b fix 在场两码皆在、fix 撤销 [] 即转红；真实模板 sha256 前后一致 True。承重性完全保留，B54 整个失败类不存在。",
         "recommendation": "方案 B —— 风险面消除优于风险面加固；该 carrier 保护的正是模板逐字节冻结，其失效模式与保护目标同向"
       },
-      "optional_scope_extension": "oracle 第 4 项补一句：同类输入面的等价载体（如临时副本）满足要求；若变异会写到被判据保护的制品本身，须优先选用不写该制品的等价载体。此句由 B54 提炼，与 rev5 折进 B53 判别句同型，但会把 rev6 范围扩到再动一次模板，故列为方向 2 由用户定。"
+      "optional_scope_extension": "oracle 第 4 项补一句：同类输入面的等价载体（如临时副本）满足要求；若变异会写到被判据保护的制品本身，须优先选用不写该制品的等价载体。此句由 B54 提炼，与 rev5 折进 B53 判别句同型，但会把 rev6 范围扩到再动一次模板，故列为方向 2 由用户定。",
+      "user_choice": "方向 2 —— rev6 修载具（方案 B：M-T0/M-T0b 变异临时副本、删除 _mutate_on_disk、补「真实模板字节前后一致」断言）+ 两份模板 oracle 第 4 项末尾追加两行口径 + FROZEN_BODY_ACCEPTANCE 同步",
+      "verbatim_user_message": "2"
+    },
+    "rev6_pre_freeze_probes": {
+      "note": "冻结前把 brief 里每条可机械判别的要求都实测过；全部只动临时副本或一次性 git archive 树",
+      "option_B_carrier": {
+        "probe": "/Users/admin/.claude/jobs/8a8bf01e/tmp/probe-rev6-optionB.py",
+        "M-T0": "fix 在场 ['SECTION_MISSING'] 且 REPLICA_MISMATCH 不在场；fix 撤销 [] → 转红",
+        "M-T0b": "fix 在场 ['REPLICA_MISMATCH','SECTION_MISSING']；fix 撤销 [] → 转红",
+        "real_templates_sha256_unchanged": true
+      },
+      "oracle_item4_append": {
+        "probe": "/Users/admin/.claude/jobs/8a8bf01e/tmp/probe-rev6-wording.py + 一次性 git archive 树",
+        "anchor_unique": "追加锚点行在模板与常量中各出现 1 次",
+        "synced": "两份模板 + 常量同步后 tests/test_wp_template_dispatch_lint.py 32 passed",
+        "desynced": "只改模板不改常量 → 7 failed（含三条 harmless-green），故同步要求承重",
+        "post_edit_sha256": "bf2cb2858e37c53202259c830be601c074f0e920d8e1d3ea91b59fdb701595e5（两份一致）"
+      },
+      "criterion_body_path_agnostic": "_read_text_preserving_newlines(path) 接受任意路径、_check_both(text, text) 接受任意文本，故副本载具无需改判据本体"
     }
   },
-  "consult": {
-    "decision": "REWORK",
-    "consultant": "codex",
-    "provider": "kirogpt",
-    "identity_model": "gpt-5.6-sol",
-    "independence": "strong",
-    "consulted_at": "2026-09-18T07:20:00Z",
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev5-verdict.json",
-    "request": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev5-request.md",
-    "at_commit": "2923255",
-    "blockers": {
-      "B54": "_mutate_on_disk 的还原保证只覆盖 yield 之后的失败：变异写入循环在 try 之前，第二份 no-op guard 或 write_bytes 失败时第一份留在变异态；finally 内单个路径恢复失败会中止循环，后续路径不获恢复尝试。编排者已用交付源码的 carrier 对模板副本三条全部复现。"
-    }
-  },
+  "consult": {},
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
@@ -484,22 +495,5 @@
     "ready_for_review_at_rev5": "2026-09-18T04:05:00+08:00",
     "changes_requested_at_rev5": "2026-09-18T07:25:00Z"
   },
-  "review": {
-    "decision": "REWORK",
-    "reviewer": "claude-code",
-    "reviewed_at": "2026-09-18",
-    "rev": 5,
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev5.md",
-    "at_commit": "2923255",
-    "blockers": [
-      "B54"
-    ],
-    "follow_ups": [
-      "B52 截断谓词归因过宽（任务 #42，本 rev 范围外）",
-      "B47 段落门禁按固定命名读 brief，本 WP 五轮冻结的 PREFLIGHT_PASS 校验的都是 rev1 段落（任务 #38）；本判定未依赖该门禁"
-    ],
-    "merge_gate": "需 codex 第二签名（consult.decision=ACCEPT）；合入本身仍须用户明确批准",
-    "retracted_accept": "编排者初判 ACCEPT，经 codex 第二签名 REWORK 后撤回。撤回理由：我的探针只测了 yield 之后的失败路径，未测初始化阶段与恢复阶段自身的失败，而 brief §附注 2 明写「多文件间顺序」。",
-    "lifecycle_state": "CHANGES_REQUESTED"
-  }
+  "review": {}
 }
