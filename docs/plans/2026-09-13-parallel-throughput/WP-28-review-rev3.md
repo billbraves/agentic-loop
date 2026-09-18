@@ -104,3 +104,34 @@ brief 缺陷）是两件互不相关的事：此处是同 lane 内新增用例�
 - **B47**（既有）：`dispatch_lint.sh` 按固定命名读 brief，忽略 `evidence.brief.path`，
   revN brief 从未真正过段落门禁。本 WP 的 brief 是 rev3，因此它「过了 dispatch_lint」这件事
   在机制上并不成立——但这不影响本轮判据实现的正确性，另 WP 处理（任务 #38）。
+
+---
+
+## 附录：本判定已被撤回（2026-09-18，第二签名后）
+
+上文的 `ACCEPT` **不再有效**。codex 第二签名判 `REWORK`，报两个阻断项，编排者已逐条独立复现：
+
+| ID | 阻断项 | 复现结果 |
+|----|--------|----------|
+| B49 | 判据用 `read_text()` 取输入，Python universal-newline 把 `CRLF` 归一化为 `LF`。两份模板同步 `LF`→`CRLF`：受保护字节已变、冻结常量未改、判据返回 `[]`（GREEN）；保留换行字节则返回 `['SECTION_MISSING']`。 | REPRODUCED |
+| B50 | T3（块体切分）无步骤特异 witness。实测 `T3=[BODY_CLAUSE_MISSING, BODY_MISMATCH, SECTION_ANCHOR_MOVED]`、`T4=[BODY_CLAUSE_MISSING, BODY_MISMATCH]`、`T5=[BODY_MISMATCH]` —— 三个 code 分属诊断分类、T4/T5 兜底、T6，无一特异表示「块体被新 `## ` 截断」。 | REPRODUCED |
+
+B49 直接击穿本 WP 的核心承诺：INV-N1 的「完整 body 与冻结常量逐字节相等」与 INV-N4 的
+「任何受保护字节变化必须在测试 oracle 留下可审查 diff」。一次跨平台的行尾转换（Windows
+检出、编辑器改 EOL、`.gitattributes` 调整）就能让整段冻结文字失效而判据全绿。
+
+B50 违反 rev3 brief:180-181 与 DoD:238「§B 七类步骤各有至少一条转红变异，结构化 code
+互不相同」。
+
+### 为什么我自己的复核没抓到
+
+两项都落在我未覆盖的维度，且都不是「测得不够多」而是「测的方向有系统性盲区」：
+
+1. **我的 9 条探针全部在 LF 下构造**。我把「逐字节」当成已由 `body != frozen_body`
+   保证的性质，没有回头问一句：**判据读进来的字节，是不是文件里的字节**。
+   `read_text()` 与「逐字节」之间有一层我没打开的转换。
+2. **我核对了「诊断兜底 load-bearing」，漏核了「每步骤 code 互不相同」**。前者是我自己
+   关心的问题（B44/B45 的教训），后者是 brief 自己的 DoD 条目 —— 我按自己的关注点复核，
+   而不是按冻结的 DoD 逐条核。这正是 CLAUDE.md「不得因为是我自己写的计划就采信」要防的偏差。
+
+双签名规则在此实弹生效：单签名会放行一个可被一次无害 diff 废掉的冻结判据。

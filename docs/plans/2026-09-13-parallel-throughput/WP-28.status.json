@@ -398,7 +398,38 @@
       "docstring_boundary": "模块 docstring 末尾 WP-28 (rev3) INV-N boundary 逐条写明三条不保证"
     }
   },
-  "consult": {},
+  "consult": {
+    "decision": "REWORK",
+    "reviewed_by": "codex",
+    "consulted_at": "2026-09-18T09:05:00Z",
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev3-verdict.json",
+    "request_file": "docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-rev3-request.md",
+    "basis": "内联 rev3 brief（sha256 c14782ed…）+ 累积 diff 7a30f50..2ba5ef5；咨询者另在 read-only sandbox 自行读 worktree、本地跑 INV-N 用例（22 passed）并做内存探针。",
+    "blockers": [
+      {
+        "id": "B49",
+        "summary": "read_text() 的 universal-newline 归一化使『逐字节』硬不变式可被绕过：两份模板同步 LF→CRLF 后受保护字节已变、冻结常量未改，判据仍 GREEN。",
+        "violates": [
+          "INV-N1 完整 body 逐字节相等",
+          "INV-N4 变更可见性",
+          "DoD『T4 用真逐字节相等』"
+        ],
+        "suggested_fix": "以 read_bytes() 为事实源（或显式 newline='' 读取），冻结常量相应改为 bytes；并补一条同步改两副本换行字节的负面变异，证明其触发 BODY_MISMATCH 而非仅靠单侧 REPLICA_MISMATCH。",
+        "orchestrator_status": "REPRODUCED"
+      },
+      {
+        "id": "B50",
+        "summary": "T3（块体切分）无步骤特异 witness：实测 T3=[BODY_CLAUSE_MISSING, BODY_MISMATCH, SECTION_ANCHOR_MOVED]，三个 code 分别属于诊断分类、T4/T5 兜底与 T6，无一能特异表示『块体被新 ## 截断』。",
+        "violates": [
+          "brief §E② 原因特异 witness",
+          "DoD『§B 七类步骤各有至少一条转红变异，结构化 code 互不相同』"
+        ],
+        "suggested_fix": "为 T3 增设独立硬 code（如 SECTION_BODY_TRUNCATED / BODY_BOUNDARY_CHANGED）并由 T3 用例显式断言；BODY_MISMATCH 保留为 T4/T5 的承重兜底。",
+        "orchestrator_status": "REPRODUCED"
+      }
+    ],
+    "non_blocking_confirmations": "咨询者确认：T1–T6 均经 _mutate_both 同步施加且统一跑 no-op guard，T7 单侧变异；T5 只产生 BODY_MISMATCH，兜底 load-bearing；诊断分类仅在 BODY_MISMATCH 后运行、不参与硬放行；模块 docstring 的边界声明与实现一致，未把 WP-29 的 active_embedding 重新当作本轮门槛。"
+  },
   "timestamps": {
     "created_at": "2026-09-17T20:00:00Z",
     "frozen_at": "2026-09-17T20:05:00Z",
@@ -409,7 +440,7 @@
     "implementing_at_rev3": "2026-09-18T00:12:00+08:00"
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-18",
     "rev": 3,
@@ -418,6 +449,6 @@
     "minor": [
       "B47 既有：dispatch_lint.sh 按固定命名读 brief，忽略 evidence.brief.path，故 rev3 brief 实际未过段落门禁——另 WP 处理（任务 #38），不阻断本 WP"
     ],
-    "note": "编排者独立复核 ACCEPT（9 条自撰探针 9/9 符合预期）。状态留在 READY_FOR_REVIEW 而非 APPROVED_FOR_MERGE：按 [review_policy] 进入合入态还需 consult.decision=ACCEPT（codex 第二签名），该咨询尚未派发。合入另需用户批准。"
+    "note": "编排者撤回前次 ACCEPT（WP-28-review-rev3.md）。第二签名 codex 报两个阻断项 B49（read_text 换行归一化绕过逐字节冻结）与 B50（T3 无步骤特异 witness），编排者已逐条独立复现（探针见 WP-28-consult-codex-rev3-verdict.json.orchestrator_verification）。两项都落在我自己复核未覆盖的维度：9 条探针全在 LF 下构造；核对了『诊断兜底 load-bearing』却漏核『每步骤 code 互不相同』这条 DoD。双签名规则在此实弹生效——单签名会放行一个可被一次无害 diff 废掉的冻结判据。"
   }
 }
