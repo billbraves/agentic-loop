@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "executor": {
     "tool": "kimi-cli",
     "session": "wp29-rev1-26806",
@@ -183,8 +183,15 @@
       },
       "harness": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp29-stage1/run.py",
       "env_note": "仅剥离 OPENAI_BASE_URL",
-      "state": "IN_FLIGHT",
-      "asks": "5 条特别检查：消费面是否穷尽 / 方言权威性 / 不采纳 (b) 的反证是否站得住 / 文首文末哨兵是否有一句话绕过的反例 / 五项必答是否足以支撑阶段 2 冻结"
+      "state": "RETURNED",
+      "asks": "5 条特别检查：消费面是否穷尽 / 方言权威性 / 不采纳 (b) 的反证是否站得住 / 文首文末哨兵是否有一句话绕过的反例 / 五项必答是否足以支撑阶段 2 冻结",
+      "decision": "REWORK",
+      "prompt_bytes": null
+    },
+    "orchestrator_cross_check_of_consult": {
+      "C1 独立核验": "编排者跑了 codex 要求的仓库级搜索（--exclude-dir=.git/__pycache__/.pytest_cache/node_modules，滤掉 docs/plans/ 自身）：非测试运行时消费者仍只有 init_cmd.py:109；新暴露的面是 CHANGELOG.md / README.md / docs/QUICKSTART.zh-CN.md 三处文档引用，与 pyproject.toml:24-25 的打包 artifacts（*.tmpl 作为 package data，经 importlib.resources read_text 取用，contract_render.py:255，不解析 markdown）。C1 成立：结论不变但证据面确实不完整，且『唯一机器消费者』的措辞被文档自己的输出推翻。",
+      "C2 独立核验": "这正是编排者 review §3 的内容；codex 把它从『编排者不采纳』升级为『交付物本身的阻断缺陷』——判定更严，编排者接受：brief 要求执行者裁定三选一，而一份漏掉强制 GREEN 约束的可行性分析不足以支撑阶段 2 冻结。",
+      "哨兵反例 独立实测": "编排者跑 probe-wp29-sentinel.py 复现 codex 的绕过：保持首行 '# WP-N: <标题>' 与末行字节不变、把中间全部包进 <!-- --> → 哨兵 GREEN（逃逸）；首行后插未闭合 <!-- → 哨兵 GREEN（逃逸）；仅『整档外包前后缀』→ RED。故编排者 review §4 把哨兵称为『专拦 E1/E2 这一族、性价比最高』是错的，它只拦一个精确形状。该结论已作废。"
     }
   },
   "review": {
@@ -201,7 +208,26 @@
     "verdict_note": "交付物 ACCEPT；其推荐的方案 (b) 整份逐字节冻结不采纳，编排者改判 (c′)：不引 parser（采纳其论证），不整份冻结（会把 WP-28 rev3 明文要求必绿的 4 条无害编辑全部判红），优先「文首/文末哨兵 + 承诺边界明文化」。阶段 2 仍未冻结，须用户批准本裁定后方可冻结。"
   },
   "consult": {
-    "decision": "CONSULT"
+    "decision": "REWORK",
+    "consultant": "codex",
+    "provider": "kirogpt",
+    "consulted_at": "2026-09-18",
+    "rev": 1,
+    "at_commit": "bd4ac7a",
+    "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-request.md",
+    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-verdict.md",
+    "note": "codex 未用 --output-schema 的 JSON 形态返回，而是散文；逐字存档（记忆 codex-output-schema-is-advisory）",
+    "blocking_items": {
+      "C1": "消费面证据未达 brief 要求的完整证据面：搜索只覆盖 src/ tests/ AGENTS.md + 一个 Quickstart，未覆盖 scripts/ / wrapper / CI / hook / 打包配置及其余仓库文件；『完整输出』省略了 __pycache__ 命中却未声明排除参数；且文档自己的输出已证明两个测试文件会读模板，故『唯一仓内机器消费者是 init_cmd.py』字面不成立，应改为『唯一非测试运行时消费者』并按运行时/测试/打包/文档引用分类",
+      "C2": "方案 (b) 的可行性结论遗漏强制 GREEN 约束：未核对 WP-28 rev3 明文要求保持绿的四条无害探针，故 (b) 的『成本可接受』不足以支撑阶段 2 冻结；应把四个反例写进方案表，并把裁定改成与该约束兼容的方案"
+    },
+    "stage2_constraint": "文首/文末哨兵不得被描述为拦住 E1/E2『攻击族』：保持首尾 sentinel 字节不变、只把中间内容包进 <!-- --> 即可全部失活；未闭合版本在 START_SENTINEL 后插 <!-- 亦然。哨兵只能阻止『在 sentinel 外侧追加前后缀』这一个精确形状。E4 仍在机械承诺边界之外。",
+    "agreed_with_orchestrator": [
+      "§2 无仓内权威 Markdown 方言成立",
+      "§3 威胁真实性已由 scratch 变异 + targeted pytest 证明",
+      "606 vs 619 基线差异解释充分，不构成 REWORK",
+      "不采纳 (b) 的判断正确（codex 把它升级为阻断项 C2）"
+    ]
   },
   "timestamps": {
     "created_at": "",

@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -29,7 +29,8 @@
     "base_commit": "2923255",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
-    "commit": "361b3ad"
+    "commit": "361b3ad",
+    "merged_commit": "b940248ff715afc9a6dd181e6c4043d500e6fda9"
   },
   "scope": {
     "allowed_paths": [
@@ -556,7 +557,8 @@
     "implementing_at_rev3": "2026-09-18T00:12:00+08:00",
     "dispatched_at_rev5": "2026-09-18T03:20:00+08:00",
     "ready_for_review_at_rev5": "2026-09-18T04:05:00+08:00",
-    "changes_requested_at_rev5": "2026-09-18T07:25:00Z"
+    "changes_requested_at_rev5": "2026-09-18T07:25:00Z",
+    "updated_at": "2026-09-18T08:51:28Z"
   },
   "review": {
     "decision": "ACCEPT",
