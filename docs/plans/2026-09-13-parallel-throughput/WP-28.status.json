@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -19,14 +19,14 @@
   },
   "reviewer": {
     "tool": "claude-code",
-    "session": ""
+    "session": "8a8bf01e"
   },
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
     "base_commit": "5d94387",
     "branch": "feature/wp28-norms-into-template",
     "worktree": "../wp28-norms-into-template",
-    "commit": "5d94387"
+    "commit": "2923255"
   },
   "scope": {
     "allowed_paths": [
@@ -69,13 +69,19 @@
         "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
         "result": "32 passed",
         "exit_code": 0,
-        "provenance": "orchestrator-reproduced at 5d94387"
+        "provenance": "orchestrator-reproduced at 2923255"
       },
       {
         "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "4 failed, 631 passed, 4 skipped in 110.56s；4 failed 全在 tests/test_finalize_merge_triple_sign.py，base 上即已红（工作树内 git checkout -q main 失败），属环境问题",
+        "result": "4 failed, 631 passed, 4 skipped；4 failed 全在 tests/test_finalize_merge_triple_sign.py（既有环境失败，工作树内 git checkout -q main 失败）。零回归：def test_ 全仓 514->514，用例名集合不变，故 passed 不变",
         "exit_code": 1,
-        "provenance": "orchestrator-reproduced at 5d94387"
+        "provenance": "orchestrator-reproduced at 2923255"
+      },
+      {
+        "command": "撤销 fix（_read_text_preserving_newlines -> Path.read_text）后 pytest -k t0",
+        "result": "2 failed（AssertionError: set()）—— 用例杀得掉自己的 fix；rev4 同一动作下是 2 passed（不承重）",
+        "exit_code": 1,
+        "provenance": "orchestrator's own probe: /Users/admin/.claude/jobs/8a8bf01e/tmp/verify-rev5.py"
       }
     ],
     "baseline": {
@@ -162,6 +168,22 @@
         "reviewed_at": "2026-09-18",
         "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev3.md",
         "at_commit": "2ba5ef5"
+      },
+      {
+        "rev": 4,
+        "decision": "REWORK",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev4.md",
+        "at_commit": "5d94387",
+        "blocker": "B49 的 fix（newline=\"\" 逐字节读）正确，但 M-T0/M-T0b 把变异施加于判据已持有的内存字符串，从不经过读路径；撤销 fix 后仍 2 passed，用例不承重"
+      },
+      {
+        "rev": 5,
+        "decision": "ACCEPT",
+        "reviewer": "claude (orchestrator, independent)",
+        "reviewed_at": "2026-09-18",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev5.md",
+        "at_commit": "2923255",
+        "basis": "自撰探针实测撤销 fix -> 2 failed；失败路径下模板字节恢复；oracle 第 4 项逐字节相符；零回归算术自洽"
       }
     ],
     "dispatch": {
@@ -334,14 +356,17 @@
       "docstring_boundary": "模块 docstring 末尾 WP-28 (rev3) INV-N boundary 逐条写明三条不保证"
     },
     "refreeze": {
-      "count": 3,
-      "current_rev": 4,
+      "count": 4,
+      "current_rev": 5,
       "stop_and_review_gate": {
         "rule": "第 3 次及以后 re-freeze：冻结前必须停手复核计划，未经用户批准不得冻结",
         "hit": true,
-        "occurrence": 2,
-        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev4.md",
-        "user_approved": true
+        "occurrence": 3,
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev5.md",
+        "user_approved": true,
+        "user_choice": "方案 (a) —— rev5 范围锁为 M-T0/M-T0b 改落盘字节变异 + 报告给出撤销 fix 后转红的实测，并把 B53 判别句折进 WP-28 交付的条目",
+        "verbatim_user_message": "好的，按建议执行",
+        "root_cause": "编排者自己 rev4 §A.4 的措辞把变异载具默认成了内存值，缺陷在计划侧不在执行侧"
       },
       "history": [
         {
@@ -363,9 +388,36 @@
         {
           "rev": 4,
           "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev4.md",
-          "commit": null,
-          "scope": "只修 B49 + B50，不动 INV-N1/N3/N4 承诺边界，不碰 WP-29 的 active_embedding"
+          "commit": "5d94387",
+          "scope": "只修 B49 + B50，不动 INV-N1/N3/N4 承诺边界，不碰 WP-29 的 active_embedding",
+          "outcome": "REWORK（B49 修法对但 M-T0/M-T0b 不承重：变异只改内存值，未过读路径）"
+        },
+        {
+          "rev": 5,
+          "brief": "docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev5.md",
+          "commit": "2923255",
+          "scope": "M-T0/M-T0b 改落盘字节变异 + oracle 第 4 项扩写判别句（B53）",
+          "outcome": "编排者 ACCEPT；待 codex 第二签名"
         }
+      ]
+    },
+    "rev5_orchestrator_independent_verification": {
+      "at_commit": "2923255",
+      "criterion_sha256": "f3de4ac0332855ae335b5904cf4e3aec327de200da0292dc9667a3c622f2c988",
+      "mutation_kill": "撤销 fix -> 2 failed；恢复 fix -> 2 passed。rev4 同一动作 2 passed，故 rev5 才是承重用例",
+      "carrier": "_mutate_on_disk() 把变异写进模板文件字节，判据随后自己读，读路径成为变异与 witness 之间的唯一环节",
+      "noop_guard": "assert data != originals[p]，逐文件",
+      "restore_under_failure": "在 with 块内（模板变异态）注入 assert False -> 1 failed；模板 sha256 ed5dc2d4... 前后完全相同",
+      "crlf_idempotence": "先归一再改行尾；对已 CRLF 输入再变异一次，\\r\\r\\n 计数为 0",
+      "attribution": "M-T0 两份同步施加，REPLICA_MISMATCH 不在场；M-T0b 单侧，REPLICA_MISMATCH 与 SECTION_MISSING 皆在场",
+      "oracle_item4": "两份模板 oracle 第 4 项与 brief 指定文本逐字节相符；两份模板 sha256 相同；FROZEN_BODY_ACCEPTANCE 已同步，positive control 绿",
+      "scope": "git diff --name-only 7a30f50..HEAD = 3 文件 / +687，全在 allowed_paths；contract_render.py / init_cmd.py / pyproject.toml 均 ZERO_DIFF",
+      "contract_template_version": "6（未 bump）",
+      "zero_regression_arithmetic": "def test_ 全仓 514->514，目标文件 31->31，用例名集合逐字节相同 -> 未增删用例，passed 保持 631，算术自洽",
+      "executor_report_crosscheck": "报告每条可验算断言均独立复算一致，无虚报；主动披露全量仅在 py3.11 跑过（本机 3.13/3.14 未装 pytest），本 WP 未声明多解释器矩阵，不构成缺项",
+      "orchestrator_own_probe_failures": [
+        "第一版探针正则匹配读取实现，因 docstring 形状不同而 PROBE_INVALID —— guard 生效，未产出假结论",
+        "验「失败路径是否恢复」时锚点在文件中出现 2 次，探针自行中止，我当时误把随后那句「模板完好」当结论；改用 with 块内唯一锚点重做后才拿到真结论"
       ]
     }
   },
@@ -377,7 +429,22 @@
     "dispatch_blocked_at": "2026-09-17T20:20:00Z",
     "rev3_frozen_at": "2026-09-18",
     "dispatched_at_rev3": "2026-09-18T00:10:00+08:00",
-    "implementing_at_rev3": "2026-09-18T00:12:00+08:00"
+    "implementing_at_rev3": "2026-09-18T00:12:00+08:00",
+    "dispatched_at_rev5": "2026-09-18T03:20:00+08:00",
+    "ready_for_review_at_rev5": "2026-09-18T04:05:00+08:00"
   },
-  "review": {}
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-18",
+    "rev": 5,
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-review-rev5.md",
+    "at_commit": "2923255",
+    "blockers": [],
+    "follow_ups": [
+      "B52 截断谓词归因过宽（任务 #42，本 rev 范围外）",
+      "B47 段落门禁按固定命名读 brief，本 WP 五轮冻结的 PREFLIGHT_PASS 校验的都是 rev1 段落（任务 #38）；本判定未依赖该门禁"
+    ],
+    "merge_gate": "需 codex 第二签名（consult.decision=ACCEPT）；合入本身仍须用户明确批准"
+  }
 }
