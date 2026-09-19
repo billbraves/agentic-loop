@@ -408,6 +408,55 @@
         "(c′) 裁定是否批准（决定阶段 2 范围）",
         "合入批准"
       ]
+    },
+    "brief_rev4": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev4.md",
+      "sha256": "03a56829bd661aa32762fbc973033d36d4b01a8e17724f12e3ebde2f2fa2e422",
+      "rev": 4,
+      "frozen_at": "2026-09-19",
+      "refreeze_seq": 3,
+      "refreeze_stop_rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 触发强制停手复核。rev4 = 第 4 次冻结 = 第 3 次 re-freeze，规则本次触发。编排者已出停手复核 WP-29-plan-review-before-rev4.md（sha256 a54b45fd0cdf6025ce3f486db62701b10b084a976d9574a47cfcef7ce4c73d44, commit 0369d77），用户从其 §六 三个方向中选定「方向 1」（rev4 只修 §1 取证），该选定即本次 re-freeze 的用户批准。范围不得超出方向 1。",
+      "user_approval": {
+        "granted": true,
+        "form": "用户回复「方向1」，选定 WP-29-plan-review-before-rev4.md §六 的方向 1",
+        "scope_granted": "仅 WP-29-scope-decision.md 的 §1 取证呈现（停手复核 §三 的四条）+ §0 中与 §1 有关的措辞 + 文末追加「rev3 → rev4 改了什么」小节",
+        "scope_NOT_granted": [
+          "(c′) 裁定本身的批准（阶段 2 范围由它决定）",
+          "阶段 2 的冻结",
+          "合入批准"
+        ]
+      },
+      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev3.md",
+      "section_gate": "dispatch_lint.sh 的段落门禁因 B47（按固定命名 WP-29-brief.md 读 brief，忽略 evidence.brief.path）不会作用于 revN 文件；编排者把该门禁的 Python 段落检查器（dispatch_lint.sh:68-99）抽出单独对 rev4 跑，结果 PASS：Acceptance tests 22 行 / Allowed and forbidden paths 9 行 / Completion definition 39 行，均非空。",
+      "new_acceptance_criterion": {
+        "id": "标的 0",
+        "text": "§1 里每一个形如 `$ <命令>` 的命令块，按字面原文重跑，其输出行数必须等于紧随其后粘贴的输出块行数。",
+        "why": "这是 rev3 逃掉的那一格：交付物用了未声明的 --exclude=WP-29-scope-decision.md，命令原文重跑得不到粘贴结果；而编排者核验时自行加了同一个过滤器（B57），比对必然成立。该判据可机械检查，且核验者无需自行构造过滤器。",
+        "mechanically_checkable": true
+      },
+      "targets": {
+        "T0_evidence_criterion": "命令原文重跑 = 粘贴行数；零省略（无 ……/（略）/（同前）/（另匹配 N 处）/三点）；声明的行数须可数出",
+        "T1_declare_what_you_use": "两条主 grep（交付物 :36 / :79）的命令原文须含其实际使用的全部过滤器（做法 A 显式 --exclude，或做法 B 改显式范围清单并申报覆盖面）；定稿后重跑",
+        "T2_no_elision": "交付物 :47 与 :90 两处 …… 全部改为逐字完整的 grep 输出行（同一命中 WP-28-consult-codex-shape-verdict.json:6）",
+        "T3_wide_grep_complete": "宽口径新增命中完整 17 行 + 「新增」算法可重跑；tests/test_init_contract.py:62 与 tests/test_wp_template_dispatch_lint.py:24 改归 B 类",
+        "T4_missing_raw_output": "grep -rn 'load_template' src/ tests/（实测 6 行）与资源读取入口搜索各补命令原文 + 完整输出；「只有一处」支撑不足须降级并申报未覆盖面",
+        "PRESERVED_verbatim": "§2 / §3 / §4 / §5 逐字保留，含 (c′) 裁定本身；改了即 REWORK"
+      },
+      "orchestrator_measurements_at_e493c2a": {
+        "main_grep_1_declared_lines": 88,
+        "main_grep_1_pasted_lines": 39,
+        "main_grep_1_with_undeclared_exclude": 39,
+        "main_grep_2_declared_lines": 104,
+        "main_grep_2_pasted_lines": 47,
+        "main_grep_2_with_undeclared_exclude": 47,
+        "wide_only_locations": 17,
+        "load_template_hits": 6,
+        "elision_sites": [
+          "WP-29-scope-decision.md:47",
+          "WP-29-scope-decision.md:90"
+        ],
+        "note": "编排者在被审树 /Users/admin/vibe/wp29-render-scope-decision (HEAD e493c2a) 只读实测；数字作 brief 的参照值，执行者须以自己定稿后的重跑为准。"
+      }
     }
   },
   "review": {
