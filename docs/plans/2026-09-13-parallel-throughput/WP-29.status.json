@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "CHANGES_REQUESTED",
+  "state": "DISPATCHED",
   "executor": {
     "tool": "kimi-cli",
     "session": "",
@@ -456,6 +456,13 @@
           "WP-29-scope-decision.md:90"
         ],
         "note": "编排者在被审树 /Users/admin/vibe/wp29-render-scope-decision (HEAD e493c2a) 只读实测；数字作 brief 的参照值，执行者须以自己定稿后的重跑为准。"
+      },
+      "dispatch_prompt": {
+        "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev4-prompt.md",
+        "sha256": "51868e8bb1578d5eee442510fb3eac904d1c049057a97ea070e59c5a41a1686a",
+        "runner": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
+        "env_isolation": "env -u OPENAI_BASE_URL（B51：env 覆盖 --config-file 里的 base_url）。不剥 OPENAI_API_KEY —— 剥掉会让 codex 侧 exit 0 空结论；kimi 侧同样只剥 BASE_URL。",
+        "preflight": "在被审树跑 agentic preflight：STATUS_VALID / LOCK_REACQUIRED owner=claude-53c58ab0 / PREFLIGHT_PASS branch=feature/wp29-render-scope-decision state=CHANGES_REQUESTED"
       }
     }
   },
