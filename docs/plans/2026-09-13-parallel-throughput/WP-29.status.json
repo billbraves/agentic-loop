@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "executor": {
     "tool": "kimi-cli",
     "session": "",
@@ -115,7 +115,7 @@
     "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "branch": "feature/wp29-render-scope-decision",
     "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
-    "commit": "e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23"
+    "commit": "f1eee7e"
   },
   "scope": {
     "allowed_paths": [
@@ -464,10 +464,87 @@
         "env_isolation": "env -u OPENAI_BASE_URL（B51：env 覆盖 --config-file 里的 base_url）。不剥 OPENAI_API_KEY —— 剥掉会让 codex 侧 exit 0 空结论；kimi 侧同样只剥 BASE_URL。",
         "preflight": "在被审树跑 agentic preflight：STATUS_VALID / LOCK_REACQUIRED owner=claude-53c58ab0 / PREFLIGHT_PASS branch=feature/wp29-render-scope-decision state=CHANGES_REQUESTED"
       }
+    },
+    "review_rev4_first_signature": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
+      "sha256": "59a53368d70f7507168c2851c474d21a5701262ce048986570f5b33e1a06e78c",
+      "reviewer": "claude-code (orchestrator, first signature)",
+      "reviewed_commit": "f1eee7e",
+      "base_commit": "e493c2a",
+      "decision": "ACCEPT",
+      "reviewed_at": "2026-09-19",
+      "targets_verdict": {
+        "T0_literal_rerun": "PASS (5/5 blocks byte-identical, not merely equal line counts)",
+        "T1_declared_excludes": "PASS (exclusion set minimal: codex-json costs exactly 1 line)",
+        "T2_zero_elision": "ACCEPT_WITH_SUBSTITUTION (executor used declared --exclude instead of verbatim 9574-byte paste; equivalent on the criterion's intent, loss quantified at 1 line, that line named by line number in C class)",
+        "T3_wide_difference_17": "PASS (96 = 79 union + 17 difference; 15 C + 2 B reclassified)",
+        "T4_quantifier_honesty": "PASS (search surface named; cli.py uncovered surface declared and independently confirmed)",
+        "PRESERVED_verbatim": "PASS (zero hunks in old lines 193..363 = sections 2,3,4,5 including the (c-prime) verdict)"
+      },
+      "rerun_method": {
+        "binary": "/usr/bin/grep (BSD grep)",
+        "why": "shell grep is a function shim to ugrep injecting --ignore-files --hidden -I and omitting the ./ prefix",
+        "blocks": [
+          {
+            "block": 1,
+            "pasted": 38,
+            "rerun": 38,
+            "diff": "identical"
+          },
+          {
+            "block": 2,
+            "pasted": 46,
+            "rerun": 46,
+            "diff": "identical"
+          },
+          {
+            "block": 3,
+            "pasted": 17,
+            "rerun": 17,
+            "diff": "identical"
+          },
+          {
+            "block": 4,
+            "pasted": 6,
+            "rerun": 6,
+            "diff": "identical"
+          },
+          {
+            "block": 5,
+            "pasted": 4,
+            "rerun": 4,
+            "diff": "identical"
+          }
+        ]
+      },
+      "gates": {
+        "files_changed": 1,
+        "insertions": 137,
+        "deletions": 37,
+        "allowed_paths_respected": true,
+        "templates_unchanged": true,
+        "pyproject_unchanged": true,
+        "template_pair_identical": "wc -c 2889 both, cmp IDENTICAL",
+        "worktree_clean": true,
+        "cross_worktree_writeback": "none",
+        "test_baseline": "4 failed, 606 passed, 4 skipped",
+        "baseline_matches_declared": true,
+        "failures_preexisting": "all 4 in test_finalize_merge_triple_sign.py, git checkout -q main vs local init.defaultBranch=master"
+      },
+      "new_defects": {
+        "B58": "reviewer-side: verify `type`/`command -v` before re-running a literal command; a shell function shim injected undeclared filters and produced a false red (mirror image of B57)",
+        "B59": "brief-side: criterion T2 specified a means (verbatim paste) rather than the goal (zero elision + declared-is-used) plus an acceptable-means set"
+      },
+      "NOT_granted_by_this_review": [
+        "(c-prime) 裁定本身的批准 —— 仍属用户",
+        "合入批准 —— 仍属用户",
+        "阶段 2 的冻结 —— 依赖 (c-prime) 获批"
+      ],
+      "next_step": "dispatch codex for the second signature"
     }
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-19",
     "rev": 3,
@@ -497,10 +574,12 @@
       "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1-rev3.md §7"
     },
     "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
-    "document_sha256": "7a3a139ed206f1ec75fbe2dfd02a1ed2aa1febd2ac12854f646791291a1ff76a"
+    "document_sha256": "7a3a139ed206f1ec75fbe2dfd02a1ed2aa1febd2ac12854f646791291a1ff76a",
+    "reviewed_commit": "f1eee7e",
+    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md"
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": null,
     "consultant": "codex",
     "provider": "kirogpt",
     "model": "gpt-5.6-sol",
@@ -511,7 +590,7 @@
     "request_sha256": "3718e2b4b9733f1b2718a00ea2a95e3ccbf070190ce5a421ffbf7ee978eb4260",
     "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-rev3-verdict.md",
     "verdict_sha256": "9e5e8936fd22db2289d6b49e473bc1351e8b687909a7df0e25bc16cfac0e0207",
-    "note": "codex 未用 --output-schema 的 JSON 形态返回，而是散文；逐字存档（记忆 codex-output-schema-is-advisory）。RC=0，prompt 47171 字节。",
+    "note": "codex 第二签名待派发（rev4）",
     "blocking_items": {
       "C1-R3": "消费链证据仍不满足『仓库级完整原始输出』：(1) 两条命令搜索范围是 . 却未排除当前交付物，粘贴结果无任何自命中，故不是该命令对最终被审树的完整输出；(2) 长行被 …… 替换，不是『原始命中行，不得摘要』；(3) 宽口径只粘 5 个新增命中并称归 C 类，但遗漏中含两个 B 类测试读取点，拼接路径精确 grep 本就发现不了，故不完整 + 误分类会实质削弱『没有其它通用消费者』的结论；另称 load_template 只有指定调用点但未附原始输出。"
     },
