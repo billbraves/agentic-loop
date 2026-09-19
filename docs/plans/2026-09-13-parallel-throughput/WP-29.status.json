@@ -5,15 +5,15 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "CHANGES_REQUESTED",
+  "state": "READY_FOR_REVIEW",
   "executor": {
     "tool": "kimi-cli",
-    "session": "wp29-rev1-26806",
-    "dispatch_prompt": "",
-    "dispatch_prompt_sha256": "",
+    "session": "",
+    "dispatch_prompt": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev3-prompt.md",
+    "dispatch_prompt_sha256": "606eb7b33757132590a3fb35db33a8b8c98e3aff7e33bb8a71ffcab1b69159b4",
     "dispatch_command": "bash /Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
-    "dispatch_rev": 1,
-    "dispatch_base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
+    "dispatch_rev": 3,
+    "dispatch_base_commit": "bd4ac7a60de36c98b00b4b1fa6d0b4ce1bf0b267",
     "dispatch_blocked": {
       "reason": "派发被本会话的 auto mode classifier 拦下（Reason: [Create Unsafe Agents]），连 liveness 探针（kimi -p 'Reply with exactly: PROBE_OK'）都未获准执行。",
       "blocked_at": "2026-09-17T20:20:00Z",
@@ -29,25 +29,77 @@
       "resolved_by": "option_1_user_directed_settings_change",
       "resolution": "用户指示由编排者直接改 settings。原拦截并非 kimi 本身不被允许（~/.claude/settings.json 已有 Bash(kimi:*)），而是我发的是 `cd … && env -u … kimi …` 复合命令，前缀规则匹配不上。改法：把命令固化成 dispatch-wp28.sh，在 .claude/settings.local.json 加两条精确匹配 allow（bash <脚本> / <脚本>），不放宽任何其他 Bash 动作。settings.local.json 经 ~/.gitignore_global 忽略，不进版本库。"
     },
-    "rev": 1,
-    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp29-rev1-exec.log",
+    "rev": 3,
+    "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp29-rev3-exec.log",
     "dispatch_script": {
       "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
-      "sha256": "d674c3aca237f65f09affcc39b34372f7259302e9bdce6257b0bb1b8782fce30",
-      "why": "复合命令收成固定脚本，放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。"
+      "sha256": "78d7ec46b736dad6ff4c779ce5de3f2c6ea94a0a7416c2ea0781921917cc1b6c",
+      "why": "复合命令收成固定脚本，放行规则写成精确匹配而非放开整类 Bash；脚本自带 prompt sha256 前置校验，prompt 一改即拒发。",
+      "points_at": "wp29-rev3-prompt.md"
     },
     "prompt": {
-      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev1-prompt.md",
-      "sha256": "6449815c4578f4ee15d4f1b48601bdc9201e27be118c2e3bced199c972c5f224"
-    },
-    "liveness_probe": {
-      "method": "pgrep -fl kimi + log byte growth",
-      "pid": 26806,
-      "log_growth_bytes": "120859 -> 122842",
-      "result": "ALIVE"
+      "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev3-prompt.md",
+      "sha256": "606eb7b33757132590a3fb35db33a8b8c98e3aff7e33bb8a71ffcab1b69159b4",
+      "rev": 3
     },
     "stage": 1,
-    "stage_note": "阶段 1 交付物是裁定文档 WP-29-scope-decision.md，零代码改动；阶段 2 未冻结。"
+    "stage_note": "阶段 1 交付物是裁定文档 WP-29-scope-decision.md，零代码改动；阶段 2 未冻结。",
+    "dispatch_rev1_archived": {
+      "rev": 1,
+      "session": "wp29-rev1-26806",
+      "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
+      "prompt": {
+        "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev1-prompt.md",
+        "sha256": "6449815c4578f4ee15d4f1b48601bdc9201e27be118c2e3bced199c972c5f224"
+      },
+      "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp29-rev1-exec.log",
+      "result": "裁定文档 WP-29-scope-decision.md @ bd4ac7a；双签名 CHANGES_REQUESTED（编排者 minor + codex REWORK C1/C2）"
+    },
+    "dispatch_base_note": "rev3 是对 rev1 交付物的原地修订，故 base 是 rev1 的提交 bd4ac7a，不是 WP 的 base_commit 2e5f2c0",
+    "dispatch_blocked_rev3": {
+      "reason": "执行者工具 provider 计费阻塞，与本 WP 的 brief / status / 门禁均无关。",
+      "blocked_at": "2026-09-19T09:12:00+08:00",
+      "attempts": [
+        {
+          "lane": "deepseek/deepseek-v4-pro（dispatch-wp29.sh 的默认，--config-file ~/.kimi/deepseek.toml）",
+          "result": "FAIL: 「Membership expired, please renew your plan」/ Server: Error code: 402 {'error': {'message': 'Insufficient Balance', 'code': 'invalid_request_error'}}",
+          "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp29-rev3-exec.log"
+        },
+        {
+          "lane": "kimi-code/kimi-for-coding（~/.kimi/config.toml 的 managed:kimi-code）",
+          "result": "FAIL: access_terminated_error —— 配额用尽，提示 purchase extra usage or upgrade your plan"
+        },
+        {
+          "lane": "openrouter/glm-5.2-free",
+          "result": "FAIL: Error code: 404 'No endpoints found'（该 free 端点已下线）"
+        },
+        {
+          "lane": "openrouter/nemotron-3-ultra-free",
+          "result": "PROBE_OK —— 唯一可用通道，但是 free 档不同模型，不是本 WP 历来的执行者"
+        }
+      ],
+      "not_a_wp_defect": "PREFLIGHT_PASS 已取得（state 当时为 DISPATCHED，branch/worktree 校验通过）；WP 锁 owner=claude-53c58ab0 已持有并重取；rev3 brief 已冻结并过段落门禁等价检查；rev3 prompt 已落盘记 sha256；dispatch-wp29.sh 的 sha 前置校验通过。失败点在 provider 余额，不在任何判据。",
+      "orchestrator_did_not_substitute_executor": "未擅自换成 openrouter/nemotron-3-ultra-free 派发：换执行者模型是实质变更，且弱模型在这种证据纪律型任务上很可能产出需再返工的交付物，而本 WP 的 re-freeze 计数已到 rev3 —— 下一次 re-freeze 即触发停手复核。故交回用户裁定。",
+      "unblock_options": [
+        "给 DeepSeek 账户充值 / 续费，随后按 dispatch_command 原样派发（prompt 与 script 均已就绪，sha 已记）",
+        "续 kimi-code 订阅配额，编排者把 dispatch-wp29.sh 的 --config-file 改成 ~/.kimi/config.toml 并记新 sha 后派发",
+        "用户明示批准用 openrouter/nemotron-3-ultra-free 这一 free 通道执行本轮，编排者据此改 dispatch_command 并在 status 记录执行者模型变更",
+        "用户自行在终端跑 dispatch_command，编排者接管监控与验收"
+      ],
+      "ready_state": "工作树 /Users/admin/vibe/wp29-render-scope-decision 干净、HEAD=bd4ac7a；rev3 brief sha256=05b00b729f52eb2b38eadf27ddfe4b234108be3dae2ef477c022b647f3c2889d；rev3 prompt sha256=606eb7b33757132590a3fb35db33a8b8c98e3aff7e33bb8a71ffcab1b69159b4；dispatch-wp29.sh sha256=78d7ec46b736dad6ff4c779ce5de3f2c6ea94a0a7416c2ea0781921917cc1b6c；锁已持有；一充值即可原样发。",
+      "resolved_at": "2026-09-19T09:20:00+08:00",
+      "resolved_by": "deepseek_quota_restored",
+      "resolution": "用户告知 deepseek/deepseek-v4-pro 额度恢复；编排者复探 PROBE_OK 后按原 dispatch_command 原样派发，未改执行者模型、未改 prompt、未改脚本（三份 sha 均与冻结时一致）。"
+    },
+    "liveness_probe": {
+      "rev": 3,
+      "method": "provider PROBE_OK 复探 + log 字节增长 + pgrep -fl kimi",
+      "provider_probe": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --quiet --config-file ~/.kimi/deepseek.toml -p \"Reply with exactly: PROBE_OK\" -> PROBE_OK",
+      "log_bytes_at_probe": 188408,
+      "kimi_pids": "38695, 70712（Kimi Code，uv tools kimi-cli）",
+      "billing_errors_in_log": "none（grep 402|insufficient|expired|access_terminated|No endpoints 零命中）",
+      "result": "ALIVE"
+    }
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -63,7 +115,7 @@
     "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "branch": "feature/wp29-render-scope-decision",
     "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
-    "commit": "bd4ac7a"
+    "commit": "e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23"
   },
   "scope": {
     "allowed_paths": [
@@ -192,20 +244,150 @@
       "C1 独立核验": "编排者跑了 codex 要求的仓库级搜索（--exclude-dir=.git/__pycache__/.pytest_cache/node_modules，滤掉 docs/plans/ 自身）：非测试运行时消费者仍只有 init_cmd.py:109；新暴露的面是 CHANGELOG.md / README.md / docs/QUICKSTART.zh-CN.md 三处文档引用，与 pyproject.toml:24-25 的打包 artifacts（*.tmpl 作为 package data，经 importlib.resources read_text 取用，contract_render.py:255，不解析 markdown）。C1 成立：结论不变但证据面确实不完整，且『唯一机器消费者』的措辞被文档自己的输出推翻。",
       "C2 独立核验": "这正是编排者 review §3 的内容；codex 把它从『编排者不采纳』升级为『交付物本身的阻断缺陷』——判定更严，编排者接受：brief 要求执行者裁定三选一，而一份漏掉强制 GREEN 约束的可行性分析不足以支撑阶段 2 冻结。",
       "哨兵反例 独立实测": "编排者跑 probe-wp29-sentinel.py 复现 codex 的绕过：保持首行 '# WP-N: <标题>' 与末行字节不变、把中间全部包进 <!-- --> → 哨兵 GREEN（逃逸）；首行后插未闭合 <!-- → 哨兵 GREEN（逃逸）；仅『整档外包前后缀』→ RED。故编排者 review §4 把哨兵称为『专拦 E1/E2 这一族、性价比最高』是错的，它只拦一个精确形状。该结论已作废。"
+    },
+    "brief_rev2": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev2.md",
+      "sha256": "027789c64cfeb838a02236c2b93612d6931d0b4e63faf0da9afc69d4e4aec6ea",
+      "rev": 2,
+      "frozen_at": "2026-09-19",
+      "refreeze_seq": 1,
+      "refreeze_stop_rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 才触发停手复核；本次是第 1 次 re-freeze，规则不触发，无需用户批准即可冻结",
+      "rev1_preserved_as": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev1.md",
+        "sha256": "1dfd72aceb3649efc449a75f3a8e7893a27c0fa5480970f763265e0a6d29efd6",
+        "note": "与 WP-29-brief.md 逐字节同一，冻结原件留档"
+      },
+      "targets": {
+        "T1_C1_consumption_surface": "§1 改为仓库级 grep（显式 --exclude-dir）+ A 运行时复制/B 测试验证/C 人-agent 阅读/D 打包读取四分类；「唯一」须带限定词；D 类须给 pyproject artifacts + contract_render.load_template 行号级结论",
+        "T2_C2_specificity": "§4 表加合法编辑侧 G1–G4（WP-28-brief-rev3.md:166-173 四条无害探针），(b) 列四个 RED 须执行者自测；§0/§5 改掉「覆盖 E1–E4 全部」；裁定须与 G1–G4 兼容且量词闭合；已撤回的哨兵推荐不得作依据",
+        "T3_orchestrator_defects": "B48 基线 619 -> 606（编排者在 bd4ac7a 实测 4 failed / 606 passed / 4 skipped, 102.24s）；并记录 rev1 §4 表格只测灵敏度不测特异性属编排者冻结口径缺陷"
+      },
+      "preserved_accepted_from_rev1": [
+        "§2 渲染面结论与实测/推断标注（codex 明文认可）",
+        "§3 威胁真实性的 scratch 变异 + targeted pytest（codex 明文认可）",
+        "§1 的代码路径核验 init_cmd.py:109/:138/:253-254 与 load_template 不解析 markdown（编排者独立复现）"
+      ],
+      "orchestrator_premeasurement": {
+        "repo_wide_sweep": "grep -rn --exclude-dir={.git,__pycache__,.pytest_cache,node_modules,.venv,.worktrees} -E 'WORK_PACKAGE\\.md(\\.tmpl)?' . -> 128 hits, 117 在 docs/plans/ 下、11 在其外",
+        "surfaces_outside_docs_plans": [
+          "A 运行时复制: src/agentic_loop/init_cmd.py:109",
+          "B 测试验证: tests/test_init_contract.py:62, tests/test_wp_template_dispatch_lint.py:35,36",
+          "C 人/agent 阅读: AGENTS.md:84, src/agentic_loop/templates/AGENTS.md.tmpl:84, README.md:70, CHANGELOG.md:88,328,330, docs/QUICKSTART.zh-CN.md:202,230",
+          "D 打包读取: pyproject.toml:24-25 artifacts 含 src/agentic_loop/templates/*.tmpl；运行时经 contract_render.load_template:250-255 的 importlib.resources read_text，不解析 markdown",
+          "零命中: scripts/（目录不存在）、.github/（不存在）、.ci/（不存在）、.githooks/pre-push、install.sh、examples/、MIGRATION.md"
+        ],
+        "note": "编排者的预测量只用于把标的写得可核验，不替代执行者自己的证据面（brief 已明写这一点）"
+      },
+      "baseline_measured_by_orchestrator": {
+        "tree": "/Users/admin/vibe/wp29-render-scope-decision",
+        "commit": "bd4ac7a60de36c98b00b4b1fa6d0b4ce1bf0b267",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest -q",
+        "result": "4 failed / 606 passed / 4 skipped in 102.24s",
+        "failures": "全在 tests/test_finalize_merge_triple_sign.py（本机 git init.defaultBranch=master 与 fixture 冲突的既有失败）"
+      },
+      "superseded_by": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev3.md",
+      "dispatched": false,
+      "superseded_reason": "已冻结但从未派发。编排者在写 rev2 的派发 prompt 时对着执行者工作树独立核验，发现 rev2 自身有两处事实错误（B55 判据实况、B56 判据归属），在任何执行者读到它之前作废。rev2 文件保留在盘上作为冻结记录，不是判据。"
+    },
+    "brief_rev3": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev3.md",
+      "sha256": "05b00b729f52eb2b38eadf27ddfe4b234108be3dae2ef477c022b647f3c2889d",
+      "rev": 3,
+      "frozen_at": "2026-09-19",
+      "refreeze_seq": 2,
+      "refreeze_stop_rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 才触发停手复核。rev3 = 第 3 次冻结 = 第 2 次 re-freeze，规则不触发，无需用户批准即可冻结。下一次 re-freeze（rev4）将触发停手复核，冻结前须经用户批准。",
+      "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev2.md",
+      "section_gate": "dispatch_lint.sh 的段落门禁因 B47（按固定命名 WP-29-brief.md 读 brief，忽略 evidence.brief.path）不会作用于 revN 文件；编排者把该门禁的 Python 段落检查器（dispatch_lint.sh:68-99）抽出单独对 rev3 跑，结果 PASS：Acceptance tests 32 行 / Allowed and forbidden paths 9 行 / Completion definition 40 行，均非空。",
+      "targets": {
+        "T1_C1_consumption_surface": "§1 改为仓库级 grep（显式 --exclude-dir）+ A 运行时复制/B 测试验证/C 人-agent 阅读/D 打包读取四分类；「唯一」须带限定词；D 类须给 pyproject artifacts + contract_render.load_template 行号级结论",
+        "T2_C2_specificity": "§4 表加合法编辑侧 G1–G4（WP-28-brief-rev3.md:166-173 四条无害探针），(b) 列四个 RED 须执行者自测；§0/§5 改掉「覆盖 E1–E4 全部」；裁定须与 G1–G4 兼容且量词闭合；已撤回的哨兵推荐不得作依据；rev3 追加：判据对照表（WP-28 rev1 / WP-28 rev6 / (b) 三形态）+「凡填实测必须写清测的是哪个判据」（B56）",
+        "T3_orchestrator_defects": "B48 基线 619 -> 606（编排者在 bd4ac7a 实测 4 failed / 606 passed / 4 skipped, 102.24s）；并记录 rev1 §4 表格只测灵敏度不测特异性属编排者冻结口径缺陷；rev3 把标的 3 从两处扩为四处，新增 B55（判据实况）与 B56（判据归属）"
+      },
+      "orchestrator_defects_found_in_rev2": {
+        "B55": {
+          "title": "brief 不得断言执行者 base commit 并不具备的判据保护",
+          "where_in_rev2": "WP-29-brief-rev2.md 的 forbidden_paths 第 165 行、DoD 第 269 行、已知陷阱第 2 条第 293 行",
+          "false_claim": "「WP-28 已合入（rev6, commit b940248），两份模板处于逐字节冻结判据之下，任何改动会转红」",
+          "measured_reality": [
+            "git merge-base --is-ancestor b940248 2e5f2c0 -> 假（执行者树 base 不含该合入）",
+            "grep -c FROZEN_BODY tests/test_wp_template_dispatch_lint.py -> 0（执行者树）",
+            "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q -> 7 passed（执行者树）",
+            "主仓 plan 分支 cc22212 同一文件 -> 32 passed，FROZEN_BODY 在场"
+          ],
+          "why_it_matters": "执行者会据此推出「测试绿 ⇒ 我没碰模板」，而其树里根本没有逐字节冻结判据兜底。",
+          "fix_in_rev3": "写明实测实况：模板保护只靠 allowed_paths 与 git diff --exit-code，因此 TEMPLATES_UNCHANGED 必须贴出。"
+        },
+        "B56": {
+          "title": "每一格「实测」都必须写明测的是哪个版本的判据",
+          "where_in_rev2": "rev2 标的 2 要求 (b) 列 G1–G4 自测，但从未说明该测哪个判据",
+          "hazard": "tests/test_wp_template_dispatch_lint.py 在三处形态不同（WP-28 rev1 / rev6 / (b) 假设方案），红绿语义互不兼容；把 pytest 结果当成 (b) 的结果会得出「G1–G4 在 (b) 下是绿的」这种方向相反的结论。",
+          "fix_in_rev3": "标的 2 加三行判据对照表 + 明写「(b) 测的是你自己的 /tmp 字节比较脚本，不是 pytest」+ 判据说不清的格子只能标「推断」。"
+        }
+      },
+      "orchestrator_measurement_of_G1_G4": {
+        "probe": "docs/plans/2026-09-13-parallel-throughput/probes/WP-29-g-probe-rev1-vs-optionb.py",
+        "fixture": "docs/plans/2026-09-13-parallel-throughput/probes/WP-29-g-probe-status-fixture.json",
+        "criterion_A": "执行者树 /Users/admin/vibe/wp29-render-scope-decision 的真实 src/agentic_loop/wrappers/dispatch_lint.sh",
+        "criterion_B": "(b) 假设方案：模板全文 76 行逐字节比较",
+        "result": [
+          "baseline 未变异: A=GREEN(DISPATCH_LINT_PASS) / B=GREEN(bytes identical)",
+          "G1 改占位符: A=GREEN / B=RED(bytes differ)",
+          "G2 文末追加无关章节: A=GREEN / B=RED",
+          "G3 改 ## 范围 正文: A=GREEN / B=RED",
+          "G4 改冻结日期抬头: A=GREEN / B=RED"
+        ],
+        "hygiene": "每条变异带 mutated != original 守卫（不成立即中止）；变异只落 tempfile.TemporaryDirectory() 副本；跑完被审树 git status --porcelain 为空、两份模板字节未变。",
+        "note": "此预测量只为把标的写得可核验、并防止执行者测错对象，不替代标的 2 要求的执行者自测。"
+      },
+      "dispatch_prompt": {
+        "path": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev3-prompt.md",
+        "sha256": "606eb7b33757132590a3fb35db33a8b8c98e3aff7e33bb8a71ffcab1b69159b4",
+        "runner": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
+        "env_isolation": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY（B51：env 覆盖 --config-file 里的 base_url）"
+      }
+    },
+    "stage1_review_rev3": {
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1-rev3.md",
+      "document_sha256": "655096ca9c39912d57e37dc6aaf81b3a1280eef787f6ee6c207a83ee819d9809",
+      "reviewed_commit": "e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23",
+      "deliverable_sha256": "f98b571375c260b8ca3d41ac69442a80b8687e0ce1097b8c646057d98d4400f2",
+      "brief_sha256_recomputed": "05b00b729f52eb2b38eadf27ddfe4b234108be3dae2ef477c022b647f3c2889d",
+      "decision": "ACCEPT",
+      "reproduced_by_orchestrator": [
+        "§1 主 grep 两条：39/39 与 47/47 行逐行一致（comm -23/-13 双向空差）",
+        "D 类零命中：pyproject.toml:18-30 artifacts 列 *.tmpl glob、contract_render.py:250-255 按 name 变量取资源，字面串 WORK_PACKAGE 确实不出现",
+        "(b) 列 8/8 RED：原地重跑 /tmp/wp29-optionb-measure.py，逐格一致",
+        "WP-28 rev1 行 8/8 GREEN：原地重跑 /tmp/wp29-wp28rev1-measure.py，一致；脚本只在 /tmp 副本上变异并在结尾断言还原字节一致",
+        "(c′) 列：编排者自建纯内存探针（隔离判据、不写文件），E1-E4/G1-G4 八条全 GREEN",
+        "§2/§3 与 rev1 逐字节一致（847/1328 字节，identical=True）",
+        "基线 4 failed / 606 passed / 4 skipped 复现一致；改动面 1 个 md；模板与依赖 git diff --exit-code 零 diff"
+      ],
+      "wrong_layer_episode": "编排者首轮 (c′) 实测在 /tmp 副本上预先变异模板后跑 rev6 完整测试文件，得 G1/G3/G4 RED；追查为错误层（rev6 自检用例 test_invn_t7_replica_mismatch_red:886 的 no-op 守卫与 test_invn_harmless_placeholder_edit_green:896 的夹具前置条件均假定盘上模板未被动过）。隔离判据后八条全 GREEN，执行者结论成立。",
+      "minor_count": 3,
+      "blocking_count": 0,
+      "not_a_merge_approval": true,
+      "orchestrator_probe": "docs/plans/2026-09-13-parallel-throughput/probes/WP-29-cprime-vs-g-probe.py"
     }
   },
   "review": {
     "decision": "ACCEPT",
     "reviewer": "claude-code",
-    "reviewed_at": "2026-09-18",
-    "rev": 1,
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1.md",
+    "reviewed_at": "2026-09-19",
+    "rev": 3,
+    "at_commit": "e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23",
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1-rev3.md",
     "blockers": [],
     "minor": [
-      "§0/§5 措辞：「(b) 覆盖 E1–E4」应为「(b) 对任何字节改动都红」——判别力 1、特异性 0",
-      "B48：WP-29 brief 的零回归基线 619 是 WP-28 lane 的数，WP-29 base 2e5f2c0 实测 606；编排者自己的缺陷"
+      "M1 两条主 grep 中 WP-28-consult-codex-shape-verdict.json:6 的 codex 长文单行被显式标注省略；省略已声明且与消费面无关，不构成 C1 复发，但严格讲非『完整输出』",
+      "M2 『宽口径补充命中』块只粘 5 行（实际新增 17 行）且块头写『均归 C 类』；未粘的 12 行中 2 行实为 B 类（test_init_contract.py:62、test_wp_template_dispatch_lint.py:24，路径由片段拼接故不匹配主 grep 字面串），其余 10 行为 docs/plans 历史治理文档（确属 C 类）。两行在 §1 B 类中已正确列出，实质结论不受影响",
+      "M3 §1 A 类可加强：contract_render.py:243 的 load_template 调用在 render_template 内，而 CONTRACT_FILES 只含 AGENTS/CLAUDE/OPERATING_MODEL 三份，不含 WORK_PACKAGE.md.tmpl——唯一做占位符替换的路径也碰不到判定对象。只加强结论，不返工"
     ],
-    "verdict_note": "交付物 ACCEPT；其推荐的方案 (b) 整份逐字节冻结不采纳，编排者改判 (c′)：不引 parser（采纳其论证），不整份冻结（会把 WP-28 rev3 明文要求必绿的 4 条无害编辑全部判红），优先「文首/文末哨兵 + 承诺边界明文化」。阶段 2 仍未冻结，须用户批准本裁定后方可冻结。"
+    "verdict_note": "C1/C2 两个阻断项闭合。复核者独立复现：(1) §1 两条主 grep 的原始命中行 39/39 与 47/47 逐行一致；D 类零命中声明正确，pyproject.toml:18-30 + contract_render.py:250-255 行号级结论成立（read_text 不解析 Markdown）；(2) (b) 列 8/8 RED 用执行者脚本原地重跑逐格一致，脚本对模板只读、带空操作守卫；(3) WP-28 rev1 行 8/8 GREEN 复现一致，rev6 行诚实标注未实测（B55 纪律）；(4) (c′) 的 protected_body_identity + replica_identity 由复核者独立实测，E1-E4/G1-G4 八条全 GREEN，裁定不把任何 G 判红；(5) §2/§3 按段落字节比较 identical=True（847/1328 字节）；(6) 基线 4 failed/606 passed/4 skipped 复现一致，改动面只含一个 md，模板与依赖零 diff。三条次要项不影响论断。阶段 2 仍未冻结，须用户批准本裁定后方可冻结；本 ACCEPT 不构成合入批准。",
+    "orchestrator_own_measurement": {
+      "cprime_isolated": "直接从主仓 HEAD 的 FROZEN_BODY 常量取判据、纯内存施加八条变异：baseline GREEN，E1-E4/G1-G4 全 GREEN；脚本不写文件，复核前后主仓 src/tests/templates 无改动",
+      "wrong_layer_note": "首次尝试在 /tmp 副本上跑 rev6 完整测试文件得到 G1/G3/G4 RED，追查为错误层：test_invn_t7_replica_mismatch_red:886 会自行再变异并断言 mutated != packaged，test_invn_harmless_placeholder_edit_green:896 断言原始占位符在场，预先变异触发的是这两个用例自身的夹具前置条件，不是 (c′) 判据（记忆 mutation-red-may-come-from-wrong-layer 实弹命中）",
+      "anchor_uniqueness": "八条变异的锚点在模板内 grep -cF 均为 1，不存在『找不到锚点⇒恒等映射』的假绿隐患"
+    }
   },
   "consult": {
     "decision": "REWORK",
@@ -227,15 +409,22 @@
       "§3 威胁真实性已由 scratch 变异 + targeted pytest 证明",
       "606 vs 619 基线差异解释充分，不构成 REWORK",
       "不采纳 (b) 的判断正确（codex 把它升级为阻断项 C2）"
-    ]
+    ],
+    "stale_for_rev": 3,
+    "stale_note": "本块是 rev1（at_commit bd4ac7a）的第二签名 REWORK，其 C1/C2 两个阻断项已在 rev3（e493c2a）闭合并经编排者独立复现（review.rev=3 ACCEPT）。rev3 的第二签名尚未派发：合入前须对 e493c2a 重新取得 consult.decision=ACCEPT，届时本块整体替换为 rev3 记录。"
   },
   "timestamps": {
     "created_at": "",
     "frozen_at": "2026-09-18",
     "dispatched_at": "2026-09-18T00:00:00+08:00",
     "dispatch_blocked_at": "",
-    "rev3_frozen_at": "",
     "implementing_at": "2026-09-18T00:01:00+08:00",
-    "ready_for_review_at": "2026-09-18T00:13:00+08:00"
+    "ready_for_review_at": "2026-09-18T00:13:00+08:00",
+    "brief_rev2_frozen_at": "2026-09-19T08:31:38+08:00",
+    "brief_rev3_frozen_at": "2026-09-19T09:01:00+08:00",
+    "dispatch_blocked_rev3_at": "2026-09-19T09:12:00+08:00",
+    "dispatched_at_rev3": "2026-09-19T09:20:00+08:00",
+    "implementing_at_rev3": "2026-09-19T09:21:00+08:00",
+    "reviewed_rev3_at": "2026-09-19T11:54:13+08:00"
   }
 }
