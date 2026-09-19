@@ -367,6 +367,20 @@
       "blocking_count": 0,
       "not_a_merge_approval": true,
       "orchestrator_probe": "docs/plans/2026-09-13-parallel-throughput/probes/WP-29-cprime-vs-g-probe.py"
+    },
+    "stage1_consult_rev3": {
+      "request_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-rev3-request.md",
+      "request_sha256": "3718e2b4b9733f1b2718a00ea2a95e3ccbf070190ce5a421ffbf7ee978eb4260",
+      "dispatched_at": "2026-09-19",
+      "inputs": {
+        "brief": "WP-29-brief-rev3.md sha256 05b00b72…",
+        "diff": "累积 2e5f2c0..e493c2a（1 file +458/-0），非 rev2→rev3 增量（记忆 incremental-review-misses-prior-rounds）",
+        "deliverable_sha256": "f98b571375c260b8ca3d41ac69442a80b8687e0ce1097b8c646057d98d4400f2"
+      },
+      "harness": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp29-stage1-rev3/run.py",
+      "env_note": "仅剥离 OPENAI_BASE_URL，保留 OPENAI_API_KEY（记忆 strip-the-base-url-not-the-key）",
+      "state": "DISPATCHED",
+      "asks": "6 条特别检查：C1 是否闭合（是否有第五种消费方式 / 字面串与行号都没覆盖的读取入口）/ C2 是否闭合（G1-G4 是否足以代表必须保持 GREEN 集合，有无落在受保护跨度内的样本被漏）/ (c′) 量词是否闭合 / 编排者错误层归因是否正确 / 五项必答是否足以支撑阶段 2 冻结 / M1-M3 定性是否正确"
     }
   },
   "review": {
