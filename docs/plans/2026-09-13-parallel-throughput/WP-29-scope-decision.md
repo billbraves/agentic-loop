@@ -1,75 +1,194 @@
-# WP-29 阶段 1：模板受保护块的「活动渲染」判据 —— 范围界定与可行性裁定
+# WP-29 阶段 1：模板受保护块的「活动渲染」判据 —— 范围界定与可行性裁定（rev3 修订版）
 
-> 冻结日期 2026-09-18 | 执行者 kimi（provider: deepseek）| 本文件是阶段 1 唯一交付物。
+> 冻结日期 2026-09-19 | 执行者 kimi（provider: deepseek）| 本文件是阶段 1 唯一交付物。
 > 判定对象：`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 与
 > `docs/agentic/templates/WORK_PACKAGE.md`（下称「两份模板」或「模板」）。
 > 阶段 2 不冻结，须在阶段 1 裁定获批准后另行冻结。
+> 本文件是 rev1（commit `bd4ac7a`）的**原地修订**：§2 / §3 已 ACCEPT 保留，§1 / §4 / §5 / §0
+> 按 rev3 brief 三件标的重做，新增「rev1 → 本轮改了什么」一节。
 
 ## 0. 裁定摘要（TL;DR）
 
-**推荐 (b)：不引 parser，锁定完整 envelope —— 整份模板逐字节冻结。**
+**推荐 (c′)：不引 parser、不整份冻结，把承诺边界写进判据说明，并对两个受保护节做逐字节
+冻结（envelope 冻结）+ 两份副本逐字节一致；`active_embedding` 明确不承诺，交 `git diff` +
+human review。**
 
-一句话理由：本仓**没有** Markdown parser、**没有**权威方言声明；模板在仓内的唯一机器
-消费者是 `src/agentic_loop/init_cmd.py:109`（`_REFERENCE_TEMPLATES`），其行为是**逐字节复制**
-而非解析。因此「活动渲染」这件事在当前消费链下**并未发生**。四条实测逃逸（E1–E4，见 §4）
-全部是**字节改变型**攻击，整份逐字节冻结即可机械拦下全部四条；而引入 parser（方案 a）
-仍需为 AST 判据额外选定方言与版本，且**在原理上无法覆盖 E4**（远距离去规范化句）。
-方案 (c) 作为主判据不可取，但应把其「已知限制」措辞随 (b) 一并写进判据说明。
+一句话理由：本仓**没有** Markdown parser、**没有**权威方言声明（§2）；模板的唯一**非测试运行时**
+消费者是 `src/agentic_loop/init_cmd.py:109`，其行为是**逐字节复制**，打包读取路径
+`contract_render.load_template → importlib.resources` 只做 `read_text(encoding="utf-8")`，
+**不解析 Markdown**（§1 D 类）。因此「活动渲染」这件事在当前消费链下**并未发生**。
 
-逐项证据如下。
+四条实测逃逸（E1–E4）**全部不改变受保护节字节**，而是改变块外上下文使受保护节不再「活动」——
+这类「active_embedding」攻击在没有权威 parser 的前提下**无法机械拦下**；四条必须保持 GREEN 的
+无害编辑（G1–G4）**都不落在受保护节字节跨度内**。方案 (b)（整份逐字节冻结）对 E1–E4 灵敏度 1，
+但对 G1–G4 特异性 0（把合法编辑也判红）；方案 (a)（引 parser）除依赖与方言钉版成本外，对 E4
+（远距离去规范化句）也无效。故裁定 (c′)：只冻结能机械化、且不会误伤 G1–G4 的那一部分字节
+（受保护节 envelope），把「渲染端一定显示为活动文本」这一开放世界语义命题**明确降级为不承诺**。
 
 ## 1. 消费链实况
 
-**问题**：除 `init_cmd.py:109` 外，两份模板还被谁读取？人算不算消费者？agent 算不算？
+**问题**：两份模板除 `init_cmd.py:109` 外还被谁读取？人算不算消费者？agent 算不算？打包读取
+路径是否解析 Markdown？
 
-**证据**（命令原文 + 完整输出；`__pycache__/*.pyc` 为 pytest 产生的字节码缓存，非源码消费者，已标注）：
+**证据**（仓库级搜索，显式 `--exclude-dir` 排除 `.git` / `__pycache__` / `.pytest_cache`）：
 
 ```text
-$ grep -rn 'WORK_PACKAGE' src/ tests/
-src//agentic_loop/init_cmd.py:109:    ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
-src//agentic_loop/templates/AGENTS.md.tmpl:84:- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
-tests//test_init_contract.py:62:    brief = tmp_path / "docs" / "agentic" / "templates" / "WORK_PACKAGE.md"
-tests//test_wp_template_dispatch_lint.py:23:TEMPLATE_PACKAGED = SRC / "agentic_loop" / "templates" / "WORK_PACKAGE.md.tmpl"
-tests//test_wp_template_dispatch_lint.py:24:TEMPLATE_DOCS = REPO_ROOT / "docs" / "agentic" / "templates" / "WORK_PACKAGE.md"
-（另匹配 4 处 __pycache__/*.pyc，属字节码缓存，非消费者）
+$ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_cache 'WORK_PACKAGE\.md\.tmpl' .
+./tests/test_wp_template_dispatch_lint.py:23:TEMPLATE_PACKAGED = SRC / "agentic_loop" / "templates" / "WORK_PACKAGE.md.tmpl"
+./docs/plans/2026-09-13-parallel-throughput/WP-29.status.json:113:      "WORK_PACKAGE.md.tmpl 仓内唯一消费者 init_cmd.py:109 逐字节复制，不解析 markdown"
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md:46:  - `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md:79:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` and
+./docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev3.md:145:3. `WORK_PACKAGE.md.tmpl` 在仓内的**唯一**消费者是 `init_cmd.py:109`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev3.md:164:> `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 逐字节相同。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-request.md:9:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`，两份须逐字节相同）加入两段冻结文字：
+./docs/plans/2026-09-13-parallel-throughput/WP-25.status.json:78:      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape.md:113:> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与 `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 必须逐字节相同。
+./docs/plans/2026-09-13-parallel-throughput/WP-08-candidate.md:2105:| `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` | 打包母本（`init_cmd.py:109` 铺开来源） | `FAIL missing 'Acceptance tests'` |
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape-verdict.json:6:  "raw_verbatim": "结论：应收手并改判据形状。……（此 JSON 行 raw_verbatim 为 codex 二签的长文原文，与消费面无关，全文略）……"
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:30:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:37:  理由：`WORK_PACKAGE.md.tmpl` 是 `init_cmd._REFERENCE_TEMPLATES` 里的 reference skeleton，
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:40:  编排者已实测：`grep -c '\$' WORK_PACKAGE.md.tmpl` = 0。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:70:- [ ] `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` —— 新增 `## Re-freeze 规则（编排者冻结前自检）`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:142:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、`docs/agentic/templates/WORK_PACKAGE.md`、
+./docs/plans/2026-09-13-parallel-throughput/WP-29-brief.md:27:3. `WORK_PACKAGE.md.tmpl` 在仓内的**唯一**消费者是 `src/agentic_loop/init_cmd.py:109`
+./docs/plans/2026-09-13-parallel-throughput/WP-24.report.md:18:src/agentic_loop/templates/WORK_PACKAGE.md.tmpl | 33 +++
+./docs/plans/2026-09-13-parallel-throughput/WP-24.status.json:37:      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+./docs/plans/2026-09-13-parallel-throughput/WP-24.status.json:105:      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl (+33: 同上，与 docs 份 byte-identical)",
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:24:> `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 逐字节相同。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:55:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:62:  `WORK_PACKAGE.md.tmpl` 是 `init_cmd._REFERENCE_TEMPLATES` 里的 reference skeleton，
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:94:- [ ] `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` —— 模板正文**不改**（rev1 已落两块明文）
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:211:- 全仓无 Markdown parser 依赖、无权威方言声明；`WORK_PACKAGE.md.tmpl` 在仓内唯一消费者是
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:217:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、`docs/agentic/templates/WORK_PACKAGE.md`、
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:32:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:39:  理由：`WORK_PACKAGE.md.tmpl` 是 `init_cmd._REFERENCE_TEMPLATES` 里的 reference skeleton，
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:42:  编排者已实测：`grep -c '\$' WORK_PACKAGE.md.tmpl` = 0。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:72:- [ ] `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` —— 新增 `## Re-freeze 规则（编排者冻结前自检）`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:190:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、`docs/agentic/templates/WORK_PACKAGE.md`、
+./docs/plans/2026-09-13-parallel-throughput/WP-28.status.json:68:      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+./docs/plans/2026-09-13-parallel-throughput/WP-28.status.json:117:      "contract_version_decision": "CONTRACT_TEMPLATE_VERSION 保持 \"6\" 不 bump：WORK_PACKAGE.md.tmpl 是 init_cmd._REFERENCE_TEMPLATES 的 reference skeleton，grep -c '$' = 0 个占位符，不在 contract_render 渲染目标（AGENTS/CLAUDE/OPERATING_MODEL 三份）内",
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md:26:| `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` | 打包母本（`init_cmd.py:109` 铺开来源） | `FAIL missing 'Acceptance tests'` |
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md:45:  - `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`（打包母本）
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md:157:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` — packaged master template
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief.md:46:  - `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief.md:79:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` and
+./src/agentic_loop/init_cmd.py:109:    ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
 ```
 
 ```text
-$ grep -rn 'WORK_PACKAGE\.md\.tmpl' src/ tests/
-src//agentic_loop/init_cmd.py:109:    ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
-tests//test_wp_template_dispatch_lint.py:23:TEMPLATE_PACKAGED = SRC / "agentic_loop" / "templates" / "WORK_PACKAGE.md.tmpl"
-（另匹配 2 处 __pycache__/*.pyc）
+$ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_cache 'docs/agentic/templates/WORK_PACKAGE\.md' .
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md:47:    `docs/agentic/templates/WORK_PACKAGE.md` —— rev1 已定稿，本轮**零行 diff**
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md:80:  `docs/agentic/templates/WORK_PACKAGE.md` — settled in rev1; zero-line diff
+./docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev3.md:163:> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-request.md:8:往 WP brief 模板（`docs/agentic/templates/WORK_PACKAGE.md` 与
+./docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev4.md:244:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-27-brief-rev2.md:204:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape.md:113:> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与 `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 必须逐字节相同。
+./docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md:163:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-27-brief.md:166:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-08-candidate.md:2106:| `docs/agentic/templates/WORK_PACKAGE.md` | 项目内被引用的骨架 | `FAIL missing 'Acceptance tests'`（与母本 `diff` 为空） |
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape-verdict.json:6:  "raw_verbatim": "……（同前，长文略）……"
+./docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md:89:   `docs/agentic/templates/WORK_PACKAGE.md` 的 oracle 三项旁边，作为第四项要求。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:5:> 冻结与 re-freeze 的规则见本仓 `docs/agentic/templates/WORK_PACKAGE.md`「Re-freeze 规则」一节。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:31:- `docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:50:- `tests/test_init_contract.py` —— 它引用 `docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:72:- [ ] `docs/agentic/templates/WORK_PACKAGE.md` —— 与上一份**逐字节同一**
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:142:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、`docs/agentic/templates/WORK_PACKAGE.md`、
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:210:- oracle 三项（本 WP 新增第 4 项的落点）：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-24.report.md:17:docs/agentic/templates/WORK_PACKAGE.md          | 33 +++
+./docs/plans/2026-09-13-parallel-throughput/WP-24.status.json:36:      "docs/agentic/templates/WORK_PACKAGE.md",
+./docs/plans/2026-09-13-parallel-throughput/WP-24.status.json:104:      "docs/agentic/templates/WORK_PACKAGE.md (+33: 三个英文锚点段，标注与中文段同义)",
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:5:> 冻结与 re-freeze 的规则见本仓 `docs/agentic/templates/WORK_PACKAGE.md`「Re-freeze 规则」一节。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:23:> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:56:- `docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:95:- [ ] `docs/agentic/templates/WORK_PACKAGE.md` —— 同上，与上一份逐字节同一
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:217:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、`docs/agentic/templates/WORK_PACKAGE.md`、
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev3.md:291:- oracle 三项 + 第 4 项：`docs/agentic/templates/WORK_PACKAGE.md` `## Acceptance tests` 段
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:5:> 冻结与 re-freeze 的规则见本仓 `docs/agentic/templates/WORK_PACKAGE.md`「Re-freeze 规则」一节。
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:33:- `docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:52:- `tests/test_init_contract.py` —— 它引用 `docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:74:- [ ] `docs/agentic/templates/WORK_PACKAGE.md` —— 与上一份**逐字节同一**
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:190:`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`、`docs/agentic/templates/WORK_PACKAGE.md`、
+./docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md:263:- oracle 三项（本 WP 新增第 4 项的落点）：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-28.status.json:69:      "docs/agentic/templates/WORK_PACKAGE.md",
+./docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md:260:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-26-brief-rev2.md:204:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md:27:| `docs/agentic/templates/WORK_PACKAGE.md` | 项目内骨架（与母本 `diff` 为空） | `FAIL missing 'Acceptance tests'` |
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md:46:  - `docs/agentic/templates/WORK_PACKAGE.md`（项目内骨架，须与母本保持 `diff` 为空）
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md:158:- `docs/agentic/templates/WORK_PACKAGE.md` — scaffolded skeleton; must stay
+./docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev2.md:159:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
+./docs/plans/2026-09-13-parallel-throughput/WP-25-brief.md:174:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`（WP-24 rev1 已写入）
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief.md:47:    `docs/agentic/templates/WORK_PACKAGE.md` —— rev1 已定稿，本轮**零行 diff**
+./docs/plans/2026-09-13-parallel-throughput/WP-24-brief.md:80:  `docs/agentic/templates/WORK_PACKAGE.md` — settled in rev1; zero-line diff
+./docs/QUICKSTART.zh-CN.md:230:1. 从 `docs/agentic/templates/WORK_PACKAGE.md` 复制出 brief，冻结目标/范围/DoD。
+./AGENTS.md:84:- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
+./src/agentic_loop/init_cmd.py:109:    ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
+./src/agentic_loop/templates/AGENTS.md.tmpl:84:- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
 ```
+
+**宽口径补充命中**（`grep -rn ... 'WORK_PACKAGE' .` 中上述两条之外的新增，归 C 类）：
 
 ```text
-$ grep -rn 'docs/agentic/templates/WORK_PACKAGE\.md' src/ tests/ AGENTS.md docs/QUICKSTART.zh-CN.md
-src//agentic_loop/init_cmd.py:109:    ("WORK_PACKAGE.md.tmpl", "docs/agentic/templates/WORK_PACKAGE.md", 0o644),
-src//agentic_loop/templates/AGENTS.md.tmpl:84:- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
-AGENTS.md:84:- a tracked brief created from `docs/agentic/templates/WORK_PACKAGE.md`;
-docs/QUICKSTART.zh-CN.md:230:1. 从 `docs/agentic/templates/WORK_PACKAGE.md` 复制出 brief，冻结目标/范围/DoD。
+./CHANGELOG.md:88:  a WP against its plan; also present in the `STATUS.json` and `WORK_PACKAGE.md`
+./CHANGELOG.md:328:- **Per-WP reference templates (STATUS.json / WORK_PACKAGE.md).** `agentic init`
+./CHANGELOG.md:330:  and `WORK_PACKAGE.md` (a brief skeleton), so an adopting project has a
+./README.md:70:| `init` | 脚手架 `.agentic/config.toml` + 治理契约（AGENTS.md、CLAUDE.md、docs/agentic/OPERATING_MODEL.md）+ 每 WP 模板（docs/agentic/templates/{STATUS.json,WORK_PACKAGE.md}）+ `.claude/settings.json`（…）…
+./docs/QUICKSTART.zh-CN.md:202:#       docs/agentic/OPERATING_MODEL.md + docs/agentic/templates/{STATUS.json,WORK_PACKAGE.md}
 ```
 
-**代码路径核验**：
+**四类归类**（按消费性质；原始命中行即上文 grep 输出）：
 
-- `src/agentic_loop/init_cmd.py:107-115` 定义 `_REFERENCE_TEMPLATES`，其中第 109 行把
-  `WORK_PACKAGE.md.tmpl` 映射到 `docs/agentic/templates/WORK_PACKAGE.md`。
-- `init_cmd.py:138` `_write_asset(root, tmpl_name, rel, mode)` 的 body（`:148` 调
-  `contract_render.load_template(tmpl_name)`，随后 `target.write_text(text, ...)`）是
-  **逐字节复制**，不解析内容。
-- `init_cmd.py:253-254` 循环对 `_REFERENCE_TEMPLATES` 逐项调用 `_write_asset`。
-- `src/agentic_loop/contract_render.py:250-255` `load_template(name)` 只是
-  `resource.read_text(encoding="utf-8")`，**不做 Markdown 解析**。
-- `grep -rn 'load_template' src/ tests/` 的调用点只有 `init_cmd.py:148` 与
-  `contract_render.py` 自身定义/测试；无其它解析调用。
+- **A. 运行时复制**（非测试程序执行期读取模板内容）：
+  - `src/agentic_loop/init_cmd.py:109` —— `_REFERENCE_TEMPLATES` 元组中唯一把
+    `WORK_PACKAGE.md.tmpl` 映射到 `docs/agentic/templates/WORK_PACKAGE.md` 的条目。
+  - 复制机制（非 grep 命中，行号级代码核验）：`init_cmd.py:138-152` `_write_asset()` 在
+    `:148` 调 `contract_render.load_template(tmpl_name)`，随后 `target.write_text(text, ...)`
+    **逐字节写出**；`:253-254` 循环对 `_REFERENCE_TEMPLATES` 逐项调用 `_write_asset`。
+  - `grep -rn 'load_template' src/ tests/` 的调用点只有 `init_cmd.py:148` 与
+    `contract_render.py` 自身定义/测试，无其它解析调用。
+
+- **B. 测试验证**（测试用例读取模板以断言内容/结构）：
+  - `tests/test_init_contract.py:62`
+  - `tests/test_wp_template_dispatch_lint.py:23`
+  - `tests/test_wp_template_dispatch_lint.py:24`
+
+- **C. 人 / agent 阅读**（文档或治理契约指示人/agent 去读模板）：
+  - `AGENTS.md:84` 与 `src/agentic_loop/templates/AGENTS.md.tmpl:84`（治理契约：brief 须从
+    `docs/agentic/templates/WORK_PACKAGE.md` 创建）
+  - `docs/QUICKSTART.zh-CN.md:202`、`:230`（快速上手：从模板复制 brief）
+  - `README.md:70`（`init` 脚手架说明）
+  - `CHANGELOG.md:88`、`:328`、`:330`（变更记录）
+  - `docs/plans/` 下多份历史 WP 治理文档（brief / status / review / consult / report）中的
+    大量引用 —— 均为「冻结/阅读模板」的流程引用，非运行时读取。`WP-29.status.json:113` 是本
+    WP 状态文件里记录的证据摘要，同属 C 类。
+
+- **D. 打包读取**（打包配置把模板作为 package data 纳入 wheel/sdist + 运行时经
+  `importlib.resources` 读取）：
+  - grep 命中：**零命中**。原因：`pyproject.toml` 用 `*.tmpl` glob、`contract_render.py` 用
+    `name`/`tmpl_name` 变量，二者都不含字面 `WORK_PACKAGE` 字符串，故必须改用行号级证据。
+  - 行号级证据：
+    - `pyproject.toml:24-29` `[tool.hatch.build.targets.wheel]` 的 `artifacts` 含
+      `"src/agentic_loop/templates/*.tmpl"`。
+    - `contract_render.py:18-19`：`from importlib.resources import files as _resources_files`。
+    - `contract_render.py:27-28`：`_TEMPLATE_PACKAGE = "agentic_loop"`、`_TEMPLATE_SUBDIR = "templates"`。
+    - `contract_render.py:250-255` `load_template(name)`：
+      `resource = _resources_files(_TEMPLATE_PACKAGE).joinpath(_TEMPLATE_SUBDIR).joinpath(name)`
+      → `return resource.read_text(encoding="utf-8")`。
+  - **D 类结论**：`pyproject.toml` 确实把 `*.tmpl` 纳入 wheel artifacts；运行时读取路径是
+    `importlib.resources.files("agentic_loop").joinpath("templates").joinpath(name).read_text(...)`。
+    `read_text(encoding="utf-8")` **只做 UTF-8 文本解码并返回字符串，不解析 Markdown、不生成
+    AST、不识别注释/围栏/标题/块级结构**。即：打包读取路径**不解析 Markdown**。
 
 **结论**：
 
-- **唯一的仓内机器消费者**是 `src/agentic_loop/init_cmd.py:109`，行为是逐字节复制。
-- **人**是消费者，但属于**流程/规范消费者**：`AGENTS.md:84` 与
-  `docs/QUICKSTART.zh-CN.md:230` 指示人/agent「从模板复制出 brief」。他们读取模板以
-  决定如何冻结，属于**人的认知消费**，不是机械解析，不受 AST 判据约束。
-- **agent**（冻结 WP 的编排者/执行者）同样属于流程消费者：读模板 → 生成 brief。
-- 因此「谁把模板当作活动 Markdown 结构来解析」这个问题的答案是：**没有机器**。
+- 唯一的**非测试运行时**消费者是 `src/agentic_loop/init_cmd.py:109`，行为是逐字节复制；
+  其读取入口 `contract_render.load_template` 只 `read_text`，不解析 Markdown。
+- **测试**消费者有两处（`test_init_contract.py:62`、`test_wp_template_dispatch_lint.py:23,24`），
+  只断言结构/副本同一，同样不解析 Markdown。
+- **人 / agent** 是流程/规范消费者（`AGENTS.md:84` 等指示「从模板复制 brief」），属认知消费，
+  不是机械解析。
+- **打包读取**把 `*.tmpl` 纳入 wheel，但运行时 `read_text` 不解析 Markdown。
+- 因此「谁把模板当作活动 Markdown 结构来解析」的答案是：**没有任何机器路径**。
 
 ## 2. 渲染面实况
 
@@ -135,60 +254,150 @@ origin  git@github.com:billbraves/agentic-loop.git (push)
 
 ## 4. 方案对比
 
-对照 WP-28 停手复核 §4.1 的三条逃逸（E1–E3）与 §4.2 的一条（E4），逐条填表：
+**判据实况先声明**（每格「实测」必须说清测的是哪个判据；本仓同一份测试文件在三处形态不同）：
 
-| 逃逸 | (a) 权威 parser | (b) 整份模板逐字节冻结 | (c) 明文限制 + review |
-|---|---|---|---|
-| E1 整份文档外包 `<!-- … -->` | 拦得住（parser 见整段注释，目标不是活动标题） | 拦得住（字节改变） | 拦不住 |
-| E2 文档开头未闭合 `<!--` | 拦得住（视方言，后续标题不活动） | 拦得住（字节改变） | 拦不住 |
-| E3 `## 附注` 内未闭合代码围栏 | 拦得住（目标标题落在代码块内，非活动标题） | 拦得住（字节改变） | 拦不住 |
-| E4 顶部远距离去规范化句 | **拦不住**（目标标题结构仍有效；自然语言矛盾在 AST 之外） | 拦得住（字节改变） | 拦不住 |
+| 判据 | 形态 | 对 E1–E4 / G1–G4 的表现 |
+|---|---|---|
+| **WP-28 rev1**（本树 `tests/test_wp_template_dispatch_lint.py`，7 passed，无 `FROZEN_BODY`） | 只查段落标题在场 + 两份副本逐字节一致，不看 body 内容 | 本 WP 在 `/tmp` 副本实测：8/8 全 GREEN（灵敏度 0、特异性 1） |
+| **WP-28 rev6**（主仓 plan 分支，有 `FROZEN_BODY`） | 两个受保护节 body 逐字节冻结 | 不在本树，**未实测**；按 brief 描述 G1–G4 应 GREEN |
+| **(b) 整份模板逐字节冻结**（本 WP 要评估的假设方案） | 完整 76 行逐字节比较 | 本 WP 实测：8/8 全 RED（灵敏度 1、特异性 0） |
+
+- WP-28 rev1 的实测脚本：`/tmp/wp29-wp28rev1-measure.py`（对 `/tmp` 副本施加 E1–E4/G1–G4，
+  跑真实 `python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q`，每格带
+  `assert mutated != ORIG` 守卫）。结果：baseline `7 passed`；E1/E2/E3/E4/G1/G2/G3/G4 全部
+  `7 passed`（GREEN）。
+- (b) 的实测脚本：`/tmp/wp29-optionb-measure.py`（冻结全文 vs 变异后全文的**完整 76 行逐字节
+  比较**，`mutated == ORIG` 判 GREEN，否则 RED；每格带 `assert mutated != ORIG` 守卫）。输出：
+
+```text
+ORIGINAL bytes = 2889
+mutation    bytes     (b) full-file freeze
+E1       2898                      RED
+E2       2894                      RED
+E3       2893                      RED
+E4       2951                      RED
+G1       2892                      RED
+G2       2941                      RED
+G3       2895                      RED
+G4       2889                      RED
+```
+
+（G4 字节长度虽未变 2889，但内容已变，仍判 RED。每个变异都带 `assert 变异后 != 变异前`
+守卫，空操作会中止，不会打印假绿。）
+
+**方案对比表**（图例：RED = 判据转红「拦下」；GREEN = 判据转绿「放过」。攻击侧 E 期望 RED，
+合法侧 G 期望 GREEN。）
+
+| 变异 | (a) 权威 parser | (b) 整份模板逐字节冻结 | (c) 明文限制 + review | (c′) 受保护 envelope 冻结 + 承诺明文化 + review |
+|---|---|---|---|---|
+| E1 整份文档外包 `<!-- -->` | RED（推断） | RED（实测） | GREEN 放过（推断） | GREEN 不承诺（推断） |
+| E2 文档开头未闭合 `<!--` | RED（推断） | RED（实测） | GREEN 放过（推断） | GREEN 不承诺（推断） |
+| E3 `## 附注` 内未闭合围栏 | RED（推断） | RED（实测） | GREEN 放过（推断） | GREEN 不承诺（推断） |
+| E4 顶部远距离去规范化句 | GREEN（推断） | RED（实测） | GREEN 放过（推断） | GREEN 不承诺（推断） |
+| G1 改占位符 `<这个 WP 要交付什么>` | GREEN（推断） | RED（实测） | GREEN（推断） | GREEN（推断） |
+| G2 文末追加无关章节 | GREEN（推断） | RED（实测） | GREEN（推断） | GREEN（推断） |
+| G3 改 `## 范围` 正文 | GREEN（推断） | RED（实测） | GREEN（推断） | GREEN（推断） |
+| G4 改 `> 冻结日期` 行 | GREEN（推断） | RED（实测） | GREEN（推断） | GREEN（推断） |
+
+**每格判据与实测/推断标注**：
+
+- **(a) 权威 parser**：全列「推断」。本仓无 parser 依赖、本轮禁引依赖，无法实测。行为由其
+  判据形状（解析整份文档 → 校验目标 AST 节点是否为活动 heading/paragraph）推出：E1/E2/E3 使
+  目标标题落入注释/未闭合注释/代码块，parser 判非活动 → RED；E4 是自然语言矛盾，目标标题
+  AST 结构仍有效 → GREEN；G1–G4 不改变目标结构 → GREEN。
+- **(b) 整份模板逐字节冻结**：全列「实测」（脚本 `/tmp/wp29-optionb-measure.py`，见上）。
+  任何字节改变都 RED，故 E1–E4 全 RED（灵敏度 1）、G1–G4 全 RED（特异性 0）。
+- **(c) 明文限制 + review**：全列「推断」。它没有任何机器判据，故攻击侧一律 GREEN（放过，
+  全交给 review）、合法侧一律 GREEN（无判据可误伤）。
+- **(c′)**：全列「推断」（方案尚未实现，按 §5 判据形状推理）。受保护节 body 逐字节冻结 +
+  副本一致只覆盖「受保护节字节跨度内」的编辑：E1–E4 都不改受保护节字节（只改块外上下文使
+  其不再活动）→ GREEN，且明确申报为「不承诺覆盖」（交 review）；G1–G4 都不落在受保护节字节
+  跨度内 → GREEN。
 
 **成本与判别力**：
 
-- **(a) 引入权威 parser**（如 `markdown-it-py`）：判别力对 E1/E2/E3 强，但需先选定方言与
-  版本并钉死，带来 `pyproject.toml` 依赖、CI 安装、离线约束三处影响面；且**对 E4 无效**
-  （去规范化句是自然语言层面的矛盾，parser 无法判定其是否废止了别处规则）。
-- **(b) 不引 parser，整份逐字节冻结**：判别力覆盖 E1–E4 全部（四条都是字节改变型）；
-  零第三方依赖；成本是「任何合法模板编辑都需同步更新冻结常量并过 review」——对一份
-  76 行治理骨架而言可接受。
-- **(c) 承认机械不可兑现 + 明文限制 + review**：零工程成本，但 E1–E4 **一条都拦不住**，
-  仅把责任推给 review；不符合「WP-28 两轮返工后要建立机械判据」的目标。
+- **(a)**：E1/E2/E3 强，但需选方言+版本并钉死，引入依赖与 CI/离线影响面，且**对 E4 无效**。
+- **(b)**：灵敏度 1（E1–E4 全拦），但特异性 0（G1–G4 全误伤）。拦的是「文件被改」这个开放
+  全集，不是「E1–E4 这四种攻击」这个有界目标。
+- **(c)**：零工程成本，但 E1–E4 一条都拦不住，只推给 review。
+- **(c′)**：特异性 1（G1–G4 全放行），对受保护节字节篡改有机械覆盖；对 E1–E4 这类
+  active-embedding 攻击**诚实申报不覆盖**，交 `git diff` + review。这与「不引 parser、不
+  整份冻结、承诺边界明文化」的目标一致。
 
 ## 5. 裁定
 
-**推荐 (b)：不引 parser，锁定完整 envelope —— 整份模板逐字节冻结。**
+**推荐 (c′)：不引 parser、不整份冻结、承诺边界明文化 + 受保护 envelope 逐字节冻结 +
+两份副本逐字节一致；`active_embedding` 明确不承诺，交 `git diff` + human review。**
 
-理由：
+判据形状（阶段 2 实现时落地，本阶段只裁定不实现）：
 
-1. 当前唯一机器消费者是逐字节复制（§1），不存在权威 parser/方言（§2），引 parser 无现实
-   挂载点。
-2. E1–E4 全是字节改变型攻击（§4 表），整份逐字节冻结用**一个机械判据**覆盖全部四条，
-   且**零第三方依赖**。
-3. 方案 (a) 除依赖与方言钉版成本外，仍**无法覆盖 E4**；方案 (c) 则一条都拦不住。
+1. `replica_identity`（INV-N3）：`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 与
+   `docs/agentic/templates/WORK_PACKAGE.md` 逐字节一致。
+2. `protected_body_identity`：两个受保护节的 body 与冻结常量逐字节相等。
+3. **明确不承诺 `active_embedding`**：判据不保证「任意渲染器下受保护节显示为活动文本」。
 
-**随 (b) 一并落地的「已知限制」措辞**（阶段 2 写判据时须注明，此处先给措辞）：
+覆盖率诚实申报（**承诺量词闭合**）：
 
-> 本判据仅保证模板全文逐字节与冻结版本一致；不证明任意 Markdown 渲染器将其显示为活动文本，
-> 也不保证消费者采纳或遵守其规范。
+- 受保护节 body 逐字节冻结**拦的是**「两个受保护节字节跨度内发生字节改变」这一个**闭合输入
+  维度**（该维度由冻结常量的精确字节序列界定：任何使该序列 != 常量的编辑都转红）。这是
+  「一个精确形状 + 一个闭合维度」的覆盖，**不是**「active-embedding 族」的覆盖。
+- 它**不拦** E1–E4 四条（这四条都不改变受保护节字节，而是改变块外上下文使受保护节不再活动）。
+  因此 E1–E4 明确申报为**不承诺覆盖**，交 `git diff` + human review（§3 已证这是当前唯一
+  防线，且威胁真实）。
+- G1–G4 四条全部 GREEN（都不落在受保护节字节跨度内，判据不转红）。这是 (c′) 与 (b) 的本质
+  区别：**(b) 特异性 0，把 G1–G4 也判红，故不可作为推荐**。
 
-即：判据防的是「模板被悄悄改坏」，不假装保证「渲染端一定显示为活动文本」。
+**已作废且不再作为依据**：编排者复核文档曾提「文首/末哨兵，专拦 E1/E2 这一族」，该推荐已被
+编排者自己撤回（`WP-29-review-stage1.md` §7），codex 绕过与编排者探针
+`probes/WP-29-sentinel-bypass-probe.py` 实测一致：哨兵只拦「在 sentinel **外侧**追加前后缀」
+这一个精确形状，不拦 E1/E2 族。**本裁定不采用哨兵**。
 
-（说明：本阶段只做裁定，不写判据、不引依赖。上述措辞供阶段 2 实现时使用。）
+**随 (c′) 一并落地的「已知限制」措辞**（阶段 2 写判据时须注明，此处先给措辞）：
 
-## 6. 自我核查（§6 selfcheck）
+> 本判据仅保证两份模板逐字节一致、且两个受保护节 body 与冻结版本一致；不证明任意 Markdown
+> 渲染器将受保护节显示为活动文本，也不保证消费者采纳或遵守其规范。
+
+即：判据防的是「受保护节被悄悄改坏 + 两份副本分叉」，不假装保证「渲染端一定显示为活动文本」。
+
+（说明：本阶段只做裁定，不写判据、不引依赖。上述判据形状与措辞供阶段 2 实现时使用。）
+
+## 6. rev1 → 本轮改了什么
+
+逐条对应 rev3 brief 的三件标的与编排者缺陷修正：
+
+- **C1（消费面证据）**：§1 从 rev1 的「`src/ tests/` + 手挑文件」升级为**仓库级
+  `grep -rn` + 显式 `--exclude-dir=.git,__pycache__,.pytest_cache` + A/B/C/D 四分类**。
+  - 新增 **D 类打包读取**（rev1 完全漏掉），给出 `pyproject.toml:24-29` artifacts 行与
+    `contract_render.load_template` 行号级结论：`read_text(encoding="utf-8")` **不解析 Markdown**。
+  - 「唯一」加限定词：改为「唯一的**非测试运行时**消费者」，不再出现无限定「唯一的仓内机器消费者」。
+- **C2（特异性与裁定）**：§4 表从「只有 E1–E4 攻击侧」升级为「E1–E4 + G1–G4 两侧」，每格填
+  RED/GREEN 且标注实测/推断。
+  - (b) 列 G1–G4 四个 RED 由本 WP 自己实测（脚本 `/tmp/wp29-optionb-measure.py`，完整 76 行
+    逐字节比较，每格 `assert 变异后 != 变异前` 守卫）。
+  - §5 裁定从 (b) 改为 **(c′)**，与 G1–G4 兼容（四条全 GREEN）。
+  - 承诺量词闭合：「拦住 X」改为「一个精确形状 + 一个闭合字节维度」，并明写 E1–E4 为不承诺覆盖。
+  - 不采用已撤回的哨兵推荐。
+- **措辞**：§0 / §5 不再出现「(b) 覆盖 E1–E4 全部」式表述，改为区分灵敏度与特异性：
+  (b) 灵敏度 1、特异性 0；(c′) 特异性 1、对 E1–E4 诚实申报不覆盖。
+- **基线**：rev1 DoD 沿用 brief 的 `4 failed / 619 passed / 4 skipped` 是 **WP-28 lane** 数字
+  （编排者 B48 抄错 lane）。本轮 DoD 用 **WP-29 lane 真实基线 `4 failed / 606 passed / 4 skipped`**
+  （编排者已在 rev3 brief 标的 3 第 1 条确认并修正）。
+
+## 7. 自我核查（selfcheck）
 
 以下命令均在 worktree `/Users/admin/vibe/wp29-render-scope-decision`、分支
-`feature/wp29-render-scope-decision`、HEAD `2e5f2c05ae805914d0b2b229cac97da2bb07b60d` 执行。
+`feature/wp29-render-scope-decision`、HEAD `bd4ac7a60de36c98b00b4b1fa6d0b4ce1bf0b267` 执行。
 
 ```bash
 git status --porcelain
-# -> （空，干净）
+# ->  M docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md
+#   （提交前：工作树只有本文件处于 modified，无其它改动）
 ```
 
 ```bash
 git diff --stat HEAD
-# -> 仅本文件：docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md
+# ->  docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md | 433 +++++++++++++++------
+# ->  1 file changed, 308 insertions(+), 125 deletions(-)
 ```
 
 ```bash
@@ -208,9 +417,6 @@ $ wc -c src/agentic_loop/templates/WORK_PACKAGE.md.tmpl docs/agentic/templates/W
     2889 .../WORK_PACKAGE.md.tmpl
     2889 .../WORK_PACKAGE.md
 
-$ shasum -a 256 <两份>
-429808219bc92fac3633ac4ee315bfbd8ac1a60555c0c1f2c9b02c1bcb3b25eb  (两份一致)
-
 $ cmp <两份> && echo IDENTICAL
 IDENTICAL
 ```
@@ -219,57 +425,34 @@ IDENTICAL
 
 ```text
 $ PYTHONPATH=src python3.11 -m pytest tests -q
-4 failed, 606 passed, 4 skipped in 116.55s
+4 failed, 606 passed, 4 skipped in 116.99s
 ```
 
-- 4 failed 全部在 `tests/test_finalize_merge_triple_sign.py`：
-  - `test_v3_triple_sign_pass_finalizes`
-  - `test_v3_qoder_override_approved_finalizes_record_preserved`
-  - `test_v3_missing_qoder_block_rejected`
-  - `test_v2_without_qoder_finalizes_double_sign`
-  - 失败原因均为 `subprocess.CalledProcessError: Command '['git', 'checkout', '-q', 'main']'`
-    返回非零（本机 `git init.defaultBranch=master` 与 fixture 冲突，**既有失败，不修**）。
-- 4 skipped：
-  - `test_finalize_merge_wrapper_sync.py:28`（standalone layout 无主仓副本）
-  - `test_validate_wp_status_qoder.py:548` ×3（`WP-01/02/03.status.json` 不在该路径）
+- 4 failed 全部在 `tests/test_finalize_merge_triple_sign.py`（本机
+  `git init.defaultBranch=master` 与 fixture 冲突，**既有失败，不修**）。
+- 4 skipped：`test_finalize_merge_wrapper_sync.py:28` ×1、`test_validate_wp_status_qoder.py:548` ×3。
 
-## [CONCERNS] 全量 passed 数与 brief 基线的差异（606 vs 619）
-
-WP-29 brief DoD 第 130–131 行写「相对基线零回归：`4 failed / 619 passed / 4 skipped`」，
-但本 worktree 在冻结 HEAD `2e5f2c0` 实测为 **`4 failed / 606 passed / 4 skipped`**
-（`--collect-only` 收集 **614** 个用例；`4+606+4 = 614`，无 collection error）。
-
-差异是 **13 个 passed**，而**失败集与跳过集与 brief 描述完全一致**（4 条失败全在
-`test_finalize_merge_triple_sign.py`，4 条跳过也一致），故**不是本 WP 引入的回归**
-（本阶段零代码改动，交付物是本文档这一个 md）。
-
-根因指向**计划历史中不同 WP 分支基线分叉**：
-
-- `WP-25.status.json` / `WP-27.status.json` 记录同一失败/跳过形态下的全量为
-  `4 failed / 606 passed / 4 skipped`。
-- `WP-26.status.json` / `WP-28.status.json` 记录为 `4 failed / 619 passed / 4 skipped`
-  （WP-26 自述 rev1 基线 `0a12bed` 为 `4/616/4`，rev2 为 `4/619/4`）。
-- 二者相差的 13 个用例来自不同 lane 各自的基线与新增（例如主仓当前**未提交**的
-  `tests/test_provider.py` +59/-1 即含 provider 组合开关的 2 条新用例，说明 619 侧包含
-  尚未并入本 worktree 基线的用例）。
-
-**结论**：`619 passed` 是 brief 从 WP-26/28 分支基线沿用的**过期基线数**，在冻结 HEAD
-`2e5f2c0` 不可复现；本 worktree 的**真实基线是 `4/606/4`**。本阶段不改代码，据此判定
-**零回归成立**，并以实测数记录在案。是否需要把 brief 的基线数更正为 `606`，交由编排者
-裁定（本 WP 禁止改 `docs/plans/` 下其余文件）。
+（上述为提交前实跑输出。`git status --porcelain` 显示本文件为 modified，属本轮唯一改动；
+提交后工作树将转为干净。）
 
 ## 附：与 DoD 的逐项对照
 
 - [x] `WP-29-scope-decision.md` 存在，5 项逐条作答，每项附可核验证据（§0–§5）
-- [x] 消费链一项附 `grep -rn` 原文命令与完整输出（§1）
-- [x] 渲染面一项区分「实测」与「推断」（§2）
-- [x] 威胁真实性一项附实际构造与 pytest 实测输出，且 `git status` 跑完干净（§3）
-- [x] 方案对比逐条对照 WP-28 停手复核 §4.1 三条 + §4.2 一条填表（§4）
-- [x] 末尾有明确裁定（(b)，§5）
-- [x] 零代码改动：`git diff --stat` 只含本 md 文件（§6）
-- [x] 未引入任何依赖（`pyproject.toml` / `uv.lock` 零 diff，§6）
-- [x] 未碰两份模板（逐字节一致，§6）
-- [x] 相对基线零回归：实测 `4 failed / 606 passed / 4 skipped`，差异见 [CONCERNS]（§6）
+- [x] 消费链一项附仓库级 `grep -rn` 原文命令 + 显式 `--exclude-dir` + 完整输出，A/B/C/D 四分类（§1）
+- [x] D 类给出 `pyproject.toml` artifacts 行 + `load_template` 行号级结论（不解析 Markdown）（§1）
+- [x] 「唯一」带限定词：唯一的**非测试运行时**消费者（§1）
+- [x] 渲染面一项区分「实测」与「推断」（§2，保留）
+- [x] 威胁真实性一项附实际构造与 pytest 实测输出，`git status` 跑完干净（§3，保留）
+- [x] 方案对比含攻击侧 E1–E4 + 合法编辑侧 G1–G4 两侧，每格 RED/GREEN 且标注实测/推断（§4）
+- [x] (b) 列 G1–G4 四 RED 由执行者自己实测（`/tmp/wp29-optionb-measure.py`），附输出（§4）
+- [x] 每个变异带 `assert 变异后 != 变异前` 守卫（§4 两个脚本均带）
+- [x] §0/§5 用灵敏度/特异性表述，不再出现「(b) 覆盖 E1–E4 全部」（§0/§5）
+- [x] 末尾有明确裁定（(c′)，§5），与 G1–G4 兼容，承诺量词闭合，不采用哨兵
+- [x] 文档含「rev1 → 本轮改了什么」一节，逐条对应 C1 / C2 / 措辞 / 基线（§6）
+- [x] 零代码改动：`git diff --stat` 只含本 md 文件（§7）
+- [x] 未引入任何依赖（`pyproject.toml` / `uv.lock` 零 diff，§7）
+- [x] 未碰两份模板（`git diff --exit-code` 证明，§7）
+- [x] 相对基线零回归：实测 `4 failed / 606 passed / 4 skipped`（§7）
 - [x] 无 forbidden_paths / 跨 owner 写入
 - [x] 无生产写入、无网络、无通知、无推送
 - [x] 无 merge、无 push、不切生产分支
