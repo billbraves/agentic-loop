@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "executor": {
     "tool": "kimi-cli",
     "session": "",
@@ -468,18 +468,18 @@
     },
     "review_rev4_first_signature": {
       "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
-      "sha256": "31ab8edb8396956235a1eb59715a4379c9dffe349b223d50933c19d143c13aae",
+      "sha256": "db1474a57ab5b65263ab24fe711d8348ccdc06df75a7f9c0e929ceeceee0412f",
       "reviewer": "claude-code (orchestrator, first signature)",
       "reviewed_commit": "f1eee7e",
       "base_commit": "e493c2a",
-      "decision": "ACCEPT",
+      "decision": "REWORK",
       "reviewed_at": "2026-09-19",
       "targets_verdict": {
-        "T0_literal_rerun": "PASS (5/5 blocks byte-identical, not merely equal line counts)",
-        "T1_declared_excludes": "PASS (exclusion set minimal: codex-json costs exactly 1 line)",
-        "T2_zero_elision": "ACCEPT_WITH_SUBSTITUTION (executor used declared --exclude instead of verbatim 9574-byte paste; equivalent on the criterion's intent, loss quantified at 1 line, that line named by line number in C class)",
+        "T0_literal_rerun": "PASS (5/5 blocks byte-identical, not merely equal line counts) [二签同向确认 38/46/17/6/4 全 IDENTICAL；B57 窄问题已闭合]",
+        "T1_declared_excludes": "PASS (exclusion set minimal: codex-json costs exactly 1 line) [二签补一必要条件：『过滤已声明』非充分条件，还须验证排除不改变答案；本例满足：219 → 去自指 97 → 去二签 96，二签文件只移除 1 行且已按行号归入 C 类]",
+        "T2_zero_elision": "REWORK (撤回 ACCEPT_WITH_SUBSTITUTION：执行者用 --exclude 替代冻结 brief :127/:255 明文要求的逐字粘贴，而 brief :132/:250/:354 三处逐字拒绝『结论不受影响』豁免。事实层面该行缺席不改变 C1 答案，错在权限层面：冻结输入执行期只读，替代手段须 re-freeze；执行者无权替换验收条件，第一签名无权事后追认)",
         "T3_wide_difference_17": "PASS (96 = 79 union + 17 difference; 15 C + 2 B reclassified)",
-        "T4_quantifier_honesty": "PASS (search surface named; cli.py uncovered surface declared and independently confirmed)",
+        "T4_quantifier_honesty": "REWORK (撤回 PASS：交付物 :222 的『_resources_files 是唯一别名』前提由 :226 的单 token 命令无法自证，排除不了其它别名 / pkgutil.get_data / pkg_resources / import_module / __import__；brief :169 明文要求搜索面须支撑量词否则降级。第一签名用复核者自己的 src/ 扫描替交付物补了证据 —— 复核者重跑只能否证交付物，不能替其补证。结论仍为真，证据面不足)",
         "PRESERVED_verbatim": "PASS (zero hunks in old lines 193..363 = sections 2,3,4,5 including the (c-prime) verdict)",
         "OUT_OF_SCOPE_spotcheck": "section 2's never-before-rerun negative claims independently verified: GitLab origin, no .github, no static-site-generator config, and the only CommonMark|GFM|GLFM hit in the whole repo is the deliverable itself. All four hold."
       },
@@ -535,28 +535,70 @@
       },
       "new_defects": {
         "B58": "reviewer-side: verify `type`/`command -v` before re-running a literal command; a shell function shim injected undeclared filters and produced a false red (mirror image of B57)",
-        "B59": "brief-side: criterion T2 specified a means (verbatim paste) rather than the goal (zero elision + declared-is-used) plus an acceptable-means set"
+        "B59": "brief-side: criterion T2 specified a means (verbatim paste) rather than the goal (zero elision + declared-is-used) plus an acceptable-means set",
+        "B60": "冻结 brief 的验收条件在复核阶段只能被满足或判不满足，不能被复核者重新解释为等效；判『等效替代』必须走 re-freeze 并重新计一次 re-freeze 次数。推论：复核者自己跑出的证据只能用来否证交付物，不能用来替交付物补证。",
+        "B61": "判据须携带执行面声明。仅核验 type grep 只能发现当前环境被污染，不能让另一环境复现相同语义。至少须固定 binary / locale / cwd / shell；要求逐行一致时还须显式 sort，否则 grep -r 的遍历顺序未定，只能承诺集合或行数相同。本次成功执行面：/usr/bin/grep (BSD grep 2.6.0-FreeBSD) + LC_ALL=C + cwd=被审 worktree + zsh（第三块依赖 <(...)）。与 B58（复核者须先验证自己的 binary）互补。",
+        "B59_scope_note": "B59（brief 判据过度指定手段）保留登记，但只作用于 rev5 及以后的 brief 写法，不追溯豁免 rev4 —— 判据写得不好不等于本轮可以不守。"
       },
       "NOT_granted_by_this_review": [
         "(c-prime) 裁定本身的批准 —— 仍属用户",
         "合入批准 —— 仍属用户",
         "阶段 2 的冻结 —— 依赖 (c-prime) 获批"
       ],
-      "next_step": "dispatch codex for the second signature"
+      "next_step": "dispatch codex for the second signature",
+      "decision_history": [
+        {
+          "decision": "ACCEPT",
+          "at": "2026-09-19",
+          "withdrawn": true,
+          "withdrawn_why": "codex 第二签名返 REWORK，两个阻断项均独立复核成立；撤回记录见 review-rev4.md §9"
+        }
+      ],
+      "withdrawal": {
+        "withdrawn_at": "2026-09-19",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md §9",
+        "meta_defect": "B60",
+        "two_blocking_items": {
+          "Q2_T2": "编排者给了自己冻结的 brief 明文拒绝的豁免（权限形态的 B57）",
+          "Q4_T4": "复核者用自己的重跑替交付物补足缺失的证据面"
+        }
+      }
+    },
+    "consult_rev4": {
+      "consultant": "codex",
+      "provider": "kirogpt",
+      "model": "gpt-5.6-sol",
+      "dispatched_at": "2026-09-19",
+      "at_commit": "f1eee7e",
+      "sandbox": "read-only",
+      "exit_code": 0,
+      "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4.md",
+      "request_sha256": "a476c4434a663c660353184dafcdb9d6275c1d4f0c70a8ef85dd6f8aa51f354f",
+      "verdict_document": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4-verdict.md",
+      "verdict_sha256": "1551922fd69d7b5b5ba0350cdd0b9db8734965dedcb582a18bcb2fcf8a6c9c61",
+      "decision": "REWORK",
+      "blocking": {
+        "Q2": "标的 2：替代方案语义等效，但执行者无权用它替换冻结验收条件，第一签名无权追认（引 brief :127/:131/:253）",
+        "Q4": "标的 4：_resources_files 单 token 搜索不足以支撑现有量词，同族入口穷举命令未进交付物（引 brief :166）"
+      },
+      "non_blocking": {
+        "Q1": "标的 0 闭合 B57 窄问题（5/5 IDENTICAL），但须另验排除项不改变答案；本例满足",
+        "Q3": "B58 有残留，判据须携带执行面声明（binary/locale/cwd/shell + 排序）→ 登记 B61"
+      },
+      "codex_did_not": "未评判或改动 §5 的 (c′) 裁定；工作区保持只读",
+      "orchestrator_cross_check": "两个阻断项均由编排者独立核对原文复现成立：brief :127/:132/:250/:255/:354 五处逐字确认；交付物 :222-223 的『唯一别名』前提与 :226 的单 token 命令确实不自洽。故编排者撤回第一签名 ACCEPT，本 WP 判 REWORK。"
     }
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-19",
-    "rev": 3,
-    "at_commit": "e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23",
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1-rev3.md",
+    "rev": 4,
+    "at_commit": "f1eee7e",
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
     "blockers": [
-      "C1-R3（codex 提出、编排者实测复现）：两条主 grep 的声明过滤器与实际产生粘贴输出的过滤器不一致（缺 --exclude=WP-29-scope-decision.md 的声明）；rev4 须做到声明即所用并粘贴逐字输出",
-      "M1 升为阻断：WP-28-consult-codex-shape-verdict.json:6 长行的 …… 省略须取消，逐字粘贴",
-      "M2 升为阻断：宽口径 WORK_PACKAGE 搜索须完整粘贴 17 行，并把两个拼接路径测试命中（tests/test_init_contract.py:62、tests/test_wp_template_dispatch_lint.py:24）改归 B 类",
-      "补 grep -rn 'load_template' src/ tests/ 与资源读取入口搜索的原始输出（交付物有断言无输出；实测该命令 6 行命中）"
+      "标的 2（T2）：交付物用 --exclude 替代冻结 brief :127/:255 要求的逐字完整粘贴 WP-28-consult-codex-shape-verdict.json:6 长行；brief :132/:250/:354 三处逐字拒绝『结论不受影响』豁免。事实无误，权限越界：替代手段须 re-freeze。",
+      "标的 4（T4）：交付物 :222 的『_resources_files 是唯一别名』前提由 :226 的单 token 命令无法自证；brief :169 要求搜索面支撑量词否则降级。二选一：收窄结论形状，或把同族 API/动态导入形态的完整搜索粘进交付物并说明语法边界。"
     ],
     "minor": [
       "M1 两条主 grep 中 WP-28-consult-codex-shape-verdict.json:6 的 codex 长文单行被显式标注省略；省略已声明且与消费面无关，不构成 C1 复发，但严格讲非『完整输出』",
@@ -578,21 +620,22 @@
     "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
     "document_sha256": "7a3a139ed206f1ec75fbe2dfd02a1ed2aa1febd2ac12854f646791291a1ff76a",
     "reviewed_commit": "f1eee7e",
-    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md"
+    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
+    "withdrawn_first_signature": "ACCEPT → REWORK，撤回记录见 docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md §9"
   },
   "consult": {
-    "decision": null,
+    "decision": "REWORK",
     "consultant": "codex",
     "provider": "kirogpt",
     "model": "gpt-5.6-sol",
     "consulted_at": "2026-09-19",
-    "rev": 3,
-    "at_commit": "e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23",
-    "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-rev3-request.md",
-    "request_sha256": "3718e2b4b9733f1b2718a00ea2a95e3ccbf070190ce5a421ffbf7ee978eb4260",
-    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-codex-stage1-rev3-verdict.md",
-    "verdict_sha256": "9e5e8936fd22db2289d6b49e473bc1351e8b687909a7df0e25bc16cfac0e0207",
-    "note": "codex 第二签名待派发（rev4）",
+    "rev": 4,
+    "at_commit": "f1eee7e",
+    "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4.md",
+    "request_sha256": "a476c4434a663c660353184dafcdb9d6275c1d4f0c70a8ef85dd6f8aa51f354f",
+    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4-verdict.md",
+    "verdict_sha256": "1551922fd69d7b5b5ba0350cdd0b9db8734965dedcb582a18bcb2fcf8a6c9c61",
+    "note": "rev4 第二签名已到位：REWORK，两个阻断项（详见 evidence.consult_rev4）",
     "blocking_items": {
       "C1-R3": "消费链证据仍不满足『仓库级完整原始输出』：(1) 两条命令搜索范围是 . 却未排除当前交付物，粘贴结果无任何自命中，故不是该命令对最终被审树的完整输出；(2) 长行被 …… 替换，不是『原始命中行，不得摘要』；(3) 宽口径只粘 5 个新增命中并称归 C 类，但遗漏中含两个 B 类测试读取点，拼接路径精确 grep 本就发现不了，故不完整 + 误分类会实质削弱『没有其它通用消费者』的结论；另称 load_template 只有指定调用点但未附原始输出。"
     },
@@ -620,6 +663,8 @@
     "dispatched_at_rev3": "2026-09-19T09:20:00+08:00",
     "implementing_at_rev3": "2026-09-19T09:21:00+08:00",
     "reviewed_rev3_at": "2026-09-19T11:54:13+08:00",
-    "consulted_rev3_at": "2026-09-19T12:09:39+08:00"
+    "consulted_rev3_at": "2026-09-19T12:09:39+08:00",
+    "review_rev4_withdrawn_at": "2026-09-19",
+    "consult_rev4_at": "2026-09-19"
   }
 }
