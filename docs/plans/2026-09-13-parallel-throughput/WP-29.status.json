@@ -417,14 +417,15 @@
       "refreeze_seq": 3,
       "refreeze_stop_rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 触发强制停手复核。rev4 = 第 4 次冻结 = 第 3 次 re-freeze，规则本次触发。编排者已出停手复核 WP-29-plan-review-before-rev4.md（sha256 a54b45fd0cdf6025ce3f486db62701b10b084a976d9574a47cfcef7ce4c73d44, commit 0369d77），用户从其 §六 三个方向中选定「方向 1」（rev4 只修 §1 取证），该选定即本次 re-freeze 的用户批准。范围不得超出方向 1。",
       "user_approval": {
-        "granted": true,
+        "granted": "UNVERIFIED",
         "form": "用户回复「方向1」，选定 WP-29-plan-review-before-rev4.md §六 的方向 1",
         "scope_granted": "仅 WP-29-scope-decision.md 的 §1 取证呈现（停手复核 §三 的四条）+ §0 中与 §1 有关的措辞 + 文末追加「rev3 → rev4 改了什么」小节",
         "scope_NOT_granted": [
           "(c′) 裁定本身的批准（阶段 2 范围由它决定）",
           "阶段 2 的冻结",
           "合入批准"
-        ]
+        ],
+        "verification": "查无实据：本会话中没有任何用户消息包含「方向1」的选定。该记录由编排者写入，可能对应压缩前的真实用户消息（停手复核 commit 0369d77 确实存在），但按约束不得以编排者自己的陈述充当用户批准。证明力降为「编排者主张，未核实」，须由用户补确认。rev4 的技术复核结论（第一签名 ACCEPT）不依赖本字段；受影响的是「本次 re-freeze 是否获批」这一程序事实。"
       },
       "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev3.md",
       "section_gate": "dispatch_lint.sh 的段落门禁因 B47（按固定命名 WP-29-brief.md 读 brief，忽略 evidence.brief.path）不会作用于 revN 文件；编排者把该门禁的 Python 段落检查器（dispatch_lint.sh:68-99）抽出单独对 rev4 跑，结果 PASS：Acceptance tests 22 行 / Allowed and forbidden paths 9 行 / Completion definition 39 行，均非空。",
