@@ -51,7 +51,7 @@ $ /usr/bin/grep -rn 'WORK_PACKAGE\.md\.tmpl' . | head -1
 |----|---------|------|---------|---------|---------|
 | 1 | `:39-41` / 粘贴 `:42-79` | 主 grep `WORK_PACKAGE\.md\.tmpl` | 38 | 38 | **IDENTICAL** |
 | 2 | `:83-85` / 粘贴 `:86-131` | 主 grep `docs/agentic/templates/WORK_PACKAGE\.md` | 46 | 46 | **IDENTICAL** |
-| 3 | `:142-148` / 粘贴 `:149-165` | `comm -23` 宽口径差集 | 17 | 17 | **IDENTICAL** |
+| 3 | `:142-148` / 粘贴 `:150-166` | `comm -23` 宽口径差集 | 17 | 17 | **IDENTICAL** |
 | 4 | `:180` / 粘贴 `:181-186` | `load_template` 调用点 | 6 | 6 | **IDENTICAL** |
 | 5 | `:226` / 粘贴 `:227-230` | `_resources_files` 资源入口 | 4 | 4 | **IDENTICAL** |
 
@@ -79,7 +79,7 @@ $ /usr/bin/grep -rn 'WORK_PACKAGE\.md\.tmpl' . | head -1
 1. **排除集是最小的**。`WP-28-consult-codex-shape-verdict.json` 全文只有 **1 行**含
    `WORK_PACKAGE`（`:6` 的 `raw_verbatim`，单行 9574 字节，为本仓最长行）。即该排除项
    代价恰为 1 行，不是一个可藏东西的宽口径过滤。
-2. **理由写在文中且可核**：交付物 `:133-135` 给出排除理由，并在 C 类 `:213-215` 把被排除的
+2. **理由写在文中且可核**：交付物 `:134-136` 给出排除理由，并在 C 类 `:214-215` 把被排除的
    `WP-28-consult-codex-shape-verdict.json:6` **按行号点名并归类**，未让它从证据面消失。
 
 **标的 1：PASS。**
@@ -110,7 +110,7 @@ brief 原文要求：两处「都改为**逐字完整粘贴该 grep 输出行**�
 - 宽口径算术自洽且实测吻合：宽口径 96 行、两条主 grep 并集 79 行（38 + 46 − 5 重叠）、
   差集 17 行。四个数我独立实测全部一致（`comm -12` 实测重叠 = 5）。
 - 17 行的归类闭合：**15 行 C 类**（非 `docs/plans/` 5 行 + `docs/plans/` 10 行，交付物
-  `:207-212` 逐个点名）+ **2 行 B 类**（`test_init_contract.py:62`、
+  `:207-213` 逐个点名）+ **2 行 B 类**（`test_init_contract.py:62`、
   `test_wp_template_dispatch_lint.py:24`）= 17。两处 B 类重分类正确：这两行是测试读取模板
   做断言，属「测试验证」而非「人/agent 阅读」。
 - 差集由 `comm -23` 字面求得，非手挑，且该命令本身通过标的 0（块 3）。
@@ -130,9 +130,9 @@ brief 原文要求：两处「都改为**逐字完整粘贴该 grep 输出行**�
 | `contract_render.py:255` `read_text(encoding="utf-8")`，不解析 Markdown | ✅ |
 | `pyproject.toml:24-29` artifacts 含 `src/agentic_loop/templates/*.tmpl` | ✅ |
 
-**量词已收敛（本轮关键改进）**：交付物 `:236-238` 写的是「故『读取 package data 的入口只有
+**量词已收敛（本轮关键改进）**：交付物 `:234-235` 写的是「故『读取 package data 的入口只有
 `load_template` 一处』在 **`src/` 运行时源码这一搜索面内**成立」——点名了所覆盖的输入维度，
-而非裸的全称断言。并在 `:260-262` **主动申报未覆盖面**：`cli.py:25` 也 import
+而非裸的全称断言。并在 `:249-251` **主动申报未覆盖面**：`cli.py:25` 也 import
 `importlib.resources`（别名 `_resources`），但只用 `.path()` 定位打包 wrapper
 （`:119` / `:222`），不读模板 package data。我独立扫 `src/` 全部
 `importlib.resources` 使用点，结果与申报一致，无第四处。
@@ -155,6 +155,22 @@ brief 原文要求：两处「都改为**逐字完整粘贴该 grep 输出行**�
 **旧行 193..363 区间零 hunk** ⇒ §2 / §3 / §4 / §5（含 (c′) 裁定）**逐字未动**。
 §6 只新增 `6.2` 子节并把标题从「rev1 → 本轮」改为「rev1 → rev4」，§7 与 DoD 附录的改动
 均为本轮 §1 证据的同步记账。范围与 brief 的 方向 1 一致，**无越界**。
+
+## 6b. 标的 0 范围外的抽查（超出 brief 要求，主动做的）
+
+标的 0 只约束 §1。但 §2 在 `:271` 另有一个 `$ git remote -v` 块，且 §2 的三条否定性断言
+（无 `.github`、无静态站点生成器配置、全仓无权威方言声明）本轮虽逐字未动，却从未被任何
+一轮判据重跑过——正是「增量复核漏掉前几轮」那一类逃逸。故独立实测：
+
+| §2 断言 | 实测 |
+|---------|------|
+| origin 是 GitLab | ✅ `git@github.com:billbraves/agentic-loop.git`（fetch/push 同一） |
+| 无 `.github` 目录 | ✅ 不存在 |
+| 无 `mkdocs.yml` / `docusaurus` / `sphinx` / `_config.yml` 等 | ✅ 逐个探测均不存在 |
+| 全仓无权威 Markdown 方言声明 | ✅ `CommonMark\|GFM\|GLFM` 全仓唯一命中就是本交付物自身 |
+
+四条全部成立。§2「不存在权威单一渲染器」这一支撑 (c′) 不走 parser 路线的事实**可复现**。
+（注：本节是对 §2 的事实核验，**不**是对 (c′) 裁定是否该被采纳的判断——后者属用户。）
 
 ## 7. 门禁与基线
 
