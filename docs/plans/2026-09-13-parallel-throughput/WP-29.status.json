@@ -1038,7 +1038,8 @@
       "still_NOT_granted": [
         "WP-29 的合入与推送（rev7 通过双签名后仍须单独批准）",
         "阶段 2 brief 的冻结"
-      ]
+      ],
+      "transcript_verification": "2026-09-20 复核：在会话 transcript 53c58ab0…jsonl 中定位到该用户轮 (ts 2026-09-20T05:42:57.872Z，userType=external，isMeta 未置，isSidechain=false，无 toolUseResult，content 为字符串 'A')，其紧前一条编排者消息正文即停手复核的「需要你决定」两路提问（路 A 冻 rev7 单句返工 / 路 B 不再冻版）。批准记录属实，非编排者自述。记此条是因为上一次上下文压缩的摘要把它误标为「查无实据」；核过 transcript 后该疑点解除。"
     },
     "brief_rev7": {
       "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev7.md",
