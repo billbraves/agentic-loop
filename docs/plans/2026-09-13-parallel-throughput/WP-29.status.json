@@ -708,10 +708,19 @@
       "background_task_id": "bih2hkj9g",
       "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/bih2hkj9g.output",
       "env_isolation": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY（kimi 侧两个都剥：B51 的 BASE_URL 覆盖 + 见记忆 kimi-and-codex-need-different-env-stripping，env 里的 OPENAI_API_KEY 字面是 'dummy'，kimi 必须剥掉。codex 侧相反，只剥 BASE_URL）",
-      "session_id": "PENDING（kimi --afk 的 session id 在日志中，完成后回填）"
+      "session_id": "6ce69a63-551b-4c61-821d-e45d0e1c5992",
+      "executor_report": {
+        "status": "DONE",
+        "commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+        "message": "WP-29 scope decision rev5: restore verbatim verdict paste and fix literal count to 2",
+        "target_b_choice": "(a) 收窄结论形状",
+        "target_c_sort_stance": "两条主 grep 只承诺行数/集合，不承诺顺序；差集两侧显式 sort",
+        "line_counts_self_measured": "主 grep 39 / 47，宽口径 97，差集 17",
+        "concerns": "无对判据的异议；自述把 prose/自检里的精确串改写为不含 :6 的表述以满足 grep -c = 2，并把自检命令改为 awk 字节长核验以免自我抬高计数"
+      }
     },
     "consult_rev5": {
-      "state": "DRAFTED_PENDING_DELIVERABLE",
+      "state": "DELIVERED",
       "consultant": "codex",
       "provider": "kirogpt",
       "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5.md",
@@ -729,43 +738,53 @@
         "Q3 标的 C 执行面声明是否足以机械化 + 排序表态自洽",
         "Q4 §2/§3/§4/§5 逐字未动（自行 diff）",
         "Q5 元问题：编排者本轮是否又犯 B60"
-      ]
+      ],
+      "request_sha256": "2f91b24dd6910672392c72c2b354222fdefadce5040bda3c3fc3269496eb9aab",
+      "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+      "deliverable_sha256": "1ac5a413fdf1d74ff7078536a379e8fb8325176caf832be1e4c4a9e2551da6b1",
+      "model": "gpt-5.6-sol",
+      "sandbox": "read-only",
+      "exit_code": 0,
+      "harness": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp29-stage1-rev5/run.py（CodexAdapter._build_prompt + codex exec --output-schema，cwd=被审 worktree，累计 diff 2e5f2c0..e2c483d 避免 incremental-review-misses-prior-rounds）",
+      "verdict_document": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md",
+      "verdict_sha256": "5c2ea9197e9c10e8aa93509997b6c28c951473789fffbbd8a0978ab011db2c55",
+      "decision": "REWORK",
+      "blocking": {
+        "C1": "§7 :517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d",
+        "C2": "DoD 对照（codex 标 :588，实为 :590）仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行命令（只排除本交付物）及标的 A 相反"
+      },
+      "passed_independently": "标的 A（39/47 行 + 差集同步 + 两处长行 sha256 一致）、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2/§3/§4/§5 逐节字节一致、未发现「等效替代」追认冻结判据",
+      "answered_Q5": "codex 明确答：未发现用「等效替代」追认冻结判据的情况（即本轮编排者未犯 B60）"
+    },
+    "review_rev5": {
+      "reviewer": "claude-code（编排者，第一签名）",
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+      "sha256": "edb347c14a2e0a38bc4c62f1c048cf4fdb053e6d64efec724d59e6a6bd7e83b5",
+      "decision": "REWORK",
+      "parallelism": "与 codex 二签并行派发；派发时 codex 未收到本报告任何结论，本报告在 codex 结论到达后未作修改以求一致。两份独立形成，同判 REWORK、阻断项相同。",
+      "self_constraint_b60": "本报告每条 PASS 均为「交付物自贴命令 + 自贴输出」按字面重跑一致；编排者自测数值只用于核对交付物已声明的数，不替代交付物缺失的证据。",
+      "blocking": {
+        "R1": "= codex C1（:517 提交哈希/标注不符）",
+        "R2": "= codex C2（:590 排除项括注与现行命令矛盾）；codex 行号偏 2 行，指认文本无误"
+      },
+      "non_blocking": [
+        "§6.2 历史记录节仍写排除两项 —— 描述 rev4 当时状态，不改是正确的",
+        "§6 标题仍为「rev1 → rev4 改了什么」，brief 未要求改，下一 rev 可顺手改"
+      ],
+      "targets_met": "标的 A / B / C 三条实质要求全部达成，含 brief 标注「最容易漏」的差集过滤器同步项"
+    },
+    "refreeze_count": {
+      "frozen_revs": 5,
+      "next_would_be": 6,
+      "rule": "WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后的 re-freeze 须停手复核计划，且须用户批准",
+      "status": "rev6 冻结前须再次停手复核；编排者的第一签名不得充当该批准"
     }
   },
   "review": {
-    "decision": "N/A",
-    "reviewer": "claude-code",
-    "reviewed_at": "2026-09-19",
-    "rev": 4,
-    "at_commit": "f1eee7e",
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
-    "blockers": [
-      "标的 2（T2）：交付物用 --exclude 替代冻结 brief :127/:255 要求的逐字完整粘贴 WP-28-consult-codex-shape-verdict.json:6 长行；brief :132/:250/:354 三处逐字拒绝『结论不受影响』豁免。事实无误，权限越界：替代手段须 re-freeze。",
-      "标的 4（T4）：交付物 :222 的『_resources_files 是唯一别名』前提由 :226 的单 token 命令无法自证；brief :169 要求搜索面支撑量词否则降级。二选一：收窄结论形状，或把同族 API/动态导入形态的完整搜索粘进交付物并说明语法边界。"
-    ],
-    "minor": [
-      "M1 两条主 grep 中 WP-28-consult-codex-shape-verdict.json:6 的 codex 长文单行被显式标注省略；省略已声明且与消费面无关，不构成 C1 复发，但严格讲非『完整输出』",
-      "M2 『宽口径补充命中』块只粘 5 行（实际新增 17 行）且块头写『均归 C 类』；未粘的 12 行中 2 行实为 B 类（test_init_contract.py:62、test_wp_template_dispatch_lint.py:24，路径由片段拼接故不匹配主 grep 字面串），其余 10 行为 docs/plans 历史治理文档（确属 C 类）。两行在 §1 B 类中已正确列出，实质结论不受影响",
-      "M3 §1 A 类可加强：contract_render.py:243 的 load_template 调用在 render_template 内，而 CONTRACT_FILES 只含 AGENTS/CLAUDE/OPERATING_MODEL 三份，不含 WORK_PACKAGE.md.tmpl——唯一做占位符替换的路径也碰不到判定对象。只加强结论，不返工"
-    ],
-    "verdict_note": "C1/C2 两个阻断项闭合。复核者独立复现：(1) §1 两条主 grep 的原始命中行 39/39 与 47/47 逐行一致；D 类零命中声明正确，pyproject.toml:18-30 + contract_render.py:250-255 行号级结论成立（read_text 不解析 Markdown）；(2) (b) 列 8/8 RED 用执行者脚本原地重跑逐格一致，脚本对模板只读、带空操作守卫；(3) WP-28 rev1 行 8/8 GREEN 复现一致，rev6 行诚实标注未实测（B55 纪律）；(4) (c′) 的 protected_body_identity + replica_identity 由复核者独立实测，E1-E4/G1-G4 八条全 GREEN，裁定不把任何 G 判红；(5) §2/§3 按段落字节比较 identical=True（847/1328 字节）；(6) 基线 4 failed/606 passed/4 skipped 复现一致，改动面只含一个 md，模板与依赖零 diff。三条次要项不影响论断。阶段 2 仍未冻结，须用户批准本裁定后方可冻结；本 ACCEPT 不构成合入批准。",
-    "orchestrator_own_measurement": {
-      "cprime_isolated": "直接从主仓 HEAD 的 FROZEN_BODY 常量取判据、纯内存施加八条变异：baseline GREEN，E1-E4/G1-G4 全 GREEN；脚本不写文件，复核前后主仓 src/tests/templates 无改动",
-      "wrong_layer_note": "首次尝试在 /tmp 副本上跑 rev6 完整测试文件得到 G1/G3/G4 RED，追查为错误层：test_invn_t7_replica_mismatch_red:886 会自行再变异并断言 mutated != packaged，test_invn_harmless_placeholder_edit_green:896 断言原始占位符在场，预先变异触发的是这两个用例自身的夹具前置条件，不是 (c′) 判据（记忆 mutation-red-may-come-from-wrong-layer 实弹命中）",
-      "anchor_uniqueness": "八条变异的锚点在模板内 grep -cF 均为 1，不存在『找不到锚点⇒恒等映射』的假绿隐患"
-    },
-    "withdrawn_accept": {
-      "was": "ACCEPT",
-      "withdrawn_at": "2026-09-19",
-      "why": "codex 第二签名指出一条编排者漏掉、可直接验证的事实：交付物 §1 声明的两条主 grep 只带 --exclude-dir，但交付物自身含搜索串 49/57 处；按声明命令原文重跑得 88/104 行，粘贴的 39/47 行须再加一个未声明的 --exclude=WP-29-scope-decision.md 才能得到。即『完整输出』再次带未声明过滤器，正是 C1 缺陷类别。编排者上一轮逐行比对时自己也加了同一过滤器，故查不出（记为 B57）。连带把 M1/M2 由非阻断升为阻断：本阶段交付标的就是可复现完整的消费面证据本身，不能用『结论不变』豁免。",
-      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1-rev3.md §7"
-    },
-    "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
-    "document_sha256": "7a3a139ed206f1ec75fbe2dfd02a1ed2aa1febd2ac12854f646791291a1ff76a",
-    "reviewed_commit": "f1eee7e",
-    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
-    "withdrawn_first_signature": "ACCEPT → REWORK，撤回记录见 docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md §9",
-    "note": "rev4 复核已闭（REWORK，见 evidence.review_rev4_first_signature）；rev5 复核未开始"
+    "decision": "REWORK",
+    "independence": "strong（并行双签名，consultant 未见第一签名）",
+    "first_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+    "second_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md"
   },
   "consult": {
     "decision": null,

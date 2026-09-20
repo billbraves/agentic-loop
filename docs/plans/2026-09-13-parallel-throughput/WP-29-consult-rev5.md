@@ -22,8 +22,8 @@
 
 - 交付物：`docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md`
 - worktree：`/Users/admin/vibe/wp29-render-scope-decision`，分支 `feature/wp29-render-scope-decision`
-- rev5 提交：`__COMMIT__`（基线 `f1eee7e`，纯文档）
-- 交付物 sha256：`__DELIVERABLE_SHA__`
+- rev5 提交：`e2c483d26ef9999ac77aaaa22db59b2e0db5abe4`（基线 `f1eee7e`，纯文档）
+- 交付物 sha256：`1ac5a413fdf1d74ff7078536a379e8fb8325176caf832be1e4c4a9e2551da6b1`
 
 ## rev5 的三条标的（brief 原文为准，此处仅提炼）
 
@@ -53,7 +53,7 @@ rev4 交付物 `:222-223` 声称「`_resources_files` 是 `importlib.resources.f
 ## 逐字保护区（改动即 REWORK）
 
 交付物 §2/§3/§4/§5 须**逐字未动**。§5 的 (c′) 裁定已于 2026-09-20 获用户批准，
-改动它等于改已批准文本。请用 `git diff -U0 f1eee7e..__COMMIT__` 自行核验 hunk 落点，
+改动它等于改已批准文本。请用 `git diff -U0 f1eee7e..e2c483d26ef9999ac77aaaa22db59b2e0db5abe4` 自行核验 hunk 落点，
 不要采信我的说法。
 
 ## 请你独立裁定的问题
