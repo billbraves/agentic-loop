@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "executor": {
     "tool": "kimi-cli",
     "session": "6d12a60f-9777-4c23-9ab2-c5b0539a98d6",
@@ -115,7 +115,8 @@
     "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "branch": "feature/wp29-render-scope-decision",
     "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
-    "commit": "e6b733047c9b325c17f5cb8824cfbdb81f6f85b0"
+    "commit": "e6b733047c9b325c17f5cb8824cfbdb81f6f85b0",
+    "merged_commit": "67791df3dce1e0183f419dc2a954b496b00d5269"
   },
   "scope": {
     "allowed_paths": [
@@ -1214,6 +1215,16 @@
         "git push（推送仍是独立的 always_stop 动作，本次未批准）",
         "阶段 2 brief 的冻结与派发"
       ]
+    },
+    "merge_rev7": {
+      "merged_commit": "67791df3dce1e0183f419dc2a954b496b00d5269",
+      "merged_branch": "feature/wp29-render-scope-decision",
+      "merged_tip": "e6b733047c9b325c17f5cb8824cfbdb81f6f85b0",
+      "into": "plan/2026-09-13-parallel-throughput",
+      "gate": "merge.sh → MERGE_OK；finalize_merge.sh → FINALIZE_OK",
+      "byte_identity": "合入后主区 WP-29-scope-decision.md sha256 b56b074c50dc3e58125c12bcbfa4f74bd09e09cc05e89c0c44fe7446f77eb71e，与被审提交 e6b7330 的同文件逐字节相同；625 行，long_lines=2（9659×2）",
+      "amend_note": "merge 提交曾被 --amend 改写提交信息（8d5227e092d7f1592909d8471fe481eb8d07585f → 67791df3dce1e0183f419dc2a954b496b00d5269），两个 parent 未变（c0a179e + e6b7330）。finalize 写入的是 amend 前的哈希，此处已更正。",
+      "pushed": false
     }
   },
   "review": {
@@ -1293,6 +1304,7 @@
     "consult_rev7_voided_at": "2026-09-20",
     "consulted_rev7_at": "2026-09-20",
     "ready_for_review_rev7_at": "2026-09-20",
-    "approved_for_merge_at": "2026-09-20"
+    "approved_for_merge_at": "2026-09-20",
+    "merged_at": "2026-09-20"
   }
 }
