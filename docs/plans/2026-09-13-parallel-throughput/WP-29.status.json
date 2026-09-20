@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "READY_FOR_REVIEW",
+  "state": "APPROVED_FOR_MERGE",
   "executor": {
     "tool": "kimi-cli",
     "session": "6d12a60f-9777-4c23-9ab2-c5b0539a98d6",
@@ -1201,6 +1201,19 @@
         "Q5：未发生 B60——标的写入的是 rev5 签名后的下一轮冻结并经用户批准"
       ],
       "convergence": "与第一签名**独立同判 REWORK**，且阻断项指向同一处（:517）。codex 另把穷举义务不足单列为阻断，我列为判据 3 FAIL 但不单独阻断——差异在归类，不在事实。"
+    },
+    "user_approval_merge_rev7": {
+      "at": "2026-09-20",
+      "verbatim_user_message": "合入WP-29；同任务 #38（B47）和 #50（B63）都是派发器读错/漏附材料的同族缺陷，可以合并成一个 WP；操作完成后将后续待执行任务全部列出来，我同意转角给另外一个session来执行",
+      "granted": {
+        "local_merge_no_ff": true,
+        "what": "WP-29 阶段 1 rev7（e6b7330）本地 --no-ff 合入 plan/2026-09-13-parallel-throughput",
+        "preconditions_met": "双签名齐：第一签名 ACCEPT（WP-29-review-rev7.md）+ codex 第二签名 ACCEPT（WP-29-consult-rev7-codex.md），提交 0483f5a"
+      },
+      "still_NOT_granted": [
+        "git push（推送仍是独立的 always_stop 动作，本次未批准）",
+        "阶段 2 brief 的冻结与派发"
+      ]
     }
   },
   "review": {
@@ -1279,6 +1292,7 @@
     "reviewed_rev7_at": "2026-09-20",
     "consult_rev7_voided_at": "2026-09-20",
     "consulted_rev7_at": "2026-09-20",
-    "ready_for_review_rev7_at": "2026-09-20"
+    "ready_for_review_rev7_at": "2026-09-20",
+    "approved_for_merge_at": "2026-09-20"
   }
 }
