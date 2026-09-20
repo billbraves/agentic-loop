@@ -1,13 +1,12 @@
-# WP-29 阶段 1：模板受保护块的「活动渲染」判据 —— 范围界定与可行性裁定（rev4 修订版）
+# WP-29 阶段 1：模板受保护块的「活动渲染」判据 —— 范围界定与可行性裁定（rev5 修订版）
 
-> 冻结日期 2026-09-19 | 执行者 kimi（provider: deepseek）| 本文件是阶段 1 唯一交付物。
+> 冻结日期 2026-09-20 | 执行者 kimi（provider: deepseek）| 本文件是阶段 1 唯一交付物。
 > 判定对象：`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 与
 > `docs/agentic/templates/WORK_PACKAGE.md`（下称「两份模板」或「模板」）。
 > 阶段 2 不冻结，须在阶段 1 裁定获批准后另行冻结。
 > 本文件是 rev1（commit `bd4ac7a`）的**原地修订**：rev3（commit `e493c2a`）重做 §1 / §4 / §5 /
-> §0（§2 / §3 已 ACCEPT 保留）；rev4（本轮，在 `e493c2a` 之上）补全 §1 消费面证据——三条主 grep
-> 显式排除本交付物与 codex 二签记录、补齐 `load_template` / `_resources_files` 调用点原文、
-> 宽口径差集补到完整 17 行、移除全部 U+2026 省略符，保证每个粘贴块可字面重跑。
+> §0（§2 / §3 已 ACCEPT 保留）；rev4（在 `e493c2a` 之上）补全 §1 消费面证据；rev5（本轮，在
+> `f1eee7e` 之上）恢复 codex 二签 JSON 长行的逐字完整粘贴、收窄「唯一别名」前提、固定执行面。
 
 ## 0. 裁定摘要（TL;DR）
 
@@ -32,12 +31,27 @@ human review。**
 **问题**：两份模板除 `init_cmd.py:109` 外还被谁读取？人算不算消费者？agent 算不算？打包读取
 路径是否解析 Markdown？
 
+**执行面声明**（本 §1 所有 `$ <命令>` 块均按以下执行面字面重跑，命令文本本身即含可复现要素）：
+
+- binary：`/usr/bin/grep`（BSD grep 2.6.0-FreeBSD）。本机交互 shell 的 `grep` 是指向 `ugrep` 的
+  函数壳，会注入 `--ignore-files --hidden -I --exclude-dir=...` 且**省略 `./` 前缀**；故本证据
+  一律显式使用 `/usr/bin/grep`，不依赖 shell 的 `grep` 别名/函数。下文命令块中的 `grep` 一律
+  指 `/usr/bin/grep`。
+- locale：`LC_ALL=C`
+- cwd：被审 worktree 根 `/Users/admin/vibe/wp29-render-scope-decision`
+- shell：`bash`（`/bin/bash`）。差集块依赖 process substitution `<(...)`，须在 bash/zsh 下运行。
+
+**排序表态**：`grep -rn` 的目录遍历顺序未由 POSIX 固定，故本 §1 的两条主 grep 输出块**只承诺
+命中行数与命中集合相同，不承诺输出顺序可跨环境逐行复现**；差集块（`comm -23`）的两个输入侧
+均已显式 `| sort`（宽口径侧 `| sort`、主 grep 并集侧 `| sort -u`），故差集输出本身按 `sort`
+顺序确定，可逐行复现。
+
 **证据**（仓库级搜索；三条主 grep 均显式 `--exclude-dir` 排除 `.git` / `__pycache__` /
-`.pytest_cache`，并 `--exclude` 排除本交付物自身与 codex 二签记录，理由见下）：
+`.pytest_cache`，并 `--exclude` 仅排除本交付物自身以消除自指，理由见下）：
 
 ```text
 $ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_cache \
-      --exclude=WP-29-scope-decision.md --exclude=WP-28-consult-codex-shape-verdict.json \
+      --exclude=WP-29-scope-decision.md \
       'WORK_PACKAGE\.md\.tmpl' .
 ./tests/test_wp_template_dispatch_lint.py:23:TEMPLATE_PACKAGED = SRC / "agentic_loop" / "templates" / "WORK_PACKAGE.md.tmpl"
 ./docs/plans/2026-09-13-parallel-throughput/WP-29.status.json:113:      "WORK_PACKAGE.md.tmpl 仓内唯一消费者 init_cmd.py:109 逐字节复制，不解析 markdown"
@@ -49,6 +63,7 @@ $ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_ca
 ./docs/plans/2026-09-13-parallel-throughput/WP-25.status.json:78:      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
 ./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape.md:113:> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与 `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 必须逐字节相同。
 ./docs/plans/2026-09-13-parallel-throughput/WP-08-candidate.md:2105:| `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` | 打包母本（`init_cmd.py:109` 铺开来源） | `FAIL missing 'Acceptance tests'` |
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape-verdict.json:6:  "raw_verbatim": "结论：应收手并改判据形状。B44/B45 不是“还差两个面”，而是在证明当前承诺属于开放世界语义命题，有限攻击面无法穷尽。推荐把 WP-28 收缩为“受保护文本及其指定 Markdown 结构保持不变”，将“在实际渲染/消费链中仍为有效规范”另作独立不变式；不要再用新增黑名单或手写注释/围栏状态机宣称覆盖“规范力”。\n\n### 1. 递归诊断\n\n判断基本成立，但需要更精确地表述：\n\n“面清单”本身不必然错误。若这些面来自一个封闭、形式化的输入模型，并能证明它们构成完备分解，那么有限枚举可以是完整判据。例如“块体必须与常量逐字节相等”实际覆盖了所有字节位置，并不是按已知缺陷枚举。\n\n当前递归的真正原因是：\n\n- `削弱规范力` 是开放世界的自然语言语义性质，没有形式化定义；\n- Markdown 方言、渲染器和模板实际消费方式没有成为判据输入；\n- 允许块外任意编辑，却试图靠有限局部探针证明全局语义不受影响；\n- S2/S3/S5b 等检查使用“必须包含某些片段”或“不得包含已知坏短语”，只能证明有限的存在/排除命题；\n- “按判据组成步骤生成变异”只能验证已声明步骤的实现，不能证明步骤集合本身完备。\n\n所以每轮逃逸不是偶然漏测，而是规格量词超过了判据模型：brief 声称覆盖“任何削弱”，实现只能覆盖“当前识别出的削弱表示”。\n\n### 2. 判据形状\n\n正确形状不是一个主判据，而是几个正交、可形式化的硬不变式：\n\n```text\nVALID =\n    identity_and_placement\n  ∧ protected_body_identity\n  ∧ active_embedding\n  ∧ replica_identity\n```\n\n其中：\n\n1. `identity_and_placement`：两个目标 section 在指定语法层级各恰好出现一次，并位于指定相邻 section 之间。\n2. `protected_body_identity`：完整块体与冻结常量相等。\n3. `active_embedding`：在明确指定的 Markdown 方言/解析器下，它们确实解析为活动的顶层 heading、paragraph、list，而不是 code、raw HTML/comment 等不可见内容。\n4. `replica_identity`：两份模板逐字节相同。\n\n块体等值确实比继续补 S2/S3/S5b/S7 更收口。但建议用真正的逐字节相等，而不是无限制的 `_normalize_ws()` 相等。Markdown 中空白可能有语义：\n\n- 行首四空格可能变成 code block；\n- 空行可能结束 list；\n- 行尾两个空格可能产生 hard line break；\n- block quote/list continuation 也依赖空白。\n\n如果必须允许折行变化，就要明确一个经过证明的等价关系，例如比较指定 Markdown parser 产生的规范 AST；不能把所有 whitespace 无条件折叠后称为“等值冻结”。最稳妥的 WP-28 范围是：块内不允许所谓无害改写，任何折行也要求同步修改冻结常量。冻结文字本来就不需要支持随意格式化。\n\n块体一字不改仍然能被 B44 一族绕过。是的，`active_embedding` 必然是至少部分依赖块外上下文的性质：\n\n```markdown\n<!--\n## Acceptance tests\n完整冻结块\n-->\n```\n\n块体相等只证明 substring；不能证明它在完整文档中的解释。类似逃逸还包括不同类型的 Markdown raw HTML block、不同长度围栏、缩进 code、`<pre>`/`<script>` 等，具体集合依赖 Markdown 方言。\n\n因此，不建议把 HTML 注释深度计数当成最终收口。它是有价值的 B44 回归检查，却仍是一个不完整的 Markdown mini-parser。若要承诺渲染语义，应使用实际权威 parser 解析整份文档，并校验目标 AST 节点；若项目没有权威 parser，就必须把承诺降级为 raw-text preservation。\n\n“紧邻前一非空行”也不够。自然语言规范力没有有限的上下文半径，例如文档开头可以加入：\n\n> 下列所有流程规则均已废止，仅供历史参考。\n\n它可以离冻结块任意远。渲染状态同样可能从很远的未闭合结构开始。要机械收口，只能：\n\n- 锁定一个明确定义的完整 envelope；或\n- 按整份文档解析，并锁定目标节点的顶层位置和 sibling 关系；或\n- 锁整份模板。\n\n即使锁定 AST 位置，也只能证明“作为活动规范文本出现”，不能证明文档其他位置没有自然语言矛盾，除非把整份文档都纳入冻结范围。\n\n### 3. 归因保留\n\n应把“判定”和“诊断”分开，而不是靠检查顺序决定第一个 witness。\n\n建议结构：\n\n```python\nfacts = extract_and_parse(text)\n\nhard_violations = [\n    check_unique_top_level_sections(facts),\n    check_frozen_body_identity(facts),\n    check_active_embedding(facts),\n    check_required_placement(facts),\n]\n\nif body_mismatch:\n    diagnostic_violations = classify_body_diff(actual, expected)\n    if not diagnostic_violations:\n        diagnostic_violations = [BODY_MISMATCH]\n```\n\n也就是：\n\n- 所有硬不变式独立运行；任一失败即红。\n- 块体不等后，再用 S2/S3/S4/S7 对 diff 做二次归因。\n- 细化面不是放行依据；漏掉某种分类时由通用 `BODY_MISMATCH` 兜底。\n- `active_embedding` 与块体等值并列，因为可能出现“块体绿、上下文红”。\n- witness 最好返回结构化 code，例如 `BODY_POLARITY_CHANGED`、`BODY_ITEM_COUNT_CHANGED`、`SECTION_NOT_TOP_LEVEL`，不要依赖 `violations[0]` 的执行顺序。\n- 一个变异可以产生多个 witness；若测试需要主因，可另设稳定的 `primary_code` 优先级，但该优先级只用于展示，不参与是否放行。\n\n因此，在用户给出的两个选项中，“主判据红后再按面二次定位”更正确；但渲染/定位类硬不变式仍须独立运行，不能依附于块体先红。\n\n### 4. 不变式表述\n\n不应再写“任何削弱其规范力的模板改动都必须转红”。建议改成以下可机械兑现的命题：\n\n> **INV-N1（受保护块身份）**：在两份 WP 模板中，指定的两个二级 section 各恰好存在一次；每个 section 的 heading 与完整 body 必须与测试中的冻结常量逐字节相同。任何受保护字节的新增、删除、替换或重排，若不同时修改冻结常量，测试必须转红。\n\n> **INV-N2（结构与活动上下文）**：在指定版本和方言的 Markdown parser 下解析完整模板后，两个 section 必须分别表现为唯一的顶层 level-2 heading，并具有与冻结参考相同的 section AST，且位于冻结的前后 sibling 锚点之间。落入 code、raw HTML/comment 或其他非活动上下文必须转红。\n\n> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与 `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 必须逐字节相同。\n\n> **INV-N4（变更可见性）**：改变上述受保护文本或结构，必须在测试冻结常量或结构期望中留下可审查 diff；测试不负责判断该变更是否获得用户批准。\n\n最后一句很重要：测试能强迫变更“可见”，但无法证明“已经批准”。\n\n如果不引入权威 Markdown parser，则 INV-N2 应诚实降级为：\n\n> 判据只保证冻结块的 raw text、唯一性和声明的位置锚点保持不变；不保证块外编辑不会改变其 Markdown 渲染上下文、产生远距离去规范化语句或改变实际消费者对文本的解释。\n\n在这种降级下，最强可达命题是：\n\n> 两段冻结文字的受保护表示在两份模板中保持不变，任何受保护表示变化必须显式修改测试 oracle。\n\n它不能升级为：\n\n- 规范一定被人或 agent 遵守；\n- 文档中不存在远处矛盾条款；\n- 任意渲染器都把它显示为活动文本；\n- 实际 scaffold/consumer 一定采用这份模板；\n- 所有“语义等价的削弱”都会被识别。\n\n### 5. 是否收手\n\n是。WP-28 下一次冻结已经命中它自己要建立的第 3 次冻结停手规则。当前机器状态也仍是 `CHANGES_REQUESTED / REWORK`，阻断项为 B44、B45；不应直接冻结 rev3。\n\n建议先让用户裁定以下承诺边界：\n\n- WP-28 收缩为 `INV-N1 + INV-N3`，必要时加固定 section 顺序/锚点；完整块体逐字节冻结，S2/S3/S4/S7只作诊断分类。\n- 明文声明 WP-28 不证明全局“规范力”，只证明受保护表示和变更可见性。\n- 若确实要求 B44 意义上的活动渲染保证，另立 WP 定义权威 Markdown 方言、parser 版本、目标 AST 和消费链。不要继续在 WP-28 中追加 HTML 注释计数器。\n- 如果项目已有且明确使用的 Markdown parser，`active_embedding` 可以留在 WP-28；否则引入 parser/依赖和决定渲染方言已经超出当前三个 `allowed_paths` 的冻结范围，应拆包。\n\n你实测的 B44/B45 修法都可作为回归证据，但定位不同：块体等值应成为内容身份的正式判据；HTML 注释深度计数最多是临时回归保护，不能作为“渲染上下文已经完备覆盖”的依据。\n\n本次仅作只读设计咨询，没有修改文件。现场依据包括 [WP-28 brief rev2](/Users/admin/vibe/agentic_loop/docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md)、[WP-28 状态](/Users/admin/vibe/agentic_loop/docs/plans/2026-09-13-parallel-throughput/WP-28.status.json) 和 [实际判据](/Users/admin/vibe/wp28-norms-into-template/tests/test_wp_template_dispatch_lint.py:252)。",
 ./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:30:- `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl`
 ./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:37:  理由：`WORK_PACKAGE.md.tmpl` 是 `init_cmd._REFERENCE_TEMPLATES` 里的 reference skeleton，
 ./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:40:  编排者已实测：`grep -c '\$' WORK_PACKAGE.md.tmpl` = 0。
@@ -81,7 +96,7 @@ $ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_ca
 
 ```text
 $ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_cache \
-      --exclude=WP-29-scope-decision.md --exclude=WP-28-consult-codex-shape-verdict.json \
+      --exclude=WP-29-scope-decision.md \
       'docs/agentic/templates/WORK_PACKAGE\.md' .
 ./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md:47:    `docs/agentic/templates/WORK_PACKAGE.md` —— rev1 已定稿，本轮**零行 diff**
 ./docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md:80:  `docs/agentic/templates/WORK_PACKAGE.md` — settled in rev1; zero-line diff
@@ -93,6 +108,7 @@ $ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_ca
 ./docs/plans/2026-09-13-parallel-throughput/WP-26-brief.md:163:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
 ./docs/plans/2026-09-13-parallel-throughput/WP-27-brief.md:166:- oracle 三项规则：`docs/agentic/templates/WORK_PACKAGE.md`
 ./docs/plans/2026-09-13-parallel-throughput/WP-08-candidate.md:2106:| `docs/agentic/templates/WORK_PACKAGE.md` | 项目内被引用的骨架 | `FAIL missing 'Acceptance tests'`（与母本 `diff` 为空） |
+./docs/plans/2026-09-13-parallel-throughput/WP-28-consult-codex-shape-verdict.json:6:  "raw_verbatim": "结论：应收手并改判据形状。B44/B45 不是“还差两个面”，而是在证明当前承诺属于开放世界语义命题，有限攻击面无法穷尽。推荐把 WP-28 收缩为“受保护文本及其指定 Markdown 结构保持不变”，将“在实际渲染/消费链中仍为有效规范”另作独立不变式；不要再用新增黑名单或手写注释/围栏状态机宣称覆盖“规范力”。\n\n### 1. 递归诊断\n\n判断基本成立，但需要更精确地表述：\n\n“面清单”本身不必然错误。若这些面来自一个封闭、形式化的输入模型，并能证明它们构成完备分解，那么有限枚举可以是完整判据。例如“块体必须与常量逐字节相等”实际覆盖了所有字节位置，并不是按已知缺陷枚举。\n\n当前递归的真正原因是：\n\n- `削弱规范力` 是开放世界的自然语言语义性质，没有形式化定义；\n- Markdown 方言、渲染器和模板实际消费方式没有成为判据输入；\n- 允许块外任意编辑，却试图靠有限局部探针证明全局语义不受影响；\n- S2/S3/S5b 等检查使用“必须包含某些片段”或“不得包含已知坏短语”，只能证明有限的存在/排除命题；\n- “按判据组成步骤生成变异”只能验证已声明步骤的实现，不能证明步骤集合本身完备。\n\n所以每轮逃逸不是偶然漏测，而是规格量词超过了判据模型：brief 声称覆盖“任何削弱”，实现只能覆盖“当前识别出的削弱表示”。\n\n### 2. 判据形状\n\n正确形状不是一个主判据，而是几个正交、可形式化的硬不变式：\n\n```text\nVALID =\n    identity_and_placement\n  ∧ protected_body_identity\n  ∧ active_embedding\n  ∧ replica_identity\n```\n\n其中：\n\n1. `identity_and_placement`：两个目标 section 在指定语法层级各恰好出现一次，并位于指定相邻 section 之间。\n2. `protected_body_identity`：完整块体与冻结常量相等。\n3. `active_embedding`：在明确指定的 Markdown 方言/解析器下，它们确实解析为活动的顶层 heading、paragraph、list，而不是 code、raw HTML/comment 等不可见内容。\n4. `replica_identity`：两份模板逐字节相同。\n\n块体等值确实比继续补 S2/S3/S5b/S7 更收口。但建议用真正的逐字节相等，而不是无限制的 `_normalize_ws()` 相等。Markdown 中空白可能有语义：\n\n- 行首四空格可能变成 code block；\n- 空行可能结束 list；\n- 行尾两个空格可能产生 hard line break；\n- block quote/list continuation 也依赖空白。\n\n如果必须允许折行变化，就要明确一个经过证明的等价关系，例如比较指定 Markdown parser 产生的规范 AST；不能把所有 whitespace 无条件折叠后称为“等值冻结”。最稳妥的 WP-28 范围是：块内不允许所谓无害改写，任何折行也要求同步修改冻结常量。冻结文字本来就不需要支持随意格式化。\n\n块体一字不改仍然能被 B44 一族绕过。是的，`active_embedding` 必然是至少部分依赖块外上下文的性质：\n\n```markdown\n<!--\n## Acceptance tests\n完整冻结块\n-->\n```\n\n块体相等只证明 substring；不能证明它在完整文档中的解释。类似逃逸还包括不同类型的 Markdown raw HTML block、不同长度围栏、缩进 code、`<pre>`/`<script>` 等，具体集合依赖 Markdown 方言。\n\n因此，不建议把 HTML 注释深度计数当成最终收口。它是有价值的 B44 回归检查，却仍是一个不完整的 Markdown mini-parser。若要承诺渲染语义，应使用实际权威 parser 解析整份文档，并校验目标 AST 节点；若项目没有权威 parser，就必须把承诺降级为 raw-text preservation。\n\n“紧邻前一非空行”也不够。自然语言规范力没有有限的上下文半径，例如文档开头可以加入：\n\n> 下列所有流程规则均已废止，仅供历史参考。\n\n它可以离冻结块任意远。渲染状态同样可能从很远的未闭合结构开始。要机械收口，只能：\n\n- 锁定一个明确定义的完整 envelope；或\n- 按整份文档解析，并锁定目标节点的顶层位置和 sibling 关系；或\n- 锁整份模板。\n\n即使锁定 AST 位置，也只能证明“作为活动规范文本出现”，不能证明文档其他位置没有自然语言矛盾，除非把整份文档都纳入冻结范围。\n\n### 3. 归因保留\n\n应把“判定”和“诊断”分开，而不是靠检查顺序决定第一个 witness。\n\n建议结构：\n\n```python\nfacts = extract_and_parse(text)\n\nhard_violations = [\n    check_unique_top_level_sections(facts),\n    check_frozen_body_identity(facts),\n    check_active_embedding(facts),\n    check_required_placement(facts),\n]\n\nif body_mismatch:\n    diagnostic_violations = classify_body_diff(actual, expected)\n    if not diagnostic_violations:\n        diagnostic_violations = [BODY_MISMATCH]\n```\n\n也就是：\n\n- 所有硬不变式独立运行；任一失败即红。\n- 块体不等后，再用 S2/S3/S4/S7 对 diff 做二次归因。\n- 细化面不是放行依据；漏掉某种分类时由通用 `BODY_MISMATCH` 兜底。\n- `active_embedding` 与块体等值并列，因为可能出现“块体绿、上下文红”。\n- witness 最好返回结构化 code，例如 `BODY_POLARITY_CHANGED`、`BODY_ITEM_COUNT_CHANGED`、`SECTION_NOT_TOP_LEVEL`，不要依赖 `violations[0]` 的执行顺序。\n- 一个变异可以产生多个 witness；若测试需要主因，可另设稳定的 `primary_code` 优先级，但该优先级只用于展示，不参与是否放行。\n\n因此，在用户给出的两个选项中，“主判据红后再按面二次定位”更正确；但渲染/定位类硬不变式仍须独立运行，不能依附于块体先红。\n\n### 4. 不变式表述\n\n不应再写“任何削弱其规范力的模板改动都必须转红”。建议改成以下可机械兑现的命题：\n\n> **INV-N1（受保护块身份）**：在两份 WP 模板中，指定的两个二级 section 各恰好存在一次；每个 section 的 heading 与完整 body 必须与测试中的冻结常量逐字节相同。任何受保护字节的新增、删除、替换或重排，若不同时修改冻结常量，测试必须转红。\n\n> **INV-N2（结构与活动上下文）**：在指定版本和方言的 Markdown parser 下解析完整模板后，两个 section 必须分别表现为唯一的顶层 level-2 heading，并具有与冻结参考相同的 section AST，且位于冻结的前后 sibling 锚点之间。落入 code、raw HTML/comment 或其他非活动上下文必须转红。\n\n> **INV-N3（副本同一）**：`docs/agentic/templates/WORK_PACKAGE.md` 与 `src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 必须逐字节相同。\n\n> **INV-N4（变更可见性）**：改变上述受保护文本或结构，必须在测试冻结常量或结构期望中留下可审查 diff；测试不负责判断该变更是否获得用户批准。\n\n最后一句很重要：测试能强迫变更“可见”，但无法证明“已经批准”。\n\n如果不引入权威 Markdown parser，则 INV-N2 应诚实降级为：\n\n> 判据只保证冻结块的 raw text、唯一性和声明的位置锚点保持不变；不保证块外编辑不会改变其 Markdown 渲染上下文、产生远距离去规范化语句或改变实际消费者对文本的解释。\n\n在这种降级下，最强可达命题是：\n\n> 两段冻结文字的受保护表示在两份模板中保持不变，任何受保护表示变化必须显式修改测试 oracle。\n\n它不能升级为：\n\n- 规范一定被人或 agent 遵守；\n- 文档中不存在远处矛盾条款；\n- 任意渲染器都把它显示为活动文本；\n- 实际 scaffold/consumer 一定采用这份模板；\n- 所有“语义等价的削弱”都会被识别。\n\n### 5. 是否收手\n\n是。WP-28 下一次冻结已经命中它自己要建立的第 3 次冻结停手规则。当前机器状态也仍是 `CHANGES_REQUESTED / REWORK`，阻断项为 B44、B45；不应直接冻结 rev3。\n\n建议先让用户裁定以下承诺边界：\n\n- WP-28 收缩为 `INV-N1 + INV-N3`，必要时加固定 section 顺序/锚点；完整块体逐字节冻结，S2/S3/S4/S7只作诊断分类。\n- 明文声明 WP-28 不证明全局“规范力”，只证明受保护表示和变更可见性。\n- 若确实要求 B44 意义上的活动渲染保证，另立 WP 定义权威 Markdown 方言、parser 版本、目标 AST 和消费链。不要继续在 WP-28 中追加 HTML 注释计数器。\n- 如果项目已有且明确使用的 Markdown parser，`active_embedding` 可以留在 WP-28；否则引入 parser/依赖和决定渲染方言已经超出当前三个 `allowed_paths` 的冻结范围，应拆包。\n\n你实测的 B44/B45 修法都可作为回归证据，但定位不同：块体等值应成为内容身份的正式判据；HTML 注释深度计数最多是临时回归保护，不能作为“渲染上下文已经完备覆盖”的依据。\n\n本次仅作只读设计咨询，没有修改文件。现场依据包括 [WP-28 brief rev2](/Users/admin/vibe/agentic_loop/docs/plans/2026-09-13-parallel-throughput/WP-28-brief-rev2.md)、[WP-28 状态](/Users/admin/vibe/agentic_loop/docs/plans/2026-09-13-parallel-throughput/WP-28.status.json) 和 [实际判据](/Users/admin/vibe/wp28-norms-into-template/tests/test_wp_template_dispatch_lint.py:252)。",
 ./docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md:89:   `docs/agentic/templates/WORK_PACKAGE.md` 的 oracle 三项旁边，作为第四项要求。
 ./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:5:> 冻结与 re-freeze 的规则见本仓 `docs/agentic/templates/WORK_PACKAGE.md`「Re-freeze 规则」一节。
 ./docs/plans/2026-09-13-parallel-throughput/WP-28-brief.md:31:- `docs/agentic/templates/WORK_PACKAGE.md`
@@ -132,19 +148,20 @@ $ grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_ca
 ```
 
 （排除项说明：`WP-29-scope-decision.md` 是本交付物自身，不是模板消费者，排除以消除自指；
-`WP-28-consult-codex-shape-verdict.json` 是 codex 二签记录，其 `raw_verbatim` 单行 ~9.5KB
-长文仅引用 INV-N3 原文，排除以保持证据可读——该文件属 C 类「agent 阅读」记录，见 C 类。）
+`WP-28-consult-codex-shape-verdict.json` **不再排除**——其 `raw_verbatim` 单行 JSON（内容长度
+9574 字节）已按标的 A 要求逐字完整出现在上面两个输出块内（两个输出块的第 11 行），该文件属
+C 类「agent 阅读」记录，见 C 类。）
 
-**宽口径补充命中**（宽口径 `grep 'WORK_PACKAGE'` 共 96 行命中；减去上面两条主 grep 的并集
-79 行（38 + 46 − 5 处重叠）后，差集为下列 17 行。差集由 `comm -23` 求得，命令与完整输出如下）：
+**宽口径补充命中**（宽口径 `grep 'WORK_PACKAGE'` 共 97 行命中；减去上面两条主 grep 的并集
+80 行（39 + 47 − 6 处重叠）后，差集为下列 17 行。差集由 `comm -23` 求得，命令与完整输出如下）：
 
 ```text
 $ comm -23 \
       <(grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_cache \
-          --exclude=WP-29-scope-decision.md --exclude=WP-28-consult-codex-shape-verdict.json \
+          --exclude=WP-29-scope-decision.md \
           'WORK_PACKAGE' . | sort) \
       <(grep -rn --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.pytest_cache \
-          --exclude=WP-29-scope-decision.md --exclude=WP-28-consult-codex-shape-verdict.json \
+          --exclude=WP-29-scope-decision.md \
           -e 'WORK_PACKAGE\.md\.tmpl' -e 'docs/agentic/templates/WORK_PACKAGE\.md' . | sort -u)
 ./CHANGELOG.md:328:- **Per-WP reference templates (STATUS.json / WORK_PACKAGE.md).** `agentic init`
 ./CHANGELOG.md:330:  and `WORK_PACKAGE.md` (a brief skeleton), so an adopting project has a
@@ -211,8 +228,9 @@ tests/test_contract_render.py:167:        txt = cr.load_template(name)
       `WP-28-brief-rev2.md:243` / `:266`、`WP-28-brief-rev3.md:274` / `:293`、
       `WP-28-brief.md:190` / `:213`、`WP-29-brief.md:45` —— 均为历史 WP 治理文档里对模板 /
       「消费链实况」的引用，非运行时读取。
-  - 另：`WP-28-consult-codex-shape-verdict.json:6` 属 C 类「agent 阅读」记录（codex 二签原文
-    引用 INV-N3），已在上文 grep 中显式 `--exclude` 排除，理由见「排除项说明」。
+  - 另：`WP-28-consult-codex-shape-verdict.json` 属 C 类「agent 阅读」记录（codex 二签原文
+    引用 INV-N3），其 `raw_verbatim` 单行已按标的 A 要求逐字出现在上文两个主 grep 输出块内，
+    不再 `--exclude` 排除（理由见「排除项说明」）。
 
 - **D. 打包读取**（打包配置把模板作为 package data 纳入 wheel/sdist + 运行时经
   `importlib.resources` 读取）：
@@ -220,7 +238,7 @@ tests/test_contract_render.py:167:        txt = cr.load_template(name)
     `name`/`tmpl_name` 变量，二者都不含字面 `WORK_PACKAGE` 字符串，故必须改用行号级证据 +
     资源入口 grep。
   - 资源读取入口证据（命令原文 + 完整输出；`_resources_files` 是 `importlib.resources.files`
-    在本仓的唯一别名）：
+    在本仓内的别名，下文只证该别名在 `src/` 中的调用点）：
 
 ```text
 $ grep -rn --exclude-dir=__pycache__ '_resources_files' src
@@ -231,8 +249,10 @@ src/agentic_loop/contract_render.py:254:    resource = _resources_files(_TEMPLAT
 ```
 
     上述 4 行都落在 `contract_render.py`：`:19` import 绑定、`:21` None 回退、`:252` None 守卫、
-    `:254` **唯一一次调用**（真正读取 package data），位于 `load_template` 内。故「读取 package
-    data 的入口只有 `load_template` 一处」在 `src/` 运行时源码这一搜索面内成立。
+    `:254` **唯一一次调用**（真正读取 package data），位于 `load_template` 内。故
+    「`_resources_files` 这一别名在 `src/` 中仅于 `load_template` 调用」在 `src/` 运行时源码
+    这一搜索面内成立。此结论**只承诺该别名的调用点唯一**，不承诺 `importlib.resources.files`
+    在本仓无其它别名，也不承诺读取 package data 的入口（含其它别名/接口）只有一处。
   - 行号级证据：
     - `pyproject.toml:24-29` `[tool.hatch.build.targets.wheel]` 的 `artifacts` 含
       `"src/agentic_loop/templates/*.tmpl"`。
@@ -474,10 +494,27 @@ G4       2889                      RED
   按「主 grep 命中 / 宽口径补充命中」来源重新标注，新增 `cli.py` 非第二读取入口的未覆盖面申报。
 - **去省略符**：移除 §1 全部 U+2026 省略符，每个 grep 粘贴块与 `grep` 字面重跑逐行一致。
 
+### 6.3 rev4 → rev5（本轮，只动 §1 取证 + §0/§7 相关格子）
+
+逐条对应 rev5 brief 的三件标的（A / B / C）：
+
+- **标的 A（恢复逐字完整粘贴）**：两条主 grep 与差集命令去掉
+  `--exclude=WP-28-consult-codex-shape-verdict.json`，仅保留 `--exclude=WP-29-scope-decision.md`
+  （消除自指）；`WP-28-consult-codex-shape-verdict.json` 的 `raw_verbatim` 单行（9574 字节）
+  在两条主 grep 输出块内逐字完整出现，零省略；相关行数按字面重跑重数（主 grep 39 / 47 行、
+  宽口径 97 行、差集 17 行）。
+- **标的 B（量词证据面）**：选 **(a) 收窄结论形状**——删掉「`_resources_files` 是
+  `importlib.resources.files` 在本仓的唯一别名」这一前提句，把结论收窄为「`_resources_files`
+  这一别名在 `src/` 中仅于 `load_template` 调用」，并明写不再承诺更强的形状；`cli.py:25`
+  未覆盖面申报保留。
+- **标的 C（执行面声明）**：§1 开头新增执行面声明，固定 binary（`/usr/bin/grep`）、locale
+  （`LC_ALL=C`）、cwd（被审 worktree 根）、shell（bash）四项；排序表态为「两条主 grep 只承诺
+  行数/集合相同，不承诺顺序可跨环境复现」（差集块输入侧显式 `sort`，输出顺序确定）。
+
 ## 7. 自我核查（selfcheck）
 
 以下命令均在 worktree `/Users/admin/vibe/wp29-render-scope-decision`、分支
-`feature/wp29-render-scope-decision`、HEAD `e493c2a62e14f9a7f9fc5528168b9be5d2b2bf23`（rev3 提交）执行。
+`feature/wp29-render-scope-decision`、HEAD `f1eee7e650c300c0cdc8be42a0c879961ebc83d8`（rev5 提交）执行。
 
 ```bash
 git status --porcelain
@@ -487,8 +524,8 @@ git status --porcelain
 
 ```bash
 git diff --stat HEAD
-# ->  docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md | 174 ++++++++++++++++-----
-# ->  1 file changed, 137 insertions(+), 37 deletions(-)
+# ->   .../WP-29-scope-decision.md                        | 94 +++++++++++++++++-----
+# ->   1 file changed, 72 insertions(+), 22 deletions(-)
 ```
 
 ```bash
@@ -497,6 +534,19 @@ printf 'single-U+2026: '; grep -c "$(printf '\342\200\246')" docs/plans/2026-09-
 printf 'double-U+2026: '; grep -c "$(printf '\342\200\246\342\200\246')" docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md || true
 # -> double-U+2026: 0
 ```
+
+标的 A 逐字核验（字面重跑，`/usr/bin/awk`，`LC_ALL=C`）：
+
+```text
+$ /usr/bin/awk 'length($0) > 1000 { n++; print length($0) } END { print "long_lines=" n }' docs/plans/2026-09-13-parallel-throughput/WP-29-scope-decision.md
+9659
+9659
+long_lines=2
+```
+
+（两条主 grep 输出块内的该行均为 9659 字节，等于源文件 `WP-28-consult-codex-shape-verdict.json`
+`raw_verbatim` 行（9574 字节）加上 grep 命中行自带的「路径 + 行号 + 冒号分隔符」前缀（85 字节）；
+这两处该行即为验收判据所要求的、出现次数恰好为 2 的两处逐字粘贴。）
 
 ```bash
 git diff --exit-code HEAD -- pyproject.toml uv.lock && echo DEPS_UNCHANGED
