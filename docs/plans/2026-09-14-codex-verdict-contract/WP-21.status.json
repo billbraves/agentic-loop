@@ -75,7 +75,17 @@
       }
     ],
     "p0_probes": "see WP-21-brief.md P0-1..P0-4 and WP-21-evidence-probes.md; raw artifacts under /tmp/direct-probe/ (outside repo)",
-    "user_approval": "2026-09-20 user approved: nonce plaintext block + bounded full retry + freeze; action-gating freeze per AGENTS §4.1"
+    "user_approval": "2026-09-20 user approved: nonce plaintext block + bounded full retry + freeze; action-gating freeze per AGENTS §4.1",
+    "e2e": {
+      "consumer": "consumer-repo WP-34 (candidate cfc201b); user-approved LIMITED consumer write (backup + rollback ready)",
+      "gate_run": "real gate main() with the fixed build (sys.path injection into the WP-21 worktree); 2026-09-20 16:13-17:31 local; E2E_GATE_RC=0",
+      "decision": "REWORK — a valid second signature per the WP-21 brief (ACCEPT or REWORK both count); per-chunk 8 ACCEPT + 3 REWORK, aggregate REWORK",
+      "first_pass": "11/11 chunk first passes returned legal JSON (11 codex CLI sessions, all task_complete); the recovery paths were NOT triggered by this run — recovery correctness is additionally covered by the real-function smoke below plus the frozen unit suites",
+      "consult_written": "consult block written to /Users/admin/vibe/consumer-repo/docs/wp/WP-34.status.json: decision=REWORK, reviewed_by=codex-cli, reviewed_at=2026-09-20T09:30:43Z, notes=10421 chars, independence=weak; vs the pre-e2e backup only consult.* + timestamps.updated_at changed (status sha256 before = 4269b8d3...)",
+      "answer_artifact": "docs/plans/harness-architecture/WP-34-codex-merge-gate.answer.md 14816 -> 15618 bytes; 30+ specific findings citing line numbers and SHA-256 (e.g. candidate.diff:781 tautological read-only assertion; candidate.diff:842 git-config whitelist write hole) — substantive evidence, not a prompt-echo pseudo-signature",
+      "rollback_backup": "/tmp/wp34-e2e-backup/WP-34.status.json.pre-e2e + WP-34-codex-merge-gate.answer.md.pre-e2e"
+    },
+    "repair_path_real_smoke": "Direct real-API execution of the FIXED functions (not a copied skeleton): _build_direct_retry_prompt + _direct_tool_free_verdict on the real 66774B WP-34 chunk -> completed 220.9s, ACCEPT + 5 findings, prompt 77678B <= 81920 bound; _build_normalization_prompt (nonce plaintext, no decode requirement) + direct call on a free-text prior output -> completed 96.1s (vs the pre-fix Base64 shape: burned the full 96000-token budget and returned incomplete). Artifacts: /tmp/wp21-bound/repair-*. probe_bound.py additionally imported the fixed adapter and drove its real helpers (_split_diff / _build_chunk_context) against the real API."
   },
   "review": {
     "decision": "ACCEPT",
@@ -89,6 +99,7 @@
   "timestamps": {
     "drafted_at": "2026-09-20T07:10:00Z",
     "approved_at": "2026-09-20T07:27:00Z",
-    "reviewed_at": "2026-09-20T07:55:00Z"
+    "reviewed_at": "2026-09-20T07:55:00Z",
+    "e2e_completed_at": "2026-09-20T09:31:00Z"
   }
 }
