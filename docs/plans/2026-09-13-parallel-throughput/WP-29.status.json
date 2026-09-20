@@ -8,7 +8,7 @@
   "state": "CHANGES_REQUESTED",
   "executor": {
     "tool": "kimi-cli",
-    "session": "",
+    "session": "6d12a60f-9777-4c23-9ab2-c5b0539a98d6",
     "dispatch_prompt": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev3-prompt.md",
     "dispatch_prompt_sha256": "606eb7b33757132590a3fb35db33a8b8c98e3aff7e33bb8a71ffcab1b69159b4",
     "dispatch_command": "bash /Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
@@ -115,7 +115,7 @@
     "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "branch": "feature/wp29-render-scope-decision",
     "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
-    "commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4"
+    "commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027"
   },
   "scope": {
     "allowed_paths": [
@@ -776,8 +776,8 @@
     "refreeze_count": {
       "frozen_revs": 6,
       "next_would_be": 7,
-      "rule": "WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后的 re-freeze 须停手复核计划，且须用户批准",
-      "status": "rev6 已停手复核（WP-29-plan-review-before-rev6.md）并获用户批准；rev7 若发生仍须再次停手复核 + 用户批准"
+      "rule": "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl:9 —— 同一 WP 第 3 次及以后的 re-freeze 须停手复核计划 + 用户明确批准",
+      "note": "rev7 若发生，须新的停手复核文档 + 新的用户批准；编排者自己的签名不能替代"
     },
     "review_rev4_record": {
       "decision": "N/A",
@@ -877,18 +877,142 @@
       ],
       "sites_are": "破口清单，不是标的；只改这四处即 REWORK",
       "dispatch_lint_note": "dispatch_lint.sh 按固定名 WP-29-brief.md 读 brief（缺陷 B47，任务 #38 待修），故 revN brief 从未过段落门禁；本次三段（Acceptance tests / Allowed and forbidden paths / Completion definition）由编排者用与门禁同一段落谓词直接核过，均非空。"
+    },
+    "dispatch_rev6": {
+      "executor_tool": "kimi-cli",
+      "lane": "deepseek",
+      "provider_probe": "PROBE_OK（派发前实测，session 514e2a2f-2c42-42d3-a209-7312ba41d2e6）",
+      "dispatch_script": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
+      "dispatch_script_sha256": "52ea37af3426c76ba9a54fd100380ff49aad220c19137ac0f6ad86605b0ccfb1",
+      "prompt": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev6-prompt.md",
+      "prompt_sha256": "46b96779babd19c6b92a02605641dacf5ab14f62f7f61895b855e9d47c9ce6f6",
+      "brief_sha256": "26626e2da3ab2286587628ed455ad6204b89290a5be998c6b3fe5f40865eb902",
+      "base_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+      "background_task_id": "b37f2j25x",
+      "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/b37f2j25x.output",
+      "env_isolation": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY（kimi 必须两者都剥；env 里的 OPENAI_API_KEY 字面是 dummy。codex 侧只剥 BASE_URL）",
+      "fixed_command_form": "脚本内 prompt 路径与 sha 硬编码，派发命令形态固定，以便 .claude/settings.local.json 的 allow 规则精确匹配",
+      "session_id": "6d12a60f-9777-4c23-9ab2-c5b0539a98d6",
+      "exit_code": 0,
+      "executor_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+      "executor_report_status": "READY_FOR_REVIEW（执行者自报；报告落 /Users/admin/.claude/jobs/8a8bf01e/tmp/wp29-rev6-report.txt）"
+    },
+    "review_rev5_record": {
+      "decision": "REWORK",
+      "reviewer": "claude-code",
+      "reviewed_at": "2026-09-20",
+      "rev": 5,
+      "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+      "blockers": [
+        "R1 = codex C1：WP-29-scope-decision.md:517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d。一行事实更正。",
+        "R2 = codex C2：同文件 :590（codex 标 :588，偏 2 行，指认文本无误）的 DoD 自核查括注仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行单排除命令及标的 A 相反。一行事实更正。"
+      ],
+      "minor": [
+        "§6.2 历史记录节仍写排除两项 —— 描述 rev4 当时状态，不改是正确的",
+        "§6 标题仍为「rev1 → rev4 改了什么」，brief 未要求改，下一 rev 可顺手改"
+      ],
+      "verdict_note": "标的 A/B/C 三条实质要求全部达成（含 brief 标注「最容易漏」的差集过滤器同步项）；§2/§3/§4/§5 逐节字节一致，(c′) 未被触动；本轮未见 B60 类偏差。两条阻断项均为交付物内一行文本的事实矛盾，无需重新取证。rev6 将是第 6 次冻结，须按 WORK_PACKAGE.md.tmpl:9 再次停手复核并取得用户批准；本报告不得充当该批准。",
+      "orchestrator_own_measurement": {
+        "cprime_isolated": "直接从主仓 HEAD 的 FROZEN_BODY 常量取判据、纯内存施加八条变异：baseline GREEN，E1-E4/G1-G4 全 GREEN；脚本不写文件，复核前后主仓 src/tests/templates 无改动",
+        "wrong_layer_note": "首次尝试在 /tmp 副本上跑 rev6 完整测试文件得到 G1/G3/G4 RED，追查为错误层：test_invn_t7_replica_mismatch_red:886 会自行再变异并断言 mutated != packaged，test_invn_harmless_placeholder_edit_green:896 断言原始占位符在场，预先变异触发的是这两个用例自身的夹具前置条件，不是 (c′) 判据（记忆 mutation-red-may-come-from-wrong-layer 实弹命中）",
+        "anchor_uniqueness": "八条变异的锚点在模板内 grep -cF 均为 1，不存在『找不到锚点⇒恒等映射』的假绿隐患"
+      },
+      "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
+      "document_sha256": "edb347c14a2e0a38bc4c62f1c048cf4fdb053e6d64efec724d59e6a6bd7e83b5",
+      "reviewed_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+      "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+      "note": "rev5 双签名已闭（并行出签，同判 REWORK）；rev4 记录完整保留于 evidence.review_rev4_record",
+      "independence": "strong（并行双签名，consultant 未见第一签名）",
+      "first_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+      "second_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md"
+    },
+    "consult_rev5_record": {
+      "decision": "REWORK",
+      "consultant": "codex",
+      "provider": "kirogpt",
+      "model": "gpt-5.6-sol",
+      "consulted_at": "2026-09-20",
+      "rev": 5,
+      "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+      "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5.md",
+      "request_sha256": "2f91b24dd6910672392c72c2b354222fdefadce5040bda3c3fc3269496eb9aab",
+      "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md",
+      "verdict_sha256": "5c2ea9197e9c10e8aa93509997b6c28c951473789fffbbd8a0978ab011db2c55",
+      "blocking_items": {
+        "C1": "§7 :517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d",
+        "C2": "DoD 对照（codex 标 :588，实为 :590）仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行命令（只排除本交付物）及标的 A 相反"
+      },
+      "non_blocking_findings": {
+        "passed_independently": "标的 A（39/47 行 + 差集同步 + 两处长行 sha256 一致）、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2/§3/§4/§5 逐节字节一致、未发现「等效替代」追认冻结判据"
+      },
+      "orchestrator_cross_check": "两条阻断项编排者均在源文件独立复核成立；codex 第二条行号 :588 实为 :590，文本指认无误，偏差已记入 WP-29-consult-rev5-verdict.md 的对照表。codex 通过的四项（标的 A 两条主 grep 39/47 + 差集 17 行 + 两处长行 9660 bytes 同 sha、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2-§5 逐节字节一致）编排者亦独立复现一致。",
+      "parallelism": "与第一签名并行派发；派发时 codex 未收到编排者任何结论。",
+      "note": "rev4 记录完整保留于 evidence.consult_rev4_record"
+    },
+    "review_rev6": {
+      "decision": "REWORK",
+      "rev": 6,
+      "at_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev6.md",
+      "document_sha256": "1228e81b1896cc61c9604015fac3b0f8d988b92c505e1401593ca714750d9322",
+      "deliverable_sha256": "b88c05900047e56daba5c20c14eae2e38215368cfb66ea563d1a24bc1f989e4b",
+      "parallelism": "第一签名与二签并行派发，写就时未读 codex 结论",
+      "criteria": {
+        "1_INV_S1": "FAIL",
+        "2_hash_decoupled": "PASS",
+        "3_exhaustive_ledger": "FAIL",
+        "4_evidence_zero_diff": "PASS",
+        "5_protected_zero_diff": "PASS",
+        "6_history_zero_diff": "PASS",
+        "7_long_lines": "PASS",
+        "8_no_code": "PASS"
+      },
+      "blockers": [
+        "R1 = 交付物 :517（执行者本轮新增的 §6.4 首句）自述「本 rev 是五轮里唯一不动证据的一轮（零重跑、零新命令、零新输出）」：(i) 依赖「当前是第几版」这一 INV-S1 后半句明文禁止的前提；(ii) 同小节 :524/:525 自陈「按实跑更新」，且 :595 的 pytest 输出由 116.99s 改为 96.04s (0:01:36)，与「零重跑、零新输出」矛盾。属 INV-S1 正面违反，落在本轮亲手新增的行上。"
+      ],
+      "criterion3_failure": "执行者报告的 12 项全为改动点，无一条「已同真、不改」的裁定；brief 判据 3 明文要求含此类。不单独阻断（R1 已阻断），但它是 R1 漏出的机制。",
+      "minor": {
+        "M1": "§2–§5 冻结区残留「本轮」——执行者主动申报；我判不在 INV-S1 族内（描述当时方案语境，非自身版本/提交/节结构/命令形态），且判据 5 冻结该区，处理正确。",
+        "M2": ":458 §6.1 标题「（上一轮，已提交 e493c2a）」相对 rev6 已陈旧，但判据 6 要求逐字保留 —— rev6 判据内部的真实张力，写进下一轮冻结解决，不得追加为本轮返工项。",
+        "M3": "B47 绕行仍在：dispatch_lint.sh 按固定名读 brief，rev6 brief 同样未过段落门禁，仍靠手工套用门禁自身段落谓词核三段。任务 #38 未动。"
+      },
+      "orchestrator_own_measurement": "仅用于否证与 PASS 侧核对：awk long_lines=2 且两版长行集合 sha256 均 5601c20b…33aa9；U+2026 双零；模板 2889/2889 + IDENTICAL；git diff --stat = 1 file changed, 30 insertions(+), 12 deletions(-)；hunk 落点 11 处全在 §0 头注/§6/§7/DoD，§1 与 §2–§5 零 hunk；selfcheck 自 rev3(e493c2a) 起即为 §7，故「全量（§7 命令）」标注正确。R1 的依据全部来自交付物自身文本与其自身 diff，未用我的重跑补证。",
+      "b60_self_check": "未追认等效替代；未用自跑证据补交付物之缺。rev6 标的扩大发生在 rev5 签名结束后的冻结环节并经用户批准，属上一轮发现进入下一轮冻结。"
+    },
+    "consult_rev6": {
+      "decision": "REWORK",
+      "rev": 6,
+      "at_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+      "consultant": "codex",
+      "provider": "kirogpt",
+      "request": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp29-stage1-rev6/prompt.md",
+      "request_sha256": "8b73a67fa041d27e9791320d11e7206d483171e1a273fcb1c19573bc56954722",
+      "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev6-codex.md",
+      "verdict_sha256": "4e55a7b19d578290e7fb3399ca14c092273ba074b2791e52c2e653229e119dd1",
+      "parallelism": "与第一签名并行派发，codex 未见编排者结论",
+      "blocking_items": [
+        ":517「五轮 / 零重跑、零新命令、零新输出」与 :525 的「按实跑更新」及 :595 的 96.04s 矛盾，且仍依赖轮数",
+        "穷举报告义务未满足：12 项全为改动点，缺「已同真、不改」的逐一裁定（举 :3、:35–51、:151–157、:534–603、:607–626）"
+      ],
+      "non_blocking": [
+        "Q2：:535 新 HEAD 标注合格，e2c483d 确为 dffae33 父提交，全文零「<hash>（revN 提交）」形态，执行者 rationale 成立",
+        "Q3：§2–§5 的「本轮」不构成 INV-S1 违反；若扩张 INV-S1 到所有历史语境的「本轮」，将与判据 5 冲突——属下一轮判据设计问题，不归责本次执行",
+        "Q4：判据 4/5/6/7/8 均成立（逐项复核 hunk 落点、长行 sha256、交付物 sha256）",
+        "Q5：未发生 B60——标的写入的是 rev5 签名后的下一轮冻结并经用户批准"
+      ],
+      "convergence": "与第一签名**独立同判 REWORK**，且阻断项指向同一处（:517）。codex 另把穷举义务不足单列为阻断，我列为判据 3 FAIL 但不单独阻断——差异在归类，不在事实。"
     }
   },
   "review": {
     "decision": "REWORK",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-20",
-    "rev": 5,
-    "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
-    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+    "rev": 6,
+    "at_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev6.md",
     "blockers": [
-      "R1 = codex C1：WP-29-scope-decision.md:517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d。一行事实更正。",
-      "R2 = codex C2：同文件 :590（codex 标 :588，偏 2 行，指认文本无误）的 DoD 自核查括注仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行单排除命令及标的 A 相反。一行事实更正。"
+      "R1 = 交付物 :517（执行者本轮新增的 §6.4 首句）自述「本 rev 是五轮里唯一不动证据的一轮（零重跑、零新命令、零新输出）」：(i) 依赖「当前是第几版」这一 INV-S1 后半句明文禁止的前提；(ii) 同小节 :524/:525 自陈「按实跑更新」，且 :595 的 pytest 输出由 116.99s 改为 96.04s (0:01:36)，与「零重跑、零新输出」矛盾。属 INV-S1 正面违反，落在本轮亲手新增的行上。"
     ],
     "minor": [
       "§6.2 历史记录节仍写排除两项 —— 描述 rev4 当时状态，不改是正确的",
@@ -901,11 +1025,11 @@
       "anchor_uniqueness": "八条变异的锚点在模板内 grep -cF 均为 1，不存在『找不到锚点⇒恒等映射』的假绿隐患"
     },
     "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
-    "document_sha256": "edb347c14a2e0a38bc4c62f1c048cf4fdb053e6d64efec724d59e6a6bd7e83b5",
-    "reviewed_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+    "document_sha256": "1228e81b1896cc61c9604015fac3b0f8d988b92c505e1401593ca714750d9322",
+    "reviewed_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
     "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
-    "note": "rev5 双签名已闭（并行出签，同判 REWORK）；rev4 记录完整保留于 evidence.review_rev4_record",
-    "independence": "strong（并行双签名，consultant 未见第一签名）",
+    "note": "rev5 的完整审核记录见 evidence.review_rev5_record；rev4 见 evidence.review_rev4_record",
+    "independence": "第一签名与第二签名并行派发；双签名独立同判 REWORK，阻断项指向同一处 :517",
     "first_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
     "second_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md"
   },
@@ -915,22 +1039,22 @@
     "provider": "kirogpt",
     "model": "gpt-5.6-sol",
     "consulted_at": "2026-09-20",
-    "rev": 5,
-    "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
-    "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5.md",
-    "request_sha256": "2f91b24dd6910672392c72c2b354222fdefadce5040bda3c3fc3269496eb9aab",
-    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md",
-    "verdict_sha256": "5c2ea9197e9c10e8aa93509997b6c28c951473789fffbbd8a0978ab011db2c55",
-    "blocking_items": {
-      "C1": "§7 :517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d",
-      "C2": "DoD 对照（codex 标 :588，实为 :590）仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行命令（只排除本交付物）及标的 A 相反"
-    },
+    "rev": 6,
+    "at_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+    "request": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult-wp29-stage1-rev6/prompt.md",
+    "request_sha256": "8b73a67fa041d27e9791320d11e7206d483171e1a273fcb1c19573bc56954722",
+    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev6-codex.md",
+    "verdict_sha256": "4e55a7b19d578290e7fb3399ca14c092273ba074b2791e52c2e653229e119dd1",
+    "blocking_items": [
+      ":517「五轮 / 零重跑、零新命令、零新输出」与 :525 的「按实跑更新」及 :595 的 96.04s 矛盾，且仍依赖轮数",
+      "穷举报告义务未满足：12 项全为改动点，缺「已同真、不改」的逐一裁定（举 :3、:35–51、:151–157、:534–603、:607–626）"
+    ],
     "non_blocking_findings": {
       "passed_independently": "标的 A（39/47 行 + 差集同步 + 两处长行 sha256 一致）、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2/§3/§4/§5 逐节字节一致、未发现「等效替代」追认冻结判据"
     },
     "orchestrator_cross_check": "两条阻断项编排者均在源文件独立复核成立；codex 第二条行号 :588 实为 :590，文本指认无误，偏差已记入 WP-29-consult-rev5-verdict.md 的对照表。codex 通过的四项（标的 A 两条主 grep 39/47 + 差集 17 行 + 两处长行 9660 bytes 同 sha、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2-§5 逐节字节一致）编排者亦独立复现一致。",
     "parallelism": "与第一签名并行派发；派发时 codex 未收到编排者任何结论。",
-    "note": "rev4 记录完整保留于 evidence.consult_rev4_record"
+    "note": "rev5 的完整二签记录见 evidence.consult_rev5_record；rev4 见 evidence.consult_rev4_record"
   },
   "timestamps": {
     "created_at": "",
@@ -955,6 +1079,10 @@
     "consulted_rev5_at": "2026-09-20",
     "changes_requested_rev5_at": "2026-09-20",
     "refreeze_stop_review_rev6_at": "2026-09-20",
-    "brief_rev6_frozen_at": "2026-09-20"
+    "brief_rev6_frozen_at": "2026-09-20",
+    "dispatched_at_rev6": "2026-09-20",
+    "implementing_at_rev6": "2026-09-20",
+    "reviewed_at": "2026-09-20",
+    "updated_at": "2026-09-20"
   }
 }
