@@ -1,0 +1,105 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-21",
+  "iteration_id": "2026-09-14-codex-verdict-contract",
+  "phase": "P2",
+  "state": "APPROVED_FOR_MERGE",
+  "role": "Developer",
+  "executor": {
+    "tool": "kiro-dsh-orchestrator-direct",
+    "deviation_from_dispatch_form": "Option B (same as WP-18/WP-19/WP-20): implemented directly in an isolated worktree by the orchestrator session instead of dispatching the configured developer tool, because the agentic-loop main checkout /Users/admin/vibe/agentic_loop is occupied by another session and `agentic preflight` resolves the main root to it. Branch and worktree isolation, explicit allowed/forbidden paths, frozen revision decisions and independent review all apply unchanged."
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "current-dsh-session",
+    "actual_tool_note": "Kiro / DeepSeek Harness"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "main",
+    "base_commit": "359bcdb",
+    "branch": "fix/wp-21-direct-finalization-correctness",
+    "worktree": "/Users/admin/vibe/.worktrees/agentic-wp21-direct-finalization",
+    "commit": "c99a1bd",
+    "integration_branch": "main"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/adapters/codex.py",
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_codex_direct_finalization.py",
+      "tests/test_codex_verdict_recovery.py",
+      "docs/plans/2026-09-14-codex-verdict-contract/WP-21-brief.md",
+      "docs/plans/2026-09-14-codex-verdict-contract/WP-21.status.json",
+      "docs/plans/2026-09-14-codex-verdict-contract/WP-21-evidence-probes.md",
+      "docs/plans/2026-09-14-codex-verdict-contract/HANDOFF-direct-finalization.md"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/resolve_paths.py",
+      "src/agentic_loop/provider.py",
+      "src/agentic_loop/provider_binding.py",
+      "tests/test_codex_line_level_split.py",
+      "tests/test_codex_config_isolation_chunking.py",
+      "tests/test_codex_gate_capability_merge.py",
+      "tests/test_gate_diff_start.py",
+      "tests/test_codex_finalization_benign_warning.py",
+      "consumer repo files (/Users/admin/vibe/consumer-repo/**)"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "ALLOWED_PROVIDER_API_ONLY",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY",
+    "consumer_repo_writes": "LIMITED_E2E_SECOND_SIGNATURE_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "python3.11 -m pytest tests/test_codex_verdict_recovery.py tests/test_codex_direct_finalization.py -q",
+        "result": "69 passed (recovery 50 incl. the 3 user-ruled assertion revisions + direct 19 with the 9 new WP-21 tests)",
+        "exit_code": 0
+      },
+      {
+        "command": "python3.11 -m pytest tests -q",
+        "result": "632 passed, 4 skipped, 4 failed in 109.14s — the 4 failures are all the pre-existing test_finalize_merge_triple_sign.py git-env baseline ('git checkout -q main' exit 1), reproduced identically on a throwaway worktree at main tip 359bcdb (4 failed / 1 passed there)",
+        "exit_code": 1
+      }
+    ],
+    "p0_probes": "see WP-21-brief.md P0-1..P0-4 and WP-21-evidence-probes.md; raw artifacts under /tmp/direct-probe/ (outside repo)",
+    "user_approval": "2026-09-20 user approved: nonce plaintext block + bounded full retry + freeze; action-gating freeze per AGENTS §4.1",
+    "e2e": {
+      "consumer": "consumer-repo WP-34 (candidate cfc201b); user-approved LIMITED consumer write (backup + rollback ready)",
+      "gate_run": "real gate main() with the fixed build (sys.path injection into the WP-21 worktree); 2026-09-20 16:13-17:31 local; E2E_GATE_RC=0",
+      "decision": "REWORK — a valid second signature per the WP-21 brief (ACCEPT or REWORK both count); per-chunk 8 ACCEPT + 3 REWORK, aggregate REWORK",
+      "first_pass": "11/11 chunk first passes returned legal JSON (11 codex CLI sessions, all task_complete); the recovery paths were NOT triggered by this run — recovery correctness is additionally covered by the real-function smoke below plus the frozen unit suites",
+      "consult_written": "consult block written to /Users/admin/vibe/consumer-repo/docs/wp/WP-34.status.json: decision=REWORK, reviewed_by=codex-cli, reviewed_at=2026-09-20T09:30:43Z, notes=10421 chars, independence=weak; vs the pre-e2e backup only consult.* + timestamps.updated_at changed (status sha256 before = 4269b8d3...)",
+      "answer_artifact": "docs/plans/harness-architecture/WP-34-codex-merge-gate.answer.md 14816 -> 15618 bytes; 30+ specific findings citing line numbers and SHA-256 (e.g. candidate.diff:781 tautological read-only assertion; candidate.diff:842 git-config whitelist write hole) — substantive evidence, not a prompt-echo pseudo-signature",
+      "rollback_backup": "/tmp/wp34-e2e-backup/WP-34.status.json.pre-e2e + WP-34-codex-merge-gate.answer.md.pre-e2e"
+    },
+    "repair_path_real_smoke": "Direct real-API execution of the FIXED functions (not a copied skeleton): _build_direct_retry_prompt + _direct_tool_free_verdict on the real 66774B WP-34 chunk -> completed 220.9s, ACCEPT + 5 findings, prompt 77678B <= 81920 bound; _build_normalization_prompt (nonce plaintext, no decode requirement) + direct call on a free-text prior output -> completed 96.1s (vs the pre-fix Base64 shape: burned the full 96000-token budget and returned incomplete). Artifacts: /tmp/wp21-bound/repair-*. probe_bound.py additionally imported the fixed adapter and drove its real helpers (_split_diff / _build_chunk_context) against the real API."
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewed_commit": "c99a1bd",
+    "reviewer_tool": "qoder-code-review-subagent",
+    "reviewer_note": "Independent adversarial review in a separate agent context (did not author the change; qoder CodeReview subagent, explicit target = branch diff 359bcdb..c99a1bd). All five adversarial checkpoint groups passed: (1) nonce anti-breakout — open/close markers share one fresh uuid4().hex[:16] nonce per call, each marker form appears exactly once (collision proof asserted in tests), and an adversarial payload containing a fabricated close marker stays data (no re-decision); (2) the bounded retry fails closed BEFORE any HTTP call — an over-bound prompt raises at construction time against the 80 KiB bound (test asserts no urlopen); (3) site A / site B direct-path separation — the no-context finalization text ('FINALIZATION for the review you just completed') can no longer enter either direct-path prompt (test-asserted); (4) global invariants — no regex->decision mapping, no new decision literals, key never in URL/logs/exceptions; (5) no residual references to the removed Base64 shape / _NORMALIZATION_BLOCK_END. Re-ran tests: revised suites 69 passed (recovery 50 + direct 19); whole tests/ 632 passed / 4 skipped / 4 failed in 109.14s — the 4 failures are exclusively the pre-existing test_finalize_merge_triple_sign.py git-env baseline ('git checkout -q main' exit 1). Scope: all changed files are inside allowed_paths.",
+    "baseline_note": "Declared unverified by the reviewer: it did NOT independently re-reproduce the 4-failure baseline on unmodified base 359bcdb. The implementer reproduced it identically in a throwaway worktree at main tip 359bcdb (4 failed / 1 passed there), so the baseline attribution is implementer-side evidence.",
+    "reviewed_at": "2026-09-20T07:55:00Z"
+  },
+  "consult": {},
+  "timestamps": {
+    "drafted_at": "2026-09-20T07:10:00Z",
+    "approved_at": "2026-09-20T07:27:00Z",
+    "reviewed_at": "2026-09-20T07:55:00Z",
+    "e2e_completed_at": "2026-09-20T09:31:00Z"
+  }
+}
