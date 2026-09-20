@@ -1002,6 +1002,23 @@
         "Q5：未发生 B60——标的写入的是 rev5 签名后的下一轮冻结并经用户批准"
       ],
       "convergence": "与第一签名**独立同判 REWORK**，且阻断项指向同一处（:517）。codex 另把穷举义务不足单列为阻断，我列为判据 3 FAIL 但不单独阻断——差异在归类，不在事实。"
+    },
+    "refreeze_stop_review_rev7": {
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-plan-review-before-rev7.md",
+      "sha256": "02a1225f01d44792f1f5eabfcb46cf9cbb7478a51afd9ca279d8f83c04307f46",
+      "trigger": "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl:9 —— 第 7 次冻结",
+      "correction": "编排者在 rev6 收尾口头判断「连续两轮都是判据有洞」对 rev6 不成立：:517 那句在 rev5 不存在（git show e2c483d 无该文本），是 rev6 自己新写、且落在 INV-S1 已覆盖的范围内。故 rev7 不重做判据。",
+      "criterion_tension_M2": "§6.1 标题 :458「（上一轮，已提交 e493c2a）」上 INV-S1 与判据 6 给出相反指令。解法是在 rev7 判据里显式豁免 §6.x 历史条目中描述该条目自身那一轮的措辞，但不豁免描述本文件当前状态/轮次/节结构的措辞（即使写在 §6.x 内）。",
+      "criterion3_decision": "rev7 不再把「全族穷举台账」设为阻断门：它约束报告而非交付物，而族的封闭性已由一签与二签两次独立全文扫描建立（双方都只剩 :517）；继续设门会把一句返工换成开放世界判据。",
+      "recommendation": "路 A —— 冻 rev7，单句返工；判据唯一改动是缩小适用面（§6.x 豁免）+ 明写本轮新增文本在适用面内须最后扫一遍。",
+      "rejected_option": "路 B —— 接受现状不再冻版。不推荐：会立下「双签名同判 REWORK 后仍合入」的先例，成本高于再派发一次。",
+      "approval_state": "PENDING_USER —— 编排者自己的签名不能替代第 7 次冻结所需的用户明确批准",
+      "carried_constraints": [
+        "执行面声明 B61",
+        "双签名并行（rev5/rev6 两轮实测独立收敛）",
+        "禁止照抄哈希修法",
+        "新增：本轮新增文本在适用面内，报告须说明新写法对 rev8 成立"
+      ]
     }
   },
   "review": {
