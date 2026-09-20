@@ -425,7 +425,8 @@
           "阶段 2 的冻结",
           "合入批准"
         ],
-        "verification": "查无实据：本会话中没有任何用户消息包含「方向1」的选定。该记录由编排者写入，可能对应压缩前的真实用户消息（停手复核 commit 0369d77 确实存在），但按约束不得以编排者自己的陈述充当用户批准。证明力降为「编排者主张，未核实」，须由用户补确认。rev4 的技术复核结论（第一签名 ACCEPT）不依赖本字段；受影响的是「本次 re-freeze 是否获批」这一程序事实。"
+        "verification": "查无实据：本会话中没有任何用户消息包含「方向1」的选定。该记录由编排者写入，可能对应压缩前的真实用户消息（停手复核 commit 0369d77 确实存在），但按约束不得以编排者自己的陈述充当用户批准。证明力降为「编排者主张，未核实」，须由用户补确认。rev4 的技术复核结论（第一签名 ACCEPT）不依赖本字段；受影响的是「本次 re-freeze 是否获批」这一程序事实。",
+        "retro_note": "2026-09-20：用户就 rev5 方向给出实据批准（见 evidence.user_approval_2026_09_20）。该批准针对 rev5，不追认 rev4 这条 granted=UNVERIFIED 的记录 —— rev4 的方向选定仍查无实据，保持 UNVERIFIED。"
       },
       "supersedes": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev3.md",
       "section_gate": "dispatch_lint.sh 的段落门禁因 B47（按固定命名 WP-29-brief.md 读 brief，忽略 evidence.brief.path）不会作用于 revN 文件；编排者把该门禁的 Python 段落检查器（dispatch_lint.sh:68-99）抽出单独对 rev4 跑，结果 PASS：Acceptance tests 22 行 / Allowed and forbidden paths 9 行 / Completion definition 39 行，均非空。",
@@ -587,6 +588,69 @@
       },
       "codex_did_not": "未评判或改动 §5 的 (c′) 裁定；工作区保持只读",
       "orchestrator_cross_check": "两个阻断项均由编排者独立核对原文复现成立：brief :127/:132/:250/:255/:354 五处逐字确认；交付物 :222-223 的『唯一别名』前提与 :226 的单 token 命令确实不自洽。故编排者撤回第一签名 ACCEPT，本 WP 判 REWORK。"
+    },
+    "user_approval_2026_09_20": {
+      "at": "2026-09-20",
+      "verbatim_user_message": "(c′) 采纳；2. i；3. 同意；4. 确认",
+      "asked_by_orchestrator": "编排者在前一轮消息末尾列出四问：1. (c′) 采纳与否（建议先给）；2. rev5 方向（建议 (i) 严格照字面）；3. 判据族拆出为独立 WP（建议同意）；4. WP-28 已降为 UNVERIFIED 的 re-freeze 批准需重新确认或否认。",
+      "granted": {
+        "cprime_verdict": {
+          "granted": true,
+          "answer": "(c′) 采纳",
+          "what": "§5 的 (c′) 裁定获批：不设 Markdown 解析器、不做整文件冻结、显式承诺边界 + 可选受保护信封冻结",
+          "unlocks": "阶段 2 的范围由 (c′) 确定，可进入冻结准备；本批准不含阶段 2 brief 的冻结本身，也不含合入"
+        },
+        "rev5_direction": {
+          "granted": true,
+          "answer": "i",
+          "choice": "方向 (i) —— 严格按 rev4 brief 字面执行",
+          "means": "去掉两条主 grep 的 --exclude=WP-28-consult-codex-shape-verdict.json，重跑，把该 9574 字节长 JSON 行在两处逐字完整粘贴；不改判据",
+          "explicitly_not": "不采纳方向 (ii)（先按 B59 把标的 2 改写为「目的 + 可接受手段集」再执行）——判据修复另立 WP"
+        },
+        "criteria_family_split": {
+          "granted": true,
+          "answer": "同意",
+          "what": "B55/B56/B58/B59/B60/B61 拆为独立 WP（任务 #46），不进 WP-29 rev5",
+          "why": "避免判据与交付物互相迁就；在该 WP 里判据形状是主题而非附带条件"
+        }
+      },
+      "still_NOT_granted": [
+        "阶段 2 brief 的冻结（范围已由 (c′) 确定，冻结仍需走正常派发流程）",
+        "WP-29 的合入与推送",
+        "rev5 的冻结 —— 须先做第 4 次 re-freeze 的强制停手复核（任务 #24 规范条目），其结论可能是不冻 rev5"
+      ]
+    },
+    "refreeze_stop_review_rev5": {
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-plan-review-before-rev5.md",
+      "sha256": "dbc05029ee76524881cc0bf0a27139ca8a8a472e833a9e5f06637a161172840a",
+      "refreeze_seq": 4,
+      "freeze_seq": 5,
+      "rule": "WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后 re-freeze，冻结前必须停手复核计划，未经用户批准不得冻结",
+      "rule_hit_count": "本仓该规则第 6 次实弹命中",
+      "state": "AWAITING_USER_DECISION",
+      "prerequisites_met": "用户已批准 (c′)、选定方向 (i)、同意判据族拆出（evidence.user_approval_2026_09_20）。方向已定不等于「该不该再冻一版」已答，故本复核仍先做。",
+      "measured_facts": {
+        "deliverable_churn": "rev2→rev3: +308/-125 (32 hunks); rev3→rev4: +137/-37 (27 hunks)",
+        "hunk_landing_rev3_to_rev4": "旧行 1,7,33,36,47,79,90,129,132,135,136,147,151,156,168,173,180 (§0+§1) 与 364,385,389,399,413,417,420,441,443,451 (§6+§7)；旧行 193..363 零 hunk = §2/§3/§4/§5 含 (c′) 逐字未动",
+        "blocking_items_by_section": "连续两轮（rev3→rev4、rev4→rev5）阻断项 100% 落在 §1 证据形式；§2–§5 自 rev3 起经两次双签名零改动"
+      },
+      "root_cause": "判据族漏面序列 B57→B58→B59→B60→B61，五条中四条在编排者侧（brief 或复核）。形状是 open-world 断言：漏的不是某个面，是「§1 须是完整可复现证据」这个承诺的量词。叠加 B60 的角色重叠——编排者既是判据作者又是判据执行面。",
+      "recommendation": "冻结 rev5（不拆 WP、不收手），返工面两条全在 §1，附两条约束",
+      "why_not_split": [
+        "rev5 返工面最窄且已完全确定（方向 (i) 不改判据，无设计空间）",
+        "判据族修复已拆出为独立 WP（用户已同意，任务 #46）",
+        "(c′) 已获批，§1 由「阻塞路径」降为「补齐记录」，rev5 失败不再使阶段 2 停摆"
+      ],
+      "added_constraints": {
+        "A_execution_surface_declaration": "rev5 brief 须携带 B61 执行面声明：/usr/bin/grep (BSD grep 2.6.0-FreeBSD) + LC_ALL=C + cwd=被审 worktree + zsh/bash（第三块依赖 <(...)）；要求逐行一致的块须显式 sort",
+        "B_parallel_signatures": "rev5 第一签名与第二签名并行派发，codex 不再事后复查编排者结论；编排者复核报告不得引用任何「自己跑出但交付物未写」的证据（B60 推论）"
+      },
+      "rework_surface": {
+        "T2": "两条主 grep 去掉 --exclude=WP-28-consult-codex-shape-verdict.json；该 ~9574 字节单行在两处逐字完整；差集命令过滤器同步；行数按新输出重数（预期 39/47，以执行者重跑为准）",
+        "T4": "二选一：(a) 收窄为「_resources_files 这一别名在 src/ 中仅于 load_template 调用」；(b) 粘贴覆盖同族形态的完整搜索命令原文+输出并明写正则语法边界。:222-223 的「唯一别名」前提须自证或删除"
+      },
+      "out_of_scope": "§2/§3/§4/§5 逐字保留（(c′) 已获用户批准，任何改动都是越界）；不做阶段 2 设计；不碰 src/ tests/ 模板 pyproject.toml",
+      "orchestrator_will_not": "未获用户对本复核 §六 的回答前不冻结 rev5、不派发执行者"
     }
   },
   "review": {
@@ -665,6 +729,8 @@
     "reviewed_rev3_at": "2026-09-19T11:54:13+08:00",
     "consulted_rev3_at": "2026-09-19T12:09:39+08:00",
     "review_rev4_withdrawn_at": "2026-09-19",
-    "consult_rev4_at": "2026-09-19"
+    "consult_rev4_at": "2026-09-19",
+    "user_approval_cprime_and_rev5_direction_at": "2026-09-20",
+    "refreeze_stop_review_rev5_at": "2026-09-20"
   }
 }

@@ -403,7 +403,7 @@
         "hit": true,
         "occurrence": 4,
         "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev6.md",
-        "user_approved": "UNVERIFIED",
+        "user_approved": "CONFIRMED_RETROACTIVELY_2026-09-20：用户就编排者第 4 问回复「4. 确认」，确认该 re-freeze 方向选定确曾获批。原 UNVERIFIED 的成因是压缩后查无实据（编排者不得以自己的陈述充当用户批准），现由用户本人在有实据的消息中确认。⚠️ 编排者提问时把本项误称为「方向 1」，而本处记录的实际是**方向 2**（rev6 修载具，方案 B）；用户答的是「WP-28 那条已降为 UNVERIFIED 的 re-freeze 批准」这一指称对象，该指称在 WP-28 中唯一对应本条与 rev6_stop_and_review 两处（均为方向 2），故确认落于此二处。verbatim_user_message=「(c′) 采纳；2. i；3. 同意；4. 确认」",
         "user_choice": "方向 2 —— rev6 修载具（方案 B：M-T0/M-T0b 变异临时副本、删除 _mutate_on_disk、补「真实模板字节前后一致」断言）+ 两份模板 oracle 第 4 项末尾追加两行口径 + FROZEN_BODY_ACCEPTANCE 同步",
         "verbatim_user_message": "2",
         "root_cause": "编排者把「变异须落到判据真实的输入面」翻译成「写那两个真实路径」——输入面是一个文件的字节，不是特定路径。连续两轮根因均在计划侧。",
@@ -482,7 +482,7 @@
       "hit": true,
       "occurrence": 4,
       "document": "docs/plans/2026-09-13-parallel-throughput/WP-28-plan-review-before-rev6.md",
-      "user_approved": "UNVERIFIED",
+      "user_approved": "CONFIRMED_RETROACTIVELY_2026-09-20：用户就编排者第 4 问回复「4. 确认」，确认该 re-freeze 方向选定确曾获批。原 UNVERIFIED 的成因是压缩后查无实据（编排者不得以自己的陈述充当用户批准），现由用户本人在有实据的消息中确认。⚠️ 编排者提问时把本项误称为「方向 1」，而本处记录的实际是**方向 2**（rev6 修载具，方案 B）；用户答的是「WP-28 那条已降为 UNVERIFIED 的 re-freeze 批准」这一指称对象，该指称在 WP-28 中唯一对应本条与 rev6_stop_and_review 两处（均为方向 2），故确认落于此二处。verbatim_user_message=「(c′) 采纳；2. i；3. 同意；4. 确认」",
       "root_cause": "编排者把「变异须落到真实输入面」直接翻译成「写真实仓库文件」——输入面指一个文件的字节，不是那两个特定路径。连续两轮根因均在计划侧。",
       "remedies_measured_before_freeze": {
         "note": "不把未验证的判据写进 brief（记忆 verify-the-remedy-not-just-the-finding）；两个方案均已实测，只动模板副本",
@@ -534,6 +534,21 @@
       "at": "2026-09-18",
       "gate": "orchestrator ACCEPT + codex consult ACCEPT + user approval",
       "note": "合入批准本身有实据（用户消息「合并」）。另一条已更正：evidence.refreeze.stop_and_review_gate 与 evidence.rev6_stop_and_review 的 user_approved 已从 true 改为 \"UNVERIFIED\"（任务 #45），本次批准仅覆盖合入动作，不追认 re-freeze 的方向选定。"
+    },
+    "user_approval_confirmation_2026_09_20": {
+      "at": "2026-09-20",
+      "verbatim_user_message": "(c′) 采纳；2. i；3. 同意；4. 确认",
+      "answer_to": "编排者第 4 问",
+      "confirms": [
+        "evidence.refreeze.stop_and_review_gate.user_approved",
+        "evidence.rev6_stop_and_review.user_approved"
+      ],
+      "direction_confirmed": "方向 2 —— rev6 修载具（方案 B）",
+      "orchestrator_mislabel": "编排者提问时误称其为「方向 1」；实际是方向 2。已在两处记录中注明。",
+      "not_affected": [
+        "evidence.refreeze_stop_rule_check.user_approval（方向 1，granted=true，verbatim=「1」，本就有实据，未曾降级）",
+        "evidence.rev6_merge_approval（verbatim=「合并」，本就有实据）"
+      ]
     }
   },
   "consult": {
