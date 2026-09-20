@@ -3,7 +3,7 @@
   "work_package_id": "WP-21",
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "phase": "P2",
-  "state": "APPROVED",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kiro-dsh-orchestrator-direct",
@@ -23,7 +23,7 @@
     "base_commit": "359bcdb",
     "branch": "fix/wp-21-direct-finalization-correctness",
     "worktree": "/Users/admin/vibe/.worktrees/agentic-wp21-direct-finalization",
-    "commit": "",
+    "commit": "c99a1bd",
     "integration_branch": "main"
   },
   "scope": {
@@ -62,14 +62,33 @@
     "consumer_repo_writes": "LIMITED_E2E_SECOND_SIGNATURE_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      {
+        "command": "python3.11 -m pytest tests/test_codex_verdict_recovery.py tests/test_codex_direct_finalization.py -q",
+        "result": "69 passed (recovery 50 incl. the 3 user-ruled assertion revisions + direct 19 with the 9 new WP-21 tests)",
+        "exit_code": 0
+      },
+      {
+        "command": "python3.11 -m pytest tests -q",
+        "result": "632 passed, 4 skipped, 4 failed in 109.14s — the 4 failures are all the pre-existing test_finalize_merge_triple_sign.py git-env baseline ('git checkout -q main' exit 1), reproduced identically on a throwaway worktree at main tip 359bcdb (4 failed / 1 passed there)",
+        "exit_code": 1
+      }
+    ],
     "p0_probes": "see WP-21-brief.md P0-1..P0-4 and WP-21-evidence-probes.md; raw artifacts under /tmp/direct-probe/ (outside repo)",
     "user_approval": "2026-09-20 user approved: nonce plaintext block + bounded full retry + freeze; action-gating freeze per AGENTS §4.1"
   },
-  "review": {},
+  "review": {
+    "decision": "ACCEPT",
+    "reviewed_commit": "c99a1bd",
+    "reviewer_tool": "qoder-code-review-subagent",
+    "reviewer_note": "Independent adversarial review in a separate agent context (did not author the change; qoder CodeReview subagent, explicit target = branch diff 359bcdb..c99a1bd). All five adversarial checkpoint groups passed: (1) nonce anti-breakout — open/close markers share one fresh uuid4().hex[:16] nonce per call, each marker form appears exactly once (collision proof asserted in tests), and an adversarial payload containing a fabricated close marker stays data (no re-decision); (2) the bounded retry fails closed BEFORE any HTTP call — an over-bound prompt raises at construction time against the 80 KiB bound (test asserts no urlopen); (3) site A / site B direct-path separation — the no-context finalization text ('FINALIZATION for the review you just completed') can no longer enter either direct-path prompt (test-asserted); (4) global invariants — no regex->decision mapping, no new decision literals, key never in URL/logs/exceptions; (5) no residual references to the removed Base64 shape / _NORMALIZATION_BLOCK_END. Re-ran tests: revised suites 69 passed (recovery 50 + direct 19); whole tests/ 632 passed / 4 skipped / 4 failed in 109.14s — the 4 failures are exclusively the pre-existing test_finalize_merge_triple_sign.py git-env baseline ('git checkout -q main' exit 1). Scope: all changed files are inside allowed_paths.",
+    "baseline_note": "Declared unverified by the reviewer: it did NOT independently re-reproduce the 4-failure baseline on unmodified base 359bcdb. The implementer reproduced it identically in a throwaway worktree at main tip 359bcdb (4 failed / 1 passed there), so the baseline attribution is implementer-side evidence.",
+    "reviewed_at": "2026-09-20T07:55:00Z"
+  },
   "consult": {},
   "timestamps": {
     "drafted_at": "2026-09-20T07:10:00Z",
-    "approved_at": "2026-09-20T07:27:00Z"
+    "approved_at": "2026-09-20T07:27:00Z",
+    "reviewed_at": "2026-09-20T07:55:00Z"
   }
 }
