@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "CHANGES_REQUESTED",
+  "state": "DISPATCHED",
   "executor": {
     "tool": "kimi-cli",
     "session": "",
@@ -145,9 +145,10 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief.md",
-      "sha256": "1dfd72aceb3649efc449a75f3a8e7893a27c0fa5480970f763265e0a6d29efd6",
-      "rev": 1
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev5.md",
+      "sha256": "808e06820d46d03ae54b024995cead06f940fcf16ab4ed6c8155b9eb34773d42",
+      "rev": 5,
+      "note": "当前生效的冻结输入指向 rev5；历史各版见 evidence.brief_rev2..brief_rev5"
     },
     "origin": {
       "split_from": "WP-28 rev3 承诺收缩",
@@ -651,10 +652,49 @@
       },
       "out_of_scope": "§2/§3/§4/§5 逐字保留（(c′) 已获用户批准，任何改动都是越界）；不做阶段 2 设计；不碰 src/ tests/ 模板 pyproject.toml",
       "orchestrator_will_not": "未获用户对本复核 §六 的回答前不冻结 rev5、不派发执行者"
+    },
+    "brief_rev5": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev5.md",
+      "sha256": "808e06820d46d03ae54b024995cead06f940fcf16ab4ed6c8155b9eb34773d42",
+      "rev": 5,
+      "frozen_at": "2026-09-20",
+      "freeze_seq": 5,
+      "refreeze_seq": 4,
+      "refreeze_stop_rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 触发强制停手复核。rev5 = 第 5 次冻结 = 第 4 次 re-freeze，规则本次触发（本仓第 6 次实弹命中）。编排者已出停手复核 WP-29-plan-review-before-rev5.md (sha256 dbc05029ee76524881cc0bf0a27139ca8a8a472e833a9e5f06637a161172840a, commit cf2e99b)，用户逐字批准「按两条返工面 冻 rev5 并派发」。",
+      "user_approval": {
+        "granted": true,
+        "at": "2026-09-20",
+        "verbatim_user_message": "按两条返工面 冻 rev5 并派发",
+        "direction": "方向 (i) —— 严格按 rev4 brief 字面执行，不改判据（前序消息「(c′) 采纳；2. i；3. 同意；4. 确认」）",
+        "scope_granted": "WP-29-scope-decision.md 的 §1（标的 A/B/C）+ §0 与 §1 有关措辞 + §7 与 §1 有关格子 + §6 追加改动记录",
+        "scope_NOT_granted": [
+          "§2/§3/§4/§5 的任何改动（(c′) 已获批，改它是改已批准文本）",
+          "阶段 2 的冻结（范围已由 (c′) 确定，冻结本身未获批）",
+          "合入与推送"
+        ]
+      },
+      "targets": {
+        "A_verbatim_paste": "两条主 grep 去掉 --exclude=WP-28-consult-codex-shape-verdict.json（保留 --exclude=WP-29-scope-decision.md）；该 ~9574 字节单行在两处逐字完整；差集命令过滤器同步；行数自己重数",
+        "B_quantifier": "二选一：(a) 删「唯一别名」前提句 + 收窄结论；(b) 贴同族穷举搜索（importlib 各别名/pkgutil.get_data/pkg_resources/import_module/__import__）命令原文 + 完整输出 + 语法边界。两路均保留 cli.py 未覆盖面申报",
+        "C_execution_surface": "B61 新增：执行面声明含 binary(/usr/bin/grep BSD 2.6.0-FreeBSD)/locale(LC_ALL=C)/cwd/shell(zsh|bash)；排序问题须表态（显式 sort 或只承诺行数/集合）"
+      },
+      "closed_not_to_regress": [
+        "标的 0 字面重跑（5/5 IDENTICAL）",
+        "标的 1 声明即所用 + 排除不改变答案",
+        "标的 3 宽口径 17 行 15C/2B 归类",
+        "§2–§5 逐字未动"
+      ],
+      "section_gate_selfcheck": "dispatch_lint.sh:60 按固定名 ${work_package_id}-brief.md 读 brief（B47），revN 文件不会被自动门禁检查。编排者已手工自检四必需段：Acceptance tests(1110B)、Allowed and forbidden paths(538B)、Completion definition(867B)、风险声明(191B)，均在场且非空。"
+    },
+    "parallel_signature_plan_rev5": {
+      "why": "B60 的根因是编排者既是判据作者又是判据执行面；修法是在本轮就把复核者与判据作者分开",
+      "how": "rev5 的第一签名（编排者）与第二签名（codex）并行派发，codex 不再事后复查编排者结论，而是并行独立取证",
+      "constraint": "编排者复核报告不得引用任何「自己跑出但交付物未写」的证据（B60 推论）",
+      "source": "WP-29-plan-review-before-rev5.md §三 约束 B"
     }
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "N/A",
     "reviewer": "claude-code",
     "reviewed_at": "2026-09-19",
     "rev": 4,
@@ -685,10 +725,11 @@
     "document_sha256": "7a3a139ed206f1ec75fbe2dfd02a1ed2aa1febd2ac12854f646791291a1ff76a",
     "reviewed_commit": "f1eee7e",
     "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
-    "withdrawn_first_signature": "ACCEPT → REWORK，撤回记录见 docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md §9"
+    "withdrawn_first_signature": "ACCEPT → REWORK，撤回记录见 docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md §9",
+    "note": "rev4 复核已闭（REWORK，见 evidence.review_rev4_first_signature）；rev5 复核未开始"
   },
   "consult": {
-    "decision": "REWORK",
+    "decision": null,
     "consultant": "codex",
     "provider": "kirogpt",
     "model": "gpt-5.6-sol",
@@ -699,7 +740,7 @@
     "request_sha256": "a476c4434a663c660353184dafcdb9d6275c1d4f0c70a8ef85dd6f8aa51f354f",
     "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4-verdict.md",
     "verdict_sha256": "1551922fd69d7b5b5ba0350cdd0b9db8734965dedcb582a18bcb2fcf8a6c9c61",
-    "note": "rev4 第二签名已到位：REWORK，两个阻断项（详见 evidence.consult_rev4）",
+    "note": "rev5 第二签名将与第一签名并行派发（evidence.parallel_signature_plan_rev5）",
     "blocking_items": {
       "C1-R3": "消费链证据仍不满足『仓库级完整原始输出』：(1) 两条命令搜索范围是 . 却未排除当前交付物，粘贴结果无任何自命中，故不是该命令对最终被审树的完整输出；(2) 长行被 …… 替换，不是『原始命中行，不得摘要』；(3) 宽口径只粘 5 个新增命中并称归 C 类，但遗漏中含两个 B 类测试读取点，拼接路径精确 grep 本就发现不了，故不完整 + 误分类会实质削弱『没有其它通用消费者』的结论；另称 load_template 只有指定调用点但未附原始输出。"
     },
@@ -731,6 +772,7 @@
     "review_rev4_withdrawn_at": "2026-09-19",
     "consult_rev4_at": "2026-09-19",
     "user_approval_cprime_and_rev5_direction_at": "2026-09-20",
-    "refreeze_stop_review_rev5_at": "2026-09-20"
+    "refreeze_stop_review_rev5_at": "2026-09-20",
+    "brief_rev5_frozen_at": "2026-09-20"
   }
 }
