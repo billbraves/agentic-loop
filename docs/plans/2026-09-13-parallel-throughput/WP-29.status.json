@@ -774,10 +774,10 @@
       "targets_met": "标的 A / B / C 三条实质要求全部达成，含 brief 标注「最容易漏」的差集过滤器同步项"
     },
     "refreeze_count": {
-      "frozen_revs": 5,
-      "next_would_be": 6,
+      "frozen_revs": 6,
+      "next_would_be": 7,
       "rule": "WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后的 re-freeze 须停手复核计划，且须用户批准",
-      "status": "rev6 冻结前须再次停手复核；编排者的第一签名不得充当该批准"
+      "status": "rev6 已停手复核（WP-29-plan-review-before-rev6.md）并获用户批准；rev7 若发生仍须再次停手复核 + 用户批准"
     },
     "review_rev4_record": {
       "decision": "N/A",
@@ -840,6 +840,43 @@
         "阶段 2 追加冻结项": "阶段 2 brief 仍应冻结具体标题锚点、body 边界、缺失/重复标题和换行处理。"
       },
       "orchestrator_cross_check": "第 1 条编排者原地实测复现：交付物自身含搜索串 49/57 处；按声明命令重跑 88/104 行；加 --exclude=WP-29-scope-decision.md 后恰为 39/47（与粘贴一致）。故 codex 成立，编排者撤回 ACCEPT。第 2/3 条与编排者 M1/M2 同料，codex 的阻断定性更严且正确（本阶段交付标的就是可复现完整的证据本身）。其余裁决与编排者第一签名同向。"
+    },
+    "refreeze_stop_review_rev6": {
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-plan-review-before-rev6.md",
+      "sha256": "ec6dec6ae9ef6d3a997cd244a05c27d9a083ccac8651e53b6c6f8e66384d45f6",
+      "freeze_seq": 6,
+      "refreeze_seq": 5,
+      "rule": "WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后的 re-freeze 冻结前必须停手复核计划，未经用户批准不得冻结",
+      "user_approval": "用户逐字「好的，继续修复」（2026-09-20）",
+      "verdict": "冻 rev6。返工面是六轮里最窄且封闭：四处单行自指陈述更正，零重跑、零新证据、零设计空间。",
+      "why_not_stop": [
+        "缺陷族封闭可枚举（全文自指陈述），不是 §1 那个开放世界量词；按 closed-model-or-bounded-claim 可给全称承诺",
+        "(c′) 已获批，rev6 不阻塞阶段 2；最坏后果是记录仍有陈旧自述",
+        "本轮不新增任何证据要求，不动命令/输出/结论，无「判据与交付物互相迁就」的条件"
+      ],
+      "structural_finding": "«:517 是构造性陈旧»：§7 自核查必然在本轮提交之前运行，HEAD 那一刻永远是上一版。照抄哈希修法（f1eee7e→e2c483d）会在 rev7 视角下原地复发，故 brief 专条要求改标注语义而非改哈希，并要执行者说明其写法为何在 rev7 仍成立。",
+      "carried_constraints": "沿用 rev5 的两条（B61 执行面声明、双签名并行），新增第三条（禁照抄哈希修法）"
+    },
+    "b62_registered": {
+      "id": "B62",
+      "statement": "交付物的自指陈述须与交付物同真，且判据须覆盖自指面。",
+      "why": "六轮判据全部瞄准「对外断言的证据质量」，无一覆盖「对内自述的时效」。一份反复修订的文档里自述最容易掉队——它不是证据，没有复核者会去重跑它。",
+      "scope": "本轮 WP-29 rev6 按 INV-S1 逐处收口；长期修法（brief 模板自带自指同真 DoD 项）归入任务 #46 的判据族 WP，不塞进 rev6。",
+      "note": "编排者第一签名把 :455/:601 判为非阻断，理由「brief 未要求」成立（B60 禁止复核者追加判据），但它暴露的是 brief 的漏面。正确动作是不在签名里追加判据，而在下一次冻结时把整族写进判据。"
+    },
+    "brief_rev6": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev6.md",
+      "sha256": "26626e2da3ab2286587628ed455ad6204b89290a5be998c6b3fe5f40865eb902",
+      "frozen_at": "2026-09-20",
+      "target": "唯一标的 INV-S1（自指同真）+ 穷举义务 + 禁照抄哈希修法",
+      "known_sites": [
+        ":455",
+        ":517",
+        ":590",
+        ":601"
+      ],
+      "sites_are": "破口清单，不是标的；只改这四处即 REWORK",
+      "dispatch_lint_note": "dispatch_lint.sh 按固定名 WP-29-brief.md 读 brief（缺陷 B47，任务 #38 待修），故 revN brief 从未过段落门禁；本次三段（Acceptance tests / Allowed and forbidden paths / Completion definition）由编排者用与门禁同一段落谓词直接核过，均非空。"
     }
   },
   "review": {
@@ -916,6 +953,8 @@
     "brief_rev5_frozen_at": "2026-09-20",
     "reviewed_rev5_at": "2026-09-20",
     "consulted_rev5_at": "2026-09-20",
-    "changes_requested_rev5_at": "2026-09-20"
+    "changes_requested_rev5_at": "2026-09-20",
+    "refreeze_stop_review_rev6_at": "2026-09-20",
+    "brief_rev6_frozen_at": "2026-09-20"
   }
 }
