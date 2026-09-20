@@ -15,8 +15,11 @@ supports_standalone_web_search=false 会让 turn 直接失败）。于是禁工�
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -27,6 +30,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from agentic_loop.adapters import codex as codex_mod
+from agentic_loop.adapters.base import ReviewContract
 from agentic_loop.adapters.codex import CodexAdapter
 from agentic_loop.provider_binding import ProviderBinding
 
@@ -211,3 +215,221 @@ def test_http_error_does_not_leak_body(monkeypatch):
         adapter._direct_tool_free_verdict(prompt="p", schema=SCHEMA)
     assert "sk-leaked-secret" not in str(ei.value)
     assert "401" in str(ei.value)
+
+
+# =====================================================================
+# WP-21：直连禁工具链路的正确性修复
+#   (1) 归一化 prompt = nonce 定界明文引号块（无任何解码/变换要求）；
+#   (2) 空终态直连 = 有界全量重试（内联 brief+diff；超界不发起调用）。
+# =====================================================================
+
+DIFF = "diff --git a/x.py b/x.py\n+print('wp21 diff body')\n"
+BRIEF = "WP-21 brief body: bounded direct retry"
+CHUNK_CTX = "## Chunk context\nYou are now judging chunk 1/3, which contains: x.py."
+
+
+def mk_contract(review_policy: str = "") -> ReviewContract:
+    return ReviewContract(
+        role="consultant", output_schema=SCHEMA, review_policy=review_policy
+    )
+
+
+def mk_direct_adapter(monkeypatch) -> CodexAdapter:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
+    return CodexAdapter(binding=mk_binding(), direct_finalization=True)
+
+
+def extract_norm_block(prompt: str) -> tuple[str, str]:
+    """取出 (nonce, 明文 payload)；开/闭标记共享同一 nonce。"""
+    m = re.search(
+        r"<<<<PRIOR_OUTPUT_([0-9a-f]{16})\n(.*?)\nPRIOR_OUTPUT_\1>>>>",
+        prompt,
+        re.DOTALL,
+    )
+    assert m, "nonce-delimited PRIOR_OUTPUT block not found"
+    return m.group(1), m.group(2)
+
+
+def _fake_proc():
+    return subprocess.CompletedProcess(
+        args=["codex"], returncode=0, stdout=b"", stderr=b""
+    )
+
+
+def _patch_first_attempt(monkeypatch, adapter, *, verdict):
+    """把 CLI 首轮与输出读取打桩掉，只留直连恢复调用走真实构建路径。"""
+    monkeypatch.setattr(adapter, "_exec_attempt", lambda **kw: _fake_proc())
+    monkeypatch.setattr(adapter, "_read_verdict_output", lambda *a, **k: verdict)
+
+
+# ---- 归一化 prompt：nonce 明文、无解码要求 ----------------------------------
+
+def test_normalization_prompt_nonce_plaintext_without_decode_requirement(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    prompt = adapter._build_normalization_prompt(
+        prior_output="free text verdict body", contract=mk_contract()
+    )
+    nonce, payload = extract_norm_block(prompt)
+    assert payload == "free text verdict body"
+    assert prompt.count(f"PRIOR_OUTPUT_{nonce}") == 2
+    # P0 根因（解码要求触发无界手工解码）的载体必须不复存在。
+    assert "base64" not in prompt.lower()
+    assert "decode" not in prompt.lower()
+
+
+def test_normalization_prompt_nonce_fresh_each_call(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    p1 = adapter._build_normalization_prompt(prior_output="x", contract=mk_contract())
+    p2 = adapter._build_normalization_prompt(prior_output="x", contract=mk_contract())
+    assert extract_norm_block(p1)[0] != extract_norm_block(p2)[0], (
+        "nonce 必须每次调用新生成，否则可被跨调用重放的伪造标记截断"
+    )
+
+
+# ---- 重试 prompt：结构绑定 + 上界 -------------------------------------------
+
+def test_retry_prompt_structure_binding(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    prompt = adapter._build_direct_retry_prompt(
+        diff=DIFF, brief=BRIEF, contract=mk_contract(), chunk_context=CHUNK_CTX
+    )
+    # 不再是伪签装置（无上下文收尾文案）。
+    assert not prompt.startswith("FINALIZATION")
+    assert "FINALIZATION for the review you just completed" not in prompt
+    # 与 _build_prompt 同源的评审指令段（标准载体与首轮一致）。
+    assert (
+        "You are Codex acting as the independent Architecture & Incident Consultant"
+        in prompt
+    )
+    assert "Return a structured verdict:" in prompt
+    # 材料双 nonce 块：开/闭共享同一 nonce、各自恰好一对；块内 = 原文。
+    brief_nonce = re.search(r"<<<<UNTRUSTED_BRIEF_([0-9a-f]{16})", prompt).group(1)
+    diff_nonce = re.search(r"<<<<UNTRUSTED_DIFF_([0-9a-f]{16})", prompt).group(1)
+    assert brief_nonce == diff_nonce
+    assert prompt.count(f"UNTRUSTED_BRIEF_{brief_nonce}") == 2
+    assert prompt.count(f"UNTRUSTED_DIFF_{brief_nonce}") == 2
+    assert (
+        f"<<<<UNTRUSTED_BRIEF_{brief_nonce}\n{BRIEF}\n"
+        f"UNTRUSTED_BRIEF_{brief_nonce}>>>>"
+    ) in prompt
+    assert (
+        f"<<<<UNTRUSTED_DIFF_{brief_nonce}\n{DIFF}\n"
+        f"UNTRUSTED_DIFF_{brief_nonce}>>>>"
+    ) in prompt
+    # 字节数 + SHA-256 绑定。
+    assert f"Brief UTF-8 bytes: {len(BRIEF.encode())}" in prompt
+    assert f"Brief SHA-256: {hashlib.sha256(BRIEF.encode()).hexdigest()}" in prompt
+    assert f"Diff UTF-8 bytes: {len(DIFF.encode())}" in prompt
+    assert f"Diff SHA-256: {hashlib.sha256(DIFF.encode()).hexdigest()}" in prompt
+    # chunk_context 保留（分块场景的全局方位）。
+    assert CHUNK_CTX in prompt
+
+
+def test_retry_prompt_includes_review_policy(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    prompt = adapter._build_direct_retry_prompt(
+        diff=DIFF, brief=BRIEF, contract=mk_contract(review_policy="HARD RULE: X")
+    )
+    assert "HARD RULE: X" in prompt
+    prompt2 = adapter._build_direct_retry_prompt(
+        diff=DIFF, brief=BRIEF, contract=mk_contract()
+    )
+    assert "HARD RULE" not in prompt2
+
+
+def test_retry_prompt_over_input_bound_fails_closed(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    huge = "diff --git a/x b/x\n+" + "x" * CodexAdapter._DIRECT_RETRY_MAX_INPUT_BYTES
+    with pytest.raises(RuntimeError, match="exceeds input bound"):
+        adapter._build_direct_retry_prompt(diff=huge, brief=BRIEF, contract=mk_contract())
+
+
+# ---- site A（空终态）直连接线 ------------------------------------------------
+
+def test_empty_final_state_direct_uses_bounded_retry_not_finalization(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    captured: dict = {}
+    monkeypatch.setattr(
+        codex_mod.urllib.request, "urlopen",
+        fake_urlopen(
+            ok_payload(
+                '{"decision": "ACCEPT", "rationale": "r", "findings": []}'
+            ),
+            captured,
+        ),
+    )
+    _patch_first_attempt(monkeypatch, adapter, verdict=None)
+
+    verdict = adapter._review_single(
+        diff=DIFF, brief=BRIEF, contract=mk_contract(), effort="high",
+        chunk_context=CHUNK_CTX,
+    )
+
+    assert verdict.decision == "ACCEPT"
+    sent = captured["body"]["input"]
+    # 直连空终态：发的是有界全量重试（材料内联），不是无上下文收尾文案。
+    assert "FINALIZATION for the review you just completed" not in sent
+    assert "<<<<UNTRUSTED_BRIEF_" in sent and "<<<<UNTRUSTED_DIFF_" in sent
+    assert BRIEF in sent and "wp21 diff body" in sent
+    assert CHUNK_CTX in sent
+    assert captured["body"]["tools"] == []
+
+
+def test_empty_final_state_over_bound_fails_closed_without_http(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    calls = {"n": 0}
+
+    def _forbidden_open(req, timeout=None):
+        calls["n"] += 1
+        raise AssertionError("HTTP must not be issued when retry exceeds bound")
+
+    monkeypatch.setattr(codex_mod.urllib.request, "urlopen", _forbidden_open)
+    _patch_first_attempt(monkeypatch, adapter, verdict=None)
+    huge = "diff --git a/x b/x\n+" + "x" * CodexAdapter._DIRECT_RETRY_MAX_INPUT_BYTES
+
+    with pytest.raises(RuntimeError, match="exceeds input bound"):
+        adapter._review_single(
+            diff=huge, brief=BRIEF, contract=mk_contract(), effort="high"
+        )
+    assert calls["n"] == 0
+
+
+def test_empty_final_state_retry_incomplete_fails_closed(monkeypatch):
+    """重试被截断（incomplete）→ 抛错取不到签，绝不产伪签。"""
+    adapter = mk_direct_adapter(monkeypatch)
+    payload = {"status": "incomplete", "output": [], "incomplete_details": {}}
+    monkeypatch.setattr(codex_mod.urllib.request, "urlopen", fake_urlopen(payload, {}))
+    _patch_first_attempt(monkeypatch, adapter, verdict=None)
+
+    with pytest.raises(RuntimeError, match="did not complete"):
+        adapter._review_single(
+            diff=DIFF, brief=BRIEF, contract=mk_contract(), effort="high"
+        )
+
+
+# ---- site B（非法 JSON）归一化直连接线 ---------------------------------------
+
+def test_normalization_site_direct_prompt_no_finalization_text(monkeypatch):
+    adapter = mk_direct_adapter(monkeypatch)
+    captured: dict = {}
+    monkeypatch.setattr(
+        codex_mod.urllib.request, "urlopen",
+        fake_urlopen(
+            ok_payload(
+                '{"decision": "REWORK", "rationale": "r", "findings": []}'
+            ),
+            captured,
+        ),
+    )
+    _patch_first_attempt(monkeypatch, adapter, verdict="plain free text, not json")
+
+    verdict = adapter._review_single(
+        diff=DIFF, brief=BRIEF, contract=mk_contract(), effort="high"
+    )
+
+    assert verdict.decision == "REWORK"
+    sent = captured["body"]["input"]
+    assert "plain free text, not json" in sent
+    assert "<<<<PRIOR_OUTPUT_" in sent
+    assert "base64" not in sent.lower()
+    assert "FINALIZATION for the review you just completed" not in sent
