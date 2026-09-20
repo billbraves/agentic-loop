@@ -145,10 +145,10 @@
   },
   "evidence": {
     "brief": {
-      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev5.md",
-      "sha256": "808e06820d46d03ae54b024995cead06f940fcf16ab4ed6c8155b9eb34773d42",
-      "rev": 5,
-      "note": "当前生效的冻结输入指向 rev5；历史各版见 evidence.brief_rev2..brief_rev5"
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev7.md",
+      "sha256": "527a741298d530f6d7493fe2e452b6aa287e02439e0ba0f5c9c037ca4823e607",
+      "rev": 7,
+      "note": "当前生效的冻结输入指向 rev7；历史各版见 evidence.brief_rev2..brief_rev7"
     },
     "origin": {
       "split_from": "WP-28 rev3 承诺收缩",
@@ -774,10 +774,16 @@
       "targets_met": "标的 A / B / C 三条实质要求全部达成，含 brief 标注「最容易漏」的差集过滤器同步项"
     },
     "refreeze_count": {
-      "frozen_revs": 6,
-      "next_would_be": 7,
+      "frozen_revs": 7,
+      "next_would_be": 8,
       "rule": "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl:9 —— 同一 WP 第 3 次及以后的 re-freeze 须停手复核计划 + 用户明确批准",
-      "note": "rev7 若发生，须新的停手复核文档 + 新的用户批准；编排者自己的签名不能替代"
+      "note": "rev8 若发生，须新的停手复核文档 + 新的用户批准；编排者自己的签名不能替代",
+      "approvals": [
+        "rev4：停手复核 + 用户批准",
+        "rev5：停手复核 + 用户批准（原话「(c′) 采纳；2. i；3. 同意；4. 确认」）",
+        "rev6：停手复核 + 用户批准",
+        "rev7：停手复核 02a1225f…（提交 3285a43）+ 用户批准（原话「A」）"
+      ]
     },
     "review_rev4_record": {
       "decision": "N/A",
@@ -1012,13 +1018,47 @@
       "criterion3_decision": "rev7 不再把「全族穷举台账」设为阻断门：它约束报告而非交付物，而族的封闭性已由一签与二签两次独立全文扫描建立（双方都只剩 :517）；继续设门会把一句返工换成开放世界判据。",
       "recommendation": "路 A —— 冻 rev7，单句返工；判据唯一改动是缩小适用面（§6.x 豁免）+ 明写本轮新增文本在适用面内须最后扫一遍。",
       "rejected_option": "路 B —— 接受现状不再冻版。不推荐：会立下「双签名同判 REWORK 后仍合入」的先例，成本高于再派发一次。",
-      "approval_state": "PENDING_USER —— 编排者自己的签名不能替代第 7 次冻结所需的用户明确批准",
+      "approval_state": "GRANTED —— 用户 2026-09-20 明确批准路 A（原话「A」，对应停手复核文档 §五 的两路选择：路 A 冻 rev7 单句返工 / 路 B 接受现状不再冻版）",
       "carried_constraints": [
         "执行面声明 B61",
         "双签名并行（rev5/rev6 两轮实测独立收敛）",
         "禁止照抄哈希修法",
         "新增：本轮新增文本在适用面内，报告须说明新写法对 rev8 成立"
       ]
+    },
+    "user_approval_rev7_path_a": {
+      "at": "2026-09-20",
+      "verbatim_user_message": "A",
+      "asked_by_orchestrator": "编排者在停手复核文档 §五 列出两路并给出推荐：路 A = 冻 rev7 单句返工（推荐，附三条可核理由）；路 B = 接受 rev6 现状不再冻版。消息末尾请用户二选一。",
+      "granted": {
+        "seventh_refreeze": true,
+        "what": "WP-29 第 7 次冻结获批：按路 A 冻 rev7 并派发（单句返工 + §6.x 豁免边界 + 本轮新增文本在适用面内）",
+        "satisfies": "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后的 re-freeze 须停手复核文档 + 用户明确批准；停手复核文档 02a1225f…（提交 3285a43），用户批准原话「A」"
+      },
+      "still_NOT_granted": [
+        "WP-29 的合入与推送（rev7 通过双签名后仍须单独批准）",
+        "阶段 2 brief 的冻结"
+      ]
+    },
+    "brief_rev7": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-29-brief-rev7.md",
+      "sha256": "527a741298d530f6d7493fe2e452b6aa287e02439e0ba0f5c9c037ca4823e607",
+      "frozen_at": "2026-09-20",
+      "freeze_commit": "a4e441c",
+      "base_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+      "target": "唯一阻断标的：WP-29-scope-decision.md:517 一句自述改为不依赖轮数、且与本轮实际动作同真",
+      "criteria_delta_vs_rev6": [
+        "INV-S1 原文不动（停手复核已证 rev6 的违反是执行者本轮自写、落在已冻覆盖面内，不是判据有洞）",
+        "新增判据面：INV-S1 适用面包含执行者本轮新增/改写的每一行，须在编辑定稿后、提交前对改动行再扫一遍，并用「rev8 视角」自证新措辞不依赖轮数",
+        "唯一缩小：§6.x 修订史中描述其所属那一轮当时语境的条目豁免；但对文件现状（现行轮次/节结构/命令形态）的陈述即便写在 §6.x 内也不豁免（:517 落在此边界内侧）",
+        "穷举台账不再设为阻断门（约束报告而非交付物，闭合性已由两次独立全文扫描建立）"
+      ],
+      "hard_prohibitions": [
+        "不追加 §6.5 或任何 rev7 修订史条目 —— 否则再造一个须在 rev8 保持同真的自述站点",
+        "§7 一个字都不动 —— 不追 diff stat、不追 pytest 用时",
+        "禁照抄哈希修法（沿用 rev6 判据）"
+      ],
+      "dispatch_lint_note": "B47 未修：dispatch_lint.sh 按固定名 WP-29-brief.md 读 brief，不认 evidence.brief.path，故 revN brief 从未过段落门禁。本 rev 三段谓词（Acceptance tests 34 行 / Allowed and forbidden paths 12 行 / Completion definition 30 行）由编排者用门禁自身的 python 谓词逐条手工套用，结果 PASS。任务 #38 待修。"
     }
   },
   "review": {
@@ -1100,6 +1140,9 @@
     "dispatched_at_rev6": "2026-09-20",
     "implementing_at_rev6": "2026-09-20",
     "reviewed_at": "2026-09-20",
-    "updated_at": "2026-09-20"
+    "updated_at": "2026-09-20",
+    "refreeze_stop_review_rev7_at": "2026-09-20",
+    "user_approval_rev7_path_a_at": "2026-09-20",
+    "brief_rev7_frozen_at": "2026-09-20"
   }
 }
