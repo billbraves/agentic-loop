@@ -1,12 +1,13 @@
-# WP-29 阶段 1：模板受保护块的「活动渲染」判据 —— 范围界定与可行性裁定（rev5 修订版）
+# WP-29 阶段 1：模板受保护块的「活动渲染」判据 —— 范围界定与可行性裁定
 
 > 冻结日期 2026-09-20 | 执行者 kimi（provider: deepseek）| 本文件是阶段 1 唯一交付物。
 > 判定对象：`src/agentic_loop/templates/WORK_PACKAGE.md.tmpl` 与
 > `docs/agentic/templates/WORK_PACKAGE.md`（下称「两份模板」或「模板」）。
 > 阶段 2 不冻结，须在阶段 1 裁定获批准后另行冻结。
 > 本文件是 rev1（commit `bd4ac7a`）的**原地修订**：rev3（commit `e493c2a`）重做 §1 / §4 / §5 /
-> §0（§2 / §3 已 ACCEPT 保留）；rev4（在 `e493c2a` 之上）补全 §1 消费面证据；rev5（本轮，在
-> `f1eee7e` 之上）恢复 codex 二签 JSON 长行的逐字完整粘贴、收窄「唯一别名」前提、固定执行面。
+> §0（§2 / §3 已 ACCEPT 保留）；rev4（在 `e493c2a` 之上）补全 §1 消费面证据；rev5（在
+> `f1eee7e` 之上）恢复 codex 二签 JSON 长行的逐字完整粘贴、收窄「唯一别名」前提、固定执行面；
+> rev6（在 `e2c483d` 之上）收口本文件的自指陈述（INV-S1）。
 
 ## 0. 裁定摘要（TL;DR）
 
@@ -452,7 +453,7 @@ G4       2889                      RED
 
 （说明：本阶段只做裁定，不写判据、不引依赖。上述判据形状与措辞供阶段 2 实现时使用。）
 
-## 6. rev1 → rev4 改了什么
+## 6. 修订历史（rev1 起）
 
 ### 6.1 rev1 → rev3（上一轮，已提交 `e493c2a`）
 
@@ -494,7 +495,7 @@ G4       2889                      RED
   按「主 grep 命中 / 宽口径补充命中」来源重新标注，新增 `cli.py` 非第二读取入口的未覆盖面申报。
 - **去省略符**：移除 §1 全部 U+2026 省略符，每个 grep 粘贴块与 `grep` 字面重跑逐行一致。
 
-### 6.3 rev4 → rev5（本轮，只动 §1 取证 + §0/§7 相关格子）
+### 6.3 rev4 → rev5（只动 §1 取证 + §0/§7 相关格子）
 
 逐条对应 rev5 brief 的三件标的（A / B / C）：
 
@@ -511,10 +512,27 @@ G4       2889                      RED
   （`LC_ALL=C`）、cwd（被审 worktree 根）、shell（bash）四项；排序表态为「两条主 grep 只承诺
   行数/集合相同，不承诺顺序可跨环境复现」（差集块输入侧显式 `sort`，输出顺序确定）。
 
+### 6.4 rev5 → rev6 改了什么
+
+本 rev 是五轮里唯一不动证据的一轮（零重跑、零新命令、零新输出），只改本文件对自身版本 /
+提交 / 节结构 / 命令形态的描述，使其与现行内容同真（INV-S1）：
+
+- **标题**：去掉版本号「（rev5 修订版）」，不再以版本号自称。
+- **头注修订史**：去掉 `rev5` 条目里的「本轮」，补 `rev6` 条目；各条只标注父提交。
+- **§6 节标题**：`rev1 → rev4 改了什么` 改为 `修订历史（rev1 起）`（本节已含 §6.3 / §6.4，不再只到 rev4）。
+- **§6.3 节标题**：去掉 `rev4 → rev5` 后的「本轮」，只保留「只动 §1 取证 + §0/§7 相关格子」。
+- **§7 自核查 HEAD**：标注从「（rev5 提交）」改为「（本轮修订的基线提交 / 父提交）」，哈希按实跑更新。
+- **§7 diff stat**：按实跑更新（不再保留 rev5 的 `72 22`）。
+- **§7「全量」标签**：`（§6 命令）` 改为 `（§7 命令）`（selfcheck 自 rev3 起即为 §7）。
+- **DoD 对照**：`--exclude` 描述从「本交付物 + codex 二签」改为「仅本交付物自身」；节标题描述从
+  「rev1 → rev4 改了什么」改为「修订历史（rev1 起）」并补 §6.3 / §6.4。
+- **保留区零改动**：§1 证据面（命令 / 输出 / 行数 / 四分类 / 执行面声明 / 排序表态）、§2–§5、
+  §6.1–§6.2、两条 9659 字节长行逐字未动。
+
 ## 7. 自我核查（selfcheck）
 
 以下命令均在 worktree `/Users/admin/vibe/wp29-render-scope-decision`、分支
-`feature/wp29-render-scope-decision`、HEAD `f1eee7e650c300c0cdc8be42a0c879961ebc83d8`（rev5 提交）执行。
+`feature/wp29-render-scope-decision`、HEAD `e2c483d26ef9999ac77aaaa22db59b2e0db5abe4`（本轮修订的基线提交 / 父提交）执行。
 
 ```bash
 git status --porcelain
@@ -524,8 +542,8 @@ git status --porcelain
 
 ```bash
 git diff --stat HEAD
-# ->   .../WP-29-scope-decision.md                        | 94 +++++++++++++++++-----
-# ->   1 file changed, 72 insertions(+), 22 deletions(-)
+# ->   .../WP-29-scope-decision.md                        | 42 +++++++++++++++-------
+# ->   1 file changed, 30 insertions(+), 12 deletions(-)
 ```
 
 ```bash
@@ -570,11 +588,11 @@ $ cmp src/agentic_loop/templates/WORK_PACKAGE.md.tmpl docs/agentic/templates/WOR
 IDENTICAL
 ```
 
-全量（§6 命令）：
+全量（§7 命令）：
 
 ```text
 $ PYTHONPATH=src python3.11 -m pytest tests -q
-4 failed, 606 passed, 4 skipped in 116.99s
+4 failed, 606 passed, 4 skipped in 96.04s (0:01:36)
 ```
 
 - 4 failed 全部在 `tests/test_finalize_merge_triple_sign.py`（本机
@@ -587,7 +605,7 @@ $ PYTHONPATH=src python3.11 -m pytest tests -q
 ## 附：与 DoD 的逐项对照
 
 - [x] `WP-29-scope-decision.md` 存在，5 项逐条作答，每项附可核验证据（§0–§5）
-- [x] 消费链一项附仓库级 `grep -rn` 原文命令 + 显式 `--exclude-dir` + `--exclude`（本交付物 + codex 二签）+ 完整输出，A/B/C/D 四分类（§1）
+- [x] 消费链一项附仓库级 `grep -rn` 原文命令 + 显式 `--exclude-dir` + `--exclude`（仅本交付物自身）+ 完整输出，A/B/C/D 四分类（§1）
 - [x] D 类给出 `pyproject.toml` artifacts 行 + `load_template` 调用点原文 + `_resources_files` 资源入口原文，行号级结论（不解析 Markdown）（§1）
 - [x] 「唯一」带限定词：唯一的**非测试运行时**消费者（§1）
 - [x] 每个 grep 粘贴块可字面重跑；全文零 U+2026 省略符（§1 / §7）
@@ -598,7 +616,7 @@ $ PYTHONPATH=src python3.11 -m pytest tests -q
 - [x] 每个变异带 `assert 变异后 != 变异前` 守卫（§4 两个脚本均带）
 - [x] §0/§5 用灵敏度/特异性表述，不再出现「(b) 覆盖 E1–E4 全部」（§0/§5）
 - [x] 末尾有明确裁定（(c′)，§5），与 G1–G4 兼容，承诺量词闭合，不采用哨兵
-- [x] 文档含「rev1 → rev4 改了什么」一节：§6.1 逐条对应 C1 / C2 / 措辞 / 基线，§6.2 记录 rev3→rev4 的 §1 证据补全（§6）
+- [x] 文档含「修订历史（rev1 起）」一节：§6.1 逐条对应 C1 / C2 / 措辞 / 基线，§6.2 记录 rev3→rev4 的 §1 证据补全，§6.3 记录 rev4→rev5 的标的 A/B/C，§6.4 记录 rev5→rev6 的自指收口（§6）
 - [x] 零代码改动：`git diff --stat` 只含本 md 文件（§7）
 - [x] 未引入任何依赖（`pyproject.toml` / `uv.lock` 零 diff，§7）
 - [x] 未碰两份模板（`git diff --exit-code` 证明，§7）
