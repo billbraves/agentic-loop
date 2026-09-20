@@ -719,7 +719,17 @@ def main(argv: list[str]) -> int:
     # Resolve the consultant's provider binding (e.g. DeepSeek) so codex is
     # actually injected with it — not its global default model.
     _, consultant_binding = resolve_role_binding("consultant", repo=repo_root)
-    adapter = CodexAdapter(binding=consultant_binding)
+    # direct_finalization：禁工具的收尾/归一化 turn 绕过 codex CLI，直接调 provider
+    # 的 Responses API 并强制 tools=[]。原因是 codex CLI **客户端**会注入 web_search
+    # 且无任何开关可关（--disable web_search / omit_tools_from /
+    # tools.web_search=false 实测均无效；supports_standalone_web_search=false 会让
+    # turn 直接失败），导致 tool-free turn 必然违约、第二签永远取不到。
+    # 注入方是 CLI 而非 provider：以 tools=[] 直连 DeepSeek 时，即使提示明确要求
+    # 联网搜索，输出也只有 reasoning + message。直连因此真正兑现了禁工具契约，
+    # 校验侧一行未放宽（直连路径同样对任何非 reasoning/message 项 fail-closed）。
+    adapter = CodexAdapter(
+        binding=consultant_binding, direct_finalization=True
+    )
 
     # INV-2: require self-attestable level-2 capabilities.
     capabilities = adapter.capabilities()

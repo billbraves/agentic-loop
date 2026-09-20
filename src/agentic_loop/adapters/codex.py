@@ -6,6 +6,8 @@ import json
 import os
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 import tempfile
 import uuid
 from pathlib import Path
@@ -137,7 +139,10 @@ class CodexAdapter(Adapter):
     _ITEM_BEARING_EVENT_TYPES = frozenset({"item.started", "item.completed"})
 
     def __init__(self, codex_bin: str = "codex",
-                 binding: ProviderBinding | None = None) -> None:
+                 binding: ProviderBinding | None = None,
+        direct_finalization: bool = False,
+    ) -> None:
+        self._direct_finalization = direct_finalization
         self._codex_bin = codex_bin
         self._binding = binding
 
@@ -335,6 +340,15 @@ class CodexAdapter(Adapter):
                 (workdir_path / "prompt-2.md").write_text(
                     final_prompt, encoding="utf-8"
                 )
+                # 禁工具收尾优先走直连 Responses API：codex CLI 客户端会强行
+                # 注入 web_search（所有已知开关均无效），使 tool-free turn 必然
+                # 违约、第二签永远取不到。直连让请求的 tools 恒为空数组，真正
+                # 兑现契约而不是放宽校验。无 binding 时退回 CLI 路径。
+                if self._direct_finalization_enabled():
+                    raw2 = self._direct_tool_free_verdict(
+                        prompt=final_prompt, schema=contract.output_schema
+                    )
+                    return self._to_verdict(self._redact_output(raw2))
                 proc2 = self._resume_finalization(
                     thread_id=thread_id,
                     schema_file=schema_file,
@@ -380,6 +394,12 @@ class CodexAdapter(Adapter):
             (workdir_path / "prompt-2.md").write_text(
                 norm_prompt, encoding="utf-8"
             )
+            # 同上：归一化也是禁工具 turn，优先直连。
+            if self._direct_finalization_enabled():
+                raw2 = self._direct_tool_free_verdict(
+                    prompt=norm_prompt, schema=contract.output_schema
+                )
+                return self._to_verdict(self._redact_output(raw2))
             proc2 = self._exec_attempt(
                 schema_file=schema_file,
                 answer_file=workdir_path / "answer-2.md",
@@ -462,6 +482,151 @@ class CodexAdapter(Adapter):
             stderr=subprocess.PIPE,
             cwd=workdir,
         )
+
+    # 禁工具收尾/归一化 turn 的直连预算与超时。
+    #
+    # 取值依据（实测，非估计）：收尾要把 N 个 chunk 的裁决汇总成一份结构化裁决，
+    # WP-34 的 10 个 chunk 裁决合计约 14.6KB（~4.9k token），且该模型会先产出大量
+    # reasoning token —— 一次实测 turn 用掉 output_tokens=77919，其中 reasoning
+    # 77450。16000 起初被证明过小（门禁实跑直接 status='incomplete'），故放宽到
+    # 足以容纳"长推理 + 完整裁决"。
+    #
+    # 注意：截断的裁决**永不采信**（status != completed 即 fail-closed），所以预算
+    # 过小的后果是取不到签，而不是采信一份被截断的裁决。
+    _DIRECT_MAX_OUTPUT_TOKENS = 96000
+    _DIRECT_TIMEOUT_SECONDS = 1800
+
+    def _direct_finalization_enabled(self) -> bool:
+        """禁工具收尾是否走直连 Responses API。
+
+        必须由构造方**显式**开启（`direct_finalization=True`）且存在 provider
+        binding。默认关闭。
+
+        为什么用显式开关，而不是"环境里有密钥就自动启用"：后者会让单测行为取决于
+        开发机是否配了真密钥 —— 既有用例用假 binding 打桩 codex CLI 的 JSONL 协议
+        （它们校验的正是 tool-free 流 fail-closed，是必须保留的真守卫），一旦被
+        自动劫持成真实 HTTP 就会拿到 401 而集体失败。开关默认关闭，则测试确定性地
+        走 CLI 路径，真实取签路径由 gate 显式打开。
+        """
+        return self._direct_finalization and self._binding is not None
+
+    def _direct_tool_free_verdict(self, *, prompt: str, schema: dict) -> str:
+        """绕过 codex CLI，直接调 provider 的 Responses API 完成禁工具 turn。
+
+        为什么必须绕过 CLI：codex CLI **客户端**会把 web_search 注入请求，且没有任何
+        开关能关掉它 —— 实测 `--disable web_search`、`web_search_request`、
+        `standalone_web_search`、`search_tool`、`-c tools.web_search=false`、
+        `-c model_providers.<p>.omit_tools_from=["web_search"]` 全部无效；
+        `supports_standalone_web_search=false` 则让 turn 直接失败。于是禁工具收尾
+        turn 里必然出现 web_search 项，`_validated_final_message(tools_forbidden=True)`
+        只能 fail-closed 拒签，第二签永远取不到。
+
+        注入方是 CLI 而非 provider，这一点有实测依据：直接以 `tools: []` 调
+        DeepSeek 的 /v1/responses，即使提示明确要求联网搜索，输出也只有
+        reasoning + message，没有任何工具项。
+
+        因此这条路径**真正**兑现了"禁工具"契约（请求里 tools 恒为空数组），而不是
+        事后校验一个已经被污染的流。校验侧一行未放宽。
+        """
+        if self._binding is None:
+            raise RuntimeError(
+                "direct tool-free finalization requires a provider binding"
+            )
+        b = self._binding
+        api_key = os.environ.get(b.api_key_env)
+        if not api_key:
+            raise RuntimeError(
+                f"direct tool-free finalization requires ${b.api_key_env} in env"
+            )
+        body = {
+            "model": b.cli_selector,
+            "input": prompt,
+            # 契约核心：工具面为空。不是"声明禁用"，是请求里根本没有工具。
+            "tools": [],
+            "stream": False,
+            "max_output_tokens": self._DIRECT_MAX_OUTPUT_TOKENS,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "verdict",
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+        }
+        req = urllib.request.Request(
+            b.openai_base_url.rstrip("/") + "/responses",
+            data=json.dumps(body).encode("utf-8"),
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(
+                req, timeout=self._DIRECT_TIMEOUT_SECONDS
+            ) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # 绝不把响应体原样外抛：可能含密钥或账号信息。
+            raise RuntimeError(
+                f"direct tool-free finalization HTTP {exc.code}"
+            ) from None
+        except (urllib.error.URLError, TimeoutError) as exc:
+            raise RuntimeError(
+                f"direct tool-free finalization transport failure: "
+                f"{type(exc).__name__}"
+            ) from None
+        except json.JSONDecodeError:
+            raise RuntimeError(
+                "direct tool-free finalization returned non-JSON payload"
+            ) from None
+
+        # fail-closed：截断的裁决绝不采信。
+        if payload.get("status") != "completed":
+            # 带上 incomplete_details.reason，区分"撞 token 上限"与其他中断原因；
+            # 只取 reason 字段，不回显整个响应体（可能含账号信息）。
+            details = payload.get("incomplete_details")
+            reason = (
+                details.get("reason") if isinstance(details, dict) else None
+            )
+            raise RuntimeError(
+                "direct tool-free finalization did not complete: "
+                f"status={payload.get('status')!r} reason={reason!r}"
+            )
+        output = payload.get("output")
+        if not isinstance(output, list):
+            raise RuntimeError(
+                "direct tool-free finalization returned no output list"
+            )
+        # 工具面为空，出现任何工具项即协议违约，与 CLI 路径同样 fail-closed。
+        allowed_item_types = {"reasoning", "message"}
+        texts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                raise RuntimeError(
+                    "direct tool-free finalization returned a non-object item"
+                )
+            item_type = item.get("type")
+            if item_type not in allowed_item_types:
+                raise RuntimeError(
+                    "direct tool-free finalization protocol mismatch: "
+                    f"tool-free turn emitted item type {item_type!r}"
+                )
+            if item_type != "message":
+                continue
+            for chunk in item.get("content") or []:
+                if isinstance(chunk, dict) and chunk.get("type") == "output_text":
+                    text = chunk.get("text")
+                    if isinstance(text, str):
+                        texts.append(text)
+        if len(texts) != 1:
+            raise RuntimeError(
+                "direct tool-free finalization expected exactly one output_text, "
+                f"got {len(texts)}"
+            )
+        return texts[0]
 
     def _resume_finalization(
         self,
