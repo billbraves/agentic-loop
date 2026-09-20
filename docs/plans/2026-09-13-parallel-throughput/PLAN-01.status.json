@@ -2,7 +2,7 @@
   "schema_version": "agentic-plan-status/v1",
   "plan_id": "PLAN-01",
   "iteration_id": "2026-09-13-parallel-throughput",
-  "state": "DRAFT",
+  "state": "ACTIVE",
   "title": "并行吞吐：依赖图 / 事前查撞车 / 分批收敛 / worktree 隔离",
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
@@ -16,46 +16,9 @@
       "depends_on": []
     },
     {
-      "id": "WP-02",
-      "lane": "lane-gate",
-      "depends_on": [
-        "WP-01"
-      ]
-    },
-    {
       "id": "WP-03",
       "lane": "lane-plan",
       "depends_on": []
-    },
-    {
-      "id": "WP-04",
-      "lane": "lane-gate",
-      "depends_on": [
-        "WP-02"
-      ]
-    },
-    {
-      "id": "WP-05",
-      "lane": "lane-plan",
-      "depends_on": [
-        "WP-03"
-      ]
-    },
-    {
-      "id": "WP-06",
-      "lane": "lane-plan",
-      "depends_on": [
-        "WP-03"
-      ]
-    },
-    {
-      "id": "WP-07",
-      "lane": "lane-docs",
-      "depends_on": [
-        "WP-04",
-        "WP-05",
-        "WP-06"
-      ]
     },
     {
       "id": "WP-08",
@@ -75,9 +38,7 @@
     {
       "id": "WP-11",
       "lane": "lane-gate",
-      "depends_on": [
-        "WP-04"
-      ]
+      "depends_on": []
     },
     {
       "id": "WP-12",
@@ -101,13 +62,62 @@
       ]
     },
     {
+      "id": "WP-15",
+      "depends_on": []
+    },
+    {
+      "id": "WP-17",
+      "depends_on": []
+    },
+    {
+      "id": "WP-18",
+      "depends_on": []
+    },
+    {
+      "id": "WP-19",
+      "lane": "lane-gate",
+      "depends_on": []
+    },
+    {
+      "id": "WP-21",
+      "depends_on": []
+    },
+    {
+      "id": "WP-22",
+      "depends_on": []
+    },
+    {
+      "id": "WP-23",
+      "depends_on": []
+    },
+    {
+      "id": "WP-24",
+      "depends_on": []
+    },
+    {
+      "id": "WP-25",
+      "depends_on": []
+    },
+    {
+      "id": "WP-26",
+      "depends_on": []
+    },
+    {
+      "id": "WP-27",
+      "depends_on": []
+    },
+    {
       "id": "WP-28",
       "lane": "lane-template",
+      "depends_on": []
+    },
+    {
+      "id": "WP-29",
       "depends_on": []
     }
   ],
   "timestamps": {
     "created_at": "2026-09-13T00:00:00Z",
-    "updated_at": "2026-09-13T11:55:00Z"
+    "updated_at": "2026-09-20T14:53:21Z"
   }
 }
