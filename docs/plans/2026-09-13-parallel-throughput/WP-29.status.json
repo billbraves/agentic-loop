@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "executor": {
     "tool": "kimi-cli",
     "session": "",
@@ -115,7 +115,7 @@
     "base_commit": "2e5f2c05ae805914d0b2b229cac97da2bb07b60d",
     "branch": "feature/wp29-render-scope-decision",
     "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
-    "commit": "f1eee7e"
+    "commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4"
   },
   "scope": {
     "allowed_paths": [
@@ -778,40 +778,122 @@
       "next_would_be": 6,
       "rule": "WORK_PACKAGE.md.tmpl:9 —— 第 3 次及以后的 re-freeze 须停手复核计划，且须用户批准",
       "status": "rev6 冻结前须再次停手复核；编排者的第一签名不得充当该批准"
+    },
+    "review_rev4_record": {
+      "decision": "N/A",
+      "reviewer": "claude-code",
+      "reviewed_at": "2026-09-19",
+      "rev": 4,
+      "at_commit": "f1eee7e",
+      "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
+      "blockers": [
+        "标的 2（T2）：交付物用 --exclude 替代冻结 brief :127/:255 要求的逐字完整粘贴 WP-28-consult-codex-shape-verdict.json:6 长行；brief :132/:250/:354 三处逐字拒绝『结论不受影响』豁免。事实无误，权限越界：替代手段须 re-freeze。",
+        "标的 4（T4）：交付物 :222 的『_resources_files 是唯一别名』前提由 :226 的单 token 命令无法自证；brief :169 要求搜索面支撑量词否则降级。二选一：收窄结论形状，或把同族 API/动态导入形态的完整搜索粘进交付物并说明语法边界。"
+      ],
+      "minor": [
+        "M1 两条主 grep 中 WP-28-consult-codex-shape-verdict.json:6 的 codex 长文单行被显式标注省略；省略已声明且与消费面无关，不构成 C1 复发，但严格讲非『完整输出』",
+        "M2 『宽口径补充命中』块只粘 5 行（实际新增 17 行）且块头写『均归 C 类』；未粘的 12 行中 2 行实为 B 类（test_init_contract.py:62、test_wp_template_dispatch_lint.py:24，路径由片段拼接故不匹配主 grep 字面串），其余 10 行为 docs/plans 历史治理文档（确属 C 类）。两行在 §1 B 类中已正确列出，实质结论不受影响",
+        "M3 §1 A 类可加强：contract_render.py:243 的 load_template 调用在 render_template 内，而 CONTRACT_FILES 只含 AGENTS/CLAUDE/OPERATING_MODEL 三份，不含 WORK_PACKAGE.md.tmpl——唯一做占位符替换的路径也碰不到判定对象。只加强结论，不返工"
+      ],
+      "verdict_note": "C1/C2 两个阻断项闭合。复核者独立复现：(1) §1 两条主 grep 的原始命中行 39/39 与 47/47 逐行一致；D 类零命中声明正确，pyproject.toml:18-30 + contract_render.py:250-255 行号级结论成立（read_text 不解析 Markdown）；(2) (b) 列 8/8 RED 用执行者脚本原地重跑逐格一致，脚本对模板只读、带空操作守卫；(3) WP-28 rev1 行 8/8 GREEN 复现一致，rev6 行诚实标注未实测（B55 纪律）；(4) (c′) 的 protected_body_identity + replica_identity 由复核者独立实测，E1-E4/G1-G4 八条全 GREEN，裁定不把任何 G 判红；(5) §2/§3 按段落字节比较 identical=True（847/1328 字节）；(6) 基线 4 failed/606 passed/4 skipped 复现一致，改动面只含一个 md，模板与依赖零 diff。三条次要项不影响论断。阶段 2 仍未冻结，须用户批准本裁定后方可冻结；本 ACCEPT 不构成合入批准。",
+      "orchestrator_own_measurement": {
+        "cprime_isolated": "直接从主仓 HEAD 的 FROZEN_BODY 常量取判据、纯内存施加八条变异：baseline GREEN，E1-E4/G1-G4 全 GREEN；脚本不写文件，复核前后主仓 src/tests/templates 无改动",
+        "wrong_layer_note": "首次尝试在 /tmp 副本上跑 rev6 完整测试文件得到 G1/G3/G4 RED，追查为错误层：test_invn_t7_replica_mismatch_red:886 会自行再变异并断言 mutated != packaged，test_invn_harmless_placeholder_edit_green:896 断言原始占位符在场，预先变异触发的是这两个用例自身的夹具前置条件，不是 (c′) 判据（记忆 mutation-red-may-come-from-wrong-layer 实弹命中）",
+        "anchor_uniqueness": "八条变异的锚点在模板内 grep -cF 均为 1，不存在『找不到锚点⇒恒等映射』的假绿隐患"
+      },
+      "withdrawn_accept": {
+        "was": "ACCEPT",
+        "withdrawn_at": "2026-09-19",
+        "why": "codex 第二签名指出一条编排者漏掉、可直接验证的事实：交付物 §1 声明的两条主 grep 只带 --exclude-dir，但交付物自身含搜索串 49/57 处；按声明命令原文重跑得 88/104 行，粘贴的 39/47 行须再加一个未声明的 --exclude=WP-29-scope-decision.md 才能得到。即『完整输出』再次带未声明过滤器，正是 C1 缺陷类别。编排者上一轮逐行比对时自己也加了同一过滤器，故查不出（记为 B57）。连带把 M1/M2 由非阻断升为阻断：本阶段交付标的就是可复现完整的消费面证据本身，不能用『结论不变』豁免。",
+        "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-stage1-rev3.md §7"
+      },
+      "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
+      "document_sha256": "7a3a139ed206f1ec75fbe2dfd02a1ed2aa1febd2ac12854f646791291a1ff76a",
+      "reviewed_commit": "f1eee7e",
+      "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md",
+      "withdrawn_first_signature": "ACCEPT → REWORK，撤回记录见 docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev4.md §9",
+      "note": "rev4 复核已闭（REWORK，见 evidence.review_rev4_first_signature）；rev5 复核未开始"
+    },
+    "consult_rev4_record": {
+      "decision": null,
+      "consultant": "codex",
+      "provider": "kirogpt",
+      "model": "gpt-5.6-sol",
+      "consulted_at": "2026-09-19",
+      "rev": 4,
+      "at_commit": "f1eee7e",
+      "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4.md",
+      "request_sha256": "a476c4434a663c660353184dafcdb9d6275c1d4f0c70a8ef85dd6f8aa51f354f",
+      "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4-verdict.md",
+      "verdict_sha256": "1551922fd69d7b5b5ba0350cdd0b9db8734965dedcb582a18bcb2fcf8a6c9c61",
+      "note": "rev5 第二签名将与第一签名并行派发（evidence.parallel_signature_plan_rev5）",
+      "blocking_items": {
+        "C1-R3": "消费链证据仍不满足『仓库级完整原始输出』：(1) 两条命令搜索范围是 . 却未排除当前交付物，粘贴结果无任何自命中，故不是该命令对最终被审树的完整输出；(2) 长行被 …… 替换，不是『原始命中行，不得摘要』；(3) 宽口径只粘 5 个新增命中并称归 C 类，但遗漏中含两个 B 类测试读取点，拼接路径精确 grep 本就发现不了，故不完整 + 误分类会实质削弱『没有其它通用消费者』的结论；另称 load_template 只有指定调用点但未附原始输出。"
+      },
+      "non_blocking_findings": {
+        "D 类替代成立": "*.tmpl、变量 name 与 read_text() 不会命中两个精确文件名，现有证据足以说明该已知路径不解析 Markdown；四分类也无需增加第五类。",
+        "C2 已闭合": "(b) 的 E1-E4/G1-G4 均明确对应整文件字节判据并由带 no-op 守卫的实验支持；推荐方案不再误伤权威定义的 G1-G4。",
+        "(c′) 量词基本闭合": "只承诺受保护 body 与冻结常量的字节同一，明确不承诺 active_embedding，未把 E1-E4 外推成被覆盖的攻击族。",
+        "G1-G4 在跨度外不构成缺陷": "受保护 body 的合法政策升级本应使旧 oracle 转红，再通过显式更新冻结常量完成变更；不属于必须无条件 GREEN 的普通编辑。",
+        "错误层归因正确": "预先变异磁盘夹具后再运行自带变异与夹具前置断言的完整测试，测到的是测试载具前置条件，不是 (c′) 不变式。",
+        "M3 定性正确": "仅加强结论。",
+        "阶段 2 追加冻结项": "阶段 2 brief 仍应冻结具体标题锚点、body 边界、缺失/重复标题和换行处理。"
+      },
+      "orchestrator_cross_check": "第 1 条编排者原地实测复现：交付物自身含搜索串 49/57 处；按声明命令重跑 88/104 行；加 --exclude=WP-29-scope-decision.md 后恰为 39/47（与粘贴一致）。故 codex 成立，编排者撤回 ACCEPT。第 2/3 条与编排者 M1/M2 同料，codex 的阻断定性更严且正确（本阶段交付标的就是可复现完整的证据本身）。其余裁决与编排者第一签名同向。"
     }
   },
   "review": {
     "decision": "REWORK",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-20",
+    "rev": 5,
+    "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+    "document": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+    "blockers": [
+      "R1 = codex C1：WP-29-scope-decision.md:517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d。一行事实更正。",
+      "R2 = codex C2：同文件 :590（codex 标 :588，偏 2 行，指认文本无误）的 DoD 自核查括注仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行单排除命令及标的 A 相反。一行事实更正。"
+    ],
+    "minor": [
+      "§6.2 历史记录节仍写排除两项 —— 描述 rev4 当时状态，不改是正确的",
+      "§6 标题仍为「rev1 → rev4 改了什么」，brief 未要求改，下一 rev 可顺手改"
+    ],
+    "verdict_note": "标的 A/B/C 三条实质要求全部达成（含 brief 标注「最容易漏」的差集过滤器同步项）；§2/§3/§4/§5 逐节字节一致，(c′) 未被触动；本轮未见 B60 类偏差。两条阻断项均为交付物内一行文本的事实矛盾，无需重新取证。rev6 将是第 6 次冻结，须按 WORK_PACKAGE.md.tmpl:9 再次停手复核并取得用户批准；本报告不得充当该批准。",
+    "orchestrator_own_measurement": {
+      "cprime_isolated": "直接从主仓 HEAD 的 FROZEN_BODY 常量取判据、纯内存施加八条变异：baseline GREEN，E1-E4/G1-G4 全 GREEN；脚本不写文件，复核前后主仓 src/tests/templates 无改动",
+      "wrong_layer_note": "首次尝试在 /tmp 副本上跑 rev6 完整测试文件得到 G1/G3/G4 RED，追查为错误层：test_invn_t7_replica_mismatch_red:886 会自行再变异并断言 mutated != packaged，test_invn_harmless_placeholder_edit_green:896 断言原始占位符在场，预先变异触发的是这两个用例自身的夹具前置条件，不是 (c′) 判据（记忆 mutation-red-may-come-from-wrong-layer 实弹命中）",
+      "anchor_uniqueness": "八条变异的锚点在模板内 grep -cF 均为 1，不存在『找不到锚点⇒恒等映射』的假绿隐患"
+    },
+    "unaffected": "C2（G1-G4 进表 + (b) 特异性 0）、(c′) 量词闭合、错误层归因、§2/§3 逐字节保留、零回归基线、范围 —— 四项 codex 同向确认，不在 rev4 返工面内",
+    "document_sha256": "edb347c14a2e0a38bc4c62f1c048cf4fdb053e6d64efec724d59e6a6bd7e83b5",
+    "reviewed_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
+    "note": "rev5 双签名已闭（并行出签，同判 REWORK）；rev4 记录完整保留于 evidence.review_rev4_record",
     "independence": "strong（并行双签名，consultant 未见第一签名）",
     "first_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-review-rev5.md",
     "second_signature": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md"
   },
   "consult": {
-    "decision": null,
+    "decision": "REWORK",
     "consultant": "codex",
     "provider": "kirogpt",
     "model": "gpt-5.6-sol",
-    "consulted_at": "2026-09-19",
-    "rev": 4,
-    "at_commit": "f1eee7e",
-    "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4.md",
-    "request_sha256": "a476c4434a663c660353184dafcdb9d6275c1d4f0c70a8ef85dd6f8aa51f354f",
-    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev4-verdict.md",
-    "verdict_sha256": "1551922fd69d7b5b5ba0350cdd0b9db8734965dedcb582a18bcb2fcf8a6c9c61",
-    "note": "rev5 第二签名将与第一签名并行派发（evidence.parallel_signature_plan_rev5）",
+    "consulted_at": "2026-09-20",
+    "rev": 5,
+    "at_commit": "e2c483d26ef9999ac77aaaa22db59b2e0db5abe4",
+    "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5.md",
+    "request_sha256": "2f91b24dd6910672392c72c2b354222fdefadce5040bda3c3fc3269496eb9aab",
+    "verdict": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5-verdict.md",
+    "verdict_sha256": "5c2ea9197e9c10e8aa93509997b6c28c951473789fffbbd8a0978ab011db2c55",
     "blocking_items": {
-      "C1-R3": "消费链证据仍不满足『仓库级完整原始输出』：(1) 两条命令搜索范围是 . 却未排除当前交付物，粘贴结果无任何自命中，故不是该命令对最终被审树的完整输出；(2) 长行被 …… 替换，不是『原始命中行，不得摘要』；(3) 宽口径只粘 5 个新增命中并称归 C 类，但遗漏中含两个 B 类测试读取点，拼接路径精确 grep 本就发现不了，故不完整 + 误分类会实质削弱『没有其它通用消费者』的结论；另称 load_template 只有指定调用点但未附原始输出。"
+      "C1": "§7 :517 把 rev4 的提交 f1eee7e 标成「rev5 提交」，实际 rev5 是 e2c483d",
+      "C2": "DoD 对照（codex 标 :588，实为 :590）仍写 --exclude 含「本交付物 + codex 二签」，与 §1 现行命令（只排除本交付物）及标的 A 相反"
     },
     "non_blocking_findings": {
-      "D 类替代成立": "*.tmpl、变量 name 与 read_text() 不会命中两个精确文件名，现有证据足以说明该已知路径不解析 Markdown；四分类也无需增加第五类。",
-      "C2 已闭合": "(b) 的 E1-E4/G1-G4 均明确对应整文件字节判据并由带 no-op 守卫的实验支持；推荐方案不再误伤权威定义的 G1-G4。",
-      "(c′) 量词基本闭合": "只承诺受保护 body 与冻结常量的字节同一，明确不承诺 active_embedding，未把 E1-E4 外推成被覆盖的攻击族。",
-      "G1-G4 在跨度外不构成缺陷": "受保护 body 的合法政策升级本应使旧 oracle 转红，再通过显式更新冻结常量完成变更；不属于必须无条件 GREEN 的普通编辑。",
-      "错误层归因正确": "预先变异磁盘夹具后再运行自带变异与夹具前置断言的完整测试，测到的是测试载具前置条件，不是 (c′) 不变式。",
-      "M3 定性正确": "仅加强结论。",
-      "阶段 2 追加冻结项": "阶段 2 brief 仍应冻结具体标题锚点、body 边界、缺失/重复标题和换行处理。"
+      "passed_independently": "标的 A（39/47 行 + 差集同步 + 两处长行 sha256 一致）、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2/§3/§4/§5 逐节字节一致、未发现「等效替代」追认冻结判据"
     },
-    "orchestrator_cross_check": "第 1 条编排者原地实测复现：交付物自身含搜索串 49/57 处；按声明命令重跑 88/104 行；加 --exclude=WP-29-scope-decision.md 后恰为 39/47（与粘贴一致）。故 codex 成立，编排者撤回 ACCEPT。第 2/3 条与编排者 M1/M2 同料，codex 的阻断定性更严且正确（本阶段交付标的就是可复现完整的证据本身）。其余裁决与编排者第一签名同向。"
+    "orchestrator_cross_check": "两条阻断项编排者均在源文件独立复核成立；codex 第二条行号 :588 实为 :590，文本指认无误，偏差已记入 WP-29-consult-rev5-verdict.md 的对照表。codex 通过的四项（标的 A 两条主 grep 39/47 + 差集 17 行 + 两处长行 9660 bytes 同 sha、标的 B (a) 路收窄、标的 C 四项 + 排序表态、§2-§5 逐节字节一致）编排者亦独立复现一致。",
+    "parallelism": "与第一签名并行派发；派发时 codex 未收到编排者任何结论。",
+    "note": "rev4 记录完整保留于 evidence.consult_rev4_record"
   },
   "timestamps": {
     "created_at": "",
@@ -831,6 +913,9 @@
     "consult_rev4_at": "2026-09-19",
     "user_approval_cprime_and_rev5_direction_at": "2026-09-20",
     "refreeze_stop_review_rev5_at": "2026-09-20",
-    "brief_rev5_frozen_at": "2026-09-20"
+    "brief_rev5_frozen_at": "2026-09-20",
+    "reviewed_rev5_at": "2026-09-20",
+    "consulted_rev5_at": "2026-09-20",
+    "changes_requested_rev5_at": "2026-09-20"
   }
 }
