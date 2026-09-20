@@ -5,7 +5,7 @@
   "role": "Developer",
   "plan_id": "PLAN-01",
   "work_package_id": "WP-29",
-  "state": "CHANGES_REQUESTED",
+  "state": "IMPLEMENTING",
   "executor": {
     "tool": "kimi-cli",
     "session": "6d12a60f-9777-4c23-9ab2-c5b0539a98d6",
@@ -1059,6 +1059,24 @@
         "禁照抄哈希修法（沿用 rev6 判据）"
       ],
       "dispatch_lint_note": "B47 未修：dispatch_lint.sh 按固定名 WP-29-brief.md 读 brief，不认 evidence.brief.path，故 revN brief 从未过段落门禁。本 rev 三段谓词（Acceptance tests 34 行 / Allowed and forbidden paths 12 行 / Completion definition 30 行）由编排者用门禁自身的 python 谓词逐条手工套用，结果 PASS。任务 #38 待修。"
+    },
+    "dispatch_rev7": {
+      "executor_tool": "kimi-cli",
+      "lane": "deepseek",
+      "provider_probe": "PROBE_OK（派发前实测，session 4fa8fdcb-ee78-4852-87c5-26acd9cef35c，RC 0）",
+      "provider_status": "kimi default_model = deepseek/v4-pro",
+      "dispatch_script": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
+      "dispatch_script_sha256": "e688ddf649cbf6f1f5f3e3179b4f70efa0c475e51539d4687a20dc78637c327c",
+      "prompt": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev7-prompt.md",
+      "prompt_sha256": "aa1a82f38168ea07f51c6f0d7df4f06b5fa091bfdbfeaf4ac98e5ae705e22db3",
+      "brief_sha256": "527a741298d530f6d7493fe2e452b6aa287e02439e0ba0f5c9c037ca4823e607",
+      "base_commit": "dffae33d5a89c3f0f6384356b2a7122c1290f027",
+      "background_task_id": "bvnos0v9p",
+      "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/bvnos0v9p.output",
+      "preflight": "PREFLIGHT_PASS branch=feature/wp29-render-scope-decision state=CHANGES_REQUESTED worktree=/Users/admin/vibe/wp29-render-scope-decision（经 agentic CLI 从 worktree 内运行；直接调 wrappers/preflight.sh 会被 python3.14 无 agentic_loop 模块卡住）",
+      "lock": "LOCK_REACQUIRED owner=claude-53c58ab0",
+      "env_isolation": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY（kimi 必须两者都剥；env 里的 OPENAI_API_KEY 字面是 dummy。codex 侧只剥 BASE_URL）",
+      "fixed_command_form": "脚本内 prompt 路径与 sha 硬编码，派发命令形态固定，以便 .claude/settings.local.json 的 allow 规则精确匹配"
     }
   },
   "review": {
@@ -1143,6 +1161,8 @@
     "updated_at": "2026-09-20",
     "refreeze_stop_review_rev7_at": "2026-09-20",
     "user_approval_rev7_path_a_at": "2026-09-20",
-    "brief_rev7_frozen_at": "2026-09-20"
+    "brief_rev7_frozen_at": "2026-09-20",
+    "dispatched_at_rev7": "2026-09-20",
+    "implementing_at_rev7": "2026-09-20"
   }
 }
