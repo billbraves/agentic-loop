@@ -4,7 +4,7 @@
   "iteration_id": "2026-09-13-parallel-throughput",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DRAFT",
   "role": "Developer",
   "executor": {
     "tool": "kimi",

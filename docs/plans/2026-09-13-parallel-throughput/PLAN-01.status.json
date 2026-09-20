@@ -36,16 +36,9 @@
       "depends_on": []
     },
     {
-      "id": "WP-11",
-      "lane": "lane-core",
-      "depends_on": []
-    },
-    {
       "id": "WP-12",
       "lane": "lane-core",
-      "depends_on": [
-        "WP-11"
-      ]
+      "depends_on": []
     },
     {
       "id": "WP-13",
@@ -124,6 +117,6 @@
   ],
   "timestamps": {
     "created_at": "2026-09-13T00:00:00Z",
-    "updated_at": "2026-09-20T15:15:58Z"
+    "updated_at": "2026-09-20T23:04:40Z"
   }
 }
