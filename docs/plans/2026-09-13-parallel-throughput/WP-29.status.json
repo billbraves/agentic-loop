@@ -691,6 +691,45 @@
       "how": "rev5 的第一签名（编排者）与第二签名（codex）并行派发，codex 不再事后复查编排者结论，而是并行独立取证",
       "constraint": "编排者复核报告不得引用任何「自己跑出但交付物未写」的证据（B60 推论）",
       "source": "WP-29-plan-review-before-rev5.md §三 约束 B"
+    },
+    "dispatch_rev5": {
+      "dispatched_at": "2026-09-20T11:20:00+08:00",
+      "executor_tool": "kimi-cli",
+      "lane": "deepseek/deepseek-v4-pro（--config-file /Users/admin/.kimi/deepseek.toml）",
+      "liveness_probe_before_dispatch": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --quiet --config-file ~/.kimi/deepseek.toml -p 'Reply with exactly: PROBE_OK' -> PROBE_OK（session b5d1536c-be01-4677-92c1-5dccfda04e2a）",
+      "dispatch_script": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/dispatch-wp29.sh",
+      "dispatch_script_sha256": "6b48776316b7e7b2e64c8ff071fd5d2b5449e804cc0a841627bd1e93d7c5404f",
+      "prompt": "/Users/admin/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp29-rev5-prompt.md",
+      "prompt_sha256": "0715c4a7e3096cab3bb92e5dd4740978b8d3ee2be4bb49b1b313712497c51425",
+      "brief_sha256_at_dispatch": "808e06820d46d03ae54b024995cead06f940fcf16ab4ed6c8155b9eb34773d42",
+      "dispatch_base_commit": "f1eee7e",
+      "worktree": "/Users/admin/vibe/wp29-render-scope-decision",
+      "preflight": "PREFLIGHT_PASS branch=feature/wp29-render-scope-decision state=DISPATCHED worktree=/Users/admin/vibe/wp29-render-scope-decision（自工作树内运行）；LOCK_REACQUIRED owner=claude-53c58ab0",
+      "background_task_id": "bih2hkj9g",
+      "log": "/private/tmp/claude-502/-Users-admin-vibe-agentic-loop/8a8bf01e-1f92-4c09-b1d7-5812319bb245/tasks/bih2hkj9g.output",
+      "env_isolation": "env -u OPENAI_BASE_URL -u OPENAI_API_KEY（kimi 侧两个都剥：B51 的 BASE_URL 覆盖 + 见记忆 kimi-and-codex-need-different-env-stripping，env 里的 OPENAI_API_KEY 字面是 'dummy'，kimi 必须剥掉。codex 侧相反，只剥 BASE_URL）",
+      "session_id": "PENDING（kimi --afk 的 session id 在日志中，完成后回填）"
+    },
+    "consult_rev5": {
+      "state": "DRAFTED_PENDING_DELIVERABLE",
+      "consultant": "codex",
+      "provider": "kirogpt",
+      "request": "docs/plans/2026-09-13-parallel-throughput/WP-29-consult-rev5.md",
+      "request_sha256_draft": "fd923521a2e036d4bfdcd942e6c6d3914396efe78944faf126a7ee970c4f344f",
+      "placeholders": [
+        "__COMMIT__",
+        "__DELIVERABLE_SHA__"
+      ],
+      "why_not_yet_dispatched": "咨询请求必须指向具体交付物提交；执行者 rev5 提交尚未产生。『并行』指第二签名与编排者第一签名并行（同时看同一份交付物、互不先给结论），不是与执行者并行 —— 后者物理上不可能。见 evidence.parallel_signature_plan_rev5。",
+      "dispatch_trigger": "执行者报 DONE 且 commit 落定后，同一时刻派发 codex 并开始写第一签名；第一签名不得在 codex 结论到达前修改，codex 请求里也不携带我的结论。",
+      "env_isolation": "codex 侧只剥 OPENAI_BASE_URL，保留 OPENAI_API_KEY（剥掉会 exit 0 空结论）",
+      "questions": [
+        "Q1 标的 A 逐字完整粘贴 + 差集过滤器同步",
+        "Q2 标的 B 量词收敛（含请 codex 自构同族形态）",
+        "Q3 标的 C 执行面声明是否足以机械化 + 排序表态自洽",
+        "Q4 §2/§3/§4/§5 逐字未动（自行 diff）",
+        "Q5 元问题：编排者本轮是否又犯 B60"
+      ]
     }
   },
   "review": {
