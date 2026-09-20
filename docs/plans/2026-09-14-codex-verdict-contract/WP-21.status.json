@@ -3,7 +3,7 @@
   "work_package_id": "WP-21",
   "iteration_id": "2026-09-14-codex-verdict-contract",
   "phase": "P2",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kiro-dsh-orchestrator-direct",
@@ -24,7 +24,8 @@
     "branch": "fix/wp-21-direct-finalization-correctness",
     "worktree": "/Users/admin/vibe/.worktrees/agentic-wp21-direct-finalization",
     "commit": "c99a1bd",
-    "integration_branch": "main"
+    "integration_branch": "main",
+    "merged_commit": "dda9b9ba59203052a5fa213a69b8a05957c7722e"
   },
   "scope": {
     "allowed_paths": [
@@ -100,6 +101,7 @@
     "drafted_at": "2026-09-20T07:10:00Z",
     "approved_at": "2026-09-20T07:27:00Z",
     "reviewed_at": "2026-09-20T07:55:00Z",
-    "e2e_completed_at": "2026-09-20T09:31:00Z"
+    "e2e_completed_at": "2026-09-20T09:31:00Z",
+    "merged_at": "2026-09-20T09:50:59Z"
   }
 }
