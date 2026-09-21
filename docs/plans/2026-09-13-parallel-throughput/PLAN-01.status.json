@@ -2,7 +2,7 @@
   "schema_version": "agentic-plan-status/v1",
   "plan_id": "PLAN-01",
   "iteration_id": "2026-09-13-parallel-throughput",
-  "state": "ACTIVE",
+  "state": "READY_TO_MERGE",
   "title": "并行吞吐：收敛已完成成果（重新基线化，10 个 MERGED；11 pending + 长尾迁 framework-hardening 迭代）",
   "git": {
     "base_branch": "plan/2026-09-13-parallel-throughput",
@@ -58,6 +58,6 @@
   ],
   "timestamps": {
     "created_at": "2026-09-13T00:00:00Z",
-    "updated_at": "2026-09-21T11:56:50Z"
+    "updated_at": "2026-09-21T14:33:13Z"
   }
 }
