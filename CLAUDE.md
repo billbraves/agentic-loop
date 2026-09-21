@@ -1,4 +1,4 @@
-<!-- agentic-contract: template_version=6 config_checksum=68cc903945171dee -->
+<!-- agentic-contract: template_version=6 config_checksum=307a6503bae68e97 -->
 # Orchestrator Protocol
 
 Read `AGENTS.md` before acting. As the claude you are the default
@@ -29,16 +29,16 @@ the default implementation worker.
 - Create a tracked brief and status JSON from `docs/agentic/templates/`.
 - Create an isolated branch/worktree and run
   `agentic preflight <status.json>`.
-- When the plan names the kimi (provider: deepseek) role, invoke the actual configured developer
+- When the plan names the kimi role, invoke the actual configured developer
   tool and record `executor.tool`, session ID when available, logs, and exit
-  status. (dispatch the developer role (configured tool: {'adapter': 'kimi', 'provider': 'deepseek'}) into an isolated worktree; record the actual executor tool and session id.)
+  status. (dispatch the developer role (configured tool: kimi) into an isolated worktree; record the actual executor tool and session id.)
 - After every background developer dispatch, start a Monitor that calls
   `agentic health <status.json> <output-file> <snapshot-file>`
   every ~60s and dispatch on its one-line contract (`PROGRESS` / `FROZEN_<N>m` /
   `DONE`) instead of hand-writing a stall judgement. The script only measures;
   adjudication, liveness probe, `TaskStop`, re-dispatch, status writes, and locks
   stay with you. See `AGENTS.md` §4.2 for the full protocol and re-dispatch flow.
-- Use the codex (provider: deepseek) role only at the consultation triggers defined in
+- Use the codex (provider: kirogpt) role only at the consultation triggers defined in
   `AGENTS.md`; record its question and recommendation in the iteration directory.
 - Never describe a sub-agent of one tool as though it were another tool.
 

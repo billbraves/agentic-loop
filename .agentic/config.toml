@@ -7,25 +7,45 @@
 iterations_dir = "docs/plans"
 # default_output_language = "English"
 
-# ── DeepSeek API（默认启用；不用 DeepSeek 就整段删掉 + roles 改回 string）──
-# 让 claude/kimi/codex 三签统一走 DeepSeek。key 存环境变量（不落盘明文）：
-#     export DEEPSEEK_API_KEY=sk-...        # 写进 ~/.zshrc
-[providers.deepseek]
-anthropic_base_url = "https://api.deepseek.com/anthropic"   # claude/kimi 用
-openai_base_url    = "https://api.deepseek.com/v1"          # codex 用
-api_key_env        = "DEEPSEEK_API_KEY"                     # 只存 env 名，绝不存 key 明文
-identity_model     = "deepseek-v4-pro"                      # canonical，独立性评级唯一依据
-[providers.deepseek.selectors]
-kimi   = "deepseek/v4-pro"
-codex  = "deepseek-v4-pro"
-claude = "deepseek-v4-pro"
+# ── 本地 kiro 网关（official 接入）─────────────────────────────
+# 本机跑着两个网关，均为 kiro 后端：
+#   127.0.0.1:18080  anthropic /v1/messages + openai /v1  ← claude 用
+#   127.0.0.1:18090  litellm，转发到 18080，openai /v1/responses  ← codex 用
+# 拆成两个 provider 条目而非一个：identity_model 是独立性评级的唯一依据
+# （independence.evaluate 只看它），reviewer 与 consultant 必须落在不同
+# identity_model 上才评得到 strong。合成一个条目会退回同源 weak。
+#
+# key 只存 env 名，绝不落盘明文。两个网关当前都是占位 key
+# （litellm 侧 master_key=dummy），但 adapter 一律按真 key 对待。
+[providers.kiroopus]
+anthropic_base_url = "http://127.0.0.1:18080"               # claude 用
+api_key_env        = "ANTHROPIC_API_KEY"
+identity_model     = "claude-opus-5"                        # canonical
+[providers.kiroopus.selectors]
+claude = "claude-opus-5"
+
+# provider 名不带连字符：CodexAdapter 把它拼进
+# `-c model_providers.<name>.base_url=...`，连字符在 codex 的 inline TOML
+# 解析里可能被当表达式。也刻意不叫 `kiro`——避免 inline 覆盖与
+# ~/.codex/config.toml 里已有的 [model_providers.kiro] 混淆难排查。
+[providers.kirogpt]
+openai_base_url    = "http://127.0.0.1:18090/v1"            # codex 用
+api_key_env        = "OPENAI_API_KEY"
+identity_model     = "gpt-5.6-sol"                          # canonical
+[providers.kirogpt.selectors]
+codex = "gpt-5.6-sol"
 
 [roles]
-# 三签绑 DeepSeek。不用 DeepSeek 时改回 string 形式（如 developer = ["kimi","claude"]）。
+# reviewer=opus5 / consultant=gpt5.6 已是异源，但 gate 路径下仍评 weak
+# （reviewer identity 不可观测，原因见 [review_policy]）。
 orchestrator = "claude"
-developer    = { adapter = "kimi",   provider = "deepseek" }
-reviewer     = { adapter = "claude", provider = "deepseek" }
-consultant   = { adapter = "codex",  provider = "deepseek" }
+# developer 不绑 provider：binding=None 时 adapter 零注入，kimi 走自己的全局
+# 默认（kimi-for-coding）。绑了也不影响评级——只有 review.decision == "N/A"
+# 时才用 executor.tool 构造 implementer_id，那里只有 tool 名没有 model，
+# independence._model_known() 恒 False。
+developer    = "kimi"
+reviewer     = { adapter = "claude", provider = "kiroopus" }
+consultant   = { adapter = "codex",  provider = "kirogpt" }
 
 # 路径→测试命令规则。正式形式是 [[gate]]（kind="command", stage="pre_review"），
 # 见 docs/QUICKSTART.zh-CN.md §「配置」。注意 `agentic init` 的模板生成的是
@@ -54,10 +74,14 @@ forbidden_paths  = [".env", ".context/"]
 production_paths = []
 
 [review_policy]
-# 代价显式声明：上面 [roles] 三签全指同一 DeepSeek identity_model
-# （deepseek-v4-pro），independence.evaluate() 因此最高只能评到 weak。
-# 若这里留 "strong"，合并门会永久拒绝——不是框架有 bug，是配置自相矛盾。
-# 本仓明确接受「同源弱独立」；改回多 provider（不同 identity_model）后升回 strong。
+# 保持 weak，但理由已与「同源」无关：上面 reviewer=claude-opus-5 /
+# consultant=gpt-5.6-sol 已是异源。真正的天花板在 engine 侧——
+# gate/__init__.py 调 evaluate() 时 reviewer_id 硬编码为 None（reviewer 是
+# orchestrator，没有 adapter identity），evaluate() 因此走 bootstrap 分支、
+# compare_against 为 None，异源比较根本不会发生，最高只能返回 weak-attested。
+# 换言之 strong 目前在 gate 路径上不可达（写 strong 会命中 gate 的
+# bootstrap_override，带 warning 放行——那是自欺，不如如实写 weak）。
+# reviewer 走上 adapter 且 identity 可观测后，这里才应升 strong。
 min_independence = "weak"
 
 # Optional autonomy policy: machine-checkable AUTO/STOP per orchestration action.

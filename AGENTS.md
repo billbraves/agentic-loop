@@ -1,4 +1,4 @@
-<!-- agentic-contract: template_version=6 config_checksum=68cc903945171dee -->
+<!-- agentic-contract: template_version=6 config_checksum=307a6503bae68e97 -->
 # agentic_loop Agent Operating Contract
 
 This file is the durable, cross-agent operating contract for this repository.
@@ -37,10 +37,10 @@ rule. Never silently resolve a material conflict.
 - **claude / Orchestrator and Reviewer**: clarifies requirements,
   maintains the product contract and phase plans, dispatches work, reviews
   evidence, and returns product decisions to the user.
-- **codex (provider: deepseek) / Architecture and Incident Consultant**: independently reviews
+- **codex (provider: kirogpt) / Architecture and Incident Consultant**: independently reviews
   architecture, time/data semantics, migrations, security, and difficult root
   causes. Does not own routine implementation.
-- **kimi (provider: deepseek) / Developer**: implements a frozen work package, writes and runs
+- **kimi / Developer**: implements a frozen work package, writes and runs
   tests, records evidence, and stops when the package requires a specification
   change.
 - **Observer / Runtime Observer**: serves the product and collects production
@@ -77,7 +77,7 @@ any active state -> BLOCKED
 ```
 
 `APPROVED` means scope and acceptance criteria are frozen. `READY_FOR_REVIEW`
-means only that the kimi (provider: deepseek) supplied evidence; it is not approval.
+means only that the kimi supplied evidence; it is not approval.
 
 Every WP must have:
 
@@ -107,11 +107,11 @@ subscription weekly quota, not per-call cost.
 
 ### 4.1 Dispatch command form and approval boundary
 
-- Dispatch the kimi (provider: deepseek) role with a command whose prefix matches the
+- Dispatch the kimi role with a command whose prefix matches the
   configured developer tool's allowlist so it skips the interactive permission
   hook. Use the tool's work-dir flag, not a `cd` prefix: a `cd <worktree> && ...`
   compound form has prefix `cd`, misses the allowlist, and is sent to human
-  review. (dispatch the developer role (configured tool: {'adapter': 'kimi', 'provider': 'deepseek'}) into an isolated worktree; record the actual executor tool and session id.)
+  review. (dispatch the developer role (configured tool: kimi) into an isolated worktree; record the actual executor tool and session id.)
 - Background developer dispatch and low-risk `DRAFT -> APPROVED` scope freezes
   proceed without human approval. Low-risk means engine-side additive change,
   pure test/fixture, or docs, with every `risk.*` flag false and
@@ -280,7 +280,7 @@ main-repo plan status copy (single source of truth), just like the WP gates.
   the main repo checkout, not a possibly-stale worktree copy. This is why
   `agentic preflight` resolves the main root before invoking the lock and status
   validator.
-- One WP has one owning kimi (provider: deepseek). Parallel lanes require separate branches and
+- One WP has one owning kimi. Parallel lanes require separate branches and
   non-overlapping file ownership.
 - Orchestrator concurrency: multiple orchestrator sessions/runners may act on the
   same iteration. Each write action (status edit, dispatch, rework, merge) MUST
@@ -298,7 +298,7 @@ main-repo plan status copy (single source of truth), just like the WP gates.
   an `MM` entry or any staged path you did not add means another session is
   active — commit only your own paths explicitly. Locks guard who may write a WP
   but do not partition the shared Git index.
-- The kimi (provider: deepseek) must not merge, push, delete the worktree, or release.
+- The kimi must not merge, push, delete the worktree, or release.
 - The Reviewer merges only after `APPROVED_FOR_MERGE` and re-verifies on the
   destination branch.
 - Merge finalization is a manual orchestrator step, not automatic. After the
@@ -337,7 +337,7 @@ actions to make a test pass.
 
 ## 7. Implementation loop
 
-For a frozen WP, the kimi (provider: deepseek) may iterate:
+For a frozen WP, the kimi may iterate:
 
 ```text
 implement -> run relevant tests -> diagnose -> fix -> rerun
@@ -357,7 +357,7 @@ not unbounded retries.
 
 ## 8. Verification and evidence
 
-The kimi (provider: deepseek) handoff must include:
+The kimi handoff must include:
 
 - changed files and behavioral changes;
 - design decisions and deviations from the brief;
@@ -378,8 +378,8 @@ evidence in the status file; do not rely on a chat response.
 
 Project-specific quality-gate command mapping (path prefix -> test command):
 
-  - src/agentic_loop/** -> python3 -m pytest tests -q
-  - tests/** -> python3 -m pytest tests -q
+  - src/agentic_loop/** -> python3.11 -m pytest tests -q
+  - tests/** -> python3.11 -m pytest tests -q
 
 Run package test suites separately when repository-wide collection has
 conflicting `conftest.py` module names.

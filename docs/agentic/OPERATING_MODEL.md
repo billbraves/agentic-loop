@@ -1,4 +1,4 @@
-<!-- agentic-contract: template_version=6 config_checksum=68cc903945171dee -->
+<!-- agentic-contract: template_version=6 config_checksum=307a6503bae68e97 -->
 # Multi-Agent Operating Model
 
 ## 1. Three nested loops
@@ -15,7 +15,7 @@ summarize feedback, but it may not approve a product direction.
 ### Engineering loop
 
 ```text
-frozen WP -> kimi (provider: deepseek) implementation -> tests -> repair -> claude (provider: deepseek) review
+frozen WP -> kimi implementation -> tests -> repair -> claude (provider: kiroopus) review
 ```
 
 This loop may run autonomously only inside approved scope and risk boundaries.
@@ -23,10 +23,10 @@ This loop may run autonomously only inside approved scope and risk boundaries.
 ### Consultation loop
 
 ```text
-architecture/incident question -> codex (provider: deepseek) independent analysis -> claude decision
+architecture/incident question -> codex (provider: kirogpt) independent analysis -> claude decision
 ```
 
-codex (provider: deepseek) advice does not silently change the product contract. Material scope
+codex (provider: kirogpt) advice does not silently change the product contract. Material scope
 or behavior changes return to the user.
 
 ## 2. Gates
@@ -34,9 +34,9 @@ or behavior changes return to the user.
 | Gate | Owner | Required evidence |
 |---|---|---|
 | Product Ready | User + claude | problem, value, scope, non-scope, measurable acceptance |
-| Architecture Ready | claude; codex (provider: deepseek) when triggered | boundaries, data/time semantics, migration, rollback, test design |
+| Architecture Ready | claude; codex (provider: kirogpt) when triggered | boundaries, data/time semantics, migration, rollback, test design |
 | WP Approved | claude; user for material risk | tracked brief/status, branch/worktree, frozen acceptance tests |
-| Ready for Review | kimi (provider: deepseek) | diff, exact tests, commit, risks, no production mutation |
+| Ready for Review | kimi | diff, exact tests, commit, risks, no production mutation |
 | Approved for Merge | claude | independent diff review and rerun evidence |
 | Plan Ready to Merge | claude | every WP in the plan is MERGED into the integration branch |
 | Plan Merged | claude | single plan merge commit recorded via `agentic plan finalize` |
@@ -51,7 +51,7 @@ exactly once afterwards. See `AGENTS.md` §4.3.
 
 ## 3. Consultation triggers
 
-Consult the codex (provider: deepseek) role when any of the following applies:
+Consult the codex (provider: kirogpt) role when any of the following applies:
 
 - cross-package architecture or dependency direction changes;
 - scoring, valuation, schema, migration, or point-in-time data semantics change;
@@ -66,7 +66,7 @@ recommendations with reasons.
 
 ## 4. Autonomous-loop budget
 
-A kimi (provider: deepseek) may continue without user input while all are true:
+A kimi may continue without user input while all are true:
 
 - the WP remains within approved scope and allowed paths;
 - no production write, real notification, or irreversible action is needed;
@@ -79,9 +79,9 @@ the claude to explain what new evidence justifies continuing.
 ## 5. Status ownership
 
 - The claude creates and transitions `DRAFT`, `APPROVED`, and `DISPATCHED`.
-- The actual kimi (provider: deepseek) transitions `DISPATCHED -> IMPLEMENTING` and records
+- The actual kimi transitions `DISPATCHED -> IMPLEMENTING` and records
   executor/session evidence.
-- The kimi (provider: deepseek) may set `READY_FOR_REVIEW` or `BLOCKED`.
+- The kimi may set `READY_FOR_REVIEW` or `BLOCKED`.
 - The claude alone sets `CHANGES_REQUESTED` or `APPROVED_FOR_MERGE`.
 - The merge owner sets `MERGED` after destination-branch verification.
 - The user-authorized release owner sets `RELEASED`.
