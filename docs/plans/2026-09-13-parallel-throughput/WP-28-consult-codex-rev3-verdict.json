@@ -1,0 +1,21 @@
+{
+  "work_package_id": "WP-28",
+  "round": "rev3-merge-gate-consult",
+  "decision": "REWORK",
+  "raw_verbatim": "VERDICT: REWORK\n\n结论基于以下实际输入：\n\n- 冻结 brief：`WP-28-brief-rev3.md`，SHA-256 为 `c14782edaea217d8fbbaa5617a414c9f32a0740dab10ff144a1f6e58e48b69df`\n- 被审提交：`2ba5ef5c87cf3378f2860232956cc047c755c519`\n- 累积 diff：`7a30f50..2ba5ef5`\n- 实际 worktree：`/Users/admin/vibe/wp28-norms-into-template`\n- diff 仅含 brief 允许的 3 个文件，worktree 干净；`CONTRACT_TEMPLATE_VERSION == \"6\"`，`contract_render.py` 与 `pyproject.toml` 无 diff\n- 本地只读运行 INV-N 用例：`22 passed`\n\n有两个阻断项。\n\n1. `read_text()` 使“逐字节”硬不变式可被换行归一化绕过\n\n[tests/test_wp_template_dispatch_lint.py:499](/Users/admin/vibe/wp28-norms-into-template/tests/test_wp_template_dispatch_lint.py:499)、[tests/test_wp_template_dispatch_lint.py:516](/Users/admin/vibe/wp28-norms-into-template/tests/test_wp_template_dispatch_lint.py:516) 和 T7 均用 `Path.read_text()` 取得判据输入。Python universal-newline 会把 `CRLF` 归一化为 `LF`。\n\n我对两份模板同步将全部 `LF` 改成 `CRLF` 后做了内存探针：\n\n```text\nbytes_changed= True\nread_text_equivalent_equals_original= True\ncodes_after_read_text_normalization= []\ncodes_if_newlines_preserved= ['SECTION_MISSING']\n```\n\n即受保护块字节已经改变、测试中的冻结常量完全未改，但实际读取路径会返回 GREEN。这直接违反：\n\n- INV-N1：完整 body 与冻结常量逐字节相同\n- INV-N4：任何受保护字节变化都必须在测试 oracle 留下 diff\n- DoD：“T4 用真逐字节相等”\n\n修复时应以 `read_bytes()` 为事实源，或用不会进行 newline translation 的显式读取方式；冻结常量也应形成对应的 byte literal/UTF-8 bytes。随后增加一个同步修改两副本换行字节的负面变异，证明它触发 `BODY_MISMATCH`，而不是只依赖一侧变化产生 `REPLICA_MISMATCH`。\n\n2. T3 没有步骤特异 witness，与 T4 共用 `BODY_MISMATCH`\n\n[tests/test_wp_template_dispatch_lint.py:569](/Users/admin/vibe/wp28-norms-into-template/tests/test_wp_template_dispatch_lint.py:569) 的 T3 变异只断言 `BODY_MISMATCH`。实际 witness 是：\n\n```text\nT3 = BODY_CLAUSE_MISSING, BODY_MISMATCH, SECTION_ANCHOR_MOVED\nT4 = BODY_CLAUSE_MISSING, BODY_MISMATCH\nT5 = BODY_MISMATCH\n```\n\n这里没有任何 code 能特异表示“T3 块体切分被新 `## ` 截断”。`BODY_MISMATCH` 同时是 T4/T5 的 code，`SECTION_ANCHOR_MOVED` 又属于 T6，`BODY_CLAUSE_MISSING` 是诊断分类。因此不满足 brief §E②及 DoD 的“每个步骤的 code 互不相同、红可归因到具体步骤”。\n\n建议为 T3 增加独立硬 witness，例如 `BODY_BOUNDARY_CHANGED` 或 `SECTION_BODY_TRUNCATED`，并让 T3 用例明确断言该 code。`BODY_MISMATCH` 仍可同时存在并继续作为 T4/T5 的承重兜底。\n\n其余重点检查结果没有发现阻断：\n\n- T1–T6 变异均通过 `_mutate_both()` 同步施加，并统一执行 no-op guard；T7 单独变异一侧。\n- T5 的追加散文和列表重排确实只产生 `BODY_MISMATCH`，兜底是 load-bearing。\n- 诊断分类只在 `BODY_MISMATCH` 后运行，不参与硬放行。\n- 模块 docstring 与实现一致地声明了 Markdown 渲染上下文、远处矛盾条款及消费者采纳均不在本 WP 保证范围；我没有把 WP-29 的 `active_embedding` 重新作为本轮门槛。\n",
+  "consultant": {
+    "adapter": "codex",
+    "provider": "kirogpt",
+    "identity_model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "read-only",
+    "consulted_at": "2026-09-18T09:05:00Z",
+    "transport": "codex exec --sandbox read-only -m gpt-5.6-sol via litellm bridge :18090. 手动路径而非 codex_merge_gate.sh：gate/__init__.py:868 按固定命名读 {wp_id}-brief.md，会把 rev1 契约（sha 24dc48cf…）喂给复核 rev3 diff 的咨询者（B47）；改写 canonical brief 的写操作被权限分类器拒绝，故沿用 WP-24 rev2 的既有先例——brief 内联提供。未用 --output-schema：该 provider 下它只是建议（见既有记录），咨询者以 'VERDICT: REWORK' 自然语言作答，由编排者逐字转录。",
+    "inputs": "WP-28-consult-codex-rev3-request.md + WP-28-brief-rev3.md（sha256 c14782ed…，内联）+ 累积 diff 7a30f50..2ba5ef5（含 b34deb9 与 2ba5ef5 两个提交，内联）。咨询者另在 read-only sandbox 内自行读取 worktree 并本地跑了 INV-N 用例（报 22 passed）与内存探针，故本轮独立性强于纯内联复核。"
+  },
+  "orchestrator_verification": {
+    "finding_1_crlf": "REPRODUCED。独立探针：两份模板同步 LF→CRLF，字节已变、冻结常量未改，read_text() 路径 codes=[]（GREEN）；保留换行字节则 codes=['SECTION_MISSING']。确证 INV-N1 的『逐字节』与 INV-N4 的『变更可见性』均可被 universal-newline 归一化绕过。",
+    "finding_2_t3_witness": "REPRODUCED。实测 T3=['BODY_CLAUSE_MISSING','BODY_MISMATCH','SECTION_ANCHOR_MOVED']、T4=['BODY_CLAUSE_MISSING','BODY_MISMATCH']、T5=['BODY_MISMATCH']。T3 无任何步骤特异 code，与 brief §E② 及 DoD『§B 七类步骤各有至少一条转红变异，结构化 code 互不相同』（rev3 brief:180-181,238）不符。",
+    "orchestrator_own_review": "本编排者此前判 ACCEPT（WP-28-review-rev3.md）并未发现这两项 —— 两者都落在我没测的维度：我的 9 条探针全部在 LF 下构造，且我核对了『诊断兜底 load-bearing』却没核对『每步骤 code 互不相同』这条 DoD。ACCEPT 应予撤回。"
+  }
+}

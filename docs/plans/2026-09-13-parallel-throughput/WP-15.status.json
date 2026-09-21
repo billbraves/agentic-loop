@@ -1,0 +1,56 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-15",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "802b667",
+    "branch": "feature/wp15-provider-max-context",
+    "worktree": "../wp15-provider-max-context",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/provider_binding.py",
+      "src/agentic_loop/adapters/kimi.py",
+      "tests/test_provider_binding.py",
+      "tests/test_adapter_injection.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": []
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": {}
+}

@@ -6,7 +6,7 @@ if [[ $# -ne 1 ]]; then
   exit 64
 fi
 
-status_file=$1
+status_arg=$1
 # Locate sibling wrappers relative to THIS script's own directory so a bundled
 # copy under agentic_loop/wrappers/ calls its co-located siblings — not an
 # absent scripts/agentic/ in an external pip-install project. macOS BSD readlink
@@ -22,6 +22,33 @@ if _gcd="$(git rev-parse --git-common-dir 2>/dev/null)"; then
   main_root="$(dirname "$(cd "$_gcd" && pwd)")"
   export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$main_root/packages/agentic-loop/src"
 fi
+
+# B17 (WP-27): a bare `status_file=$1` resolved a relative status path against
+# cwd — which §4.1 forces to be the secondary worktree — so the gate judged the
+# git-tracked historical snapshot in the worktree, not the live main-repo
+# status. Anchor relative paths to the MAIN repo root, exactly the same
+# anchoring as dispatch_lint.sh:26-29. Absolute paths are honoured unchanged.
+main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "PREFLIGHT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+case "$status_arg" in
+  /*) status_file="$status_arg" ;;
+  *) status_file="${main_root:+$main_root/}$status_arg" ;;
+esac
+
+# WP-19 single authority (agentic_loop.gate.path_is_in_worktree), same WORKTREE
+# refusal semantics as finalize_merge.sh: a status path that resolves inside a
+# linked worktree is refused — the main-repo copy is the single source of truth.
+wt_verdict=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY' 2>/dev/null || echo PROBE_FAIL
+import sys
+from pathlib import Path
+from agentic_loop.gate import path_is_in_worktree
+print("WORKTREE" if path_is_in_worktree(Path(sys.argv[1])) else "MAIN")
+PY
+)
+if [[ "$wt_verdict" != "MAIN" ]]; then
+  echo "PREFLIGHT_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy (single source of truth)" >&2
+  exit 2
+fi
+
 repo_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root current_worktree) || { echo "PREFLIGHT_FAIL: resolver failed to resolve current_worktree" >&2; exit 2; }
 branch=$(git branch --show-current)
 primary_worktree=$(git worktree list --porcelain | awk '/^worktree / {print substr($0, 10); exit}')
@@ -42,12 +69,20 @@ if [[ "$(cd "$repo_root" && pwd -P)" == "$(cd "$primary_worktree" && pwd -P)" ]]
   exit 2
 fi
 
-if [[ "$branch" != "$expected_branch" ]]; then
+# A4: 冻结（APPROVED）天然发生在开 worktree 之前，模板默认 branch/worktree
+# 为空串，校验器也认为冻结期留空合法。空串视为「尚未绑定」：回填活分支并
+# 明确提示，不再误挂。非空时行为完全不变——严格比对，不等即失败（防绑错分支）。
+if [[ -z "$expected_branch" ]]; then
+  echo "PREFLIGHT_WARN: git.branch empty; bound to $branch" >&2
+  expected_branch=$branch
+elif [[ "$branch" != "$expected_branch" ]]; then
   echo "PREFLIGHT_FAIL: current branch $branch != status branch $expected_branch" >&2
   exit 2
 fi
 
-if [[ -n "$expected_worktree" ]]; then
+if [[ -z "$expected_worktree" ]]; then
+  echo "PREFLIGHT_WARN: git.worktree empty; bound to $repo_root" >&2
+else
   case "$expected_worktree" in
     /*) expected_abs=$expected_worktree ;;
     *) expected_abs="$primary_worktree/$expected_worktree" ;;
@@ -66,15 +101,20 @@ case "$state" in
     ;;
 esac
 
-if ! git ls-files --error-unmatch "$status_file" >/dev/null 2>&1; then
+# 锁/lint 脚本只在主仓存在（唯一事实源），用 resolver 求主仓根（INV-4）。
+# A7: 该解析上移到 tracked 检查之前——tracked 判据同样须以主仓为准。
+main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "PREFLIGHT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
+
+# A7: status 本就是主区 live 状态（全局规范 §4.1），tracked 判据须在**主仓**
+# 索引里查。若在当前 worktree 查，「以另一个未合并 WP 分支为基线」的兄弟分
+# 叉场景（冻结提交不是本分支祖先）必然误挂。
+if ! git -C "$main_root" ls-files --error-unmatch "$status_file" >/dev/null 2>&1; then
   echo "PREFLIGHT_FAIL: status file must be tracked before implementation" >&2
   exit 2
 fi
 
 # 并发闸（concurrency lock）：实现/返工前必须持有本 WP 锁。
 # 见 docs/superpowers/specs/2026-08-01-agentic-concurrency-lock-design.md §5.1
-# 锁/lint 脚本只在主仓存在（唯一事实源），用 resolver 求主仓根定位它们（INV-4）。
-main_root=$("${AGENTIC_PYTHON:-python3}" -m agentic_loop.resolve_paths --root main_repo) || { echo "PREFLIGHT_FAIL: resolver failed to resolve main_repo" >&2; exit 2; }
 
 # 派发前只读硬门：校验不过不该占锁（lint 必须在锁 acquire 之前）。
 if ! lint_reason=$("$here/dispatch_lint.sh" "$status_file" 2>&1 >/dev/null); then
@@ -100,4 +140,4 @@ if ! lock_out=$("$here/lock.sh" acquire --kind wp --key "${iter}__${wp}"); then
 fi
 echo "LOCK: $lock_out" >&2
 
-echo "PREFLIGHT_PASS branch=$branch state=$state worktree=$repo_root"
+echo "PREFLIGHT_PASS branch=$branch state=$state worktree=$repo_root status=$status_file"

@@ -14,6 +14,8 @@ Sub-actions:
   plan lint     <plan.status.json>  read-only: enforce status commit discipline
                                     (freeze + finalize only, no review/consult/
                                     override "sync" commits) per WP
+  plan lanes    <plan.status.json>  read-only: compute READY / BLOCKED / DONE
+                                    from the dependency graph + lane serialization
   plan merge    <plan.status.json>  single `git merge --no-ff <integration>`
                                     onto the target branch (the only git-mutating
                                     step; autonomy-gated as local_merge_no_ff;
@@ -83,6 +85,11 @@ REQUIRED_TOP_LEVEL = {
 
 OPTIONAL_TOP_LEVEL = {"title"}
 
+# Default lane a WP lands in when its object entry has no `lane` (and every WP
+# in the legacy string form). A lane is defined as *serial*: at any instant,
+# only one READY WP per lane may start (§5 + WP-03 brief).
+DEFAULT_LANE = "default"
+
 # Exit codes (mirror the WP gates: 0 ok, 2 fail, 3 autonomy stop / not converged,
 # 64 usage).
 RC_OK = 0
@@ -149,10 +156,37 @@ def validate(data: dict) -> list:
         errors.append("git.base_branch must differ from git.target_branch")
 
     work_packages = data.get("work_packages")
-    if not isinstance(work_packages, list) or not all(
-        isinstance(item, str) and item.strip() for item in work_packages
-    ):
-        errors.append("work_packages must be a list of non-empty strings")
+    if not isinstance(work_packages, list):
+        errors.append("work_packages must be a list")
+    else:
+        seen_ids = set()
+        for item in work_packages:
+            if isinstance(item, str):
+                if not item.strip():
+                    errors.append(
+                        "work_packages entries must be non-empty strings or objects"
+                    )
+                    continue
+                wp_id = item
+            elif isinstance(item, dict):
+                wp_id = item.get("id")
+                if not isinstance(wp_id, str) or not wp_id.strip():
+                    errors.append(
+                        "work_packages object entries need a non-empty 'id'"
+                    )
+                    continue
+                lane = item.get("lane")
+                if lane is not None and (not isinstance(lane, str) or not lane.strip()):
+                    errors.append("work_packages[{!r}].lane must be a non-empty string".format(wp_id))
+                depends_on = item.get("depends_on")
+                if depends_on is not None and not isinstance(depends_on, list):
+                    errors.append("work_packages[{!r}].depends_on must be a list".format(wp_id))
+            else:
+                errors.append("work_packages entries must be strings or objects")
+                continue
+            if wp_id in seen_ids:
+                errors.append("duplicate work_packages id: {!r}".format(wp_id))
+            seen_ids.add(wp_id)
 
     timestamps = data.get("timestamps")
     if not isinstance(timestamps, dict):
@@ -163,6 +197,28 @@ def validate(data: dict) -> list:
     if state in {"READY_TO_MERGE", "MERGED"} and not work_packages:
         errors.append("work_packages must not be empty in state {}".format(state))
 
+    # Topology: dependencies must exist, must not cycle, must not deadlock across
+    # lanes. Performed here so `plan check` and `plan lanes` both reject before
+    # any git/IO work.
+    if isinstance(work_packages, list):
+        norm = _normalize_work_packages(work_packages)
+        wp_ids = [wp["id"] for wp in norm]
+        present = {wp["id"] for wp in norm if isinstance(wp["id"], str)}
+        graph = _dependency_graph(work_packages)
+
+        for wp_id in wp_ids:
+            for dep in graph.get(wp_id, []):
+                if dep not in present:
+                    errors.append(
+                        "work_packages[{!r}] depends_on missing WP {!r}".format(
+                            wp_id, dep
+                        )
+                    )
+
+        cycle = _find_cycle(graph)
+        if cycle is not None:
+            errors.append("dependency cycle detected: {}".format(" -> ".join(cycle)))
+
     return errors
 
 
@@ -172,6 +228,122 @@ def _validate_or_raise(data: dict, label: str) -> None:
         for error in errors:
             print("PLAN_INVALID: {}: {}".format(label, error), file=sys.stderr)
         raise SystemExit(RC_FAIL)
+
+
+# ---------------------------------------------------------------------------
+# Work-package normalization + dependency topology (pure: no IO, no clock)
+# ---------------------------------------------------------------------------
+
+def _normalize_work_packages(work_packages: list) -> list:
+    """Normalize the dual-form `work_packages` into a list of dicts, each with
+    keys `id`, `lane`, `depends_on`. String entries become
+    ``{"id": <str>, "lane": DEFAULT_LANE, "depends_on": []}``; object entries
+    inherit a missing `lane` as DEFAULT_LANE and a missing `depends_on` as [].
+    """
+    out = []
+    for item in work_packages:
+        if isinstance(item, str):
+            out.append(
+                {"id": item, "lane": DEFAULT_LANE, "depends_on": []}
+            )
+        elif isinstance(item, dict):
+            dep = item.get("depends_on")
+            out.append(
+                {
+                    "id": item.get("id"),
+                    "lane": item.get("lane") or DEFAULT_LANE,
+                    "depends_on": list(dep) if isinstance(dep, list) else [],
+                }
+            )
+        # Non-str, non-dict entries are invalid per the per-entry schema loop in
+        # validate(); skip them here so callers (topology block, _wp_ids,
+        # _dependency_graph, _lanes_ready) never crash on a type-error entry.
+    return out
+
+
+def _wp_ids(work_packages: list) -> list:
+    """The WL IDs in declared order (used by the git-status discovery path)."""
+    return [wp["id"] for wp in _normalize_work_packages(work_packages)]
+
+
+def _dependency_graph(work_packages: list) -> dict:
+    """Map of wp id -> [dependencies] (only entries whose id is a string)."""
+    graph = {}
+    for wp in _normalize_work_packages(work_packages):
+        if isinstance(wp["id"], str):
+            graph[wp["id"]] = [d for d in wp["depends_on"] if isinstance(d, str)]
+    return graph
+
+
+def _find_cycle(graph: dict):
+    """Return a cycle as a list of node ids, or None when acyclic.
+
+    Iteratively strip nodes that have no unresolved dependency within the
+    remaining set (topological layering). Any node left over belongs to at least
+    one cycle; reconstruct one concrete cycle by walking dependencies inside the
+    residue."""
+    remaining = {n for n in graph if isinstance(n, str)}
+    changed = True
+    while changed:
+        changed = False
+        for node in list(remaining):
+            deps = [d for d in graph.get(node, []) if d in remaining]
+            if not deps:
+                remaining.discard(node)
+                changed = True
+
+    if not remaining:
+        return None
+
+    # Walk one cycle inside the residue. Every remaining node still has at least
+    # one dependency in `remaining`, so following deps cannot dead-end.
+    start = sorted(remaining)[0]
+    path = [start]
+    pos = {start: 0}
+    while True:
+        cur = path[-1]
+        nxt = next((d for d in graph.get(cur, []) if d in remaining), None)
+        if nxt is None:
+            return None
+        if nxt in pos:
+            return path[pos[nxt]:] + [nxt]
+        pos[nxt] = len(path)
+        path.append(nxt)
+
+
+def _lanes_ready(work_packages: list, states: dict):
+    """Pure ready-set computation. `states` maps wp id -> WP state string
+    ('MERGED' means done). Returns a dict with keys `ready`, `blocked`, `done`.
+
+    - `ready`   : deps all done AND self not done -> can start now.
+    - `blocked` : [(wp_id, [unfinished dep ids])] -> waiting on someone.
+    - `done`    : [wp_id] already MERGED.
+
+    Same-lane serialization is NOT decided here (a lane may contain several
+    READY WPs); the caller picks one READY WP per lane, since lanes are serial
+    by definition."""
+    done_ids = {wp_id for wp_id, state in states.items() if state == "MERGED"}
+    norm = _normalize_work_packages(work_packages)
+    graph = {wp["id"]: [d for d in wp["depends_on"] if isinstance(d, str)]
+             for wp in norm if isinstance(wp["id"], str)}
+
+    ready = []
+    blocked = []
+    done = []
+    for wp in norm:
+        wp_id = wp["id"]
+        if not isinstance(wp_id, str):
+            continue
+        state = states.get(wp_id)
+        if state == "MERGED":
+            done.append(wp_id)
+            continue
+        unfinished = [d for d in graph.get(wp_id, []) if d not in done_ids]
+        if unfinished:
+            blocked.append((wp_id, unfinished))
+        else:
+            ready.append(wp_id)
+    return {"ready": ready, "blocked": blocked, "done": done}
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +421,7 @@ def _status_git_paths(data: dict, repo: Path) -> list:
     base = data["git"]["base_branch"]
     rel_iter = _rel_iter_dir(repo, data.get("iteration_id", ""))
     out = []
-    for wp_id in data.get("work_packages", []):
+    for wp_id in _wp_ids(data.get("work_packages", [])):
         chosen = None
         for c in _candidate_paths(rel_iter, wp_id):
             if _blob_exists(repo, base, c):
@@ -473,6 +645,77 @@ def cmd_lint(plan_arg: str) -> int:
     return RC_OK
 
 
+def cmd_lanes(plan_arg: str) -> int:
+    """Read the plan + each WP's actual state from the integration branch and
+    print the ready / blocked / done sets. Same-lane serialization is applied:
+    at most one READY WP is reported per lane.
+
+    Read-only (git `show` only). The ready computation is a pure function
+    (`_lanes_ready`) evaluated over WP states read from git — the state is the
+    only dynamic input; there is no clock / no network."""
+    data, path = _load_and_validate(plan_arg)
+    repo = _rp.main_repo()
+    base = data["git"]["base_branch"]
+
+    # Collect each WP's state from the integration branch tree.
+    states = {}
+    for wp_id, git_path in _status_git_paths(data, repo):
+        wp = _wp_status_git(repo, base, git_path)
+        state = wp.get("state") if isinstance(wp, dict) else None
+        states[wp_id] = state
+
+    norm = _normalize_work_packages(data.get("work_packages", []))
+    result = _lanes_ready(data.get("work_packages", []), states)
+
+    # Same-lane serialization: among READY WPs in a lane, only the first (in
+    # declared order) may start now; the rest are reported as blocked-on-lane.
+    ready_ids = set(result["ready"])
+    claimed_lanes = set()
+    ready_out = []
+    lane_held = []  # (lane, [wp ids deferred because the lane is busy])
+    for wp in norm:
+        wp_id = wp["id"]
+        if wp_id not in ready_ids:
+            continue
+        lane = wp["lane"]
+        if lane in claimed_lanes:
+            lane_held.append((wp_id, lane))
+            continue
+        claimed_lanes.add(lane)
+        ready_out.append(wp_id)
+
+    print("PLAN_LANES plan_id={} state={} base_branch={}".format(
+        data["plan_id"], data["state"], base))
+
+    print("READY:")
+    if not ready_out:
+        print("  (none)")
+    for wp_id in ready_out:
+        lane = next(wp["lane"] for wp in norm if wp["id"] == wp_id)
+        print("  {} [lane={}]".format(wp_id, lane))
+
+    print("BLOCKED:")
+    blocked_lines = []
+    for wp_id, deps in result["blocked"]:
+        blocked_lines.append("  {} waiting on {}".format(wp_id, ", ".join(deps)))
+    for wp_id, lane in lane_held:
+        blocked_lines.append(
+            "  {} waiting on lane {} (same-lane serialization)".format(wp_id, lane)
+        )
+    if not blocked_lines:
+        print("  (none)")
+    for line in blocked_lines:
+        print(line)
+
+    print("DONE:")
+    if not result["done"]:
+        print("  (none)")
+    for wp_id in result["done"]:
+        print("  {}".format(wp_id))
+
+    return RC_OK
+
+
 def cmd_merge(plan_arg: str) -> int:
     data, path = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
@@ -674,6 +917,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_lint = sub.add_parser("lint", help="enforce freeze + finalize status discipline")
     p_lint.add_argument("plan_status", help="plan.status.json path")
 
+    p_lanes = sub.add_parser("lanes", help="compute READY/BLOCKED/DONE from deps + lanes")
+    p_lanes.add_argument("plan_status", help="plan.status.json path")
+
     p_merge = sub.add_parser("merge", help="single no-ff merge of the plan into target")
     p_merge.add_argument("plan_status", help="plan.status.json path")
 
@@ -692,6 +938,8 @@ def main(argv=None) -> int:
         return cmd_check(args.plan_status)
     if args.action == "lint":
         return cmd_lint(args.plan_status)
+    if args.action == "lanes":
+        return cmd_lanes(args.plan_status)
     if args.action == "merge":
         return cmd_merge(args.plan_status)
     if args.action == "finalize":

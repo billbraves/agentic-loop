@@ -1,0 +1,24 @@
+{
+  "work_package_id": "WP-28",
+  "round": "rev5-merge-gate-consult",
+  "decision": "REWORK",
+  "raw_verbatim": "{\n  \"decision\": \"REWORK\",\n  \"blocking_items\": [\n    {\n      \"id\": \"R1\",\n      \"title\": \"_mutate_on_disk 的异常恢复边界不完整\",\n      \"evidence\": [\n        \"变异写入循环位于 try 之前。若第一份模板写入成功、第二份模板的 no-op guard 或 write_bytes() 失败，控制流不会进入 finally，第一份模板将保持变异状态。\",\n        \"write_bytes() 自身可能在截断或部分写入后抛出异常；由于该写入也在 try 之外，当前实现无法恢复该文件。\",\n        \"finally 内按顺序执行 write_bytes() 和逐文件 assert。任一文件恢复写入或校验失败都会立即中止循环，后续模板不会获得恢复尝试。\",\n        \"报告中的 assert False 实测只覆盖 yield 后的用例主体异常，没有覆盖上述初始化阶段及恢复阶段失败，因此不能证明 brief 特别要求检查的“部分写入失败、多文件间顺序”安全性。\"\n      ],\n      \"required_fix\": [\n        \"在任何落盘前完成所有 mutated_bytes != original_bytes 校验。\",\n        \"将全部变异写入置于 try/finally 的 try 范围内，使首个写入尝试发生后，无论后续写入是否失败都会进入恢复。\",\n        \"finally 必须独立尝试恢复所有可能被写入或部分写入的路径；单个路径恢复失败不得阻止后续路径的恢复尝试。\",\n        \"所有恢复尝试完成后，再逐字节校验各路径并统一抛出恢复错误。\",\n        \"增加或提供故障注入证据：第二个文件写入失败时，第一个文件仍恢复；首个恢复操作失败时，后续文件仍得到恢复尝试。\"\n      ]\n    }\n  ],\n  \"non_blocking_findings\": [\n    \"M-T0/M-T0b 已将变异施加到真实文件字节，随后通过 _read_text_preserving_newlines() 读取，再进入 _check_both()；该链路中未见其他换行归一化环节。\",\n    \"M-T0 同步变异两份模板并精确断言 SECTION_MISSING 在场、REPLICA_MISMATCH 不在场；M-T0b 单侧变异并断言两者皆在场，归因符合 brief。\",\n    \"_crlf_rewrap_bytes() 按 CRLF→LF→CRLF 的顺序处理，不会由既有 CRLF 生成 CRCRLF。\",\n    \"oracle 第 4 项在两份模板及 FROZEN_BODY_ACCEPTANCE 中与冻结文本一致，未见与其他条目冲突。\",\n    \"rev5 增量未改动 _mutate_both() 或 T1–T7 的测试逻辑；未发现测试阈值或 witness 语义被削弱。\"\n  ]\n}",
+  "consultant": {
+    "adapter": "codex",
+    "provider": "kirogpt",
+    "identity_model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "read-only",
+    "consulted_at": "2026-09-18T07:20:00Z",
+    "transport": "codex exec --ignore-user-config --sandbox read-only -m gpt-5.6-sol via litellm bridge :18090，--output-schema 生效（本轮咨询者按 schema 返回 JSON，不同于 rev3 的自然语言）。手动路径而非 codex_merge_gate.sh：gate 按固定命名读 {wp_id}-brief.md 会喂 rev1 契约（B47），故 brief 内联提供。",
+    "inputs": "WP-28-consult-codex-rev5-request.md + WP-28-brief-rev5.md（sha256 d96a7fa3…，内联）+ 累积 diff 7a30f50..2923255 + 增量 diff 5d94387..2923255。prompt 46399 bytes。",
+    "dispatch_incident": "第一次派发用 env -u OPENAI_BASE_URL -u OPENAI_API_KEY，把 codex binding 的 env_key 一起剥掉，导致 RC=0 但 answer 为空、tokens used 0 —— 空结果长得像裁决。改为只剥 OPENAI_BASE_URL 后正常返回。编排者自己的失误，已记忆。"
+  },
+  "orchestrator_verification": {
+    "R1": "REPRODUCED（三条，均以模板副本而非真实文件实测，探针 /Users/admin/.claude/jobs/8a8bf01e/tmp/probe-r1.py 直接 exec 交付源码里的 carrier，不重抄）：\n(1) 第二份的 no-op guard 失败时，第一份留在变异态 —— CASE1『A restored: False / B restored: True』。控制流未进 try，finally 从不执行。\n(2) finally 内第一份恢复写入抛错时，第二份完全不获恢复尝试 —— CASE2『A restored: False / B restored: False』。\n(3) 正常路径两份都恢复 —— CASE3 控制组全 True，证明探针本身有判别力。",
+    "reachability": "CASE1 的触发条件在当前调用点是可达的：`_crlf_rewrap_bytes` 对已是 CRLF 的文件是恒等映射（实测 CRLF 输入 -> changed False），故一旦仓库里的模板某天以 CRLF 落盘（Windows 检出、.gitattributes 改动、编辑器改行尾），M-T0 的第一份写入成功、第二份 guard 失败，真实模板会被留在 CRLF 变异态。不是纯理论洞。",
+    "severity_assessment": "阻断成立。这个 carrier 直接写测试仓里的真实模板文件，而它保护的正是『模板受保护块逐字节冻结』这条不变式 —— 漏还原会把被保护的文件本身弄脏，且脏的方向恰好是判据要抓的那种字节改动。brief §附注 2 明写『避免一条漏恢复污染另一条』，R1 正落在该要求内，不是超范围。",
+    "orchestrator_own_review": "我此前判 ACCEPT 并未发现 R1。我测的是『yield 之后的用例主体抛异常时能否恢复』（在 with 块内注入 assert False），那条路径确实安全；但初始化阶段（try 之前的写入循环）与恢复阶段本身的失败我一条都没测。brief §附注 2 就写着『多文件间顺序』，我的探针没覆盖它。ACCEPT 应予撤回，改判 CHANGES_REQUESTED。",
+    "non_blocking_findings_crosscheck": "codex 的 5 条非阻断结论与我的独立复核逐条一致（读路径唯一环节、M-T0/M-T0b 归因分层、CRLF 幂等、oracle 第 4 项一致无矛盾、T1–T7 与 _mutate_both 未被削弱）。即 rev5 的两个标的本身兑现，缺陷在载具的健壮性。"
+  }
+}

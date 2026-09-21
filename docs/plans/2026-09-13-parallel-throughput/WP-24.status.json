@@ -1,0 +1,257 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-24",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi-cli",
+    "session": "bg b4t4y0xfs (see wp24-rev2-exec.log)",
+    "redispatch_count": 1
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "e78084c",
+    "dispatch_commit": "b1ab985",
+    "branch": "feature/wp24-brief-template-anchors",
+    "worktree": "../wp24-brief-template-anchors",
+    "commit": "f508aca",
+    "merged_commit": "46838b211de371fa3848c4f0f497f238402d726c"
+  },
+  "scope": {
+    "allowed_paths": [
+      "tests/test_wp_template_dispatch_lint.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/wrappers/dispatch_lint.sh",
+      "docs/agentic/templates/WORK_PACKAGE.md",
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+      "src/agentic_loop/init_cmd.py",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev2.md",
+      "sha256": "49f0842454b24c5932ec0b3faaa64fc923ec19efc32cdaeb7f0169a6cd40e47f",
+      "rev": 2,
+      "supersedes": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-24-brief-rev1.md",
+        "sha256": "1a36ca63cbcb0c3c781899c2fa6bd2199c1a4233cb08980e95b592aa2f23bf2c",
+        "why": "rev1 交付 c04bc6b 被 codex 第二签名判 REWORK；witness 用例的原因特异性由 fixture 而非断言承载，改用已实测的差分对补齐"
+      },
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh 的 section 判据 heredoc 原文按索引切片出来直接跑（B11 修法 1）；并用已知不合规的 WP-20-brief.md 做正向对照",
+        "result": "PASS — rev2 三锚点均存在且非空（stdout='' rc=1）；对照 WP-20 报 brief missing section 'Acceptance tests' rc=0，判据具备区分力",
+        "checked_at": "2026-09-16T01:00:00Z"
+      },
+      "rework": {
+        "round": 1,
+        "reason": "consult REWORK (codex)；观察成立但其修法不可达，编排者实测出等价且可达的差分对判据",
+        "rev1_commit": "c04bc6b",
+        "carried_over": "rev1 的模板改动与 7 条用例保留；本轮只改 tests/test_wp_template_dispatch_lint.py 一个文件，两份模板转为 forbidden（零行 diff）",
+        "dispatched": {
+          "at": "2026-09-16T01:10:00Z",
+          "command": "kimi --afk --print -w /Users/admin/vibe/wp24-brief-template-anchors -p <prompt>",
+          "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp24-rev2-prompt.md",
+          "prompt_sha256": "8c04750394553a398e9d310482e5370d307467c8f4e04e1239b306af8c3afbdc",
+          "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp24-rev2-exec.log",
+          "preflight": "PREFLIGHT_PASS branch=feature/wp24-brief-template-anchors state=CHANGES_REQUESTED（主仓绝对路径，规避 B17）",
+          "autonomy": "AUTONOMY_AUTO dispatch_developer",
+          "head_at_dispatch": "c04bc6b",
+          "parallel_with": "WP-22 rev2（bg bhye2i68q）；两者工作树与文件集互不相交，无共享写入面"
+        }
+      },
+      "gate_alignment": {
+        "defect": "B16",
+        "workaround": "固定命名 WP-24-brief.md 内容置为 rev2（sha256 49f08424…），rev1 原文改名 WP-24-brief-rev1.md（sha256 1a36ca63… 与 supersedes 一致）；使 dispatch_lint.sh:60 与 redispatch.py:493 读到的都是 rev2",
+        "not_fixed_here": "B16 本体归任务 #18",
+        "aligned_at": "2026-09-16T01:00:00Z"
+      }
+    },
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-15T10:30:00Z",
+      "measured_at_commit": "aa5e964",
+      "result": "4 failed, 581 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x, fixture runs `git checkout main` in a temp repo without a main branch) — do not fix"
+    },
+    "changed_files": [
+      "docs/agentic/templates/WORK_PACKAGE.md (+33: 三个英文锚点段，标注与中文段同义)",
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl (+33: 同上，与 docs 份 byte-identical)",
+      "tests/test_wp_template_dispatch_lint.py (+212: 7 用例，实际调用真 dispatch_lint.sh)"
+    ],
+    "tests": [
+      {
+        "name": "tests/test_wp_template_dispatch_lint.py",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "7 passed",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "cross-version 3.13 / 3.14",
+        "command": "uv run --python <ver> --with pytest --no-project python -m pytest tests/test_wp_template_dispatch_lint.py -q",
+        "result": "7 passed / 7 passed",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "tests/test_init_contract.py::test_init_scaffolds_reference_templates",
+        "command": "PYTHONPATH=src python3.11 -m pytest <node> -q",
+        "result": "1 passed",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "whole suite",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 588 passed, 4 skipped (baseline 4 failed, 581 passed, 4 skipped -> +7 new, 0 regression)",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "reviewer mutation self-check",
+        "command": "rename '## Acceptance tests' -> '## MUTATED_ANCHOR' in both templates, rerun new test, then git checkout --",
+        "result": "4 failed, 3 passed; real script printed \"DISPATCH_LINT_FAIL: brief missing section 'Acceptance tests'\"; worktree clean after restore",
+        "verified_by": "orchestrator",
+        "exit_code": 1
+      },
+      {
+        "name": "scope verification (B8 baseline = git.dispatch_commit)",
+        "command": "docs/agentic/tools/review_scope.sh ../wp24-brief-template-anchors <status.json> <allowed-regex>",
+        "result": "SCOPE_OK; b1ab985..c04bc6b; 无越界; 区间内 3 个文件改动（具备区分力）",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "zero-diff forbidden paths",
+        "command": "git diff b1ab985..HEAD -- src/agentic_loop/wrappers/dispatch_lint.sh src/agentic_loop/init_cmd.py",
+        "result": "0 lines",
+        "verified_by": "orchestrator",
+        "exit_code": 0
+      },
+      {
+        "name": "rev2 witness differential pair (py3.11/3.13/3.14)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_wp_template_dispatch_lint.py -q; uv run --python 3.13|3.14 ...",
+        "result": "7 passed / 7 passed / 7 passed",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 full suite (py3.11)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 588 passed, 4 skipped (baseline e78084c: 4 failed, 581 passed -> +7 new, 0 regression; the 4 are the known test_finalize_merge_triple_sign.py fixture failures)",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 reviewer orthogonality mutation pair (cause-specificity proof)",
+        "command": "in dispatch_lint.sh: (A) neuter only the body-emptiness branch `if not non_empty:` -> `if False:`; (B) neuter only the heading branch `if not m:` -> `if False:` + `continue`; run the file after each, restore from backup",
+        "result": "A: ONLY test_witness_empty_anchor_body_fails RED (rc=0 DISPATCH_LINT_PASS on variant A); B: ONLY test_forbidden_mutation_renamed_anchor_fails RED. The two tests are orthogonal — each pins exactly one predicate half. Both restores byte-identical (git status clean), 7 passed after each.",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 scope verification (round diff = c04bc6b..f508aca)",
+        "command": "git diff --stat c04bc6b..f508aca; git diff --name-only c04bc6b..f508aca -- <forbidden set>",
+        "result": "1 file changed (+48/-11), tests/test_wp_template_dispatch_lint.py only; both templates and wrappers/ zero lines this round",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      }
+    ],
+    "artifacts": [
+      "docs/plans/2026-09-13-parallel-throughput/WP-24.report.md",
+      "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp24-exec.log"
+    ],
+    "remaining_risks": [
+      "模板锚点是文本约定，dispatch_lint 只检查存在性与非空，不检查英文段与中文段是否真的同义；同义性靠评审人工核，本轮不引入自动判据",
+      "docs/plans/ 里已有两份不合规 brief（WP-20-brief.md 缺三个锚点、WP-19-brief-rev2.md 缺两个），属编排者维护面，执行者已按 Brief 申报未动",
+      "冻结 Brief 有一处编排者错误：要求 witness 断言报 empty 而非 missing，真 gate 两条失败路径都打印 missing（dispatch_lint.sh:86/:98）。执行者已在 CONCERNS 申报并用等价三段证据链替代；已登记为缺陷 B11",
+      "B11 的根治（编排者冻结前自检：判据只能来自真脚本、负面断言须给出打印点 file:line）尚未立 WP"
+    ]
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-16T00:00:00Z",
+    "notes": "rev2 兑现了 rev1 缺的那一项：原因特异性从断言措辞搬回 fixture。codex 的修法（assert 'empty' in stderr / 'missing' not in stderr）编排者已实测为不可达（dispatch_lint.sh:86 与 :98 打印同一句 brief missing section '<h>'），执行者据此明确不采纳并写入 docstring —— 这是正确的判断，不是绕过审核意见。替代方案为差分对：同一 fixture 只差 `## Acceptance tests` 下的一行 body，两个变体都显式断言标题存在，故 :86 按构造被排除，A 的红只能来自 :98。编排者用一对正交变异独立证实：只废 :98 -> 仅 witness 用例红；只废 :86 -> 仅 renamed-anchor 用例红。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "ACCEPT -> 保留但不解锁合入",
+        "reviewed_by": "claude-code",
+        "note": "rev1 交付本身在当时约束下是正解（gate 两条路径措辞相同，codex 建议的 empty 断言不可达）；但 oracle 第 2 项由 fixture 承载的残余缺口真实存在，故以 rev2 补断言而非驳回既有交付"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "claude-code",
+        "basis": "orthogonal mutation pair + same-fixture positive control + cross-version green + zero regression + scope clean"
+      }
+    ],
+    "merge_approval": {
+      "approved_by": "user",
+      "approved_at": "2026-09-16T08:00:00Z",
+      "instruction": "合并WP-22/WP-24",
+      "note": "用户批准即合入授权；第二签名为 codex rev2 ACCEPT（逐字转录，见 verdict_file）。本地 merge --no-ff，不 push。"
+    }
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "reviewed_by": "codex",
+    "notes": "rev2 第二签名 ACCEPT。codex 撤回 rev1 的修法并认可替代方案：'差分对等价且优于原先的措辞断言'，确认两条失败路径 stderr 完全相同故基于措辞的原因区分在当前实现下不可达。其走完了推理链：variant_b 仅比 variant_a 多一行 x 且断言二者不等（证明替换发生）；两变体标题均在且显式断言，故 variant_b 过真 dispatch_lint.sh 排除 :86；variant_a 仅缺该 body 行却失败，红因被隔离到 :98；stderr 断言已明确降级为弱辅助，不再承担原因特异性；renamed-anchor 用例继续覆盖 :86。Scope 与 Brief 一致，仅改允许的测试文件；未发现 correctness/architecture/time-as-of/migration/security 阻断项，亦无削弱测试、阈值或信号语义。传输口径：codex 再次以自然语言（'VERDICT: ACCEPT'）作答而非 --output-schema 的 schema 形状，adapters/codex.py::_parse_verdict 抛 ValueError；裁决由编排者逐字转录，原文见 verdict_file.raw_verbatim。与 WP-21 记录的同一软约束问题（--output-schema 对该 provider 只是建议）。codex 明确声明其结论仅基于内联 Brief + 本轮 diff + 题面实测证据，未读取仓库其他文件、未独立重跑测试，故其为第二签名而非独立复测。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "REWORK",
+        "finding": "test_witness_empty_anchor_body_fails 只断言 'Acceptance tests' in stderr，无法区分 :86/:98，oracle 空验证",
+        "suggested_fix": "assert 'empty' in stderr; assert 'missing' not in stderr",
+        "orchestrator_note": "缺陷成立，修法不可达；已实测两路径 stderr 逐字节相同"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "codex",
+        "consulted_at": "2026-09-16T07:30:00Z",
+        "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-rev2-verdict.json",
+        "basis": "inline rev2 brief + round-only diff, forbid_repo_read=True; no independent test rerun (stated by codex itself)",
+        "transport": "prose answer; --output-schema soft for this provider; transcribed verbatim by orchestrator"
+      }
+    ],
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-24-consult-codex-rev2-verdict.json"
+  },
+  "timestamps": {
+    "created_at": "2026-09-15T10:30:00Z",
+    "dispatched_at": "2026-09-16T01:10:00Z",
+    "updated_at": "2026-09-16T02:00:23Z",
+    "review_completed_at": "2026-09-16T00:00:00Z",
+    "consulted_at": "2026-09-16T07:30:00Z",
+    "rev2_frozen_at": "2026-09-16T01:00:00Z",
+    "approved_for_merge_at": "2026-09-16T08:00:00Z"
+  }
+}

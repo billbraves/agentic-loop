@@ -1,0 +1,16 @@
+{
+  "work_package_id": "WP-22",
+  "round": "rev2",
+  "decision": "ACCEPT",
+  "raw_verbatim": "VERDICT: ACCEPT\n\n阻断项：无。\n\n1. **B15 已关闭。** `NUL` 作为记录边界，值内 `NUL` 在 `render_field()` 被整次拒收；TAB 仅按首个分隔符拆 key/value，因此值内 TAB、换行均无语法意义。赋值前的固定 `case` 白名单又阻止了未知变量名进入 `printf -v`。未发现可由合法字段值制造新记录或走私额外赋值的残余路径。\n\n2. **B13 已关闭。** 写回段改为对 `$status_raw` 执行 `json.loads(raw)`，不再 `open(status_file)`。`status_raw` 来自同一次 `O_NOFOLLOW` open，且 NUL framing 能保留尾部换行等原始内容；判定与写回使用同一份 JSON 字节。\n\n3. **B18 不阻断。** 经 argv 传递确实引入 `ARG_MAX` 可用性上限，超限时诊断也只是 shell 的裸错误，但执行会在写回前 fail-closed，不会伪造 `MERGED`。以约 15KB 的真实状态规模和约 1.81MB 的实测阈值看，当前有足够余量。建议后续改为临时文件或 stdin，并补明确诊断，但不构成本轮 correctness/security 阻断项。\n\n4. **测试证据足以支持合入。** 两条新用例都覆盖负向状态不变、原因 witness 和正向可达性；第二字段使用 `iteration_id` 携带实际记录分隔符，还验证了修复位于传输层。B19 的 mutation 没直接复现伪造成功，削弱的是变异证明的特异性，不是生产修复本身；测试仍会在编码守卫回退时转红，紧凑 JSON PoC 又补足了真实绕过证据，因此不升级为阻断。\n\n残余非阻断关注：中间目录替换面仍按 Brief 明确留存；B18、B19 应继续登记为后续改进。本结论仅基于内联 Brief、diff 与题面给出的实测证据，未读取仓库其他文件或独立重跑测试。",
+  "consultant": {
+    "adapter": "codex",
+    "provider": "kirogpt",
+    "identity_model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "read-only",
+    "consulted_at": "2026-09-16T07:30:00Z",
+    "transport": "CodexAdapter.review() + gate.VERDICT_SCHEMA via --output-schema + -o <file>. The model again answered in PROSE ('VERDICT: ACCEPT') rather than the schema, so adapters/codex.py::_parse_verdict raised ValueError and the decision was transcribed verbatim by the orchestrator. Same soft-constraint behaviour already recorded on WP-21 — --output-schema is advisory for this provider, and any consumer of _parse_verdict must treat a parse failure as 'read the raw answer', not as 'no verdict'.",
+    "inputs": "diff of the rev2 round only + the frozen rev2 brief inline; forbid_repo_read=True (no repo access)"
+  }
+}

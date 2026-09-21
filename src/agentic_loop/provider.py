@@ -80,13 +80,55 @@ def _switch_codex_official() -> bool:
     return _replace(CODEX_CFG, r'^model = ".*"', 'model = "{}"'.format(official))
 
 
+def _ensure_kimi_deepseek_defs() -> bool:
+    """保证 kimi config 里存在 `deepseek/v4-pro` 的 model 段及其 provider 段。
+
+    只改 default_model 而不建 model 段，会触发 kimi 的 config 校验
+    `Default model deepseek/v4-pro not found in models` 而拒绝启动
+    （kimi_cli/config.py: validate_model）；model 段引用的 provider 缺失
+    同样会被拒。故切换前先幂等补齐这两段，缺则追加，已存在则不动。
+    返回是否真正补写了内容（用于让调用方如实报告「已修复」而非「未修改」）。
+    """
+    if not KIMI_CFG.is_file():
+        return False
+    text = KIMI_CFG.read_text(encoding="utf-8")
+    additions = ""
+    if '[models."deepseek/v4-pro"]' not in text:
+        additions += (
+            '\n[models."deepseek/v4-pro"]\n'
+            'provider = "deepseek"\n'
+            'model = "deepseek-v4-pro"\n'
+            "max_context_size = 131072\n"
+            'capabilities = ["thinking"]\n'
+            'display_name = "DeepSeek V4 Pro"\n'
+        )
+    if "[providers.deepseek]" not in text:
+        key = _deepseek_key()
+        additions += (
+            "\n[providers.deepseek]\n"
+            'type = "openai_legacy"\n'
+            'base_url = "https://api.deepseek.com/v1"\n'
+            'api_key = "{}"\n'.format(key)
+        )
+    if additions:
+        if not text.endswith("\n"):
+            text += "\n"
+        KIMI_CFG.write_text(text + additions, encoding="utf-8")
+        return True
+    return False
+
+
 def _switch_kimi_deepseek() -> bool:
+    # 先幂等补齐 model/provider 段：只改 default_model 而缺 model 段会让 kimi
+    # 拒绝启动。补写本身也算一次有效修改，须计入返回值，否则一个 default_model
+    # 已是 deepseek/v4-pro 但缺 model 段的坏配置被修好后，仍会被报「未修改」。
+    fixed_defs = _ensure_kimi_deepseek_defs()
     cur = _find_model(KIMI_CFG, "default_model")
     if not cur or cur == "deepseek/v4-pro":
-        return False
+        return fixed_defs
     KIMI_BAK.write_text(cur + "\n", encoding="utf-8")
     return _replace(KIMI_CFG, r'^default_model = ".*"',
-                    'default_model = "deepseek/v4-pro"')
+                    'default_model = "deepseek/v4-pro"') or fixed_defs
 
 
 def _switch_kimi_official() -> bool:

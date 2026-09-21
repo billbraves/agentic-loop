@@ -1,0 +1,543 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-25",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "CHANGES_REQUESTED",
+  "role": "Developer",
+  "executor": {
+    "history": [
+      {
+        "tool": "kimi",
+        "session": "",
+        "dispatched_at": "2026-09-17T00:05:00Z",
+        "dispatch_rev": 3,
+        "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md)\"",
+        "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev3-prompt.md",
+        "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev3-exec.log",
+        "background_task_id": "bytxwid89",
+        "dispatched_brief": {
+          "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
+          "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
+          "rev": 3
+        },
+        "dispatch_base_commit": "284e223",
+        "dispatch_note": "rev3 返工派发（B28）。派发前置全部实测通过：① brief 过活树 dispatch_lint.sh:69-101 的 section 判据（切片逐字为活树脚本子串，rc=1；同切片对 WP-20-brief.md 仍 rc=0，非恒绿）；② status 过活树 validate_wp_status（STATUS_VALID）；③ 锁 owner=claude-53c58ab0 为本会话自身 id（LOCK_REACQUIRED，非抢占）；④ 执行者活性探针 PROBE_OK。⑤ preflight 必须用**主仓**脚本跑：工作树内的 preflight.sh 是 WP-27 合入前的历史快照，会读工作树自己的 status 快照（state=DRAFT）而判 PREFLIGHT_FAIL —— 这正是 WP-27 修掉的 B16/B17 本体。用主仓脚本 `PYTHONPATH=/Users/admin/vibe/agentic_loop/src bash /Users/admin/vibe/agentic_loop/src/agentic_loop/wrappers/preflight.sh <rel status>` 在工作树内发起 → PREFLIGHT_PASS state=APPROVED status=<主仓副本>。"
+      }
+    ],
+    "tool": "kimi",
+    "dispatched_at": "2026-09-17T11:08:47Z",
+    "dispatch_rev": 4,
+    "dispatch_command": "cd /Users/admin/vibe/wp25-protocol-disciplines && env -u OPENAI_BASE_URL -u OPENAI_API_KEY kimi --afk --config-file ~/.kimi/deepseek.toml -p \"$(cat ~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev4-prompt.md)\"",
+    "dispatch_prompt": "~/.claude/wp-dispatch-prompts/2026-09-13-parallel-throughput/wp25-rev4-prompt.md",
+    "dispatch_prompt_sha256": "227f81b3d2f70336a23edb618290d0f125b20c08b91bc65812aea102c81cca85",
+    "log": "~/.claude/jobs/8a8bf01e/tmp/wp25-rev4-exec.log",
+    "background_task_id": "bswuuqzjp",
+    "session": "",
+    "dispatched_brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev4.md",
+      "sha256": "7cc047d9592d5fa44dbb23e80f1fb565581eff173237def7adbb8b5a5bc9d58f",
+      "rev": 4
+    },
+    "dispatch_base_commit": "aa1e43b",
+    "dispatch_note": "rev4 派发（INV-P，定位唯一性 + 结构完整性两环一并收口，范围仍限单一测试文件）。派发前置：第 3 次 re-freeze 的强制停手复核已完成且用户已批准裁定；自工作树内发起 preflight → PREFLIGHT_PASS（state=APPROVED, LOCK_REACQUIRED owner=claude-53c58ab0）；执行者活性探针 → PROBE_OK；brief 内三个 sha256 已与活树逐一核对一致（brief 7cc047d9 / 测试文件 727caa21 / 模板 0746351e）；prompt 已落盘并记 sha256，明确写入反向差分方向（变异用例：旧实现 FAIL / 新实现 PASS）以防重踩 WP-27 的方向错。与 WP-26 rev4 并行派发：两者 allowed_paths 互不相交（WP-25 只动 tests/test_orchestrator_protocol_disciplines.py，WP-26 动 redispatch.py / dispatch_lint.sh 及其两个测试文件）。",
+    "result": "DONE (executor self-report)",
+    "exit_code": 0,
+    "commit": "f4c6e7d",
+    "report_deviation": "报告称 3.13/3.14「无 pytest 模块，无法跑」——不成立。执行者用了裸 python3.13/3.14，而 brief 给的形态是 `uv run --quiet --python 3.1X --with pytest --no-project python -m pytest`。编排者按 brief 形态实测：3.13 = 28 passed，3.14 = 28 passed。该 DoD 项实际满足，报告低估。"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "58c7624",
+    "branch": "feature/wp25-protocol-disciplines",
+    "worktree": "../wp25-protocol-disciplines",
+    "commit": "f4c6e7d",
+    "dispatch_commit": "58c7624"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/templates/CLAUDE.md.tmpl",
+      "src/agentic_loop/contract_render.py",
+      "tests/test_contract_render.py",
+      "tests/test_orchestrator_protocol_disciplines.py"
+    ],
+    "forbidden_paths": [
+      "CLAUDE.md",
+      "AGENTS.md",
+      "docs/agentic/OPERATING_MODEL.md",
+      "src/agentic_loop/templates/AGENTS.md.tmpl",
+      "src/agentic_loop/templates/OPERATING_MODEL.md.tmpl",
+      "src/agentic_loop/templates/WORK_PACKAGE.md.tmpl",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/redispatch.py",
+      "docs/plans/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "history": [
+        {
+          "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev3.md",
+          "sha256": "e912544a9ee0af6c7aa4f89785eb4f5dbe536bd89bb23f8688a8ebbc818de34a",
+          "rev": 3,
+          "refreeze_reason": "B28 rework: 存在性锚点钉不住极性（保留全部六个锚点短语、把纪律改成语义相反的规则，十条用例全绿）。rev3 把判据换成修法 D —— 按块边界切出三条纪律正文块、空白归一化、断言逐字等于测试文件里的多行字符串常量（不用 sha256 常量）。同时收口 B27/C2：变异构造改为锚点驱动、守卫用例不再写活树模板。",
+          "correction": "2026-09-16T23:40Z 冻结前自查：rev3 初稿把范围段写成 `## 范围` + `### Allowed and forbidden paths`，而活树 dispatch_lint.sh:69-101 的 section 判据要求 `^##\\s+Allowed and forbidden paths\\s*$`（h2），h3 不匹配 —— 与 rev2 是同一形状的冻结缺陷（任务 #28 复发）。已把该标题提升为 h2 并删掉外层 `## 范围`。另修正 Acceptance tests 末条的既有失败口径：基线命令 `python3.11 -m pytest tests -q` 下是 4 条（全在 test_finalize_merge_triple_sign.py，defaultBranch 冲突），第 5 条 B31 本体只在 `uv run` 下现形。两处纠正均发生在派发之前，无执行者读过旧稿。",
+          "prefreeze_check": {
+            "method": "把活树 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片直跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）。切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred_rev3.py，并以 `pred in live` 逐字断言该切片是活树脚本的字面子串（VERBATIM_SUBSTRING 通过）。",
+            "result_before_correction": "FAIL — rc=0 \"brief missing section 'Allowed and forbidden paths'\"（h3 不匹配 h2 判据）",
+            "result_after_correction": "PASS — rc=1 无输出",
+            "discriminating_power": "同一切片对 WP-20-brief.md 仍返回 rc=0 \"brief missing section 'Acceptance tests'\" —— 非恒绿",
+            "checked_at": "2026-09-16T23:45:00Z"
+          },
+          "modus_d_extraction_reverified": {
+            "note": "冻结前在工作树 284e223 的活模板上重跑 brief 指定的三组块边界标记，确认都切得出、且归一化后长度/摘要与 brief 设计期的实测一致（执行者若切不出块必须判红，见交付物 1 的 fail-closed 要求）。",
+            "template_sha256": "0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a",
+            "blocks": {
+              "criteria_sourcing": "len=392 norm_sha=a434bce6…2d2a82ad",
+              "read_face_pinning": "len=515 norm_sha=d86464d1…84f119ef",
+              "negative_assertion": "len=386 norm_sha=fec4586d…362c11b8"
+            },
+            "checked_at": "2026-09-16T23:50:00Z"
+          },
+          "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**触发**：rev1 首冻 → rev2 第 1 次 re-freeze → rev3 第 2 次 → rev4 将是第 3 次。已按规则停手复核计划而非继续冻结，结论见 docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md。实质结论：三轮失败点（B20 锚点粒度 → B28 语义极性 → D1 定位唯一性 → D2 结构完整性）是同一条链的四环，根因是编排者按台账编号冻结而非按不变式冻结（与 WP-26 §3 失误 1 同型）；另一条独立失误是判据自检的变异集由上一轮缺陷形状生成，而非由本轮判据的组成步骤生成。rev4 裁定：按 INV-P 一次性收口定位唯一性 + 结构完整性两环，范围仍限 1 个测试文件。**待用户批准该裁定后才冻结 rev4。**"
+        }
+      ],
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev4.md",
+      "sha256": "7cc047d9592d5fa44dbb23e80f1fb565581eff173237def7adbb8b5a5bc9d58f",
+      "rev": 4,
+      "refreeze_count": 3,
+      "refreeze_reason": "rev3 双签名 REWORK（D1 定位不唯一：逐字锁定用「首个标记出现位置」切块，在真实块前放一份完好冻结块即可让判据锁错文本；D2 结构被吞：_normalize 空白归一化把「删列表前缀 / 插空段 / 缩进成 code block」这类改变 Markdown 归属的结构变化抹平）。rev4 把验收标的从缺陷编号改写为不变式 INV-P，一次性收口定位唯一性与结构完整性两环。",
+      "invariant": "INV-P：三条协议纪律的任何弱化都必须让用例转红；而放行一次弱化必须以修改测试文件内的冻结常量为前提（在 diff 中可见）。",
+      "refreeze_stop_rule_check": {
+        "rule": "任务 #24 —— 同一 WP 第 3 次 re-freeze 强制停手复核计划",
+        "fired": true,
+        "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev4.md",
+        "ruling": "rev4 按 INV-P 一次性收口定位唯一性 + 结构完整性；范围仍限单一测试文件；模板仍 forbidden",
+        "user_approved": true,
+        "user_approved_at": "2026-09-17T10:54Z"
+      },
+      "prev_rev": 3
+    },
+    "tests": [
+      {
+        "name": "orchestrator_protocol_disciplines targeted (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+        "result": "19 passed（用例数 8 -> 15，参数化后 19）",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "full suite (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 616 passed, 4 skipped —— +9 passed vs 基线 607，零回归；4 条失败全在 tests/test_finalize_merge_triple_sign.py（本机 git init.defaultBranch=master 与 fixture 的 git checkout main 冲突），与基线同一组",
+        "exit_code": 1,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.13)",
+        "cmd": "PYTHONPATH=src uv run --python 3.13 --with pytest python -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+        "result": "19 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.14)",
+        "cmd": "PYTHONPATH=src uv run --python 3.14 --with pytest python -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+        "result": "19 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "编排者自构反转变异：纪律 1 禁令反转为许可（rev2 六个锚点全保留）",
+        "cmd": "隔离树三路对照 /Users/admin/.claude/jobs/8a8bf01e/tmp/b28probe/{ctl,rev2,rev3}",
+        "result": "ctl（rev2 用例 x 未变异模板）9 passed；rev2 用例 x 本反转 9 passed = B28 缺陷复现；rev3 用例 x 本反转 4 failed = 判据钉住。差分成立",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "编排者自构尾句反转 x3（检验切块 off-by-one）",
+        "cmd": "对三块各自最后一句分别反转后跑 targeted",
+        "result": "read_face / negative_assertion / criteria_sourcing 三例均 4 failed，尾句都在切口之内，无漏口",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "空转检验 + 错层检验",
+        "cmd": "① 把 _assert_discipline_verbatim 改为无条件抛错后跑 targeted ② 逐条判定三条反转的红来自哪一层",
+        "result": "① 三条极性反转用例全部转红，非靠共享 helper 顺带过关 ② 三例 cut_ok=True，红来自 verbatim-drift 层而非 fail-closed 切块层",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      }
+    ],
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-16T23:20:00Z",
+      "measured_at_commit": "284e223",
+      "result": "4 failed, 607 passed, 4 skipped",
+      "known_failures": "4 条全在 tests/test_finalize_merge_triple_sign.py：fixture 在 `git init` 出来的临时仓里跑 `git checkout -q main`，而本机 git init.defaultBranch=master，故无 main 分支。既有失败，与 WP-25 无关，不要修。",
+      "known_failure_only_under_uv": "tests/test_init_githooks.py::test_prepush_hook_targets_current_worktree_status_in_linked_worktree 在裸 python3.11 下是**绿**的，只在 `uv run` 下转红（uv 把 .venv/bin 放进 PATH，钩子子进程的 python3 因此能 import 到框架，才触发 pre-push.tmpl 丢弃 repo_root 的真缺陷 B31）。本 WP 的 3.13/3.14 走 uv 但只跑 targeted 用例（不含该文件），不会撞上。B31 已另立任务 #31，不在本 WP 范围。",
+      "note": "rev3 是叠在 rev2 提交 284e223 上的返工，零回归的参照系是 rev2 的 HEAD，不是 rev1 的 359cb1a、也不是 rev1 派发前的 58c7624。本基线由编排者本人在 /Users/admin/vibe/wp25-protocol-disciplines 实测。",
+      "b12_caveat": "B12 仍未修（任务 #11）：无机制强制 evidence.baseline 存在、也无机制强制 measured_at_commit == 派发基点。本次 measured_at_commit=284e223 与 git.commit 一致，由编排者手工核对。"
+    },
+    "blocker_resolved": {
+      "resolved_at": "2026-09-16T11:30:00Z",
+      "unblock_reason": "用户告知 kimi 执行者模型已切换为 deepseek；编排者实测探针通过。",
+      "probe": "kimi --afk --config-file ~/.kimi/deepseek.toml -p 'Reply with exactly: PROBE_OK' -> PROBE_OK",
+      "config_defects_found_by_orchestrator": [
+        "~/.kimi/config.toml 的 default_model='deepseek/v4-pro' 在 [models] 里不存在（实际定义为 deepseek/deepseek-reasoner），主配置整体 pydantic 校验失败，任何 kimi 调用（含 -m 覆盖）都起不来。绕法：--config-file ~/.kimi/deepseek.toml。",
+        "环境变量 OPENAI_BASE_URL / OPENAI_API_KEY 会把 deepseek provider 的请求劫到 kiro 端点，返回 400 kiro_api_error 'Invalid model ID or insufficient subscription level'。派发时须 env -u OPENAI_BASE_URL -u OPENAI_API_KEY。"
+      ],
+      "previous_blocker": {
+        "reason": "kimi 账号周配额（7-day usage limit）耗尽",
+        "evidence": "HTTP 403 access_terminated_error：\"You've reached your weekly (7-day) usage limit. Your quota will reset when the current 7-day window ends.\" 三个执行者均在 StepBegin(n=1) 处 StepInterrupted()，日志各约 12KB。",
+        "not_a_dispatch_defect": "与派发形态无关。首轮 nohup 派发跑得更远（日志 102/32/55KB，读完 Brief，is_error=False 全程）是因为当时配额尚未耗尽；本轮 403 在第一步即触发。",
+        "resume_command": "kimi -r ace22dfe-2474-4cb6-a01e-136c9836d1d2",
+        "leftover_worktree_state": "第一轮（配额耗尽前）残留未提交改动：contract_render.py 已 bump 到 \"7\"、CLAUDE.md.tmpl 已写入三条纪律（+29 行）、tests/test_orchestrator_protocol_disciplines.py 已创建但未跟踪。均为被打断的半成品：无提交、无测试运行、无 oracle 三项证据。编排者未触碰（不写实现），保留现场待续跑。",
+        "blocked_at": "2026-09-16T10:30:00Z",
+        "unblock_condition": "配额窗口重置，或购买额外用量/升级套餐后用 resume_command 续跑"
+      },
+      "round1_leftover_verified_by_orchestrator": "round-1 残留经编排者独立核验成立：contract_render.py 6→7、CLAUDE.md.tmpl +28/-1、未跟踪 tests/test_orchestrator_protocol_disciplines.py(155 行/9 用例)。3.11 全量 4 failed/606 passed/4 skipped（基线 597 passed，+9 == 新增用例数，零回归成立）；3.13/3.14 经 uv run 跑新测试+两个版本守卫用例 39 passed；渲染产物零行 diff 成立；两次禁忌变异（differential pair / historical snapshot）各自转红且失败措辞互不相同，还原后字节一致（sha256 0746351e…）。执行者是在 git commit 之前被杀的，代码本身基本可交付。",
+      "redispatch_reason": "执行者模型由 kimi-for-coding 切换为 deepseek；不续跑旧 session（避免同一 WP 中途换模型、执行记录归属不清），改为在同一工作树新派发，round-1 残留如实告知执行者。"
+    },
+    "orchestrator_independent_review": {
+      "scope": "diff touches exactly 3 allowed paths: contract_render.py (version bump only), CLAUDE.md.tmpl (+29/-1), tests/test_orchestrator_protocol_disciplines.py (new, 155 lines); zero forbidden-path writes",
+      "rendered_artifacts_zero_line_diff": "git status --porcelain -- CLAUDE.md AGENTS.md docs/agentic/OPERATING_MODEL.md is empty in the worktree",
+      "oracle_item_1_positive_control": "test_template_carries_control_anchor asserts '## Dispatch'/'## Review' present on the same fixture",
+      "oracle_item_2_cause_specificity": "orchestrator re-ran both mutations: 'differential pair'->'differential couple' fails with \"missing anchor 'differential pair' for discipline 'negative_assertion'\"; 'historical snapshot'->'stale copy' fails with \"missing anchor 'historical snapshot' for discipline 'read_face_pinning'\" — messages differ verbatim, so no differential pair is required here",
+      "oracle_item_3_forbidden_mutation": "both mutations turn 2 tests red (2 failed, 7 passed) and restore byte-identically: sha256 0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a before and after; worktree clean",
+      "deliverable_2_self_consistency": "chose the warn-in-place option on both examples; test_preflight_example_carries_frozen_copy_warning and test_health_check_example_carries_frozen_copy_warning pin it by window search, not whole-line equality",
+      "verdict": "REWORK",
+      "note": "executor re-ran its own evidence as required by the r2 dispatch; every number recorded here is the orchestrator's own run, not a transcription of the executor's",
+      "superseded_earlier_verdict": "an earlier ACCEPT in this same field was written before the anchor-vs-semantics probe below; it is wrong and is retained only as a record",
+      "blocking_defect": {
+        "id": "B20",
+        "summary": "the six semantic anchors do not pin the semantics they are named for: the 'how' of discipline 2 and the whole rev-rename clause of discipline 3 can be deleted while every anchor string survives, and all 9 tests stay green",
+        "found_by": "codex (its last successful probe before it crashed), independently reproduced by the orchestrator",
+        "reproduction": "keep 'file:line' and 'differential pair'; replace 'use a differential pair instead: hold everything else constant, flip exactly one input, and require the red/green verdict to flip with it.' with 'use a differential pair instead.'; and delete the entire 'When a frozen artifact is renamed (-revN), verify that every consumer channel follows the new name (a gate that reads a fixed filename does not).' clause -> pytest tests/test_orchestrator_protocol_disciplines.py -q => 9 passed",
+        "why_it_matters": "this WP's own subject is brittle/vacuous assertions (B11, B19). A template gutted of its 'how' still renders into every adopting project and still passes its own guard, so the discipline reaches projects as a slogan without a method.",
+        "required_fix": "add anchors for the operative clauses themselves, not only the label words: the differential-pair method (hold-everything-constant / flip-one-input / verdict-flips) and the rev-rename consumer-channel check. Keep them semantic, not whole-paragraph."
+      },
+      "what_did_hold": {
+        "scope": "diff touches exactly 3 allowed paths; zero forbidden-path writes; rendered artifacts zero-line diff",
+        "version_bump": "6 -> 7, matches the template text change (codex confirmed both sides of the commit)",
+        "cause_specificity": "the two anchor mutations do fail with verbatim-different messages naming anchor and discipline",
+        "restore_fidelity": "template sha256 0746351effd3e85d949452e7b8ebd86beaec3040d8b8fc2fe33b644eacba122a before and after every mutation",
+        "tests": "39 passed on 3.11/3.13/3.14; full 3.11 = 4 failed, 606 passed, 4 skipped (+9 vs baseline 597, zero regression)"
+      }
+    },
+    "brief_rev1": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief.md",
+      "sha256": "a84d74409003477bb70a2f5af9eeba2b1a11601c1b75d7106c87b3a758622b69",
+      "rev": 1,
+      "covers": "任务 #12（B11 冻结前自检进协议）+ 任务 #14（B14 agentic 源码路径/协议示例）合并；同时纳入 B16/B17 的读取面纪律",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:69-101 的 section 判据 heredoc 按行号原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不 retype、不跑副本）；切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py",
+        "result": "PASS — rc=1 无输出（三个英文锚点均存在且非空）",
+        "discriminating_power": "同一切片对 WP-20-brief.md 返回 rc=0 \"brief missing section 'Acceptance tests'\"，对 WP-24-brief-rev2.md 与 WP-25-brief.md 返回 rc=1 —— 切片有区分力，不是恒绿",
+        "checked_at": "2026-09-16T00:00:00Z"
+      },
+      "gate_alignment": {
+        "note": "B16 仍未修：门禁与 redispatch 都按固定命名 WP-25-brief.md 读，本 brief 已用该固定名，无需 workaround"
+      }
+    },
+    "refreeze_count": 3,
+    "baseline_rev1_dispatch": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-16T08:30:00Z",
+      "measured_at_commit": "58c7624",
+      "result": "4 failed, 597 passed, 4 skipped",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x) — fixture runs `git checkout -q main` in a temp repo that has no main branch. Pre-existing, unrelated to any of WP-25/26/27. DO NOT FIX.",
+      "note": "B12 尚未修（任务 #11）：evidence.baseline 目前靠编排者手工落盘，无机制强制其存在、也无机制强制 measured_at_commit == git.dispatch_commit。本次三份 status 的 baseline 由编排者在 58c7624 实测后写入，与派发时的 dispatch_commit 一致。"
+    },
+    "dispatch_ordering_constraint": {
+      "constraint": "本 WP rev2 的派发必须排在 WP-26 rev2 合入之后，或对 rev2 brief 重复手工判据切片核验（已做，见 evidence.brief.prefreeze_check）。",
+      "reason": "本 WP 的 status.evidence.brief.path 现指向 WP-25-brief-rev2.md，而主仓活树 dispatch_lint.sh 仍按固定命名推出 WP-25-brief.md（缺陷 B16 本体，其修复者正是 WP-26）。直接派发等于拿 rev1 判 rev2。",
+      "measured": "以 WP-26 status 实测：活树 dispatch_lint.sh 解析出 brief_file=…/WP-26-brief.md 并给出 DISPATCH_LINT_PASS —— 声明的 rev2 路径完全不参与。",
+      "workaround_if_dispatched_early": "已执行判据切片直跑（rev2 修正后 rc=1 通过）；但门禁本身仍会读 rev1 正文，故派发时必须在 prompt 里给出 rev2 的主仓绝对路径，且不得依赖门禁校验 brief 内容。"
+    },
+    "rev2": {
+      "commit": "284e223",
+      "base": "359cb1a",
+      "message": "♻️ rework(2026-09-13-parallel-throughput): WP-25 rev2 纪律锚点钉入可操作子句（B20 返工）",
+      "files_touched": [
+        "tests/test_orchestrator_protocol_disciplines.py"
+      ],
+      "diff_stat": "1 file changed, 103 insertions(+), 12 deletions(-)",
+      "scope_verified": "CLAUDE.md.tmpl 未改（sha256 保持 0746351e…acba122a）；contract_render.py 未碰，CONTRACT_TEMPLATE_VERSION 仍为 \"7\" 未再 bump；三份渲染产物零行 diff",
+      "anchors_added": {
+        "negative_assertion": [
+          "flip exactly one input",
+          "flip with it"
+        ],
+        "read_face_pinning": [
+          "consumer channel",
+          "-revN"
+        ]
+      },
+      "tests_reproduced_by_orchestrator": [
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q",
+          "result": "10 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "PYTHONPATH=src python3.11 -m pytest tests -q",
+          "result": "4 failed, 607 passed, 4 skipped",
+          "exit_code": 1,
+          "note": "606→607 = +1 == 新增守卫用例，零回归"
+        },
+        {
+          "cmd": "uv 3.13 targeted",
+          "result": "10 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "uv 3.14 targeted",
+          "result": "10 passed",
+          "exit_code": 0
+        }
+      ],
+      "orchestrator_probe_b20_reversal": "在**活树**模板上原样施加 B20 的两处掏空（保留 label 锚点 'differential pair'/'historical snapshot'）→ 4 failed，失败措辞分别为 missing anchor 'flip exactly one input' 与 missing anchor 'consumer channel'（原因特异，互不相同），另含渲染产物用例同步转红。rev1 下同一变换为 9 passed。B20 反转成立。探针后 sha256 还原为 0746351e…acba122a。",
+      "orchestrator_probe_b10_no_brittleness": "反向探针：只改写锚点**周边**措辞（'hold everything else constant' → 'keep every other input fixed' 等）而保留全部六个锚点短语 → 九条锚点断言全绿，未误红。证明锚点仍是短语级、未锁整段（修 B20 未反踩 B10）。",
+      "measured_at": "2026-09-16T11:29:37Z"
+    },
+    "brief_rev2": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-25-brief-rev2.md",
+      "sha256": "9d19fbe70e2f5b9dbbad757d18f9911777a7c7c8486ad02a33658bbb62aea66b",
+      "rev": 2,
+      "refreeze_reason": "B20 rework: anchors must pin the operative clauses, not the label words",
+      "correction": "2026-09-16T13:30:00Z 冻结后自查发现该 rev2 正文丢了 rev1 有的英文锚点段 `## Allowed and forbidden paths`（只留了中文「## 范围」），活树 dispatch_lint.sh:66-104 的 section 判据会直接拒收。补回该段后 sha256 由 ebf8e12c… 变为 9d19fbe7…。这是编排者自己的冻结缺陷，不是执行者问题；纠正发生在派发之前，未有执行者读过旧版。",
+      "superseded_sha256": "ebf8e12c5387b9638e3c9749aff281cb362d3ff717025c8e62a986046064989a",
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh:66-104 的 section 判据 heredoc 按行号原文切片直跑（B11 修法 1：判据只能来自真脚本）；切片存 /Users/admin/.claude/jobs/8a8bf01e/tmp/sec_pred.py，已核对与活树逐字一致",
+        "result_before_correction": "FAIL — rc=0 \"brief missing section 'Allowed and forbidden paths'\"",
+        "result_after_correction": "PASS — rc=1 无输出",
+        "discriminating_power": "同一切片对 WP-20-brief.md 仍返回 rc=0 \"brief missing section 'Acceptance tests'\"，非恒绿",
+        "consistency_check": "中文「## 范围」与英文 `## Allowed and forbidden paths` 两段的反引号路径集合做差为空集——不存在第二口径",
+        "checked_at": "2026-09-16T13:32:00Z"
+      }
+    },
+    "refreeze_stop_rule_check": "任务 #24 的规则（同一 WP 第 3 次 re-freeze 强制停手复核计划）在本次**不触发**：WP-25 的冻结序列是 rev1（首冻）→ rev2（第 1 次 re-freeze）→ rev3（第 2 次 re-freeze）。refreeze_count 字段此前按「brief rev 号」记为 2，与「re-freeze 次数」差 1；本次一并把该字段口径统一为 brief rev 号（=3），并在此显式记录 re-freeze 次数为 2，避免下次误判。WP-26 的 rev4 才是那条规则的第一个实弹（任务 #30）。",
+    "review_rev2": {
+      "decision": "REWORK",
+      "reviewer": "claude (orchestrator, independent)",
+      "reviewed_at": "2026-09-16T14:05:00Z",
+      "reviewed_commit": "284e223",
+      "retracted_self_accept": "编排者一审曾判 ACCEPT（2026-09-16T11:29:37Z，记于 commit 41b5b1f）。第二签名 REWORK 后，编排者逐条实测，**确认阻塞项成立并撤回自评 ACCEPT**。这是本会话第三次由第二签名捕获编排者漏判（前两次：WP-25 的 B20、WP-27 的差分方向）。",
+      "basis": "codex 指出的 B28（存在性锚点检测不到语义反转）经编排者实测证实：把纪律 2 正文改成语义完全相反的措辞、保留全部 6 个锚点短语，`tests/test_orchestrator_protocol_disciplines.py` **10 passed 全绿**。锚点存在性无法承载「纪律说的是哪个方向」，与 B20 是同一根因的下一层：B20 是「标签词钉不住方法」，B28 是「方法短语钉不住极性」。",
+      "merge_gate": "① 编排者独立重测 ✅（但结论已由第二签名推翻）② codex 第二签名 = **REWORK** ③ 用户批准 —— 未取得，且现在不应取得"
+    },
+    "tests_rev2": [
+      {
+        "name": "orchestrator_protocol_disciplines + contract_render + init_contract (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py tests/test_contract_render.py tests/test_init_contract.py -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "full suite (3.11)",
+        "cmd": "PYTHONPATH=src python3.11 -m pytest -q",
+        "result": "4 failed, 606 passed, 4 skipped — +9 passed vs baseline 597, delta == new test count, zero regression",
+        "exit_code": 1,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.13)",
+        "cmd": "PYTHONPATH=src uv run --quiet --python 3.13 --with pytest python -m pytest <targeted> -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      },
+      {
+        "name": "targeted (3.14)",
+        "cmd": "PYTHONPATH=src uv run --quiet --python 3.14 --with pytest python -m pytest <targeted> -q",
+        "result": "39 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator"
+      }
+    ],
+    "refreeze_stop_rule_check_rev5": {
+      "rule": "WORK_PACKAGE.md.tmpl:9 第 3 次及以后 re-freeze 冻结前必须停手复核计划",
+      "verdict_doc": "docs/plans/2026-09-13-parallel-throughput/WP-25-plan-review-before-rev5.md",
+      "refreeze_seq": "rev1 首冻 -> rev2 第1次 -> rev3 第2次 -> rev4 第3次(已复核) -> rev5 第4次(本次)",
+      "fires": true,
+      "findings": [
+        "失误1：rev4 复核给出的三条修法方向(R1前一行/R2 240字符窗口/R3 h2 envelope)本轮全部实测，无一可用——R1/R2 漏插入位置，R3 把同段无关 bullet 改写误判为 RED（envelope 覆盖 1421/1826/182 字节活文本）",
+        "失误2：把「处境」当成一个位置，实为两维（结构插入 / 邻句改写）；两条腿的 R7 实测 8 攻击+7 无害零错判",
+        "失误3：R7 仍有 X1-X4 远距离逃逸，与 WP-29 的 E4 同族；rev5 须把承诺量词改为有界，而非继续加面"
+      ],
+      "measured_remedy": "R7 = 腿(i) h2标题->块起点的引导符种类序列 (HLLLLL/HLLLLLL/HLL) + 腿(ii) 紧邻前一单元的规范化正文",
+      "residual_out_of_scope": [
+        "X1 引导句并进同段更早 bullet",
+        "X2 引导句写进 h2 标题行",
+        "X3 引导句放另一段",
+        "X4 引导句放文档前言"
+      ],
+      "scope_ruling": "收窄：只做 B38(有界版) + B39 + 承诺边界明文化；不引 parser、不整份冻结、不扩 allowed_paths",
+      "gate": "未经用户批准不得冻结 rev5"
+    }
+  },
+  "review": {
+    "decision": "REWORK",
+    "reviewer": "claude (orchestrator, independent)",
+    "reviewed_at": "2026-09-17T00:00:00Z",
+    "reviewed_commit": "f4c6e7d",
+    "review_doc": "docs/plans/2026-09-13-parallel-throughput/WP-25-review-rev4.md",
+    "achieved": "指定修法三项全部落地：定位唯一性（枚举出现位置 + 恰 1 次 + 有序不重叠 + 四类原因特异措辞）、结构完整性（`- ` 前缀纳入起始标记 + 归一化前的结构断言）、_normalize 正当性论证进 docstring。反向差分方向正确，编排者独立复现：6 种攻击在 rev3(aa1e43b) 上全部 GREEN（逃逸）、在 rev4 上全部 RED；三条纪律的无害折行探针在两版上均 GREEN（无误红）。brief 点名的另三类逃逸（标记大小写 / Unicode 同形字 / HTML 注释包裹）编排者实测在 rev4 上均 RED。前三轮判别力逐项在位；模板 sha256 跑前跑后 = 0746351e…；targeted 19 -> 28 passed，全量 3.11 = 4 failed(既有环境) / 625 passed / 4 skipped。",
+    "blockers": {
+      "B38": "去规范化引导句可让三条纪律整体失效而判据全绿。在纪律列表前插入一句 `The following are non-binding historical examples only:`，三块字节不变，20 条用例全绿（编排者实测）。对照：``` 代码围栏包裹、搬进 deprecated 附录段、HTML 注释包裹三种攻击均 RED。INV-P 明文覆盖此形态（『凡削弱了纪律而测试仍绿皆算违反，即便本 brief 没枚举那个形状』），故判阻塞。修法方向：给三块补上文语境判据（紧邻前一行 + 所属段标题纳入冻结常量），自检须含①引导句攻击转红 ②无关段落编辑仍 GREEN。",
+      "B39": "brief §D 卫生第一条明列『用例内断言』模板 sha256，未落地：grep sha256/hashlib 只命中 :96 的一条注释，无任何用例断言模板字节同一性。执行者用 shell shasum 在报告里给了跑前跑后一致，满足『跑完一致』但不满足『用例内断言之』。与 :96 注释不冲突（那说的是不用 sha256 替代逐字正文比较，本条要的是卫生用例，可照抄 WP-26 的 live_before 逐字节自比）。"
+    },
+    "root_cause_note": "B38 不是执行者的实现缺陷 —— 执行者严格照 brief 的『指定修法』三项做完，两环确已收口。B38 是编排者的 brief 缺陷：INV-P 写得足够宽（宽到覆盖 B38），但『指定修法』只枚举定位与结构两类，未把『处境/语境』列为第三类，执行者照清单收工是合理的。与 WP-26 §B35 同型：不变式写宽了、修法清单按已知形状收窄，执行者照清单做就够不着不变式。rev5 前应先落任务 #36（变异集按判据组成维度生成）。",
+    "merge_gate": "① 编排者独立复核 = REWORK ② codex 第二签名 —— 未取，本轮不必取 ③ 用户批准 —— 未取，且现在不应取"
+  },
+  "consult": {
+    "decision": "REWORK",
+    "requested": true,
+    "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+    "verdict": "REWORK",
+    "rev": 3,
+    "reviewed_commit": "aa1e43b",
+    "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult3/wp25-verdict-rev3.raw.txt",
+    "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev3.md",
+    "request_brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-brief.md",
+    "consulted_at": "2026-09-17",
+    "disclosed_limitation": "沙箱只读、未读仓库其他文件、未自行跑测试；测试数字采用 brief 中编排者实测值。两条修法自述「未实测」。",
+    "findings": [
+      {
+        "id": "D1",
+        "claim": "块定位不是唯一定位：_cut_discipline_block 用 text.index(start) 取首个出现点，未断言边界标记唯一。在真实纪律前插入一份完好的冻结正文作 decoy，再反转真实纪律，逐字锁读到 decoy 而保持 GREEN，DISCIPLINE_ANCHORS 也 GREEN。这推翻了 rev3 的核心保证「给反转开绿灯必须改测试里的冻结常量」。",
+        "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证，非采信转述。** 实测：取 criteria_sourcing 块，把真实块的 `may only` 改为 `may also`（极性反转），并在其前插入 `- ` + 原块 + 其 end marker 作为 decoy。结果 `_assert_discipline_verbatim` **GREEN**、`_assert_discipline_anchors` **GREEN**，而攻击后模板里真实纪律确实写着 `may also`。这正是 rev3 要防的形状，逃逸成立。",
+        "reachability": "当前活树三对边界标记各恰 1 次出现（criteria start/end=1/1、read_face=1/1、negative=1/1），三块区间 [2885,3288)/[3290,3820)/[4232,4629) 有序不重叠 —— 即当前模板未被此攻击命中。但唯一性未被编码成不变量，未来重复标题或复制纪律段即静默漂移。"
+      },
+      {
+        "id": "D2",
+        "claim": "起始标记排除了 Markdown 列表前缀 `- `，而 _normalize 用 ' '.join(text.split()) 抹除全部空白结构。故删除 `- **Criteria sourcing.**` 等的 `- ` 前缀、或插空行、或把部分规则缩进成 code block，逐字锁仍 GREEN —— 这些不是纯折行，而是协议渲染结构的变化。",
+        "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证。** 实测四种形状全部 verbatim=GREEN 且 anchors=GREEN：① 删 criteria_sourcing 的 `- ` 前缀 ② 删 read_face_pinning 的 ③ 删 negative_assertion 的 ④ 把块内一句缩进 6 空格变成 code block ⑤ 块内插空行。B10 的解药（折行免疫）被过度施用，连结构变化一并免疫了。",
+        "remedy_feasibility": "codex 提议把列表前缀纳入锁定，实测可行：`- **Criteria sourcing.**` / `- **Read-face pinning.**` / `- Every negative assertion` 三者在活树模板中各恰 1 次出现，作为起始标记不引入歧义。"
+      }
+    ],
+    "findings_confirming": [
+      "`pytest.raises(AssertionError)` 无 B19 式假绿路径：作用域内只有 `_assert_discipline_anchors` 主动抛 AssertionError，且随后检查了具体缺失短语，原因特异性足够。",
+      "版本一致性：累计 diff 已同时改 CONTRACT_TEMPLATE_VERSION 并断言其为 \"7\"，无新增阻塞项。"
+    ],
+    "orchestrator_note_on_B10_tension": "编排者补做了一项 codex 未涉及的实测，供 rev3 冻结时定形：把整条可操作从句当成一个锚点是**行不通的**——模板正文是折行的，`hold everything else constant, flip exactly one input` 这一串在原文里并不逐字存在（需先归一化空白），且把子句顺序做一次无害重排（`flip exactly one input while holding everything else constant`）就会让整句锚点失配、短语锚点却全部保留。所以 rev3 的极性判据**不能**靠加长锚点解决，必须换一种形式（例如禁忌反义词表 + 语义反转变异用例）。这一点须写进 rev3 brief，否则执行者极可能反踩 B10。",
+    "history": [
+      {
+        "decision": "REWORK",
+        "requested": true,
+        "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+        "verdict": "REWORK",
+        "rev": 2,
+        "reviewed_commit": "284e223",
+        "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-verdict.raw.txt",
+        "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev.md",
+        "request_brief": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult2/wp25-brief.md",
+        "consulted_at": "2026-09-16T13:47:10Z",
+        "disclosed_limitation": "沙箱只读、未自行跑测试，采用请求 brief 中编排者实测数字；自述 REWORK 结论来自代码结构、可静态确认。",
+        "findings": [
+          {
+            "id": "C1",
+            "claim": "存在性锚点检测不到**语义反转**。保留 `differential pair` / `flip exactly one input` / `flip with it` 三个锚点，把纪律正文改写成「do not flip exactly one input, and do not require the verdict to flip with it」，锚点测试全绿，掏空守卫也仍按预期转红（故守卫本身也通过），但纪律已表达相反规则。`read_face_pinning` 同理可用「`-revN` 后 consumer channel 不必跟随」反转。",
+            "orchestrator_adjudication": "**接受，阻塞成立。登记为 B28。**",
+            "orchestrator_verification": "两级实测。① 内存级：构造 codex 给的反转文本，`_assert_discipline_anchors` 对两条纪律**均 GREEN**，且掏空守卫的正则仍匹配、仍转红、witness 仍特异 —— 即反转文本能同时通过锚点断言与守卫断言。② 活树级：把纪律 2 正文替换为 `do not hold everything else constant, do not flip exactly one input, and do not require the red/green verdict to flip with it.`，整文件 `PYTHONPATH=src python3.11 -m pytest tests/test_orchestrator_protocol_disciplines.py -q` → **10 passed**。探针后逐字节还原，worktree clean。",
+            "why_my_accept_was_wrong": "我一审的双向探针只覆盖了「删/压缩」方向（掏空必红）与「改写周边措辞」方向（不误红），**没有覆盖「保留全部锚点但反转极性」方向**。B20 的教训我只吃了一半：我把「锚点要钉可操作子句」做到了，却没问「钉住子句在场之后，谁来钉住子句的极性」。这正是记忆 same-topic-is-not-same-extension 的形态——同一主题的下一层反例集合并未被覆盖。"
+          },
+          {
+            "id": "C2",
+            "claim": "B27 应升级为阻塞项：evisceration 正则间接锁定了整段周边措辞，只改写非锚点措辞就会让守卫因 `evisceration produced no change` 而红。fail-closed 只能证明它不静默空过，不能消除**错误拒绝**；实质上重新引入了 B10 所禁止的措辞耦合。",
+            "orchestrator_adjudication": "**接受升级为阻塞项。**",
+            "orchestrator_verification": "编排者一审已实测该形态存在（记为 B27 非阻塞）。codex 的论点补上了我漏掉的一半：我只权衡了「空过 vs 响亮失败」，没权衡「**误红**本身就是 B10 要禁的东西」。B10 的原意是「断言不得与措辞耦合」，而耦合发生在变异构造侧还是断言侧，对改写模板的人来说后果相同 —— 都是改了合法措辞却被判红。既然 C1 已要求返工，把 B27 一并收口成本极低。",
+            "prescription": "变异构造改为锚点驱动（例如「删掉包含锚点短语 X 的那个句子」），使变异构造与锚点共享同一份真值，不依赖固定句首、标点和从句边界。"
+          },
+          {
+            "id": "C3",
+            "claim": "守卫用例写活树文件，不满足并行测试隔离：`pytest -n` 下其他 worker 可能在模板处于变异态时读取它；SIGKILL / 解释器崩溃 / 恢复写入本身失败都可能留下被污染的 tracked 文件。建议完全取消 `CLAUDE_TMPL.write_text/write_bytes`，直接对内存文本调用 `_assert_discipline_anchors`。",
+            "orchestrator_adjudication": "**接受方向，但把「并行」这一条降级为次要理由。**",
+            "orchestrator_verification": "① 并行前提当前不成立：本仓未装 pytest-xdist（`import xdist` → ModuleNotFoundError），pyproject/setup.cfg/pytest.ini 均无 addopts 或 -n 配置。故 codex 举的 worker 竞态**当前无法发生**。② 但同仓另有 3 个测试文件读同一模板（test_init_contract.py / test_contract_render.py / test_wp_template_dispatch_lint.py），一旦引入 xdist 即成真隐患。③ 更强的理由是**这次写活树根本不必要**：编排者实测「纯内存变体」——不写文件、直接对 mutated 字符串调 `_assert_discipline_anchors` —— 两条纪律**都红且 witness 特异**（`flip exactly one input` / `consumer channel`），与写活树版本的判别力**完全等价**。既然等价，承担写 tracked 文件的风险就是净损失。",
+            "note": "`_template_text()` 只是 `CLAUDE_TMPL.read_text()`，不含任何额外逻辑，所以「必须经文件读取面」这个理由不成立。"
+          }
+        ],
+        "findings_confirming": [
+          "`pytest.raises(AssertionError)` 无 B19 式假绿路径：作用域内只有 `_assert_discipline_anchors` 主动抛 AssertionError，且随后检查了具体缺失短语，原因特异性足够。",
+          "版本一致性：累计 diff 已同时改 CONTRACT_TEMPLATE_VERSION 并断言其为 \"7\"，无新增阻塞项。"
+        ],
+        "orchestrator_note_on_B10_tension": "编排者补做了一项 codex 未涉及的实测，供 rev3 冻结时定形：把整条可操作从句当成一个锚点是**行不通的**——模板正文是折行的，`hold everything else constant, flip exactly one input` 这一串在原文里并不逐字存在（需先归一化空白），且把子句顺序做一次无害重排（`flip exactly one input while holding everything else constant`）就会让整句锚点失配、短语锚点却全部保留。所以 rev3 的极性判据**不能**靠加长锚点解决，必须换一种形式（例如禁忌反义词表 + 语义反转变异用例）。这一点须写进 rev3 brief，否则执行者极可能反踩 B10。"
+      }
+    ],
+    "rev3": {
+      "decision": "REWORK",
+      "requested": true,
+      "consultant": "codex (provider: kirogpt, model gpt-5.6-sol)",
+      "rev": 3,
+      "reviewed_commit": "aa1e43b",
+      "review_surface": "cumulative 58c7624..aa1e43b (3 files) + frozen rev3 brief + rev2->rev3 delta",
+      "consulted_at": "2026-09-17",
+      "independence": {
+        "rating": "strong",
+        "basis": "engine-observed models differ: consultant=gpt-5.6-sol (kirogpt) vs reviewer=claude-opus-5 (kiroopus)",
+        "note": "未经 agentic_loop.gate 路径 —— gate 要求 review.attestation，其 fresh_session=true 在本长会话中会是假声明，编排者拒绝伪造。改走历史一致的直接调用路径（与 WP-22/24/27 各轮相同），CodexAdapter 由 resolve_role_binding('consultant') 绑定，判定逐字转录。"
+      },
+      "raw_evidence": "/Users/admin/.claude/jobs/8a8bf01e/tmp/consult3/wp25-verdict-rev3.raw.txt",
+      "transcript": "docs/plans/2026-09-13-parallel-throughput/WP-25-consult-codex-rev3.md",
+      "disclosed_limitation": "沙箱只读、未读仓库其他文件、未自行跑测试；测试数字采用 brief 中编排者实测值。两条修法自述「未实测」。",
+      "findings": [
+        {
+          "id": "D1",
+          "claim": "块定位不是唯一定位：_cut_discipline_block 用 text.index(start) 取首个出现点，未断言边界标记唯一。在真实纪律前插入一份完好的冻结正文作 decoy，再反转真实纪律，逐字锁读到 decoy 而保持 GREEN，DISCIPLINE_ANCHORS 也 GREEN。这推翻了 rev3 的核心保证「给反转开绿灯必须改测试里的冻结常量」。",
+          "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证，非采信转述。** 实测：取 criteria_sourcing 块，把真实块的 `may only` 改为 `may also`（极性反转），并在其前插入 `- ` + 原块 + 其 end marker 作为 decoy。结果 `_assert_discipline_verbatim` **GREEN**、`_assert_discipline_anchors` **GREEN**，而攻击后模板里真实纪律确实写着 `may also`。这正是 rev3 要防的形状，逃逸成立。",
+          "reachability": "当前活树三对边界标记各恰 1 次出现（criteria start/end=1/1、read_face=1/1、negative=1/1），三块区间 [2885,3288)/[3290,3820)/[4232,4629) 有序不重叠 —— 即当前模板未被此攻击命中。但唯一性未被编码成不变量，未来重复标题或复制纪律段即静默漂移。"
+        },
+        {
+          "id": "D2",
+          "claim": "起始标记排除了 Markdown 列表前缀 `- `，而 _normalize 用 ' '.join(text.split()) 抹除全部空白结构。故删除 `- **Criteria sourcing.**` 等的 `- ` 前缀、或插空行、或把部分规则缩进成 code block，逐字锁仍 GREEN —— 这些不是纯折行，而是协议渲染结构的变化。",
+          "orchestrator_adjudication": "**接受，阻塞成立 —— 编排者独立实测确证。** 实测四种形状全部 verbatim=GREEN 且 anchors=GREEN：① 删 criteria_sourcing 的 `- ` 前缀 ② 删 read_face_pinning 的 ③ 删 negative_assertion 的 ④ 把块内一句缩进 6 空格变成 code block ⑤ 块内插空行。B10 的解药（折行免疫）被过度施用，连结构变化一并免疫了。",
+          "remedy_feasibility": "codex 提议把列表前缀纳入锁定，实测可行：`- **Criteria sourcing.**` / `- **Read-face pinning.**` / `- Every negative assertion` 三者在活树模板中各恰 1 次出现，作为起始标记不引入歧义。"
+        }
+      ],
+      "non_blocking_agreements": [
+        "三个切割区间确实覆盖承载极性的正文（may only / Never / must / cannot / require），三类极性变异在无重复标记的当前文本上转红。",
+        "冻结长度 392/386/515 的对应关系已由编排者实测校正：criteria=392、negative=386、read_face=515（codex 的「按 criteria/negative/read-face 顺序理解」正确）。",
+        "rev2 锚点基线断言被逐字等价蕴含，但 B20 变异用例仍单独证明旧锚点层可承载，属 brief 明确要求保留的分层回归证据，不构成阻塞（与编排者 rev3 复核结论一致）。",
+        "变异均作用于一次读取后传入判据的同一字符串，无活树写入；普通路径未发现新的读取面分离（无 B29 同族缺口）。"
+      ]
+    },
+    "independence": "strong",
+    "independence_basis": "engine-observed models differ: consultant=gpt-5.6-sol (kirogpt) vs reviewer=claude-opus-5 (kiroopus)"
+  },
+  "timestamps": {
+    "created_at": "2026-09-16T00:00:00Z",
+    "updated_at": "2026-09-17T00:05:00Z",
+    "dispatched_at": "2026-09-16T08:35:00Z",
+    "blocked_at": "2026-09-16T10:30:00Z",
+    "redispatched_at": "2026-09-17T00:05:00Z",
+    "ready_for_review_at": "2026-09-16T11:40:00Z",
+    "changes_requested_at": "2026-09-16T11:55:00Z",
+    "refrozen_at": "2026-09-16T23:50:00Z",
+    "reviewed_at": "2026-09-17T01:40:00Z",
+    "changes_requested_rev3_at": "2026-09-17",
+    "refrozen_rev4_at": "2026-09-17T10:54Z",
+    "dispatched_rev4_at": "2026-09-17T11:08:47Z"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-19",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": "4801b3af (rev2, exit=0); 2021e745->rev3 (exit=0); 9af9735d (rev4, exit=0, DONE_WITH_CONCERNS)",
+    "redispatch_count": 3
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "claude-8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "claude-8a8bf01e"
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "16e59ff",
+    "branch": "feature/wp19-wrapper-seams",
+    "worktree": "../wp19-wrapper-seams",
+    "commit": "949b976",
+    "merged_commit": "f9e166469f1599ddb1d9984c145a3ee2118b0467"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_worktree_detection.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "src/agentic_loop/cli.py",
+      "docs/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "name": "PYTHONPATH=src python3.11 -m pytest tests -q (worktree, reviewer-run)",
+        "exit_code": 1,
+        "result": "4 failed + 568 passed + 4 skipped; baseline @2a184a8 = 4 failed + 556 passed + 4 skipped; delta +12 == new cases; the 4 failures are the pre-existing test_finalize_merge_triple_sign.py 'git checkout main' fixture, untouched"
+      },
+      {
+        "name": "A12 revert-probe: git checkout 2a184a8 -- wrappers/finalize_merge.sh; pytest tests/test_finalize_merge_first_call.py",
+        "exit_code": 1,
+        "result": "FAILED with 'STATUS_INVALID: unknown field git.merged_commit' before fix; PASSED after"
+      },
+      {
+        "name": "A13 revert-probe: git checkout 2a184a8 -- gate/__init__.py; pytest tests/test_worktree_detection.py",
+        "exit_code": 2,
+        "result": "collection error (predicate absent) before fix; 5 PASSED after"
+      },
+      {
+        "name": "A4+A7 revert-probe: git checkout 2a184a8 -- wrappers/preflight.sh; pytest tests/test_preflight_branch_binding.py",
+        "exit_code": 1,
+        "result": "2 failed (empty-branch backfill, sibling-branch tracked lookup) before fix; 6 PASSED after"
+      }
+    ],
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev5.md",
+      "sha256": "61892a4d278034c3fe1997a2ba570c34b81e5578e6d1684363fcd2c44f137a4e",
+      "rev": 5,
+      "rev1": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief.md",
+        "commit": "b97ce67",
+        "outcome": "review ACCEPT (A4/A7/A12 verified, not reworked); consult REWORK on A13/A22"
+      },
+      "rev2": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev2.md",
+        "sha256": "8e80c8e68033e146fdf27e3756fe335129bac21d476ce3bd74256b029e2d3305",
+        "outcome": "review ACCEPT (withdrawn: 漏判输出解析面); consult REWORK on A28/A27 (+A26 另立WP, A25 维持登记)"
+      },
+      "rev3": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-19-brief-rev3.md",
+        "sha256": "d7c406ad64d791492bad03b7b657b4aae9c2d6c0c0bfbb3602257d0ef7c390b0",
+        "outcome": "review ACCEPT (withdrawn: 未覆盖 unguarded is_dir()); consult 中断未出 verdict; A29 登记"
+      }
+    }
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "by": "claude-code",
+    "at": "2026-09-15T07:31:04Z",
+    "note": "rev6（949b976）交付物全部就绪，编排者独立验收通过。范围：diff 恰好 1 个文件tests/test_worktree_detection.py（+28/-3），gate/__init__.py diff 为 0 行（本轮硬要求），7 个 forbidden 文件全 0，docs/ 与 .agentic/ 均 0；AST 逐 def 比对 17→18，仅 test_long_path_fails_closed_without_raising 变更 + 1 新增，其余 16 例（含 NUL 例）字节不变；删除的 3 行正是旧断言与其两行注释。跨版本：编排者用 uv 跑真 pytest 四版本实测，3.11/3.12 全绿 18 passed，3.13/3.14 各 1 failed；该唯一失败为 test_symlink_loop_fails_closed_without_raising（rev4 引入，登记为 A33），已证基线 16e59ff 在 3.13 上同样失败，故非 rev6 引入；rev6 自己的两个用例在四版本全绿。编排者另建 7 条契约向量 harness（自造 temp repo + worktree add），四版本 7/7 通过。全套 4F+581P+4S vs 基线 4F+580P+4S，恰为 +1 新用例，零回归。无 merge/amend，77941f4 与 bbfa258 仍可达。执行者自报 BLOCKED 且称该形态 fail-open——该定性经编排者实测否证：linked worktree 内的 symlink 循环在 3.11/3.13/3.14 上始终判 True、拒收从未被绕过，3.13+ 主区判 False 本就是正确答案。故 A33 为测试脆性、非安全缺陷、不需改判据。编排者据此裁决：A33 不在 rev6 交付物内（该用例不在 rev6 Brief 的清单里），不构成 BLOCKED，转任务 #6「用例契约化」WP 收尾；rev6 判 ACCEPT。执行者不擅自改禁改文件、交回编排者裁决的处置正确（§4.1 范围裁决权在编排者）。"
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "by": "codex",
+    "at": "2026-09-15T07:47:26Z",
+    "note": "rev6（949b976）codex 独立复审判 ACCEPT，P0 无。记录见 WP-19-consult-codex-rev6.md。codex 独立核实 949b976^..949b976 恰好只改 tests/test_worktree_detection.py（+28/-3）、gate/__init__.py 零差异，A30 目标完成且无 rev6 新回归；独立推演 symlink 循环四条形态后确认「未发现无需竞态即可绕过拒收的形态」，与编排者实测一致，A33 非 fail-open；并澄清 rev5 那条 P1 的边界——落在白名单只是允许修改，本轮闭合义务须同时满足「本轮引入」，A33 由 rev4 引入故转后续 WP 恰当。三条非阻断项已入册：P1=A33（转用例契约化 WP）；P2=finalize_merge.sh 注释关于 fail-open 的说法不准确（A29 修法 2 待办撤销，编排者已实测 rc=1 中止）；P2=A34 判定与使用之间的 symlink TOCTOU 窗口（新发现，另立 WP，非 rev6 引入）。"
+  },
+  "timestamps": {
+    "dispatched_at": "2026-09-14T15:44:23+00:00",
+    "updated_at": "2026-09-15T08:07:59Z",
+    "reviewed_at": "2026-09-15T00:40:00+08:00",
+    "consulted_at": "2026-09-15T12:25:00+08:00"
+  }
+}

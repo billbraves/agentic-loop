@@ -1,0 +1,106 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-08",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": "0d3b63ca-c5d2-4dde-ba5c-1af29f7e4bab (probe); dispatch session id not surfaced by --print"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "802b667",
+    "branch": "feature/wp08-independence-degraded",
+    "worktree": "../wp08-independence-degraded",
+    "commit": "a46578cf630080943da9bc2d00ff9eefec4a7fb5",
+    "merged_commit": "ee74473322360507b722703e937211af46887458"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_independence_degraded.py",
+      "tests/test_gate_independence_degraded.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/wrappers/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "name": "tests/test_independence_degraded.py + tests/test_gate_independence_degraded.py",
+        "command": "python3.11 -m pytest tests/test_independence_degraded.py tests/test_gate_independence_degraded.py -q",
+        "exit_code": 0,
+        "note": "27 passed (13 + 14). Characterization of evaluate()'s strong/weak/weak-attested/none branches plus the reverse tests required by the brief."
+      },
+      {
+        "name": "full suite (WP-08 worktree)",
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "note": "4 failed, 519 passed, 4 skipped. The 4 are the pre-existing tests/test_finalize_merge_triple_sign.py baseline (fixture runs `git checkout -q main` in a temp repo with no main branch); orchestrator reproduced the identical 4 on base 802b667 with WP-08 absent (4 failed, 492 passed). +27 over base matches the new tests exactly."
+      },
+      {
+        "name": "quality-gate (from WP-08 worktree)",
+        "command": "PATH=python3.11-first bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/.../WP-08.status.json",
+        "exit_code": 1,
+        "note": "STATUS_VALID, scope enforcement PASSES. Non-zero is only the 4 baseline failures. Two extra failures seen on a first run were orchestrator-induced, not WP-08: one was defect B3 (AGENTIC_PYTHON=python3.11 punching through the tests' python3 stub — reproduced A/B), the other (test_init_githooks pre-push) did not reproduce on a clean re-run (4 failed / 519 passed) and was caused by a concurrent probe worktree."
+      },
+      {
+        "name": "orchestrator independent A0 unblock probe",
+        "command": "simulate gate main()'s independence sequence for review.decision=ACCEPT against this repo's real bindings",
+        "exit_code": 0,
+        "note": "Decisive check, not taken from the report. Verified at review time against the then-current config (developer bound to provider deepseek): with review=ACCEPT, implementer_id resolved to kimi/deepseek-v4-pro and consultant to codex/deepseek-v4-pro, so is_bootstrap_normal=False and evaluate() returned weak via the degraded path with attestation=None; meets_threshold(weak, weak)=True. A0 was unblocked with NO self-attestation, which is the honest exit the brief demanded. STALE AS OF 2026-09-13T23:46Z, and NOT a code regression: .agentic/config.toml was edited outside this session at 23:37, changing developer from {adapter=kimi, provider=deepseek} to the bare string \"kimi\". With no developer binding, _resolve_implementer_identity() correctly fail-closes to None, so is_bootstrap_normal is True again and evaluate() returns none with the original A0 reasons verbatim (re-probed with capabilities=None and all-True; both none). The WP-08 code is correct in both configs; the degraded path simply requires the developer role to carry an engine-observed identity_model. Recorded as defect A5 in WP-08-candidate.md. Merge of WP-01/WP-03/WP-08 stays blocked until the config question is adjudicated by the user — the fix must NOT be a min_independence relaxation (still \"weak\", unchanged by that edit)."
+      },
+      {
+        "name": "orchestrator reverse-property probe",
+        "command": "direct evaluate()/is_valid() calls for the four fail-closed properties",
+        "exit_code": 0,
+        "note": "Verified independently of the executor's tests: (1) same-model consultant/implementer still cannot reach strong (meets_threshold(weak,'strong')=False); (2) capabilities false fail-closes to none even inside degraded; (3) is_valid() strict `is True` still rejects 1 and 'true'; (4) adversarial_prompt=False fail-closes the attested path to none."
+      }
+    ]
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code (orchestrator)",
+    "evidence": "ACCEPT. Reviewed the diff independently against the WP-08 brief rather than accepting the report.\n\nHard requirement met, and the executor correctly found the brief insufficient. The brief asked only to widen the implementer_id populate condition from N/A to N/A-or-ACCEPT. I verified by direct call that this literal change alone would NOT have unblocked A0: the old code built AgentIdentity(tool=executor_tool) with no model, so the degraded path was entered with an unobserved implementer model and evaluate() fail-closed to none ('implementer model not observed by engine'). Kimi added _resolve_implementer_identity(), which resolves the implementer's model from the developer role binding, symmetrically with how the consultant's model comes from its own binding. That is a necessary correction to my brief, not scope creep — without it the WP would have shipped a fix that changed nothing.\n\nA0 unblock verified end-to-end by simulating main()'s own sequence against this repo's real config: review=ACCEPT yields implementer kimi/deepseek-v4-pro vs consultant codex/deepseek-v4-pro, is_bootstrap_normal=False, level=weak with attestation=None, meets_threshold(weak, weak)=True. The honest ACCEPT now passes the gate while signing nothing self-attested, which was the whole point.\n\nAnti-bypass properties verified independently (not trusting the new tests): same-model still cannot reach strong; capabilities false fail-closes to none inside degraded; adversarial_prompt false fail-closes; is_valid()'s strict `is True` still rejects 1 and 'true'. independence.py was not touched at all, and min_independence in .agentic/config.toml was not touched — the two things the brief most wanted protected.\n\nBrief deliverable 2 (demote fresh_session to a recording-only field) was declined, which the brief explicitly permitted. Kimi's reasoning is correct and I agree: demoting it would weaken exactly the audit property min_independence exists to protect, and deliverable 1 already resolves the deadlock via the strongest of the three signals. Declining it was the better judgement.\n\nOne undisclosed behavior change found, verified non-reachable: on the pre-existing N/A path in a repo with no provider binding, implementer_id changes from AgentIdentity(tool=..., model=None) to None, which routes N/A into the bootstrap branch instead of degraded. Both spellings rate none today, so no verdict changes. I checked whether a valid attestation could turn that into a weak pass and found it cannot: gate/__init__.py:790 gates is_bootstrap_normal on review_decision == 'ACCEPT', so the N/A path never reads an attestation and attestation stays None. Non-blocking; recorded because the report should have named it.\n\nTwo test-quality nits, non-blocking. test_accept_with_model_is_degraded_not_bootstrap and test_accept_without_model_falls_back_to_bootstrap re-implement the production predicate inline (is_bootstrap_normal = \"ACCEPT\" == \"ACCEPT\" and implementer is None) instead of calling gate code, so they assert against a copy and would not catch a change to the real line. The forward end-to-end test does exercise the real resolution path, so the invariant is covered elsewhere.\n\nScope: the commit touches exactly gate/__init__.py plus the two new test files. No forbidden path, no config, no status-file write, no merge/push. Commit message carries gitmoji + Chinese."
+  },
+  "consult": {
+    "decision": "REWORK",
+    "reviewer": "codex (consultant, gpt-5.6-sol via kirogpt)",
+    "independence": "weak",
+    "evidence": "如实记录 Codex 的原始结论：REWORK。两项发现均成立，但编排者核证后确认**两者都不是 WP-08 引入的回归**，而是框架预存缺陷，已分别登记为 A9 / A10。\n\n1) A9 —— degraded 路径异源比较返回 strong，而 bootstrap 语义只允许 weak。independence.py:132-139 中 _different_model() 为真时无条件 return \"strong\"，bootstrap 分支只往 reasons 追加一句 level=strong-attested，级别本身仍是 strong，与 [review_policy] 注释「strong 在 gate 路径上不可达」的设计意图矛盾。\n2) A10 —— identity_model 来自可编辑的 .agentic/config.toml 声明，不是 dispatch 时对实际模型的探测结果，dispatch 后仍可被编辑，与产出 commit 无绑定。同一批评同等适用于 consultant_identity（走同一个 resolve_role_binding）。\n\n编排者归属核证（不采信任何一方论断，直读 git）：git log -L 128,140 -- src/agentic_loop/independence.py 证明 A9 那段自 c555daf（框架 0.1.0 初始提交）即存在；git show --stat a46578c 证明 WP-08 只改 src/agentic_loop/gate/__init__.py（+44）与两个测试文件，**完全没碰 independence.py**。A10 的身份链同样是 WP-08 之前就有的——WP-08 只把 implementer 身份填充的准入条件从 review.decision==\"N/A\" 放宽到 (\"N/A\",\"ACCEPT\")，未改变身份来源的可靠性。\n\n编排者据此维持 review.decision=ACCEPT：WP-08 自身的实现、范围、测试均合规，Codex 指出的是它所依赖的既有地基的问题。但 Codex 的 REWORK 如实保留、不改写为 ACCEPT，因为这两个缺陷确实还没修。\n\n关键联动（影响后续排期）：A9 当前不可达（本仓 developer=\"kimi\" 不绑 provider → binding=None → implementer 身份 fail-close 到 None → 落回 bootstrap，异源比较不发生），但**修 A5 的那一刻立即可达**。故修 A5 的 WP 必须先封 strong 上限，否则会把预存缺陷激活成「合并门给出 strong」的实际误判。",
+    "override": {
+      "approved": true,
+      "approver": "xizhu (用户本人，会话 8a8bf01e 明示授权：「b + 立缺陷」——用 override 合并并把 Codex 发现登记为缺陷)",
+      "justification": "Codex 的 REWORK 指向的 A9/A10 两项缺陷经编排者以 git log -L 与 git show --stat 核证，均为 c555daf 以来的预存缺陷，WP-08 未触及 independence.py，非本 WP 回归；WP-08 自身实现质量、范围合规、测试覆盖与零回归均由编排者独立核验通过。A9/A10 已登记入 WP-08-candidate.md 缺陷册并作为修 A5 的强制前置条件，不因本次放行而关闭。用户明示授权以 override 合并；override 仅放松「consult.decision 必须等于 ACCEPT」一项，REWORK 决定与 independence=weak 均如实保留在案。",
+      "reviewed_at": "2026-09-14T20:10Z"
+    }
+  },
+  "timestamps": {
+    "dispatched_at": "2026-09-13T14:53:23Z",
+    "approved_for_merge_at": "2026-09-14T19:00Z",
+    "consulted_at": "2026-09-14T20:10Z",
+    "updated_at": "2026-09-14T14:03:59Z"
+  }
+}

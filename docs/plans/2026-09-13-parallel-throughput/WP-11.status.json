@@ -1,0 +1,56 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-11",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "",
+    "branch": "feature/wp11-preflight-tracked-pipefail",
+    "worktree": "../wp11-preflight-tracked",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/preflight.sh",
+      "AGENTS.md",
+      "src/agentic_loop/templates/AGENTS.md.tmpl",
+      "tests/test_preflight_tracked_error.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/wrappers/kimi-health.sh",
+      "src/agentic_loop/wrappers/quality-gate.sh"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": []
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": {}
+}

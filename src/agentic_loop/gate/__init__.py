@@ -166,6 +166,149 @@ def git_merge_base(repo: Path, base: str, tip: str) -> str:
     return lines[0].strip()
 
 
+# A22 (WP-19 rev2/rev3): git's repository-selection variable family, stripped
+# from the environment of ``path_is_in_worktree``'s probe. Each is removed
+# because it lets the CALLER declare repository facts instead of letting the
+# predicate read them from filesystem topology:
+#   GIT_DIR — declares the git dir directly; pointing it at the main repo made
+#             a linked-worktree path answer False (the actual A22 bypass).
+#   GIT_WORK_TREE — declares the working-tree root, decoupling a path from the
+#             repository git discovers by walking the filesystem.
+#   GIT_COMMON_DIR — overrides the shared .git dir; flips the
+#             ``--git-common-dir`` side of the worktree comparison.
+#   GIT_INDEX_FILE / GIT_OBJECT_DIRECTORY /
+#   GIT_ALTERNATE_OBJECT_DIRECTORIES — redirect index/object storage lookups.
+#             The current probe does not consult them, but they are part of
+#             the same selection family: if the probe's git invocation ever
+#             changes (e.g. ``--show-toplevel`` or ``git status``), they
+#             become selection surface again (defense in depth).
+#   GIT_CEILING_DIRECTORIES — caps git's upward repository discovery, which
+#             can change or defeat which repository a path resolves to.
+_GIT_SELECTION_VARS = frozenset(
+    {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+    }
+)
+
+
+def path_is_in_worktree(path: Path) -> bool:
+    """Single authoritative predicate: does ``path`` resolve inside a linked
+    git worktree? (A13, WP-19)
+
+    Git-fact based, never a path literal: the repository owning ``path`` is a
+    linked worktree exactly when its ``--git-dir`` differs from
+    ``--git-common-dir``. Both call sites that refuse worktree-local status
+    copies (this gate and ``wrappers/finalize_merge.sh``) reference this one
+    definition (global rule §5.3, single authority).
+
+    Fail-closed and never raises: an unresolvable path (not inside any git
+    repository, git missing, unexpected output) is treated as inside a
+    worktree, i.e. refused.
+
+    A22 (WP-19 rev2/rev3): the probe never inherits the caller's repository
+    selection. ``GIT_DIR`` and its family (``_GIT_SELECTION_VARS``) let the
+    caller *declare* which repository a path belongs to, overriding
+    filesystem topology — a single ``GIT_DIR`` pointing at the main repo
+    made a linked-worktree path answer False and bypassed both call sites.
+    Those variables are stripped so the verdict reads the filesystem; the
+    rest of the environment (``PATH``, ``HOME``) is kept intact so git
+    itself still runs — a bare ``env={}`` would lose ``PATH``, fail to
+    find git, and fail closed on legitimate main-repo paths (a regression).
+
+    A27 (WP-19 rev4): the verdict must classify the file that will actually
+    be read/written, not the path NAME. The path is therefore resolved
+    BEFORE its parent directory is probed: a main-repo symlink pointing at
+    a worktree-local status file is followed by every later consumer
+    (``is_file()``, the validator, the finalize write-back), so the probe
+    must follow it too and answer the worktree's verdict.
+
+    A28 (WP-19 rev4): fail-closed holds on every degenerate path. Both
+    output lines must be non-empty after ``strip()`` — a blank
+    ``--git-common-dir`` line used to degenerate into
+    ``directory / Path("") == directory`` and answer False. And every
+    ``Path.resolve()`` sits inside a ``try`` that catches ``OSError`` AND
+    ``RuntimeError`` (a symlink loop raises ``RuntimeError``, which is not
+    an ``OSError`` subclass); any resolution failure returns True. The
+    A27 path resolution and the A28 git-dir/common-dir resolution share
+    this one guard form (§5.3, single handling).
+
+    A29 (WP-19 rev5): "never raises" now actually holds for ANY input.
+    The ``is_dir()`` probe stats the path — a ~300-character filename
+    raises ``OSError: [Errno 63] File name too long`` — so it sits inside
+    the path-resolution guard, not between guards (A29-1). And every
+    guard catches ``ValueError`` too: ``resolve()`` raises
+    ``ValueError: embedded null byte`` for NUL-containing paths, which is
+    not an ``OSError`` subclass (A29-2). All three guards share the one
+    except form ``(OSError, RuntimeError, ValueError)`` (§5.3). This
+    matters because the ``finalize_merge.sh`` call site reads the verdict
+    via command substitution: a raised predicate empties stdout and the
+    fail-open comparison skips the worktree refusal entirely.
+    """
+    sanitized_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in _GIT_SELECTION_VARS
+    }
+    try:
+        # A27: resolve first, so the probed directory is the one owning the
+        # file that will actually be read/written. A28-2: resolution never
+        # escapes — OSError and RuntimeError (symlink loop) both fail closed.
+        # A29-1: is_dir() stats the path (overlong name -> OSError), so it
+        # belongs inside this guard, not between guards. A29-2: ValueError
+        # (embedded NUL) is not an OSError subclass and is caught too.
+        resolved = path.resolve()
+        directory = resolved if resolved.is_dir() else resolved.parent
+    except (OSError, RuntimeError, ValueError):
+        return True
+    try:
+        proc = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(directory),
+                "rev-parse",
+                "--absolute-git-dir",
+                "--git-common-dir",
+            ],
+            capture_output=True,
+            text=True,
+            env=sanitized_env,
+        )
+    except (OSError, RuntimeError, ValueError):
+        # Same single guard form as the path resolution above (A29-2, §5.3).
+        return True
+    if proc.returncode != 0:
+        return True
+    lines = proc.stdout.splitlines()
+    if len(lines) != 2:
+        return True
+    git_dir_text = lines[0].strip()
+    common_dir_text = lines[1].strip()
+    # A28-1: degenerate (blank) output fails closed; Path("") would
+    # otherwise be treated as relative and collapse the comparison.
+    if not git_dir_text or not common_dir_text:
+        return True
+    git_dir = Path(git_dir_text)
+    common_dir = Path(common_dir_text)
+    if not git_dir.is_absolute():
+        return True
+    # --git-common-dir may be relative; it is then relative to the cwd git
+    # ran in (``directory``), mirroring --git-dir semantics.
+    if not common_dir.is_absolute():
+        common_dir = directory / common_dir
+    try:
+        return git_dir.resolve() != common_dir.resolve()
+    except (OSError, RuntimeError, ValueError):
+        # A28-2/A29-2: same single guard form as the path resolution above.
+        return True
+
+
 def scope_prefix(pattern: str) -> str:
     """Reduce a scope pattern to the literal directory prefix it denotes.
 
@@ -601,6 +744,43 @@ def _enforce_autonomy(repo_root: Path) -> None:
         raise SystemExit(3)
 
 
+def _should_populate_implementer(review_decision: str) -> bool:
+    """Whether the degraded path should populate ``implementer_id``.
+
+    WP-08: the degraded path (compare consultant vs implementer, both
+    engine-observed identities, no self-attestation) is the strongest of the
+    three independence signals. It was previously gated only on
+    ``review.decision == "N/A"``, which meant an orchestrator who honestly
+    signed ``ACCEPT`` was pushed into the weaker bootstrap path (whose only
+    signal is a self-declared attestation). There is no defensible reason to
+    withhold the engine-observed comparison from an ACCEPT decision, so the
+    condition is widened to ``N/A`` or ``ACCEPT``.
+
+    Pure and side-effect free so the admission gate itself can be pinned by a
+    test without reproducing the whole ``main()`` git/validator pipeline.
+    """
+    return review_decision in ("N/A", "ACCEPT")
+
+
+def _resolve_implementer_identity(
+    executor_tool: str, binding: "Any"
+) -> AgentIdentity | None:
+    """Build the implementer's engine-observed identity for the degraded path.
+
+    WP-08: the degraded path (consultant vs implementer) is only as strong as
+    its premise — *both* identities are engine-observed. The consultant's model
+    comes from the ``consultant`` role binding (``CodexAdapter.identity()``);
+    the implementer's model must symmetrically come from the ``developer`` role
+    binding. When the implementer's model is not observable (no binding), we
+    return ``None`` so the caller falls back to the weaker bootstrap path
+    rather than entering the degraded path with only one observed model.
+    """
+    model = binding.identity_model if binding is not None else None
+    if model is None:
+        return None
+    return AgentIdentity(tool=executor_tool or "unassigned", model=model)
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print("usage: gate.py <work-package-status.json>", file=sys.stderr)
@@ -625,7 +805,9 @@ def main(argv: list[str]) -> int:
             f"(resolved against main repo root {repo_root})"
         )
 
-    if "/.worktrees/" in str(status_file):
+    # A13: git-fact worktree refusal via the single authoritative predicate
+    # (no "/.worktrees/" path literal — sibling worktrees never contain it).
+    if path_is_in_worktree(status_file):
         raise GateError(
             f"status file resolves inside a worktree ({status_file}); "
             "pass the main-repo copy (single source of truth)"
@@ -746,9 +928,12 @@ def main(argv: list[str]) -> int:
     consultant_identity = adapter.identity()
 
     implementer_id: AgentIdentity | None = None
-    if review_decision == "N/A":
+    if _should_populate_implementer(review_decision):
         executor_tool = read_field(validator, status_file, "executor.tool")
-        implementer_id = AgentIdentity(tool=executor_tool or "unassigned")
+        _, implementer_binding = resolve_role_binding("developer", repo=repo_root)
+        implementer_id = _resolve_implementer_identity(
+            executor_tool, implementer_binding
+        )
 
     # True bootstrap path: review=ACCEPT and no implementer fallback. The
     # reviewer is the orchestrator (no adapter identity), so its identity is

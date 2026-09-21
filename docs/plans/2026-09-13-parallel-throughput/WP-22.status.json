@@ -1,0 +1,252 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-22",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi-cli",
+    "session": "bg bhye2i68q (see wp22-rev2-exec.log)",
+    "redispatch_count": 1
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "8a8bf01e"
+  },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "9e4284a",
+    "dispatch_commit": "b72e9c4",
+    "branch": "feature/wp22-finalize-toctou",
+    "worktree": "../wp22-finalize-toctou",
+    "commit": "b216b50",
+    "merged_commit": "5afeb4fd9c3459e717bceda1f30bc6d175b7da55"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "src/agentic_loop/validate_wp_status.py",
+      "tests/test_finalize_merge_toctou.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "docs/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief-rev2.md",
+      "sha256": "81a202f8fe8943d61015a7b52c452de8bac4701f37700ad3f6cc75f7b852e9c3",
+      "rev": 2,
+      "supersedes": {
+        "path": "docs/plans/2026-09-13-parallel-throughput/WP-22-brief-rev1.md",
+        "sha256": "3384e8ced97d5ee23f2e77792cbfaebb24a8735dde7bf397625710a59df89515",
+        "why": "rev1 交付 2fbf05d 被 codex 第二签名判 REWORK；B15 注入面（编排者 PoC 已证绕过合入门禁）+ B13 写回重读需一并修"
+      },
+      "prefreeze_check": {
+        "method": "把 dispatch_lint.sh 的 section 判据 heredoc 原文切片出来直接跑（B11 修法 1：判据只能来自真脚本，不retype、不跑副本）",
+        "result": "PASS — 三个英文锚点均存在且非空",
+        "checked_at": "2026-09-16T00:00:00Z"
+      },
+      "rework": {
+        "round": 1,
+        "reason": "consult REWORK (codex) + 编排者 PoC 证实 B15 为 rev1 引入的合入门禁绕过回归",
+        "rev1_commit": "2fbf05d",
+        "carried_over": "A34 修复（判定/读取收敛到同一次 O_NOFOLLOW open）保留，rev1 的 5 条用例须照旧通过",
+        "dispatched": {
+          "at": "2026-09-16T00:35:00Z",
+          "command": "kimi --afk --print -w /Users/admin/vibe/wp22-finalize-toctou -p <prompt>",
+          "prompt_file": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-rev2-prompt.md",
+          "prompt_sha256": "a432a8c9905f3fb1f0271b66174f6da9a171bfba32803225eef046a1920ae02d",
+          "log": "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-rev2-exec.log",
+          "liveness_probe": "kimi --print -p 'reply PROBE_OK' -> rc=0, stdout contains PROBE_OK",
+          "preflight": "PREFLIGHT_PASS branch=feature/wp22-finalize-toctou state=CHANGES_REQUESTED (主仓绝对路径，规避 B17)",
+          "autonomy": "AUTONOMY_AUTO dispatch_developer",
+          "head_at_dispatch": "2fbf05d"
+        }
+      },
+      "gate_alignment": {
+        "defect": "B16",
+        "measured": "dispatch_lint.sh:60 和 redispatch.py:493 都按固定命名 WP-22-brief.md 取 brief，从不读 evidence.brief.path；bash -x 实测门禁 lint 的是 WP-22-brief.md 而非本字段指向的 rev2",
+        "differential_pair": "evidence.brief.path 改指 DOES-NOT-EXIST.md -> 仍 DISPATCH_LINT_PASS rc=0；同一 status 仅换 work_package_id=WP-999 -> DISPATCH_LINT_FAIL brief not found rc=2",
+        "workaround": "把固定命名 WP-22-brief.md 的内容置为 rev2（sha256 与本字段一致 81a202f8...），rev1 原文改名保存为 WP-22-brief-rev1.md（sha256 3384e8ce... 与 supersedes 记录一致）；不依赖尚未修好的门禁行为",
+        "not_fixed_here": "B16 本身归独立 WP（任务 #18），本轮只做派发前对齐",
+        "aligned_at": "2026-09-16T00:00:00Z",
+        "preflight_note": "B17：preflight 相对路径落到工作树快照，首次 PREFLIGHT_PASS(state=DISPATCHED) 不构成门禁证据；改用主仓绝对路径复跑，真实裁决为 PREFLIGHT_FAIL: state DRAFT is not executable，故本次显式置 CHANGES_REQUESTED 后再跑"
+      },
+      "base_integration": {
+        "decided_at": "2026-09-16T00:00:00Z",
+        "situation": "分支基于 dispatch_commit b72e9c4；计划分支自那以来对 finalize_merge.sh 只有 6995873(WP-21) 的一处改动",
+        "measured": "git diff b72e9c4..HEAD -- finalize_merge.sh 的非注释改动行数 = 0（纯 6 行 A29 fail-closed 注释），且正落在 rev1 改写的 probe 调用处",
+        "rebase_attempted": "是，git rebase 8c2485d 在该处冲突（UU finalize_merge.sh）；已 git rebase --abort，工作树恢复干净 2fbf05d",
+        "why_not_resolved_by_orchestrator": "冲突解法要决定 A29 的告警枚举是否随调用点迁入新 probe（实现源取舍），属执行者面；编排者手改 finalize_merge.sh 即越权写实现（同 CLAUDE.md.tmpl 那次已纠正的边界）",
+        "why_not_pushed_to_executor": "rev2 Brief 已冻结（sha256 81a202f8…），加交付项须再冻结为 rev3；本轮不为一处注释再冻结一版",
+        "resolution_rule_predeclared": "合入时由编排者在 merge --no-ff 中解此冲突，规则预先声明：两段注释都保留（A29 的 fail-closed 枚举随调用点迁至新 probe 赋值，因 rev1 注释自身已断言同一契约），代码行取 rev2 的 probe 赋值；不得借解冲突改动任何非注释行",
+        "verification_at_merge": "合入后 git diff <merged>~1..<merged> -- finalize_merge.sh 须显示 A29 六行注释仍在，且 merge 引入的非注释行全部来自 rev2 分支"
+      }
+    },
+    "changed_files": [
+      "src/agentic_loop/wrappers/finalize_merge.sh (rev2 +145/-? on top of rev1: NUL-separated probe transport + assignment-side name whitelist + B13 writeback from status_raw)",
+      "tests/test_finalize_merge_toctou.py (rev2 +184: 2 new B15 cases, rev1's 5 A34 cases unchanged and green)"
+    ],
+    "tests": [
+      {
+        "name": "rev2 toctou+first_call (py3.11/3.13/3.14)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_finalize_merge_toctou.py tests/test_finalize_merge_first_call.py -q; uv run --python 3.13|3.14 ...",
+        "result": "8 passed / 8 passed / 8 passed (rev1's 5 A34 cases carried, no regression)",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 full suite (py3.11)",
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "4 failed, 588 passed, 4 skipped (baseline b72e9c4: 4 failed, 581 passed -> +7 new, 0 regression; the 4 are the known test_finalize_merge_triple_sign.py fixture failures)",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 orchestrator INDEPENDENT B15 PoC (5 payload shapes x rev1/rev2 differential)",
+        "command": "/Users/admin/.claude/jobs/8a8bf01e/tmp/b15_poc.py (own fixture, compact JSON, not the executor's): A newline in override.justification; B NUL in override.justification; C newline in iteration_id; D NUL in override.approver targeting status_raw; E newline+tab forging finalize_verdict. Same script re-pointed at rev1's finalize_merge.sh (git show 2fbf05d:...) as the differential arm.",
+        "result": "rev2: all 5 REFUSED rc=2, state stays APPROVED_FOR_MERGE, no merged_commit; positive control (clean status on merged branch) -> FINALIZE_OK + MERGED. rev1: A/C/E BREACH (rc=0, forged state=MERGED with a real merge commit of the DECOY branch while the named branch was never merged). The harness therefore discriminates: rev2's refusals are the fix, not the harness being blind.",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 reviewer mutation 1 — probe NUL guard removed",
+        "command": "in finalize_merge.sh render_field: `if \"\\0\" in rendered:` -> `if False:`; rerun the file + my PoC; restore from backup",
+        "result": "test_nul_injection_in_second_field_fails_closed_b15 RED with rc=0 'FINALIZE_OK merged_commit=5c3e1c86...' and my PoC case B flips REFUSED->BREACH. The guard is load-bearing and the case pins it. Restore byte-identical (git status clean).",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 reviewer mutation 2 — transport reverted to newline records",
+        "command": "probe: NUL record terminator -> newline; bash: `read -r -d ''` -> plain `read -r`; run the whole file; restore",
+        "result": "ALL 7 cases RED. test_newline_injection_cannot_override_branch_b15 goes red on its cause-specific witness ('merge not detected' absent, replaced by 'probe record without field separator'), i.e. it detects the reversion but via the layered no-TAB guard rather than by reproducing the breach. Measured why: _write_status uses json.dumps(indent=2), so status_raw is multi-line and trips the no-TAB guard before the forged record is reached; my PoC uses compact JSON and DOES reproduce the breach (A/C/E) under the same mutation. This matches the executor's self-reported CONCERN — it reported this honestly rather than claiming a clean kill.",
+        "exit_code": 1,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 B13 writeback source verification",
+        "command": "read finalize_merge.sh:398-430; grep for open(/status_file inside the writeback heredoc",
+        "result": "writeback python takes (tmp_status, merged_commit, updated_at, status_raw) and does json.loads(raw); no open(src). Only mktemp/mv touch status_file, i.e. the atomic landing site is unchanged as the brief required. B13 closed.",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 status_raw NUL-bypass attempt (reviewer's own attack idea)",
+        "command": "status_raw skips render_field, so I tested whether a literal NUL can reach it: json.loads on a literal NUL inside a string value / after the object / between tokens (/Users/admin/.claude/jobs/8a8bf01e/tmp/nulprobe.py)",
+        "result": "all three REJECTED by strict json.loads (JSONDecodeError 'Invalid control character' / 'Extra data' / 'Expecting value'). A \\u0000 escape decodes to NUL in the VALUE (caught by render_field) but leaves the raw source NUL-free. status_raw is therefore structurally NUL-free — the bypass does not exist. Not a gap.",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 argv-size headroom for status_raw (new residual)",
+        "command": "/Users/admin/.claude/jobs/8a8bf01e/tmp/argv_size.py at 1.3KB / 604KB / 1.81MB status sizes; getconf ARG_MAX",
+        "result": "1.3KB and 604KB finalize fine (state=MERGED, all 2000 evidence entries preserved). At 1.81MB: rc=1, state stays APPROVED_FOR_MERGE, nothing stamped — fail-closed, but the diagnostic is a raw bash 'Argument list too long' rather than a FINALIZE_FAIL line. ARG_MAX=1048576; largest real status here is 15129 bytes (70x headroom).",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      },
+      {
+        "name": "rev2 scope verification (round diff 2fbf05d..b216b50 + cumulative b72e9c4..HEAD)",
+        "command": "git diff --stat 2fbf05d..b216b50; git diff --name-only b72e9c4..HEAD; git diff --stat b72e9c4..HEAD -- src/agentic_loop/validate_wp_status.py",
+        "result": "round: 2 files (finalize_merge.sh, test_finalize_merge_toctou.py). cumulative: the same 2 files only — no forbidden path, no cross-owner write. validate_wp_status.py ZERO diff (the injection was closed in the transport, not by tightening the schema, as the brief required).",
+        "exit_code": 0,
+        "verified_by": "orchestrator"
+      }
+    ],
+    "artifacts": [
+      "docs/plans/2026-09-13-parallel-throughput/WP-22.report.md",
+      "/Users/admin/.claude/jobs/8a8bf01e/tmp/wp22-exec.log"
+    ],
+    "remaining_risks": [
+      "O_NOFOLLOW 只拒最后一段是 symlink，不防中间目录段被替换；A34 声明的残余面，Brief 附注 4 允许，执行者按约以 CONCERNS 申报，本轮不修。",
+      "【本轮新增，编排者实测】status_raw 经 argv 传给写回 python，引入了原先不存在的 ARG_MAX 上限（本机 1048576）。604KB status 正常落盘；1.81MB 时 rc=1、state 不变、不落章（fail-closed），但诊断是裸的 bash 'Argument list too long'，不是 FINALIZE_FAIL 行。本仓最大真实 status 15129 字节（70 倍余量），故不阻断合入；建议后续 WP 改用 fd/临时文件传 status_raw 并补一条 FINALIZE_FAIL 诊断。",
+      "【本轮新增，编排者实测】B15 的换行用例靠分层的「记录无 TAB 分隔」守卫转红，而非复现伪造 OK——因为 fixture 用 json.dumps(indent=2)，status_raw 天然多行，先触发该守卫。编排者用紧凑 JSON 的独立 PoC 已确认在同一变异下仍可复现完整突破，故用例的钉住能力经外部证据补足；但用例自身对「仅传输编码回退」的区分力弱于对「仅 NUL 守卫摘除」的区分力。建议后续补一条紧凑 JSON fixture 的用例。",
+      "probe 内联了一份字段渲染实现替代 10 处 --field 调用。校验规则仍唯一来自 validate()（无第二份口径），但渲染逻辑若日后在 validate_wp_status.main() 一侧漂移，probe 不会自动跟随；需漂移防护。"
+    ],
+    "baseline": {
+      "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+      "measured_at": "2026-09-15T14:20:00Z",
+      "measured_at_commit": "b72e9c4",
+      "result": "4 failed, 581 passed, 4 skipped",
+      "measured_by": "orchestrator (detached worktree at dispatch_commit; corrects the wrong 583 in the dispatch prompt, per executor CONCERN 3)",
+      "known_failures": "tests/test_finalize_merge_triple_sign.py (4x, fixture runs `git checkout main` in a temp repo without a main branch) — do not fix"
+    }
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-code",
+    "reviewed_at": "2026-09-16T00:00:00Z",
+    "notes": "rev2 关掉了 rev1 我漏掉的那一层：传输通道。修法落在通道本身（NUL 分记录 + 值内含 NUL 则整状态拒收 + 赋值端变量名白名单 fail-closed），validate_wp_status.py 零行 diff —— 没有靠收紧 schema 掩盖通道缺陷，这是对的方向。B13 一并关掉：写回改自 status_raw 解析，写回段不再 open(status_file)，mktemp/mv 落点未动。本次我不复用执行者的 fixture：自建 5 种载荷形态的 PoC，并把同一 PoC 指向 rev1 做差分——rev1 上 A/C/E 突破（伪造 MERGED，未合入分支盖上 decoy 的真 merge commit），rev2 上 5 条全拒，正向对照仍 FINALIZE_OK，证明拒收来自修复而非 PoC 失明。另外我自己找了一条攻击路径（status_raw 绕过 render_field 的 NUL 检查），实测 strict json.loads 在三个位置全部拒收字面 NUL，该绕过不存在。执行者关于变异 A 的 CONCERN 属实且如实上报（用例被分层守卫先拦下，未复现伪造 OK），我已用紧凑 JSON PoC 补足外部证据，并把两条实测残余面写入 remaining_risks（argv/ARG_MAX 上限、换行用例区分力偏弱），均不阻断合入。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "ACCEPT -> 作废",
+        "reviewed_by": "claude-code",
+        "why_void": "逐字段核验了 probe 与 --field 的渲染等价（值相同），未核验传输通道已从「一次调用一个值」变为「一段文本多行赋值」；换行由此获得语法意义。B15。"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "claude-code",
+        "basis": "independent PoC with rev1/rev2 differential + 2 reviewer mutations + reviewer's own bypass attempt disproved + cross-version green + zero regression + validate_wp_status.py zero diff + scope clean"
+      }
+    ],
+    "merge_approval": {
+      "approved_by": "user",
+      "approved_at": "2026-09-16T08:00:00Z",
+      "instruction": "合并WP-22/WP-24",
+      "note": "用户批准即合入授权；第二签名为 codex rev2 ACCEPT（逐字转录，见 verdict_file）。本地 merge --no-ff，不 push。"
+    }
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "reviewed_by": "codex",
+    "notes": "rev2 第二签名 ACCEPT，阻断项 0。逐条确认：B15 已关闭（NUL 作记录边界，值内 NUL 在 render_field() 整次拒收；TAB 仅按首个分隔符拆分故值内 TAB/换行无语法意义；赋值前固定 case 白名单阻止未知变量名进入 printf -v；未发现由合法字段值制造新记录或走私赋值的残余路径）；B13 已关闭（写回改为对 $status_raw 执行 json.loads，不再 open(status_file)，判定与写回同一份字节）；B18 不阻断（ARG_MAX 是可用性上限，超限 fail-closed 不伪造 MERGED，15KB 实际规模对 1.81MB 阈值余量充足；建议后续改临时文件/stdin 并补诊断）；B19 不阻断（削弱的是变异证明的特异性，非生产修复本身；编码守卫回退时测试仍转红，紧凑 JSON PoC 补足真实绕过证据）。残余非阻断关注：中间目录替换面按 Brief 留存；B18/B19 继续登记为后续改进。传输口径：codex 再次以自然语言（'VERDICT: ACCEPT'）作答而非 --output-schema 的 schema 形状，adapters/codex.py::_parse_verdict 抛 ValueError；裁决由编排者逐字转录，原文见 verdict_file.raw_verbatim。与 WP-21 记录的同一软约束问题（--output-schema 对该 provider 只是建议）。codex 明确声明其结论仅基于内联 Brief + 本轮 diff + 题面实测证据，未读取仓库其他文件、未独立重跑测试，故其为第二签名而非独立复测。",
+    "history": [
+      {
+        "rev": 1,
+        "decision": "REWORK",
+        "record": "WP-22-consult-codex-verdict.json"
+      },
+      {
+        "rev": 2,
+        "decision": "ACCEPT",
+        "reviewed_by": "codex",
+        "consulted_at": "2026-09-16T07:30:00Z",
+        "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-22-consult-codex-rev2-verdict.json",
+        "basis": "inline rev2 brief + round-only diff, forbid_repo_read=True; no independent test rerun (stated by codex itself)",
+        "transport": "prose answer; --output-schema soft for this provider; transcribed verbatim by orchestrator"
+      }
+    ],
+    "verdict_file": "docs/plans/2026-09-13-parallel-throughput/WP-22-consult-codex-rev2-verdict.json"
+  },
+  "timestamps": {
+    "created_at": "2026-09-15T00:00:00Z",
+    "dispatched_at": "2026-09-16T00:30:00Z",
+    "updated_at": "2026-09-16T01:23:49Z",
+    "review_completed_at": "2026-09-16T00:00:00Z",
+    "consulted_at": "2026-09-16T07:30:00Z",
+    "rev2_frozen_at": "2026-09-16T00:05:00Z",
+    "approved_for_merge_at": "2026-09-16T08:00:00Z"
+  }
+}

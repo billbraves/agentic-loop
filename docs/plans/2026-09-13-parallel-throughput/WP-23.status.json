@@ -1,0 +1,59 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-23",
+  "iteration_id": "2026-09-13-parallel-throughput",
+  "phase": "P1",
+  "state": "DRAFT",
+  "role": "Developer",
+  "executor": { "tool": "kimi-cli", "session": "", "redispatch_count": 0 },
+  "orchestrator": { "tool": "claude-code", "session": "8a8bf01e" },
+  "reviewer": { "tool": "claude-code", "session": "8a8bf01e" },
+  "git": {
+    "base_branch": "plan/2026-09-13-parallel-throughput",
+    "base_commit": "704e674",
+    "branch": "feature/wp23-resolve-paths-sanitize",
+    "worktree": "../wp23-resolve-paths-sanitize",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/resolve_paths.py",
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_resolve_paths_env_sanitization.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/redispatch.py",
+      "docs/",
+      ".agentic/config.toml",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-13-parallel-throughput/WP-23-brief.md",
+      "sha256": "1b9324cb203e596d9b1a11e302d52b8101b8c4c663c91c98d07754589c9bdf33"
+    },
+    "changed_files": [],
+    "tests": [],
+    "artifacts": [],
+    "remaining_risks": [
+      "wrapper 侧 11 个 .sh 的裸 git rev-parse --git-common-dir 仍未净化；存在自举顺序问题（PYTHONPATH 由该 rev-parse 算出），本 WP 明确不做，单独评估"
+    ]
+  },
+  "review": { "decision": "CONSULT", "reviewed_by": "claude-code",
+    "notes": "尚未派发，等 WP-21/WP-22 结清后再 dispatch。" },
+  "consult": { "decision": "CONSULT", "reviewed_by": "codex", "notes": "尚未派发。" },
+  "timestamps": { "created_at": "2026-09-15T00:00:00Z" }
+}

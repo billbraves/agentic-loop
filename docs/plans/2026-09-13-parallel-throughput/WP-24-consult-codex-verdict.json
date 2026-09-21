@@ -1,0 +1,17 @@
+{
+  "decision": "REWORK",
+  "findings_count": 1,
+  "raw_verbatim": "REWORK\n\né»å¡ç¼ºé·ï¼`test_witness_empty_anchor_body_fails` æªæ»¡è¶³ Brief è¦æ±çåå ç¹å¼æ­è¨ãå®åªæ£æ¥ï¼\n\n```python\nassert \"Acceptance tests\" in r.stderr\n```\n\nå æ­¤æ è®º checker æ¥ `empty` è¿æ¯éè¯¯å°æ¥ `missing`ï¼æµè¯é½ä¼éè¿ãè¿æ æ³è¯æâæ é¢å­å¨ä½æ®µè½ä¸ºç©ºâçå¤æ®ç¬ç«çæï¼æ­£æ¯æ¬ WP è¦é²æ­¢ç oracle ç©ºéªè¯ã\n\nä¿®å¤èå´æç¡®ï¼æ­è¨ stderr åå« `empty`ï¼å¹¶æç¡®ä¸åå« `missing`ï¼ä¾å¦ï¼\n\n```python\nassert \"empty\" in r.stderr\nassert \"missing\" not in r.stderr\n```\n\næå¥½è¿ä¸æ­¥å¹éåå« section åç§°çå®æ´è¯æ­ãå¶ä½ diff ä¸ Brief çæ¹åãæ¨¡æ¿åä»½ä¸è´æ§ãä¸ä¸ªéç¹å oracle ä¸é¡¹ææ¬è¦æ±ç¸ç¬¦ã",
+  "consultant": {
+    "adapter": "codex",
+    "provider": "kirogpt",
+    "identity_model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "read-only",
+    "consulted_at": "2026-09-15T15:40:00Z",
+    "transport": "CodexAdapter.review() + gate.VERDICT_SCHEMA (--output-schema soft; model answered in prose, decision transcribed verbatim by the orchestrator)"
+  },
+  "orchestrator_verification": {
+    "P0-1 witness assertion not cause-specific": "PARTLY VALID, PROPOSED FIX UNREACHABLE — the observation is right (asserting only \"Acceptance tests\" in stderr does not distinguish the two predicate halves), but codex's fix (assert \"empty\" in stderr) is impossible: dispatch_lint.sh prints the same \"brief missing section\" text at :86 and :98. Codex was misled by the same orchestrator error already registered as B11 (the erroneous empty/missing wording is still in the frozen brief it was given). Cause-specificity here is carried by the fixture instead: _clear_section_body leaves `## Acceptance tests` present with a body of exactly '' (verified by importing the real helper) while the other two anchors keep 3 non-empty lines each, so only :98 can fire. The residual gap is real but weaker than stated: the assertion does not itself pin the line — it relies on the fixture"
+  }
+}
