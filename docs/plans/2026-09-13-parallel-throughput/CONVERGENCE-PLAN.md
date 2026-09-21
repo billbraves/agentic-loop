@@ -1,5 +1,9 @@
 # 收敛计划：2026-09-13-parallel-throughput 迭代收敛轮
 
+> **⚠️ 2026-09-21 重新基线化：本文档 P1-P6 已被 `REBASELINE-DECISION.md` 取代**（P0 已完成部分仍有效）。
+> 原因＝迭代目标漂移 + `plan merge` 被 lint 永久阻断（P6 自相矛盾）。新策略＝收缩 PLAN-01 到 10 个
+> 已 MERGED 直接收敛（目标 A）+ 11 pending/缺陷长尾另立信任根优先的加固迭代（目标 B）。详见 `REBASELINE-DECISION.md`。
+
 > 编排者 claude ｜ 落盘日期 2026-09-20 ｜ 用户已批准启动（2026-09-20「好的，启动」+「安排好计划，今晚10点后错峰执行」）。
 > P0 已批准批次安排于 2026-09-20 22:00（Asia/Shanghai）后错峰执行。
 > 本文档不修改 PLAN.md 冻结本体；PLAN-01.status.json 的修订走 P0-4 批准流（草案先行，本体不动）。
