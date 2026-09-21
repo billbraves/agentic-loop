@@ -1,0 +1,74 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-19",
+  "iteration_id": "2026-09-14-codex-verdict-contract",
+  "phase": "P2",
+  "state": "MERGED",
+  "revision": 2,
+  "role": "Developer",
+  "executor": { "tool": "Kiro / DeepSeek Harness (orchestrator-direct, option B)", "session": "current-dsh-session", "deviation_from_dispatch_form": "Not dispatched via kimi + agentic preflight (they resolve main_root to the occupied primary checkout /Users/admin/vibe/agentic_loop). Per user-chosen option B, orchestrator implemented directly in isolated worktree /Users/admin/vibe/.worktrees/agentic-wp19-line-split; recorded honestly, same as WP-18." },
+  "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
+  "reviewer": { "tool": "claude-code", "session": "" },
+  "git": {
+    "base_branch": "main",
+    "integration_branch": "main",
+    "base_commit": "142369d",
+    "branch": "fix/wp-19-codex-line-level-split",
+    "worktree": "",
+    "commit": "ca9731d",
+    "reviewed_commit": "ca9731d",
+    "merged_commit": "d587992",
+    "merge_finalized_by": "manual (agentic finalize not run: resolves main_root to the occupied primary checkout; merge done in main worktree via git merge --no-ff, merged_commit recorded manually — same as WP-18)",
+    "merge_method": "no-ff",
+    "cherry_pick": null,
+    "worktree_path": "/Users/admin/vibe/.worktrees/agentic-wp19-line-split"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/adapters/codex.py",
+      "tests/test_codex_line_level_split.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/independence.py",
+      "tests/test_codex_verdict_recovery.py",
+      "tests/test_codex_gate_capability_merge.py",
+      "tests/test_gate_diff_start.py"
+    ],
+    "rev2_scope_note": "re-freeze rev2 moved tests/test_codex_config_isolation_chunking.py from forbidden to allowed: exactly one WP-17 case (test_single_file_over_bound_after_hunk_split_fails_closed) had to change because its assertion (a pure-addition single-hunk MUST fail closed) is the very case WP-19 makes succeed. Replaced with a line-split-success test plus two genuine fail-closed guards (single oversized line / mixed hunk). Other cases untouched. User-adjudicated."
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      { "cmd": "pytest tests/test_codex_line_level_split.py -q", "result": "8 passed", "exit_code": 0 },
+      { "cmd": "pytest tests/test_codex_config_isolation_chunking.py -q (rev2)", "result": "16 passed (1 case changed to line-split-success + 2 new fail-closed guards)", "exit_code": 0 },
+      { "cmd": "pytest 5 codex suites (recovery/chunking/combined/gate_diff_start/line_split) -q", "result": "90 passed", "exit_code": 0 },
+      { "cmd": "pytest tests/ -q (full, minus 4 git-env baseline)", "result": "574 passed, 4 skipped, 4 deselected", "exit_code": 0 },
+      { "cmd": "static invariants: 0 regex, 0 stray decision literals; static-killer tests", "result": "green", "exit_code": 0 },
+      { "cmd": "real WP-34 chunk3 (@@ -0,0 +1,4170 @@, 190KB) split", "result": "2 pieces, each git apply --check rc=0, concatenated + lines lossless (4170==4170)", "exit_code": 0 }
+    ],
+    "motivation_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-39-unlock-record.md Run 1 (gate log sha256 66679f50e582962ac2967575902360023cd4c48595a3cd6c98f5fc77a2d9ea8f): merged runtime chunking works but fail-closed on chunk 3/9, a 190KB single-hunk new file (.ci/tests/test_harness_release_gate.py, @@ -0,0 +1,4170 @@) that cannot be hunk-split.",
+    "goal": "Add lossless line-level sub-hunk splitting for a single over-bound hunk, scoped to safe pure-addition hunks only; mixed/context hunks stay fail-closed. Downstream: unblocks WP-39 Run 2.",
+    "prefreeze_review": "Independent pre-freeze review verified: (1) motivation references match reality — chunk3 is genuinely a pure-addition single hunk (new file mode, @@ -0,0 +1,4170 @@, 0 context lines, 0 real deletions), WP-18 is MERGED, gate log sha256 matches; (2) two brief tightenings applied before freeze: the pure-addition predicate is now a strict whole-hunk test (deletion count==0 AND no context lines AND no deletion lines; local all-+ regions of mixed hunks explicitly forbidden), and the -X,0 header recompute is pinned (X held constant across sub-pieces, only +side start/count increments), with an added DoD test for the append-to-nonempty-file case (@@ -100,0 +101,N @@)."
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer_role": "independent adversarial code review",
+    "reviewer_tool": "subagent (separate context, given only the diff + frozen invariants)",
+    "reviewed_commit": "ca9731d",
+    "rationale": "All six frozen invariants verified by hand-trace: (1) losslessness — each body line routed exactly once, byte-concat of sub-pieces reproduces original + body verbatim (CRLF/no-newline/exotic-unicode preserved); (2) strict pure-addition predicate rejects context/deletion lines and the '\\ No newline' marker, mixed hunks never sliced; (3) header recompute has no off-by-one (flush before run_start advance; count==len(run); next start==prev start+count; -X,0 constant); (4) fail-closed airtight (every non-splittable branch returns the whole hunk, no loop, single-oversized-line raises); (5) no regex, no stray decision literals in split/parse helpers; (6) no added provider calls — per-chunk initial+one-recovery budget unchanged, only chunk count grows. Test delta is a legitimate re-freeze of intended behavior + two genuine stricter fail-closed guards.",
+    "orchestrator_corroboration": "Independently confirmed: real WP-34 chunk3 splits into 2 git-apply-clean lossless pieces; U+2028-in-line case falls back to fail-closed (not sliced) with byte-losslessness intact; static-killer green; full suite 574 passed. First-pass ACCEPT (no rework needed), unlike WP-18.",
+    "note": "Subagent independent second read, NOT the P2-contract native Codex second signature. Human merge approval still required."
+  },
+  "consult": {},
+  "timestamps": { "drafted_at": "2026-09-15T22:00:00Z", "approved_at": "2026-09-15T22:30:00Z", "refrozen_rev2_at": "2026-09-15T23:00:00Z", "dispatched_at": "", "ready_for_review_at": "2026-09-15T23:15:00Z" }
+}

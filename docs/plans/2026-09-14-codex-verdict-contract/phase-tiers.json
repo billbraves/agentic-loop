@@ -1,0 +1,6 @@
+{
+  "phases": {
+    "P2": "architecture"
+  },
+  "default": "medium"
+}

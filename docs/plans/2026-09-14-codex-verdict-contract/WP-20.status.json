@@ -1,0 +1,90 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-20",
+  "iteration_id": "2026-09-14-codex-verdict-contract",
+  "phase": "P2",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kiro-dsh-orchestrator-direct",
+    "deviation_from_dispatch_form": "Option B (same as WP-18/WP-19): implemented directly in an isolated worktree by the orchestrator session instead of dispatching the configured developer tool, because the agentic-loop main checkout /Users/admin/vibe/agentic_loop is occupied by another session and `agentic preflight` resolves the main root to it, so the WP lock / preflight gate could not be taken for this repo from here. Branch and worktree isolation, explicit-path commits, independent review, and human merge approval were all preserved."
+  },
+  "orchestrator": { "tool": "claude-code", "session": "current-dsh-session", "actual_tool_note": "Kiro / DeepSeek Harness" },
+  "reviewer": { "tool": "claude-code", "session": "" },
+  "git": {
+    "base_branch": "main",
+    "integration_branch": "main",
+    "base_commit": "c86b35c",
+    "branch": "fix/wp-20-codex-finalization-benign-warning",
+    "worktree": "/Users/admin/vibe/.worktrees/agentic-wp20-benign-warning",
+    "commit": "97b3bb4",
+    "reviewed_commit": "97b3bb4",
+    "merged_commit": "d91bce7",
+    "merged_commit_note": "Manual finalize (not `agentic finalize`): the agentic CLI resolves the main repo root to the occupied checkout /Users/admin/vibe/agentic_loop, same deviation as WP-18/WP-19. Merge performed with `git merge --no-ff` inside the main worktree /Users/admin/vibe/agentic-loop-main-codex-merge with explicit user approval. Verified d91bce7 has parents 1c0ca63 (main tip) and 97b3bb4 (branch tip), i.e. the WP branch tip is a merge parent; no conflict occurred; post-merge re-verification on main ran tests/test_codex_finalization_benign_warning.py + test_codex_verdict_recovery.py + test_codex_line_level_split.py = 97 passed.",
+    "merge_method": "no-ff",
+    "cherry_pick": null
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/adapters/codex.py",
+      "tests/test_codex_finalization_benign_warning.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/independence.py",
+      "tests/test_codex_verdict_recovery.py",
+      "tests/test_codex_config_isolation_chunking.py",
+      "tests/test_codex_gate_capability_merge.py",
+      "tests/test_gate_diff_start.py",
+      "tests/test_codex_line_level_split.py"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests/test_codex_finalization_benign_warning.py -q -o addopts=\"\"", "result": "39 passed", "exit": 0 },
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests/test_codex_verdict_recovery.py -q -o addopts=\"\"", "result": "50 passed (frozen WP-16 suite, unmodified)", "exit": 0 },
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests/test_codex_config_isolation_chunking.py -q -o addopts=\"\"", "result": "16 passed (frozen WP-17 suite, unmodified)", "exit": 0 },
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests/test_codex_gate_capability_merge.py -q -o addopts=\"\"", "result": "8 passed (frozen WP-18 suite, unmodified)", "exit": 0 },
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests/test_gate_diff_start.py -q -o addopts=\"\"", "result": "8 passed (frozen suite, unmodified)", "exit": 0 },
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests/test_codex_line_level_split.py -q -o addopts=\"\"", "result": "8 passed (frozen WP-19 suite, unmodified)", "exit": 0 },
+      { "command": "/opt/anaconda3/bin/python3 -m pytest tests -q -o addopts=\"\" -p no:randomly", "result": "613 passed, 4 skipped, 4 failed — the 4 failures are the pre-existing git-env baseline in tests/test_finalize_merge_triple_sign.py ('git checkout -q main' exit 1), which fail identically on unmodified main (verified: 4 failed, 1 passed there)", "exit": 0 }
+    ],
+    "scope_check": "git diff c86b35c..97b3bb4 --stat touches exactly the two allowed paths: src/agentic_loop/adapters/codex.py (+99/-17) and the new tests/test_codex_finalization_benign_warning.py. None of the five frozen codex test files were modified (verified by name filter on the diff). review()/chunking/line-split/file-binding/aggregation/_parse_verdict decision semantics untouched.",
+    "motivation_reference": "consumer repo consumer-repo docs/plans/harness-architecture/WP-39-unlock-record.md Run 2 (gate log sha256 1e6ed451f3dd48db17d7821b91a2397ac8dc80850a1f8aaa7cf0eda87faa2c90): with WP-19 line-split runtime c86b35c the gate cleared the 190KB single-hunk file but fail-closed at finalization with 'tool-free turn emitted an unexpected event'. Real codex 0.154 + DeepSeek custom provider probe reproduced a benign item.type=='error' fallback-metadata warning ('Model metadata for deepseek-v4-pro not found. Defaulting to fallback metadata.') that the finalization item allowlist {reasoning, agent_message} rejects.",
+    "goal": "Strictly whitelist-tolerate codex's benign fallback-metadata warning item in the tool-free finalization JSONL validation so empty-terminal resume can return a verdict, WITHOUT relaxing fail-closed for any tool/command/unknown item. Downstream: unblocks WP-39 Run 3.",
+    "must_verify_first": "Run 2 printed the L545-556 'unexpected event' (top-level event-type) error, while the probe reproduced the L557-573 'tool or unknown item' (item-subtype) rejection. These differ. Step 0 of implementation MUST capture the real failing JSONL event stream and confirm exactly which validation point(s) fire before writing the tolerance, rather than guessing from the single-line Run 2 error.",
+    "prefreeze_note": "Frozen by user decision to open WP-20 and hand off to a fresh session. Brief is written to be fully self-reconstructable from tracked files per the context-recovery contract.",
+    "step0_findings": {
+      "method": "Re-ran the REAL gate (python3 -m agentic_loop.gate on consumer-repo docs/wp/WP-34.status.json, PYTHONPATH=<wp20 worktree>/src) under an observation-only wrapper that tee'd CodexAdapter._jsonl_events and recorded each _validated_final_message outcome. Reproduced Run 2 verbatim (GATE_FAIL: codex final-message protocol mismatch: tool-free turn emitted an unexpected event) with WP-34 status.json byte-identical afterwards (STATUS_UNCHANGED). No production writes, no notifications, no push; API key never echoed.",
+      "fact_1_real_hit_point": "The failing tool-free stream (stream-005.jsonl sha256 eb1fa51636c9668c6f190f89645138171379f4aa2953fe03e8e35655e3ea36b3) is [thread.started, item.completed(item.type=error benign fallback-metadata), turn.started, item.started(item.type=mcp_tool_call server=codex_apps tool=codex_document_control.list_document_sessions), item.completed(mcp_tool_call), item.completed(agent_message), turn.completed]. The top-level type set contains 'item.started', which is NOT in the L545-556 allowlist -> that is the actual origin of Run 2's 'unexpected event'. The L527-534 lifecycle check does NOT fire: there is no top-level 'error' event and no turn.failed ('error' in types == False), disproving the rev1 suspicion.",
+      "fact_2_wrong_branch_in_rev1": "The failure is on the NORMALIZATION branch, not resume finalization. The failing stream's thread id (01a0b1d8-...) differs from the same chunk's first-call stream-003.jsonl (01a0b1d7-...), and that first-call agent_message was rejected by _parse_verdict with 'Codex verdict is not one complete JSON value' (model emitted a backtick + full-width comma inside the JSON string). So review() took _exec_attempt(tools_enabled=False). Both tool-free branches share _validated_final_message(tools_forbidden=True), so the fix point is unchanged but covers two branches.",
+      "fact_3_resume_branch_also_blocked": "An independent probe driving the real _exec_attempt + _resume_finalization (wp20-step0-call2.jsonl sha256 e6714b15ad093725abb7a91cb1b1ec767fc567b49f8d0a96483d6cb8fad32b1e) produced [thread.started, item.completed(error), turn.started, item.completed(agent_message), turn.completed] and raised 'tool-free turn emitted a tool or unknown item' (L565-573). So rev1's observation is real, just not the Run 2 cause. The benign error item arrives BEFORE turn.started (index 1), so started_at=2/completed_at=4 and the L541 ordering, L588 message-in-turn and L593 message-is-final-item checks all still pass untouched.",
+      "fact_4_mcp_removable_at_source": "The codex_apps MCP tool does not come from ~/.codex/config.toml mcp_servers (already isolated by --ignore-user-config) but from codex 0.154's built-in apps feature. A/B probe with identical provider/flags, forcing the model to call that tool: without the flag the stream contains item.started(mcp_tool_call)+item.completed(mcp_tool_call); with '--disable apps' the MCP items disappear entirely. Therefore --disable apps TIGHTENS the execution contract (same family as the existing --disable shell_tool/unified_exec/multi_agent) instead of relaxing validation.",
+      "consequence": "Implementing only rev1's scope (tolerate the benign error item) would leave top-level item.started and item subtype mcp_tool_call as offenders, so Run 3 would still fail closed and WP-34 would still get no second signature.",
+      "refreeze": "User approved re-freeze to rev2 on 2026-09-18: (1) add --disable apps to _exec_attempt and _resume_finalization; (2) allow top-level item.started but subject its item subtype to the SAME per-item allowlist as item.completed (so tool/unknown items still fail closed via either event); (3) strictly whitelist-tolerate the benign fallback-metadata error item. allowed_paths unchanged.",
+      "post_fix_live_verification": "Re-ran the same real-codex probe (real _exec_attempt + _resume_finalization against codex 0.154 + DeepSeek, high effort) on the patched worktree: the resume stream still carries the benign fallback-metadata error item at index 1 (before turn.started), _validated_final_message(tools_forbidden=True) now returns the verdict instead of raising, and the -o artifact matched the event message verbatim. Before the fix the identical shape raised 'tool-free turn emitted a tool or unknown item'.",
+      "bypass_probes_by_orchestrator": "Adversarial self-probes against the patched validator: (A) tool item present ONLY in item.started (command_execution / mcp_tool_call / file_change / web_search / unknown) -> still fail-closed 'tool or unknown item'; (B) agent_message delivered only via item.started -> not treated as final message, and with a non-empty artifact it fails closed with 'artifact/event missing' (no verdict can be minted from the artifact alone); (C) benign warning item carrying extra tool-ish fields (command/aggregated_output) -> tolerated but completely inert, since nothing downstream reads the error item and the verdict still comes only from the artifact-matched agent_message; (D) item.started trailing after the final message -> 'message not final item'; (E) top-level error event / turn.failed -> 'invalid turn lifecycle'; (F) unknown top-level event type such as item.updated -> 'unexpected event'. Cases A and B were then frozen as regression tests."
+    }
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewed_commit": "97b3bb4",
+    "reviewer_tool": "kiro-dsh-independent-subagent",
+    "reviewer_note": "Independent adversarial review in a separate agent context (did not author the change). Verified: scope diff touches only the two allowed paths; the five frozen codex test files plus gate/, wrappers/, independence.py are byte-untouched; new file 39 passed; frozen suites 50/16/8/8/8 = 90 passed; whole tests/ 613 passed / 4 skipped with only the pre-existing test_finalize_merge_triple_sign.py git-env baseline failing (reproduced identically on unmodified main at 0cc0307). Independently confirmed 'apps' is a real codex 0.154 feature name (the CLI rejects a bogus flag with 'Unknown feature flag'), so the new --disable apps cannot silently hard-fail every gate call. Ran 38 own bypass probes in /tmp/wp20probe/ without modifying the worktree.",
+    "bypass_conclusion": "No bypass found. (a) Tool items placed ONLY in item.started with no matching item.completed all fail closed across command_execution/file_change/mcp_tool_call/web_search/todo_list/patch_apply/exec_command/unknown/dict-subclass/missing-item/None/str/int/list; a tool-typed item carrying the benign message text is still rejected because item.type is checked before the message. (b) Final-message location still keys off item.completed only, so item.started entered the event allowlist without entering the verdict-candidate set; an item.started after the real message TIGHTENS the completed_at-1 check rather than loosening it. (c) All pre-existing fail-closed paths still raise: top-level error event, turn.failed, duplicate/missing turn.started, duplicate thread.started, wrong resumed thread, item.updated/item.delta/turn.delta/exec_command_begin/type:None, non-JSON stream poisoning, artifact/event mismatch, missing final message. (d) tools_forbidden=False first-pass behavior unchanged. (e) Static invariants clean: no import re, no re.* call, zero decision literals in the changed regions.",
+    "nonblocking_hardening_item": "Reviewer finding 3 (nit): the benign-warning predicate matches on (item.type=='error', both markers present in a str message) and ignores sibling keys, so an error item carrying extra tool-ish fields such as command/aggregated_output is tolerated. Verified inert: codex.py is the only place any item message is read and only as a boolean, and nothing from the error item reaches messages/artifact comparison/_parse_verdict (frozen as test_benign_warning_item_with_extra_tool_fields_is_inert). Orchestrator decision: NOT tightened to a key set of {id,type,message} in this WP. Rationale: the observed real item shape is exactly those three keys, but pinning the key set would make the gate fail closed the moment codex adds any field to that warning, which would re-block Run 3 for a purely cosmetic reason. Logged as a future hardening option rather than adopted, since the current form is provably inert.",
+    "residual_risk": "All review evidence is offline fake-codex. The reviewer confirmed 'apps' is a valid feature name but did not re-run the A/B showing MCP items disappear; that rests on the orchestrator's Step 0 evidence plus the post-fix live probe recorded above. If Run 3 surfaces some other unlisted event or item subtype the result is fail-closed, not mis-signing, so the failure direction is safe. The inherited assumption that codex's JSONL faithfully reports tool use is unchanged and not worsened. Whether WP-39 Run 3 actually obtains the second signature is not verified by this review."
+  },
+  "consult": {},
+  "timestamps": { "drafted_at": "2026-09-17T23:30:00Z", "approved_at": "2026-09-17T23:35:00Z", "dispatched_at": "" }
+}

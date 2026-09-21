@@ -1,0 +1,229 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-17",
+  "iteration_id": "2026-09-14-codex-verdict-contract",
+  "plan_id": "PLAN-CODEX",
+  "phase": "P2",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "claude-code",
+    "actual_identity": "Kiro orchestrator via DeepSeek Harness (developer role self-executed; kimi unavailable — TUI needs no_proxy IPv6 cleanup, established precedent)",
+    "session": "kiro-wp17-dsh"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "current-dsh-session",
+    "actual_identity": "Kiro orchestrator via DeepSeek Harness"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "main",
+    "base_commit": "600c2f13662c9ac846d435e9ff3a466fa15e2cac",
+    "dispatch_commit": "628d599",
+    "branch": "fix/codex-config-isolation-chunking",
+    "worktree": "/Users/admin/vibe/agentic-loop-wp17-codex-isolation",
+    "commit": "beb167b",
+    "merged_commit": "2c71aa1eed1183556caa98997b2452cdd7b66981"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/adapters/codex.py",
+      "tests/test_codex_config_isolation_chunking.py"
+    ],
+    "forbidden_paths": [
+      ".env",
+      ".context/",
+      ".agentic/config.toml",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/independence.py",
+      "tests/test_codex_verdict_recovery.py"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "cmd": "python3.11 -m pytest tests/test_codex_config_isolation_chunking.py -q",
+        "result": "13 passed",
+        "note": "WP-17 targeted: 隔离/阈值下界/文件分块/保守聚合/fail-closed/hunk二次切/WP-16恢复复用/禁止变异/静态killer",
+        "exit_code": 0
+      },
+      {
+        "cmd": "python3.11 -m pytest tests/test_codex_verdict_recovery.py tests/test_adapter_injection.py -q",
+        "result": "39 passed",
+        "note": "WP-16 恢复契约 + adapter 注入无回归；三个 static killer 不变量(1 regex白名单/2 无phrase->decision dict/3 决策字面量只在_parse_verdict与_build_prompt)全部满足",
+        "exit_code": 0
+      },
+      {
+        "cmd": "python3.11 -m pytest tests -q --deselect tests/test_finalize_merge_triple_sign.py",
+        "result": "533 passed, 4 skipped, 0 failed",
+        "note": "全量无回归",
+        "exit_code": 0
+      },
+      {
+        "cmd": "python3.11 -m compileall -q src/agentic_loop tests/test_codex_config_isolation_chunking.py",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "cmd": "git diff --check",
+        "result": "clean",
+        "exit_code": 0
+      }
+    ],
+    "baseline_failures": [
+      {
+        "tests": [
+          "test_finalize_merge_triple_sign.py::test_v3_triple_sign_pass_finalizes",
+          "::test_v3_qoder_override_approved_finalizes_record_preserved",
+          "::test_v3_missing_qoder_block_rejected",
+          "::test_v2_without_qoder_finalizes_double_sign"
+        ],
+        "count": 4,
+        "note": "冻结基线 600c2f1 既有失败(git checkout main 返回非零)；已 stash WP-17 改动后在基线复现坐实与本 WP 无关；与 codex adapter 无关(WP-17 只改 codex.py + 新测试)",
+        "orchestrator_verified": "已独立复现：在 600c2f1 的临时 detached 工作树上跑 test_finalize_merge_triple_sign.py 得 4 failed, 1 passed，失败集合与记录完全一致。根因 init.defaultBranch=master vs fixture 的 `git checkout main`，与 codex adapter 无关。"
+      }
+    ],
+    "quality_gate": {
+      "ran": false,
+      "reason": "agentic quality-gate 包装器读主仓 checkout 的 .agentic/config.toml，期望 WP-02 的统一 [[gate]] schema；WP-17 从 main(600c2f1) 切出，main 的 config 仍是 pre-WP-02 的 [quality_gate]+[[quality_gate.rule]] schema。[[gate]] 段目前只存在于 plan/2026-09-13-parallel-throughput 分支(该 session 的 config-schema 迁移 WIP)。.agentic/config.toml 在 WP-17 forbidden_paths 内，不得改动。",
+      "equivalent_command_passed": "config 规则映射(src/agentic_loop/** 与 tests/** -> python3 -m pytest tests -q)所对应的实质命令已直接运行通过(见 tests[2] 533 passed)"
+    },
+    "orchestrator_independent_review": {
+      "by": "claude-code orchestrator (this session)",
+      "at": "2026-09-17T02:56Z",
+      "decision": "ACCEPT_WITH_NON_BLOCKING_GAPS",
+      "method": "从 WP-17 自身工作树复现测试（主仓 detached HEAD b0f1f90 早于实现，故此前 file-not-found 是检出树问题而非缺件）；随后在 scratch 副本上自行做 8 项变异，不采信已记录的通过数。",
+      "reproduced": [
+        {
+          "cmd": "pytest tests/test_codex_config_isolation_chunking.py -q",
+          "result": "13 passed",
+          "exit_code": 0
+        },
+        {
+          "cmd": "pytest tests/ -q",
+          "result": "534 passed, 4 skipped, 4 failed",
+          "exit_code": 1,
+          "note": "4 failed 全在 tests/test_finalize_merge_triple_sign.py；已在冻结基线 600c2f1 的独立临时工作树上原样复现（4 failed, 1 passed）→ 与 WP-17 无关。根因为环境：本机 init.defaultBranch=master，fixture 却 `git checkout main`。与 status 记录的 baseline_failures 一致。"
+        }
+      ],
+      "code_drift_check": "git diff --name-only beb167b HEAD 仅两个编排者文档文件；实现与测试自记录 commit 起零漂移。",
+      "scope_check": "7 条 forbidden_paths 全为 0 文件改动；beb167b 只碰 allowed_paths 两个文件；brief/status 为独立编排者提交 3df4fa3/628d599。",
+      "quality_gate_claim_verified": "独立核实：600c2f1 的 config 是 [quality_gate]+[[quality_gate.rule]]，[[gate]] 只在 plan/2026-09-13-parallel-throughput 上（HEAD 确认）。ran=false 的理由属实，且 config.toml 在 forbidden_paths 内不可动。",
+      "my_own_mutations": [
+        {
+          "id": "M1",
+          "mutation": "删去 review exec 的 --ignore-user-config",
+          "result": "2 failed → 转红，钉住"
+        },
+        {
+          "id": "M2",
+          "mutation": "聚合改为总取首块 verdict（严重度失效）",
+          "result": "3 failed → 转红，钉住"
+        },
+        {
+          "id": "M3",
+          "mutation": "阈值放大 1e4 倍（分块永不触发）",
+          "result": "6 failed → 转红，钉住"
+        },
+        {
+          "id": "M5",
+          "mutation": "不可切分的超限 diff 改为静默继续单次评审",
+          "result": "1 failed → 转红，钉住"
+        },
+        {
+          "id": "M6",
+          "mutation": "块级失败被 except 吞掉",
+          "result": "1 failed → 转红，钉住"
+        },
+        {
+          "id": "M7",
+          "mutation": "丢弃 chunk_context 全局摘要",
+          "result": "1 failed → 转红，钉住"
+        },
+        {
+          "id": "E1",
+          "mutation": "删除 hunk 二次切分（chunks.extend(_split_file_by_hunks) → append 整段）",
+          "result": "13 passed → 未转红，逃逸"
+        },
+        {
+          "id": "E2",
+          "mutation": "循环内『单块含摘要仍超阈值』的 fail-closed raise 改为静默截断 chunk_prompt",
+          "result": "13 passed → 未转红，逃逸"
+        }
+      ],
+      "escapes_non_blocking": [
+        {
+          "id": "E1",
+          "required_behavior": "brief 必需行为 3（单文件仍超阈值时在 @@ 边界二次切分）",
+          "why_escaped": "唯一相关用例 test_single_file_over_bound_after_hunk_split_fails_closed 用的是**单 hunk** 文件；单 hunk 时 _split_file_by_hunks 本就返回 [(label, seg)]，所以删掉整个二次切分调用后该用例的 raise 依然发生，断言照绿。名字承诺了 after_hunk_split，实际只覆盖了『切不动就 fail-closed』。",
+          "code_is_correct": "我另行直接调用 _split_diff 实测：1 文件 3 hunk 共 192121 bytes（>153600）→ 正确切成 3 块，各 64077 bytes，均保留文件头、各含 1 个 hunk、全部低于阈值。功能实现正确，仅缺用例钉。",
+          "blast_radius": "仅在『单文件 diff 超 150KB 且含多 hunk』时才与 E2 合流；今日不产生错误裁决，但该行为无回归防护。"
+        },
+        {
+          "id": "E2",
+          "required_behavior": "brief 必需行为 5 尾句（绝不截断，fail-closed）与 §3『分块只切 diff，绝不改写 diff 内容』",
+          "why_escaped": "该 raise 位于分块循环内（块含 brief+摘要后仍超阈值），与被覆盖的循环外 raise（整体不可切分）是两个不同 print point。现有 fail-closed 用例只命中循环外那个。",
+          "reachability": "我实测可达：a.py 段 153465 bytes ≤ 阈值，但拼上 brief 与 chunk_context 后必然越界，触发循环内 raise。",
+          "risk_if_regressed": "若该分支被改成截断，codex 会对被悄悄截断的 diff 出 ACCEPT——正是 PLAN 冻结决策 1-7『fail-closed 不可削弱』要禁的降级，且无任何用例会响。"
+        }
+      ],
+      "why_not_rework": "两处逃逸均为**用例覆盖缺口，不是实现缺陷**：E1 的代码经我直接实测行为正确；E2 的 raise 就在源码里且可达。当前交付物的运行时行为满足 brief 全部 7 条必需行为。判 REWORK 会把一个行为正确的交付物退回去补测试，而其真实风险是未来回归而非当下错误裁决。故记为非阻塞缺口并单独立 WP 补钉。",
+      "residual_risk_accepted_by": "待用户确认（用户已就 WP-17 给出合入批准）"
+    },
+    "merge_gate": {
+      "item_1_orchestrator_independent_review": "ACCEPT — 本会话编排者独立复核（commit c588426）：自做 8 项变异，6 项转红；2 项逃逸（E1 hunk 二次切分、E2 循环内 fail-closed）经实测确认为用例覆盖缺口而非实现缺陷，判非阻塞并立任务 #33 补钉。",
+      "item_2_consultant_second_signature": "ACCEPT — codex-cli（DeepSeek high-effort），commit 2988f87，2026-09-17T02:34:48Z。",
+      "item_3_user_approval": "已取得 —— 用户在收到本会话完整复核报告（含两处逃逸与非阻塞理由）后回复「合并」，即已知情接受残余风险。",
+      "all_three_obtained": true
+    },
+    "state_transition_note": "git.merged_commit 键原缺失（模板默认为空串），finalize 的 `field git.merged_commit` 因校验器对缺键报 STATUS_INVALID 而中断；编排者补入空串后 STATUS_VALID，值由 finalize 写入，不手填。",
+    "base_branch_correction": "原 status 把 git.base_branch 误记为 feature 分支自身（base_branch==branch），使 finalize 在错误历史里找合并提交（found 0）。实际基线是 main：git.base_commit 600c2f1 正是 main 的 tip（`git branch --contains 600c2f1` 含 main），合并也确实做在 main 上。编排者据此改正为 main，未改动任何 commit。"
+  },
+  "review": {
+    "tool": "claude-code",
+    "actual_identity": "Kiro orchestrator via DeepSeek Harness (independent reviewer role)",
+    "session": "kiro-wp17-dsh",
+    "decision": "ACCEPT",
+    "reviewed_commit": "beb167b",
+    "reviewed_at": "2026-09-16T16:00:00Z",
+    "rationale": "独立 fresh-session 子代理(隔离 context,不共享实现推理)对 600c2f1..beb167b 做对抗性审查并执行代码验证负面断言,裁决 ACCEPT:7 项必需行为全满足(隔离覆盖 probe_injection+_exec_attempt 两个真正 exec 点、WP-16 三条恢复路径经 _exec_attempt 免费继承隔离;阈值下界走原单次路径;聚合保守 fail-closed 取最严重、坏块无法被掩盖、空列表 ValueError 非 ACCEPT、拿不到合法 verdict 则 _review_single 抛错冒泡),WP-16 三个 static killer 不变量全保(聚合无决策字面量、切分无 re 字面量、JSON seed 不触发 AST 扫描),无自然语言->decision 映射。子代理指出 test#8 命名偏弱但非缺陷(test#3 REWORK/CONSULT 用例已提供真正 mutation-kill)。orchestrator attests: reviewer 确为独立新 session、确用对抗性 prompt。",
+    "findings": [],
+    "independent_reviewer": {
+      "kind": "subagent_fork (fresh session, isolated context)",
+      "runId": "06b5ed9f-99b3-4d5b-a559-ceb805b0ba96",
+      "method": "adversarial review against brief; executed code to verify negative assertions"
+    },
+    "attestation": {
+      "reviewer_role": "reviewer",
+      "reviewer_tool": "claude-code subagent (independent fresh-session fork)",
+      "fresh_session": true,
+      "adversarial_prompt": true,
+      "attested_by": "Kiro orchestrator via DeepSeek Harness",
+      "attested_at": "2026-09-16T16:20:00Z"
+    }
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "reviewed_by": "codex-cli",
+    "reviewed_at": "2026-09-17T02:34:48Z",
+    "notes": "该 diff 在 allowed_paths 范围内实现了 WP-17 的配置隔离、按文件/hunk 边界分块、每块复用 WP-16 有界恢复，以及保守 fail-closed 聚合。命令契约标志与 provider 注入保留，key 值不入 argv；分块只切分不重写 diff，无法继续切分或单块仍超限时抛错而非截断。聚合依据 `_parse_verdict` 白名单的严重度顺序实现 REWORK > CONSULT > ACCEPT，未引入自然语言映射，任一块失败会向上抛出。未发现阻塞性的正确性、架构、时间/时点、迁移或安全问题。\n\nFindings:\n- `--ignore-user-config` 已覆盖 review 路径与 probe_injection 路径，且保留 `-c` 注入、`--sandbox read-only`、`--skip-git-repo-check`、effort、`--output-schema`、`-o` 等既有契约，key 值不进入 argv。\n- 分块先按 `diff --git` 文件边界，单文件超限再按 `@@` hunk 边界二次切分；每块只包含自身 diff，未截断或改写 diff 内容。\n- 聚合通过 `_parse_verdict` 白名单的严重度降序确定性选出整体裁决，REWORK > CONSULT > ACCEPT，并合并 findings 与 rationale；任一块无合法 verdict 会由 `_review_single` 抛错，绝不降级为 ACCEPT。\n- 每块使用独立临时目录和独立 answer 文件，复用 WP-16 的空输出重试/归一化恢复逻辑；全局文件清单摘要仅作只读上下文。\n- 新增测试为离线确定性 fake 可执行，覆盖隔离标志、阈值下界、文件分块、保守聚合、失败抛错、WP-16 恢复与静态 killer；未发现 forbidden_paths 或越界改动。\n- 非阻塞观察：多 hunk 正向二次切分的成功路径未单独断言，但现有超限失败用例与实现逻辑未暴露缺陷。\n\nIndependence: weak\n- reviewer identity unavailable (orchestrator, attested not engine-proven)\n- no implementer fallback available\n- reviewer attestation present and complete (reviewer_role=reviewer, reviewer_tool=claude-code subagent (independent fresh-session fork), fresh_session=True, adversarial_prompt=True, attested_by=Kiro orchestrator via DeepSeek Harness)\n- level=weak-attested: reviewer=orchestrator, attested not engine-proven",
+    "independence": "weak"
+  },
+  "timestamps": {
+    "dispatched_at": "2026-09-16T15:38:00Z",
+    "approved_at": "2026-09-16T15:35:00Z",
+    "ready_at": "2026-09-16T15:55:00Z",
+    "updated_at": "2026-09-17T03:27:27Z"
+  }
+}
