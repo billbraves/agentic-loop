@@ -95,3 +95,19 @@ A3（回并 main→集成分支 + P0-5 §4.1-4.6 全量验证）→ A4（state�
 - `CONVERGENCE-P0-5-backmerge-runbook.md`（merge-tree 零冲突 + N3 证伪 + §4 验证步骤）
 - `PLAN.md §4/§5`（原始 7-WP 目标）
 - git 实测（2026-09-21）：main=2c29725、integration=7e40881、merge-base=0ef592e、45/220 分叉
+
+## §9 A3 回并验证记录（2026-09-21，合并后新基线）
+
+**回并**：`git merge --no-ff main` 于集成分支 → 合并提交 `b8a5a23`（parents：`ef90735` 集成分支尖端 ＋ `2c29725` main 尖端）；引入 main 侧 **28 文件 +6276/-84**（完全匹配 P0-5 §1 预测），零文本冲突。回滚点 `ef90735`。
+
+**P0-5 §4 全量验证（§4.1-4.6 全通过）**：
+- **§4.1 文本完整性**：`git grep '^<<<<<<<|^=======$|^>>>>>>>' -- src/ tests/` = no conflict markers；工作树仅 `?? uv.lock`。
+- **§4.2 全量测试（合并后新基线）**：`python3.11 -m pytest tests -q` = **773 passed / 4 failed / 4 skipped**（in 141s）。
+- **§4.3 CLI 门禁复测**：`plan check` = 10 WP 全 MERGED、0 pending（exit 3 = merge 未落 main，A4 前正常）；`dispatch-lint WP-26` = DISPATCH_LINT_PASS；`PYTHONPATH=src …validate_wp_status WP-29` = STATUS_VALID。
+- **§4.4 editable 未漂移**：`direct_url.json` = `file:///Users/admin/vibe/agentic_loop`（editable:true）。
+- **§4.5 gate 语义（唯一双边文件）**：`gate/__init__.py` 两侧符号俱在（main 的 `git_merge_base` ＋ 集成分支的 `path_is_in_worktree`/`_GIT_SELECTION_VARS`）；`test_worktree_detection.py + test_gate_diff_start.py` = **27 passed**（须 `PYTHONPATH=src`：该文件顶层 `from agentic_loop.gate import …` 无 sys.path 自注入，全量跑时靠字母序在前的 codex 测试注入 src 才可导入——预存测试隔离脆弱性，非本次回归）。
+- **§4.6 codex 适配**：`from agentic_loop.adapters import codex` ok；main 引入的 6 个 `test_codex_*.py` = **140 passed**。
+
+**4 个失败逐一归因（预存、非回归、不阻塞）**：全部为 `test_finalize_merge_triple_sign.py`（`test_v3_triple_sign_pass_finalizes`／`test_v3_qoder_override_approved_finalizes_record_preserved`／`test_v3_missing_qoder_block_rejected`／`test_v2_without_qoder_finalizes_double_sign`），签名 `Command '['git','checkout','-q','main']' returned non-zero exit status 1`（CalledProcessError）。**根因**：main 被 sibling 工作树 `/Users/admin/vibe/agentic-loop-main-codex-merge`（@`2c29725`）占用，git 拒绝在别处再检出 main。**预存环境性失败**：回并前基线即 4F/633P/4S，回并后 4F/773P/4S——失败数不变（4）、签名相同；passed **+140** = main 引入的 6 个 codex 测试文件（140 用例）。**R1 语义风险已缓解**（gate 27 ＋ codex 140 全绿）。P0-5 §4.2 R4 ＋ CONVERGENCE-PLAN §3 已预判此 4 失败「记录但不阻塞」（sibling 工作树释放 main 后可归零，属目标 B／§4 禁区「不清理工作树」范畴）。
+
+**A4 机械前提（已核，只读）**：合并 integration→main 须在持有 main 检出的 sibling 工作树执行（git 不允许 main 双重检出）。该工作树有未提交 WIP（`M src/agentic_loop/adapters/kimi.py`、`M src/agentic_loop/provider_binding.py`、`?? tests/test_kimi_managed_k3.py`、`?? uv.lock`），但 `git diff --name-only main b8a5a23 -- <两 tracked 文件>` = 空、`git ls-tree b8a5a23 -- <两 untracked 文件>` = 空，证实合并**不触碰**这些文件 → WIP 原样保留、合并不被拒、不违反 §4 禁区。A4 将引入 **197 文件 +35493/-123**（几乎纯增量，-123 仅落 A3 已和解的双边文件如 gate/__init__.py）。`main` 是 `b8a5a23` 祖先 → `--no-ff` 产出单一合并提交（首父 `2c29725`、次父 = 集成分支尖端），符合 A4 验收并为 A5 finalize（`_is_ancestor` + `_resolve_plan_merge_commit` 唯一）铺路。
