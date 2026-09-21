@@ -2,7 +2,7 @@
   "schema_version": "agentic-wp-status/v2",
   "work_package_id": "WP-21",
   "iteration_id": "2026-09-13-parallel-throughput",
-  "plan_id": "2026-09-13-parallel-throughput",
+  "plan_id": "PLAN-01",
   "phase": "P1",
   "state": "MERGED",
   "role": "Developer",
