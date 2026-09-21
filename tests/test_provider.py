@@ -64,7 +64,65 @@ def test_codex_official_noop_without_backup(codex):
 def test_kimi_deepseek_switches(kimi):
     _write(kimi, 'default_model = "kimi-code/kimi-for-coding"\n')
     assert provider._switch_kimi_deepseek() is True
-    assert 'default_model = "deepseek/v4-pro"' in kimi.read_text(encoding="utf-8")
+    text = kimi.read_text(encoding="utf-8")
+    assert 'default_model = "deepseek/v4-pro"' in text
+    # 切换必须同时补齐 model/provider 段，否则 kimi 校验 default_model 找不到
+    # 对应 model 会拒绝启动（本次故障根因）。
+    assert '[models."deepseek/v4-pro"]' in text
+    assert 'model = "deepseek-v4-pro"' in text
+    assert "[providers.deepseek]" in text
+
+
+def test_kimi_deepseek_repairs_missing_model_block(kimi, monkeypatch):
+    """回归：default_model 已是 deepseek/v4-pro 但缺 model 段的坏配置。
+
+    这是 `agentic provider kimi-deepseek` 早先留下的实际坏状态：只写了
+    default_model，从未建 [models."deepseek/v4-pro"]，导致 kimi 启动即报
+    `Default model deepseek/v4-pro not found in models`。修复后本函数须
+    幂等补齐两段，并把「已修复」如实报告为 True（而非旧的 noop False）。
+    """
+    monkeypatch.setattr(provider, "_deepseek_key", lambda: "sk-test")
+    _write(
+        kimi,
+        'default_model = "deepseek/v4-pro"\n'
+        '[models."kimi-code/k3"]\n'
+        'provider = "managed:kimi-code"\n'
+        'model = "k3"\n'
+        "max_context_size = 1048576\n"
+        '[providers."managed:kimi-code"]\n'
+        'type = "kimi"\n'
+        'base_url = "https://api.kimi.com/coding/v1"\n'
+        'api_key = ""\n',
+    )
+    assert provider._switch_kimi_deepseek() is True
+    text = kimi.read_text(encoding="utf-8")
+    assert '[models."deepseek/v4-pro"]' in text
+    assert "[providers.deepseek]" in text
+    # 只有一份 provider 段——已存在时不得重复追加。
+    assert text.count("[providers.deepseek]") == 1
+
+
+def test_kimi_deepseek_reuses_existing_provider(kimi, monkeypatch):
+    """provider.deepseek 已存在时，补 model 段但不重复追加 provider。"""
+    monkeypatch.setattr(provider, "_deepseek_key", lambda: "sk-test")
+    _write(
+        kimi,
+        'default_model = "kimi-code/k3"\n'
+        '[models."kimi-code/k3"]\n'
+        'provider = "managed:kimi-code"\n'
+        'model = "k3"\n'
+        "max_context_size = 1048576\n"
+        "[providers.deepseek]\n"
+        'type = "openai_legacy"\n'
+        'base_url = "https://api.deepseek.com/v1"\n'
+        'api_key = "sk-existing"\n',
+    )
+    assert provider._switch_kimi_deepseek() is True
+    text = kimi.read_text(encoding="utf-8")
+    assert '[models."deepseek/v4-pro"]' in text
+    assert text.count("[providers.deepseek]") == 1
+    # 不覆盖已有 key。
+    assert 'api_key = "sk-existing"' in text
 
 
 def test_main_reports_unchanged_when_noop(codex, capsys):
