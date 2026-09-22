@@ -1,0 +1,79 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-01",
+  "iteration_id": "2026-09-22-kimi-quota-flash-fallback",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "APPROVED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": ""
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "kqff-a3"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-09-22-kimi-quota-flash-fallback",
+    "base_commit": "1af1c770d4e6c99d4a4c18a9321a2bd5958210da",
+    "dispatch_commit": "",
+    "branch": "",
+    "worktree": "",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/quota_fallback.py",
+      "src/agentic_loop/resolve_paths.py",
+      "src/agentic_loop/redispatch.py",
+      ".agentic/config.toml",
+      "tests/test_quota_fallback.py",
+      "tests/test_resolve_fallback_binding.py",
+      "tests/test_redispatch_quota_fallback.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/independence.py",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/adapters/kimi.py",
+      "uv.lock",
+      "docs/agentic/OPERATING_MODEL.md",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "src/agentic_loop/templates/",
+      ".agentic/locks/",
+      ".env",
+      ".context/"
+    ]
+  },
+  "risk": {
+    "production_writes_authorized": false,
+    "network_authorized": false,
+    "real_notifications_authorized": false,
+    "irreversible_actions_authorized": false
+  },
+  "evidence": {
+    "brief": {
+      "path": "docs/plans/2026-09-22-kimi-quota-flash-fallback/WP-01-brief.md",
+      "sha256": "8583673a4fcab066da2e2bb415f486f7b1da6e266f8b4fd69e461cda81bd0a76",
+      "rev": 5,
+      "supersedes_rev1_sha256": "a2aeba0ddb7097a58997335c6a6fd918da5b8e2a561b0ba610f1701b62266e6f",
+      "supersedes_rev2_sha256": "1dbdb8bfb0d69048f82fcbd1a16d054b8bf308500c8165b6eec3e25482872308",
+      "supersedes_rev3_sha256": "0883b6a18b9cffbc44d374a60833bedb5fabe4b4f879fcdbe1f44a5b218fa2a2",
+      "supersedes_rev4_sha256": "5a694a7ea27dd7a8b6095d353a90cf62b65dfedaadbeaa244d821ce8f6575f13",
+      "outcome": "codex consult rev5 = ACCEPT (pre-freeze brief consult); see WP-01-consult-codex-rev5-answer.md. rev1->rev5 收敛：rev1 4 findings -> rev2 2 -> rev3 1 部分 -> rev4 1 部分（测试计数）-> rev5 全闭环（finding#1 畸形 TOML 承重测试 test_load_patterns_fails_safe_on_malformed_toml 绑 load_quota_patterns except Exception；finding#2 INV-2 三拆绑 (a1) except Exception/(a2) isinstance 非空守卫/(b) is_quota_error except re.error 各绑专属 witness；finding#3 计数校正 26=B1 7+B2 追加 4(文件合计 11)+B3 5+B4/B5 10）。codex 独立 grep 复核 26 个 def test_ 逐一一致，brief sha256=8583673a… 与 status.evidence.brief.rev=5 锚点相符、rev1-rev4 supersedes 链完整，无新 brief 级阻断项。Cleared to freeze (DRAFT->APPROVED). Post-impl merge-gate consult (agentic gate write_consult_block) still required per double-sign."
+    },
+    "tests": []
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": {
+    "created_at": "2026-09-22T02:48:11Z",
+    "updated_at": "2026-09-22T09:24:20Z",
+    "dispatched_at": ""
+  }
+}
