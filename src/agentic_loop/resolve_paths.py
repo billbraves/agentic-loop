@@ -385,6 +385,41 @@ def resolve_role_binding(
     return adapter, binding
 
 
+def resolve_role_fallback_binding(
+    role: str, repo: Path | None = None
+) -> "Any":
+    """Resolve the OPTIONAL quota-fallback binding for ``role``.
+
+    Reads ``roles.<role>`` dict's optional ``fallback_provider`` key and builds a
+    ProviderBinding from that provider's config. Returns ``None`` (zero-regression)
+    when the role is not a dict, carries no ``fallback_provider``, or the provider
+    section is missing/invalid. NEVER raises into the dispatch path.
+    """
+    from agentic_loop.provider_binding import ProviderConfigError, build_binding
+
+    repo = repo or main_repo()
+    raw_roles = get_roles_raw(repo)
+    value: Any = raw_roles.get(role, DEFAULT_ROLES.get(role))
+    if not isinstance(value, dict):
+        return None
+    fp = value.get("fallback_provider")
+    if not isinstance(fp, str) or not fp:
+        return None
+    adapter = _first_candidate(value)
+    if adapter is None:
+        return None
+    providers = get_providers(repo)
+    provider_cfg = providers.get(fp)
+    if not isinstance(provider_cfg, dict):
+        return None
+    provider_cfg = dict(provider_cfg)
+    provider_cfg["_name"] = fp
+    try:
+        return build_binding(adapter=adapter, provider_cfg=provider_cfg)
+    except ProviderConfigError:
+        return None
+
+
 ROOTS = {
     "main_repo": main_repo,
     "current_worktree": current_worktree,
