@@ -70,3 +70,41 @@ def test_bad_regex_pattern_is_skipped_not_raised():
     assert is_quota_error("unrelated output", patterns=["["]) is False
     # 坏正则 "(" 跳过，合法语境正则不匹配该串 → False
     assert is_quota_error("insufficient balance", patterns=["(", r"balance\W{0,10}credit"]) is False
+
+
+from agentic_loop.quota_fallback import DEFAULT_QUOTA_PATTERNS, load_quota_patterns
+
+
+def _write_cfg(tmp_path: Path, body: str) -> Path:
+    cfg = tmp_path / ".agentic" / "config.toml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def test_load_patterns_returns_defaults_when_no_config(tmp_path):
+    assert load_quota_patterns(repo=tmp_path) == DEFAULT_QUOTA_PATTERNS
+
+
+def test_load_patterns_reads_override(tmp_path):
+    repo = _write_cfg(tmp_path, '[quota_fallback]\npatterns = ["额度", "quota", "429"]\n')
+    assert load_quota_patterns(repo=repo) == ("额度", "quota", "429")
+
+
+def test_load_patterns_fails_safe_on_bad_override(tmp_path):
+    # patterns 非字符串列表 / 空列表 → 回落默认，绝不抛到派发主链。
+    repo = _write_cfg(tmp_path, '[quota_fallback]\npatterns = []\n')
+    assert load_quota_patterns(repo=repo) == DEFAULT_QUOTA_PATTERNS
+    repo2 = _write_cfg(tmp_path / "b", '[quota_fallback]\npatterns = "额度"\n')
+    assert load_quota_patterns(repo=repo2) == DEFAULT_QUOTA_PATTERNS
+
+
+def test_load_patterns_fails_safe_on_malformed_toml(tmp_path):
+    """codex rev3 finding #1：让 INV-2(a) 的 except Exception 承重变异可执行。
+    现有 fails_safe_on_bad_override 只测空列表/错误类型（都是合法 TOML，走 isinstance
+    fall-through，不触发 except Exception）。畸形 TOML（未闭合表头）才会让 _load_config
+    的 tomllib.load 抛 TOMLDecodeError → load_quota_patterns 的 except Exception 必须
+    吞掉并回落 DEFAULT，绝不抛进派发主链。承重变异：删 except Exception → 本用例转红。
+    """
+    repo = _write_cfg(tmp_path, '[quota_fallback\npatterns = ["额度"\n')  # 未闭合表头+未闭合数组
+    assert load_quota_patterns(repo=repo) == DEFAULT_QUOTA_PATTERNS

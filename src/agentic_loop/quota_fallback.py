@@ -55,3 +55,25 @@ def is_quota_error(output: str, patterns: Sequence[str] | None = None) -> bool:
         except re.error:
             continue
     return False
+
+
+def load_quota_patterns(repo: Path | None = None) -> tuple[str, ...]:
+    """读可选 ``[quota_fallback] patterns``；缺省/坏配置回落 DEFAULT（fail-safe）。
+
+    直读 ``_load_config``（避开 CONFIG_SECTIONS 白名单过滤）；任何异常都回落默认，
+    绝不把解析失败抛进派发主链。
+    """
+    try:
+        from agentic_loop.resolve_paths import _load_config, main_repo
+
+        repo = repo or main_repo()
+        data: Any = _load_config(repo) or {}
+        section = data.get("quota_fallback") if isinstance(data, dict) else None
+        if isinstance(section, dict):
+            pats = section.get("patterns")
+            if (isinstance(pats, (list, tuple)) and pats
+                    and all(isinstance(x, str) and x for x in pats)):
+                return tuple(pats)
+    except Exception:
+        pass
+    return DEFAULT_QUOTA_PATTERNS
