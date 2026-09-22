@@ -98,6 +98,24 @@ def test_single_hop_flash_also_quota_fails():
     assert fb.calls == 1         # 单跳：不再三跳、不无限重试
 
 
+def test_success_with_quota_like_output_no_fallback():
+    """brief rev7 §R3（findings #4/#5 erratum）：success 腿独立承重。primary
+    dispatched=True 但 output 含额度词（weekly quota reset）→ 短路守卫
+    ``if dry_run or result.dispatched: return`` 必须优先于 is_quota_error，
+    绝不构造回退。删短路 → is_quota_error 命中额度词 → 误构造回退 → 本用例转红。
+    （test_success_no_fallback 的 output "done" 非额度串，只是等价 witness，非承重。）
+    """
+    primary = _StubAdapter(_result(True, "build ok; note: weekly quota reset scheduled"))
+    built = []
+    res, prov = _dispatch_with_quota_fallback(
+        primary, WT, "b", "p", False,
+        fallback_binding=_flash_binding(),
+        fallback_factory=lambda b: built.append(b) or _StubAdapter(_result(True, "ok")))
+    assert res.dispatched is True
+    assert built == []           # success 腿：含额度词也绝不回退
+    assert prov is None
+
+
 def test_dry_run_does_not_fallback_even_on_quota_output():
     primary = _StubAdapter(_result(False, "quota exceeded", exit_code=None))
     built = []

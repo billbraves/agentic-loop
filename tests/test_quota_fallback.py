@@ -108,3 +108,23 @@ def test_load_patterns_fails_safe_on_malformed_toml(tmp_path):
     """
     repo = _write_cfg(tmp_path, '[quota_fallback\npatterns = ["额度"\n')  # 未闭合表头+未闭合数组
     assert load_quota_patterns(repo=repo) == DEFAULT_QUOTA_PATTERNS
+
+
+def test_load_patterns_emits_redacted_diagnostic_on_fault(tmp_path, capsys):
+    """codex impl-rev1 finding #8 / brief rev7 §R2b：配置故障不静默吞——回落 DEFAULT 前
+    向 stderr 打一行脱敏诊断（固定文案 + 异常类名），绝不含 config 原文/路径/密钥值。
+    畸形 TOML 内含哨兵串 SECRET_SENTINEL_DO_NOT_LEAK，断言其不出现在 stderr。
+    承重变异：删 except 内的 print → stderr 为空 → 本用例转红。
+    """
+    repo = _write_cfg(
+        tmp_path,
+        '[quota_fallback\npatterns = ["SECRET_SENTINEL_DO_NOT_LEAK"\n',  # 未闭合表头+未闭合数组
+    )
+    assert load_quota_patterns(repo=repo) == DEFAULT_QUOTA_PATTERNS
+    err = capsys.readouterr().err
+    lines = [line for line in err.splitlines() if line.strip()]
+    assert len(lines) == 1, f"诊断必须恰一行：{lines!r}"
+    assert lines[0].startswith("load_quota_patterns:")
+    assert "SECRET_SENTINEL_DO_NOT_LEAK" not in err, "脱敏失败：config 原文泄漏进 stderr"
+    assert str(tmp_path) not in err, "脱敏失败：config 路径泄漏进 stderr"
+    assert "api_key" not in err.lower() or "api_key_env" not in err, "脱敏失败：密钥字段泄漏"

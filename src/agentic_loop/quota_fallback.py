@@ -5,10 +5,15 @@
 reads an optional project-config override and fails safe to built-in defaults.
 Neither imports git/subprocess nor touches status; the dispatch layer
 (redispatch) owns all side effects.
+
+Trust boundary (brief rev7 §R2a): custom patterns come from the project config
+and are treated as operator-trusted; never inject untrusted/user-controlled
+regexes into them (no scan-window limit is imposed on full-text re.search).
 """
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -74,6 +79,12 @@ def load_quota_patterns(repo: Path | None = None) -> tuple[str, ...]:
             if (isinstance(pats, (list, tuple)) and pats
                     and all(isinstance(x, str) and x for x in pats)):
                 return tuple(pats)
-    except Exception:
-        pass
+    except Exception as exc:
+        # codex impl-rev1 #8 / brief rev7 §R2b：配置故障不静默吞——回落 DEFAULT 前
+        # 打一行脱敏诊断（固定文案 + 异常类名），绝不含 config 原文/路径/密钥值。
+        print(
+            "load_quota_patterns: quota_fallback config unreadable "
+            f"({type(exc).__name__}); falling back to built-in defaults",
+            file=sys.stderr,
+        )
     return DEFAULT_QUOTA_PATTERNS

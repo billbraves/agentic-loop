@@ -65,3 +65,36 @@ def test_none_when_provider_cfg_invalid_no_raise(tmp_path):
     )
     repo = _repo(tmp_path, bad)
     assert resolve_role_fallback_binding("developer", repo=repo) is None
+
+
+def test_none_when_selectors_is_string_no_raise(tmp_path):
+    """codex impl-rev1 finding #1 / brief rev7 §R1 精确 repro：provider 段
+    ``selectors`` 为字符串（非 table）→ build_binding 内 ``selectors.get`` 抛
+    AttributeError；except 必须拓宽为 Exception 吞掉并回落 None（不抛进派发主链）。
+    承重变异：把 except Exception 收窄回 except ProviderConfigError → 本用例转红。
+    """
+    bad = (
+        '[providers.deepseekflash]\n'
+        'anthropic_base_url = "https://api.deepseek.com/anthropic"\n'
+        'api_key_env = "DEEPSEEK_API_KEY"\n'
+        'identity_model = "deepseek-v4-flash"\n'
+        'selectors = "deepseek/v4-flash"\n'
+        '[roles]\ndeveloper = { adapter = "kimi", fallback_provider = "deepseekflash" }\n'
+    )
+    repo = _repo(tmp_path, bad)
+    assert resolve_role_fallback_binding("developer", repo=repo) is None
+
+
+def test_none_when_selectors_is_list_no_raise(tmp_path):
+    """brief rev7 §R1：``selectors`` 为列表（非 table）同样触发 build_binding 内
+    AttributeError → 回落 None，不抛。与字符串形状共用同一承重变异。"""
+    bad = (
+        '[providers.deepseekflash]\n'
+        'anthropic_base_url = "https://api.deepseek.com/anthropic"\n'
+        'api_key_env = "DEEPSEEK_API_KEY"\n'
+        'identity_model = "deepseek-v4-flash"\n'
+        'selectors = ["kimi"]\n'
+        '[roles]\ndeveloper = { adapter = "kimi", fallback_provider = "deepseekflash" }\n'
+    )
+    repo = _repo(tmp_path, bad)
+    assert resolve_role_fallback_binding("developer", repo=repo) is None
