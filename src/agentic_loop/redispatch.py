@@ -535,7 +535,14 @@ def main(argv: list[str]) -> int:
     brief_path = iteration_dir / f"{work_package_id}-brief.md"
     brief = brief_path.read_text(encoding="utf-8") if brief_path.is_file() else ""
 
-    result = _dispatch(adapter, worktree, brief, prompt_text, dry_run)
+    fallback_binding = resolve_role_fallback_binding("developer")
+    result, used_fallback = _dispatch_with_quota_fallback(
+        adapter, worktree, brief, prompt_text, dry_run,
+        fallback_binding=fallback_binding,
+        quota_patterns=load_quota_patterns(repo_root),
+    )
+    if used_fallback:
+        print(f"REDISPATCH_QUOTA_FALLBACK: provider={used_fallback}", file=sys.stderr)
 
     if dry_run:
         data = {
