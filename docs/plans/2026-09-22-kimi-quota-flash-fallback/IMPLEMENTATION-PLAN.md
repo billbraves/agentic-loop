@@ -166,10 +166,41 @@ def test_negative_cases_return_false():
     assert is_quota_error("") is False
 
 
+def test_ambiguous_phrases_are_not_quota_errors():
+    """codex rev1 finding #1：默认模式收窄后，普通错误里含 insufficient/exceeded/
+    credit/billing/rate_limit/429/balance/out of 等歧义词但**无账户/额度语境**时，
+    必须判为 False。否则 wrapper 会误触发 flash 重派，掩盖真实错误（AGENTS.md §7）。
+    本用例是「过宽判定」变异方向的承重锁（对应 brief Acceptance tests §3）。
+    """
+    assert is_quota_error("test count exceeded") is False
+    assert is_quota_error("insufficient permissions to read /etc/shadow") is False
+    assert is_quota_error("billing module failed to import") is False
+    assert is_quota_error("credit card processor returned error 500") is False
+    assert is_quota_error("AssertionError: rate_limit should be 5, got 3") is False
+    assert is_quota_error("port 429 is not available") is False
+    assert is_quota_error("balance sheet report generated") is False
+    assert is_quota_error("out of memory") is False
+
+
 def test_custom_patterns_override_defaults():
     # 自定义清单生效时，默认清单不再参与匹配。
     assert is_quota_error("quota exceeded", patterns=["credit"]) is False
     assert is_quota_error("out of credit", patterns=["credit"]) is True
+
+
+def test_bad_regex_pattern_is_skipped_not_raised():
+    """codex rev2 finding #3：config 覆盖可能引入语法非法正则。真正的 re.error 防线
+    在 is_quota_error 的 `except re.error: continue`（不是 load_quota_patterns——后者
+    只读 config、不编译正则）。坏正则必须被跳过而非抛出，且同列表中合法正则仍生效。
+    本用例是 INV-2「坏正则跳过」方向的承重锁：删 is_quota_error 的 except re.error
+    → 本用例抛 re.error 转红（对应 brief 映射表 INV-2 与 C1 mutation-probe）。
+    """
+    # 坏正则 "[" 被跳过，合法正则 \bquota\b 仍命中 → True（不抛异常）
+    assert is_quota_error("quota exceeded", patterns=["[", r"\bquota\b"]) is True
+    # 只有坏正则、无合法命中 → False（跳过而非崩溃）
+    assert is_quota_error("unrelated output", patterns=["["]) is False
+    # 坏正则 "(" 跳过，合法语境正则不匹配该串 → False
+    assert is_quota_error("insufficient balance", patterns=["(", r"balance\W{0,10}credit"]) is False
 ```
 
 - [ ] **Step 2: 运行验证失败**
@@ -197,11 +228,29 @@ from typing import Any, Sequence
 
 # 大小写不敏感；覆盖中英常见额度措辞 + HTTP 429/402。正向命中才触发回退，
 # 避免把普通失败（编译/测试错误）误判为额度问题而掩盖真实错误（AGENTS.md §7）。
+# codex rev1 finding #1：ambiguous 词（insufficient/exceeded/credit/billing/rate.?limit）
+# 必须与账户/额度名词共现，不得裸匹配；429/402 也需与额度/付费语境共现，
+# 避免命中端口号/行数。收窄后仍保留中文语义明确词的裸匹配（额度/配额/套餐/余额不足）。
 DEFAULT_QUOTA_PATTERNS: tuple[str, ...] = (
-    r"额度", r"配额", r"套餐", r"用量", r"余额",
-    r"quota", r"insufficient", r"balance", r"credit",
-    r"exceeded", r"rate.?limit", r"too many requests",
-    r"billing", r"\b429\b", r"\b402\b",
+    # 中文：语义明确，保留裸匹配
+    r"额度", r"配额", r"套餐", r"余额不足",
+    # 英文：quota 语义明确，保留裸匹配
+    r"\bquota\b",
+    # 英文：ambiguous 形容词/动词必须与账户/额度名词近距共现
+    r"(insufficient|exceeded|exhausted|depleted|out of|no remaining|used up|not enough)\W{0,10}(balance|credit|credits|funds|quota|allowance|budget|subscription)",
+    r"(balance|credit|credits|funds|quota|allowance|budget|subscription)\W{0,20}(insufficient|exceeded|exhausted|depleted|too low|not enough|used up|out of|empty|zero)",
+    # HTTP 状态码 + 额度/付费语境（避免 429 命中端口号、402 命中行号）
+    r"\b429\b.{0,80}(too many requests|rate.?limit|quota|usage)",
+    r"(too many requests|rate.?limit).{0,80}\b429\b",
+    r"\b402\b.{0,80}(payment|billing|quota|balance|credit|subscription)",
+    r"(payment|billing).{0,20}\b402\b",
+    # 明确的付费/订阅/限速短语
+    r"payment\s+required",
+    r"too\s+many\s+requests",
+    r"rate.?limit\s+(exceeded|reached|hit|exhausted)",
+    r"(subscription|payment)\s+(expired|overdue|failed|required)",
+    r"weekly.{0,15}(usage|quota|limit).{0,25}(reached|exceeded|reset)",
+    r"daily.{0,15}(usage|quota|limit).{0,25}(reached|exceeded|reset)",
 )
 
 
@@ -225,13 +274,13 @@ def is_quota_error(output: str, patterns: Sequence[str] | None = None) -> bool:
 - [ ] **Step 4: 运行验证通过**
 
 Run: `env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests/test_quota_fallback.py -q`
-Expected: PASS（6 passed）。
+Expected: PASS（7 passed — 中/英/大小写/负例/custom 5 条 + 1 歧义负例 `test_ambiguous_phrases_are_not_quota_errors`（codex rev1 #1）+ 1 坏正则跳过 `test_bad_regex_pattern_is_skipped_not_raised`（codex rev2 #3）= 7；codex rev4 finding #3 据实校正，原标 8 系 5+1+1+1 误算）。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add src/agentic_loop/quota_fallback.py tests/test_quota_fallback.py
-git commit -m "feat(kqff): quota_fallback.is_quota_error 纯函数额度检测" -- \
+git commit -m "feat(kqff): quota_fallback.is_quota_error 纯函数额度检测（语境化模式，codex rev1 #1）" -- \
   src/agentic_loop/quota_fallback.py tests/test_quota_fallback.py
 ```
 
@@ -270,6 +319,17 @@ def test_load_patterns_fails_safe_on_bad_override(tmp_path):
     assert load_quota_patterns(repo=repo) == DEFAULT_QUOTA_PATTERNS
     repo2 = _write_cfg(tmp_path / "b", '[quota_fallback]\npatterns = "额度"\n')
     assert load_quota_patterns(repo=repo2) == DEFAULT_QUOTA_PATTERNS
+
+
+def test_load_patterns_fails_safe_on_malformed_toml(tmp_path):
+    """codex rev3 finding #1：让 INV-2(a) 的 except Exception 承重变异可执行。
+    现有 fails_safe_on_bad_override 只测空列表/错误类型（都是合法 TOML，走 isinstance
+    fall-through，不触发 except Exception）。畸形 TOML（未闭合表头）才会让 _load_config
+    的 tomllib.load 抛 TOMLDecodeError → load_quota_patterns 的 except Exception 必须
+    吞掉并回落 DEFAULT，绝不抛进派发主链。承重变异：删 except Exception → 本用例转红。
+    """
+    repo = _write_cfg(tmp_path, '[quota_fallback\npatterns = ["额度"\n')  # 未闭合表头+未闭合数组
+    assert load_quota_patterns(repo=repo) == DEFAULT_QUOTA_PATTERNS
 ```
 
 - [ ] **Step 2: 运行验证失败**
@@ -306,7 +366,7 @@ def load_quota_patterns(repo: Path | None = None) -> tuple[str, ...]:
 - [ ] **Step 4: 运行验证通过**
 
 Run: `env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests/test_quota_fallback.py -q`
-Expected: PASS（9 passed）。
+Expected: PASS（11 passed — B1 的 7（含坏正则跳过）+ B2 追加 4 条 `load_quota_patterns` 测试（含畸形 TOML 回落 `test_load_patterns_fails_safe_on_malformed_toml`，codex rev3 #1）= 11；codex rev4 finding #3 据实校正）。
 
 - [ ] **Step 5: 提交**
 
@@ -733,12 +793,148 @@ def test_project_config_resolves_flash_fallback():
     assert b.identity_model == "deepseek-v4-flash"
     assert b.cli_selector == "deepseek/v4-flash"
     assert b.api_key_env == "DEEPSEEK_API_KEY"
+
+
+# ---- main() 接线级测试（codex rev1 finding #2）----
+# 追加 import 到文件顶部 import 区：import json / from agentic_loop.redispatch import main as _redispatch_main
+# 承重两条不变式，各绑定一个"必须转红"的 source mutation：
+#   INV-W1「回退成功只 +1」：primary 额度失败 -> flash 成功后 executor.redispatch_count 恰为 N+1。
+#     M1：main() 里 `new_count = count + 1` 改成 `count + 2`（或成功后再 +1 一次）-> 本测试转红。
+#   INV-W2「circuit-breaker 先于派发」：count>=REDISPATCH_MAX 时 primary/fallback 都不调、flash 不构造。
+#     M2：把 `_dispatch_with_quota_fallback` 调用移到 circuit-breaker（count>=max return 0）之前 -> 本测试转红。
+import json
+from agentic_loop.redispatch import main as _redispatch_main
+
+
+def _write_status(tmp_path, *, count, state="REWORK"):
+    itdir = tmp_path / "iters" / "2026-09-22-kimi-quota-flash-fallback"
+    itdir.mkdir(parents=True, exist_ok=True)
+    sf = itdir / "WP-01.status.json"
+    sf.write_text(json.dumps({
+        "schema_version": "agentic-wp-status/v2",
+        "wp_id": "WP-01", "work_package_id": "WP-01",
+        "iteration_id": "2026-09-22-kimi-quota-flash-fallback",
+        "state": state,
+        "git": {"worktree": str(tmp_path / "wt"), "base_branch": "plan/x",
+                "base_commit": "0" * 40, "work_branch": "", "dispatch_commit": "", "merged_commit": ""},
+        "executor": {"tool": "kimi", "session_id": "s", "redispatch_count": count,
+                     "log_path": "", "started_at": "", "finished_at": ""},
+        "review": {"decision": "N/A", "notes": "", "evidence_commit": "", "reviewed_at": ""},
+        "consult": {"decision": "N/A", "consulted_tool": "codex", "session_id": "",
+                    "evidence_commit": "", "consulted_at": ""},
+        "evidence": {"remaining_risks": [], "brief": {"path": "x", "sha256": "", "rev": 2},
+                     "attestation_commit": ""},
+        "timestamps": {"created_at": "", "updated_at": "", "dispatched_at": ""},
+    }, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "wt").mkdir(exist_ok=True)
+    return sf
+
+
+class _StubDev:           # primary developer adapter（_resolve_developer 返回它）
+    name = "kimi"
+    def probe_injection(self): return True
+
+
+class _StubFlash:         # fallback adapter（KimiAdapter 被 mock 成它）
+    name = "kimi"
+    def __init__(self, *a, **k): pass
+    def implement(self, **k):
+        return ImplementResult(dispatched=True, exit_code=0, output="flash ok",
+                               command=("kimi",), dry_run=False)
+
+
+def _stub_io(monkeypatch, tmp_path):
+    """把 main() 的 IO 依赖全部导向 tmp_path / stub，使接线逻辑可离线断言。"""
+    monkeypatch.setattr("agentic_loop.redispatch.main_repo", lambda: tmp_path)
+    monkeypatch.setattr("agentic_loop.redispatch.iterations_dir", lambda: tmp_path / "iters")
+    monkeypatch.setattr("agentic_loop.redispatch._run_validator", lambda v, s: None)
+    monkeypatch.setattr("agentic_loop.redispatch._build_prompt", lambda *a, **k: "stub prompt")
+    monkeypatch.setattr("agentic_loop.redispatch._git_output", lambda *a, **k: "")
+
+    def fake_read_field(validator, status_file, dotted):
+        cur = json.loads(Path(status_file).read_text(encoding="utf-8"))
+        for part in dotted.split("."):
+            cur = cur.get(part, "") if isinstance(cur, dict) else ""
+        if cur is None:
+            return ""
+        return cur if isinstance(cur, str) else json.dumps(cur, ensure_ascii=False)
+    monkeypatch.setattr("agentic_loop.redispatch._read_field", fake_read_field)
+
+    stub_lock = tmp_path / "lock.sh"
+    stub_lock.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    stub_lock.chmod(0o755)
+    class _Res:
+        path = stub_lock
+        stack = None
+    monkeypatch.setattr("agentic_loop.redispatch.resolve_wrapper", lambda name: _Res())
+
+    def fake_run(cmd, *a, **k):
+        joined = " ".join(cmd) if isinstance(cmd, (list, tuple)) else str(cmd)
+        class _P:
+            returncode = 0
+            stderr = ""
+        _P.stdout = "HEARTBEAT_OK\n" if "heartbeat" in joined else "PROBE_OK\n"
+        return _P()
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    monkeypatch.setattr("agentic_loop.redispatch.get_roles", lambda repo=None: {"developer": "kimi"})
+    monkeypatch.setattr("agentic_loop.redispatch._resolve_developer", lambda roles, probe=True: (_StubDev(), []))
+    monkeypatch.setattr("agentic_loop.redispatch.resolve_role_fallback_binding", lambda role, repo=None: _flash_binding())
+    monkeypatch.setattr("agentic_loop.redispatch.load_quota_patterns", lambda repo=None: ("额度", "quota"))
+
+
+def test_wiring_fallback_success_increments_count_by_one(tmp_path, monkeypatch):
+    """INV-W1 / M1：primary 额度失败 -> flash 成功，最终 redispatch_count 恰为 1（不是 2）。"""
+    sf = _write_status(tmp_path, count=0)
+    _stub_io(monkeypatch, tmp_path)
+
+    def fake_dispatch(adapter, wt, brief, prompt, dry):
+        if isinstance(adapter, _StubFlash):     # fallback 成功
+            return ImplementResult(dispatched=True, exit_code=0, output="flash ok",
+                                   command=("kimi",), dry_run=dry)
+        return ImplementResult(dispatched=False, exit_code=1, output="错误：账户额度不足",
+                               command=("kimi",), dry_run=dry)   # primary 额度失败
+    monkeypatch.setattr("agentic_loop.redispatch._dispatch", fake_dispatch)
+    monkeypatch.setattr("agentic_loop.redispatch.KimiAdapter", _StubFlash)
+
+    assert _redispatch_main([str(sf)]) == 0
+    final = json.loads(sf.read_text(encoding="utf-8"))
+    assert final["executor"]["redispatch_count"] == 1, \
+        "回退成功只 +1；=2 说明重复计数或 wrapper 内另写了 status"
+
+
+def test_wiring_circuit_breaker_precedes_dispatch(tmp_path, monkeypatch):
+    """INV-W2 / M2：count>=REDISPATCH_MAX 时 circuit-breaker 先 return，primary/fallback 都不调、flash 不构造。"""
+    sf = _write_status(tmp_path, count=1)
+    _stub_io(monkeypatch, tmp_path)
+    monkeypatch.setenv("REDISPATCH_MAX", "1")
+
+    calls = {"primary": 0, "wrapper": 0, "flash": 0}
+    def spy_dispatch(*a, **k):
+        calls["primary"] += 1
+        return ImplementResult(dispatched=True, exit_code=0, output="", command=("kimi",), dry_run=False)
+    monkeypatch.setattr("agentic_loop.redispatch._dispatch", spy_dispatch)
+    orig_wrapper = _dispatch_with_quota_fallback
+    def spy_wrapper(*a, **k):
+        calls["wrapper"] += 1
+        return orig_wrapper(*a, **k)
+    monkeypatch.setattr("agentic_loop.redispatch._dispatch_with_quota_fallback", spy_wrapper)
+    class _SpyFlash:
+        def __init__(self, *a, **k):
+            calls["flash"] += 1
+    monkeypatch.setattr("agentic_loop.redispatch.KimiAdapter", _SpyFlash)
+
+    assert _redispatch_main([str(sf)]) == 0
+    assert calls == {"primary": 0, "wrapper": 0, "flash": 0}, \
+        "circuit-breaker 必须先于任何派发/构造；非零说明派发被移到 breaker 前"
+    final = json.loads(sf.read_text(encoding="utf-8"))
+    assert final["executor"]["redispatch_count"] == 1, "circuit-breaker 不改写 count"
 ```
 
 - [ ] **Step 4: 运行验证通过**
 
 Run: `env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests/test_redispatch_quota_fallback.py -q`
-Expected: PASS（8 passed）。
+Expected: PASS（10 passed — B4 的 6 wrapper + B5 的 2 config + 2 main() 接线级）。
 
 - [ ] **Step 5: 提交**
 
@@ -753,17 +949,66 @@ git commit -m "feat(kqff): redispatch.main 接入额度回退 + 项目配置 dee
 - [ ] **Step 1: 全量测试**
 
 Run: `env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests -q`
-Expected: 仅 4 个**预存** `test_finalize_merge_triple_sign.py` 失败（根因：main 被 sibling worktree `agentic-loop-main-codex-merge` 占用，`git checkout -q main` 非零）；其余全绿，新增 ~19 个用例通过。任何**新增**失败都视为回归，必须修复。
+Expected: 仅 4 个**预存** `test_finalize_merge_triple_sign.py` 失败（根因：main 被 sibling worktree `agentic-loop-main-codex-merge` 占用，`git checkout -q main` 非零）；其余全绿，新增 26 个用例通过（test_quota_fallback.py 11 + test_resolve_fallback_binding.py 5 + test_redispatch_quota_fallback.py 10 = 26；codex rev4 finding #3 据实校正）。任何**新增**失败都视为回归，必须修复。
 
 - [ ] **Step 2: 范围守卫（确认未越界）**
 
+基线用 `status.git.dispatch_commit`（A5 冻结时的集成分支 tip），**不用** `main...HEAD`——
+后者把 A 阶段的 DESIGN/HANDOFF/freeze 治理提交也算进来，污染范围判定（codex rev1 finding #4）。
+判据从"仅检查显式 forbidden 路径"升级为"changed ⊆ allowed 的集合差为空"，捕获任何越界文件。
+
 Run:
 ```bash
-git -C /Users/admin/vibe/.worktrees/kqff-wp01 diff --stat main...HEAD
-git -C /Users/admin/vibe/.worktrees/kqff-wp01 diff main...HEAD -- \
-  src/agentic_loop/independence.py src/agentic_loop/gate/ src/agentic_loop/adapters/kimi.py uv.lock
+set -euo pipefail
+WT=/Users/admin/vibe/.worktrees/kqff-wp01
+STATUS=docs/plans/2026-09-22-kimi-quota-flash-fallback/WP-01.status.json
+BASE=$(python3 -c "import json; print(json.load(open('$WT/$STATUS'))['git']['dispatch_commit'])")
+# fail-closed 前置断言：基线必须非空且是真实存在的 commit，否则后续 diff 的空结果不可信。
+test -n "$BASE" || { echo "SCOPE_GUARD_FAIL: dispatch_commit 为空（A5 冻结未填基线）"; exit 1; }
+git -C "$WT" cat-file -e "${BASE}^{commit}" || { echo "SCOPE_GUARD_FAIL: dispatch_commit=$BASE 非有效 commit"; exit 1; }
+echo "baseline dispatch_commit=$BASE"
+
+# 1) changed-path 集合必须是 allowed_paths 的子集（集合差为空）——捕获任何越界，不止显式 forbidden。
+#    git diff 失败（三点语法/基线不可达）在 set -e + pipefail 下直接终止，不会静默产出空集。
+git -C "$WT" diff --name-only "${BASE}...HEAD" | sort -u > /tmp/kqff-wp01-changed.txt
+cat > /tmp/kqff-wp01-allowed.txt <<'EOF'
+.agentic/config.toml
+src/agentic_loop/quota_fallback.py
+src/agentic_loop/redispatch.py
+src/agentic_loop/resolve_paths.py
+tests/test_quota_fallback.py
+tests/test_redispatch_quota_fallback.py
+tests/test_resolve_fallback_binding.py
+EOF
+sort -u /tmp/kqff-wp01-allowed.txt -o /tmp/kqff-wp01-allowed.txt
+echo "=== changed paths ==="
+cat /tmp/kqff-wp01-changed.txt
+# fail-closed：comm 即便发现越界仍退出 0，故把越界项写入 unexpected 文件，非空即返回非零。
+comm -23 /tmp/kqff-wp01-changed.txt /tmp/kqff-wp01-allowed.txt > /tmp/kqff-wp01-unexpected.txt
+if [ -s /tmp/kqff-wp01-unexpected.txt ]; then
+  echo "SCOPE_GUARD_FAIL: changed 不是 allowed 子集，越界文件："
+  cat /tmp/kqff-wp01-unexpected.txt
+  exit 1
+fi
+echo "=== changed subset-of allowed OK（集合差为空）==="
+
+# 2) 显式 forbidden 路径双保险（信任根/边界/契约文件零改动）——diff 非空即失败。
+git -C "$WT" diff "${BASE}...HEAD" -- \
+  src/agentic_loop/independence.py src/agentic_loop/gate/ \
+  src/agentic_loop/adapters/kimi.py uv.lock \
+  docs/agentic/OPERATING_MODEL.md AGENTS.md CLAUDE.md > /tmp/kqff-wp01-forbidden.diff
+if [ -s /tmp/kqff-wp01-forbidden.diff ]; then
+  echo "SCOPE_GUARD_FAIL: 显式 forbidden 路径被改动："
+  cat /tmp/kqff-wp01-forbidden.diff
+  exit 1
+fi
+echo "=== forbidden 零改动 OK ==="
+echo "SCOPE_GUARD_PASS"
 ```
-Expected: 第一条只列出 6 个允许文件（quota_fallback.py / resolve_paths.py / redispatch.py / config.toml / 3 测试）；第二条**空输出**（independence/gate/kimi.py/uv.lock 零改动 → #38 边界与信任根评级未触）。
+Expected:
+- `SCOPE_GUARD_PASS` 打印且脚本退出码 0（changed paths 仅含 7 允许文件中实际改动者；集合差为空；forbidden 零改动 → #38 边界与信任根评级未触）；
+- 任何越界 / forbidden 改动 / 空或无效基线 → 打印 `SCOPE_GUARD_FAIL: ...`（含诊断内容）并**非零退出**（fail-closed，机器可判，不靠人眼读 comm 输出）；
+- 判据：changed ⊆ allowed（unexpected 文件空）+ 显式 forbidden diff 空。
 
 - [ ] **Step 3: 质量门**
 
@@ -780,9 +1025,11 @@ Expected: 命中 `src/agentic_loop/**` 规则 → 跑全量 pytest；结果与 S
 
 ### Task C1: 独立复核 + review（不轻信 kimi 报告）
 
-- [ ] 读 kimi handoff；`git show <commit> --stat` 核对改动面 == 6 允许文件。
+- [ ] 读 kimi handoff；`git show <commit> --stat` 核对改动面 == 7 允许文件。
 - [ ] **亲自重跑**：focused（3 新测试文件）+ 全量（仅 4 预存失败）+ 范围守卫（B6 Step 2）。
-- [ ] **revert-probe**：临时还原 `_dispatch_with_quota_fallback` 的额度判定（令其恒不回退）→ 断言 `test_quota_failure_retries_with_flash_success` 等转红，证明新用例承重；probe 后 worktree 须 clean。
+- [ ] **revert-probe（wrapper 层）**：临时还原 `_dispatch_with_quota_fallback` 的额度判定（令其恒不回退）→ 断言 `test_quota_failure_retries_with_flash_success` 等转红，证明新用例承重；probe 后 worktree 须 clean。
+- [ ] **mutation-probe（main() 接线层，codex rev1 finding #2）**：临时把 main() 的 `new_count = count + 1` 改成 `count + 2`（M1）→ 断言 `test_wiring_fallback_success_increments_count_by_one` 转红；再把 `_dispatch_with_quota_fallback` 调用移到 circuit-breaker（`count >= redispatch_max` return）之前（M2）→ 断言 `test_wiring_circuit_breaker_precedes_dispatch` 转红；两次 probe 后 worktree 须 clean。
+- [ ] **mutation-probe（fail-safe 层，codex rev2 finding #3）**：临时删 `is_quota_error` 的 `except re.error: continue`（让坏正则直接抛）→ 断言 `test_bad_regex_pattern_is_skipped_not_raised` 转红（`re.error` 抛出而非跳过）；probe 后 worktree 须 clean。坏正则承重变异点是 `is_quota_error` 的 `except re.error`（`load_quota_patterns` 不编译正则、无此守卫）；config 回落承重变异点是 `load_quota_patterns` 的 `except Exception`——再临时删它 → 断言 `test_load_patterns_fails_safe_on_malformed_toml` 转红（畸形 TOML 的 `TOMLDecodeError` 抛出而非回落默认，codex rev3 #1）；probe 后 worktree 须 clean。
 - [ ] 验证零回归断言：`resolve_role_binding("developer")` 主 binding 仍 None（评级语义未变）。
 - [ ] 记录 `review.decision=ACCEPT` + attestation（fresh_session/adversarial_prompt）；刷 WP 锁 heartbeat。
 
@@ -817,7 +1064,7 @@ Expected: 命中 `src/agentic_loop/**` 规则 → 跑全量 pytest；结果与 S
 - DESIGN §4.3 + §5 数据流（派发失败后单跳回退）→ B4/B5 ✓
 - DESIGN §6 安全（正向命中、单跳、脱敏、评级不变、probe 门不变）→ B4 负例 + B5 主档零回归断言 + B6 范围守卫 ✓
 - DESIGN §7 config → B5 Step 1 ✓
-- DESIGN §8 测试计划 → B1-B6 全覆盖（含零回归负例、单跳 STOP、计数不双计由 main() 逻辑保证 + C1 复核）✓
+- DESIGN §8 测试计划 → B1-B6 全覆盖（含零回归负例、单跳 STOP、歧义负例；计数不双计 INV-W1 + circuit-breaker 先于派发 INV-W2 由 B5 main() 接线级测试承重 + C1 mutation-probe 复核）✓
 - DESIGN §9 交付路径（新 iteration/plan/WP、独立 worktree、冻结→派发→评审→gate→merge→收敛、push always_stop）→ Phase A/C ✓
 - DESIGN §10 待确认（flash 精确 id/selector、额度原文锚定、是否强制 consult）→ A4 consult + B5 config 注释标注「实现前核实」✓
 - DESIGN §11 范围外 → 计划未引入多档链/probe 预切/持久改写/泛化到 claude-codex/改 init 模板 ✓
@@ -826,4 +1073,12 @@ Expected: 命中 `src/agentic_loop/**` 规则 → 跑全量 pytest；结果与 S
 
 **3. 类型/命名一致性**：`is_quota_error(output, patterns=None)`、`load_quota_patterns(repo=None)`、`resolve_role_fallback_binding(role, repo=None)`、`_dispatch_with_quota_fallback(adapter, worktree, brief, prompt, dry_run, *, fallback_binding=None, fallback_factory=None, quota_patterns=None) -> (ImplementResult, str|None)` 在 B1-B5 定义与调用处签名一致；`ProviderBinding`/`ImplementResult`/`build_binding`/`_first_candidate`/`get_roles_raw`/`get_providers`/`_load_config`/`main_repo` 均为既有符号，已核实存在。
 
-**已知测试边界（诚实标注）**：`redispatch.main()` 无既有单测harness（本仓无 test_redispatch.py），故 main() 的 3 行接线 glue 由 B4 wrapper 单测 + B5 config 解析断言 + C1 独立复核 + 全量回归共同覆盖，不为 main() 单独 stub git/validator/lock 子进程（与本仓现有测试深度一致）。
+**main() 接线级覆盖（codex rev1 finding #2 已闭环）**：`redispatch.main()` 本无既有单测 harness（本仓无 test_redispatch.py）。rev2 已在 B5 Step 3 新增 2 条接线级测试 `test_wiring_fallback_success_increments_count_by_one` / `test_wiring_circuit_breaker_precedes_dispatch`：用 monkeypatch 把 `main_repo`/`iterations_dir`/`_run_validator`/`_read_field`/`_build_prompt`/`_git_output`/`resolve_wrapper`/`subprocess.run`/`_resolve_developer`/`get_roles`/`resolve_role_fallback_binding`/`load_quota_patterns` 全部导向 tmp_path/stub，离线承重 INV-W1（回退成功只 +1）与 INV-W2（circuit-breaker 先于派发），并各绑定一个必须转红的 source mutation（M1 `count+2` / M2 wrapper 调用前移）。B4 wrapper 单测 + B5 config 断言 + C1 独立复核（含 mutation-probe）+ 全量回归为外层补充。
+
+**fail-safe 双层拆分（codex rev2 finding #3 已闭环）**：rev2 的 INV-2 把承重变异错指向 `load_quota_patterns` 的“坏正则 try/except”——但 B2 的 `load_quota_patterns` 只读 config、不编译正则，无此守卫；真正的 `re.error` 防线在 `is_quota_error` 的 `except re.error: continue`（B1 Step 3，line 269）。rev3 已：(1) B1 Step 1 新增 `test_bad_regex_pattern_is_skipped_not_raised`（用 `patterns=["[", r"\bquota\b"]` 等含坏正则的真实模式列表，断言跳过不抛且合法正则仍命中）；(2) INV-2 拆为「config 回落默认（`load_quota_patterns` 的 `try/except Exception`+isinstance 守卫）」与「坏正则跳过（`is_quota_error` 的 `except re.error`）」两个真实输入面；(3) 承重变异改为删 `is_quota_error` 的 `except re.error`，C1 mutation-probe 复核。
+
+**范围守卫 fail-closed（codex rev2 finding #4 已闭环）**：rev2 的 B6 Step 2 只 `comm -23` 观察输出——comm 即便发现越界仍退出 0，且 `dispatch_commit` 为空或 `git diff` 失败时管道可能由 `sort` 返回成功产出空集，形成“已跑但没证明”的假绿。rev3 已改 B6 Step 2 为机器化 fail-closed：`set -euo pipefail` + 断言 `dispatch_commit` 非空且 `git cat-file -e "$BASE^{commit}"` 有效 + `git diff` 失败即终止 + `comm -23` 写 unexpected 文件后 `[ -s ]` 非空即 `exit 1` + forbidden diff 非空即 `exit 1`，全绿打印 `SCOPE_GUARD_PASS`（退出 0），任何越界打印 `SCOPE_GUARD_FAIL` + 非零退出。
+
+**INV-2(a) config 回落承重补齐（codex rev3 finding #1 已闭环）**：rev3 的 INV-2(a) 声称「删 `load_quota_patterns` 的 `except Exception` → `test_load_patterns_fails_safe_on_bad_override` 红」，但该用例只测空列表（`patterns = []`）与错误类型（`patterns = "额度"`）——两者都是合法 TOML，走 isinstance 守卫的 fall-through 到 `return DEFAULT`，**不触发** `except Exception`，删守卫后用例仍全绿（变异不可执行）。rev4 已：(1) B2 Step 1 新增 `test_load_patterns_fails_safe_on_malformed_toml`（未闭合表头的畸形 TOML → `_load_config` 的 `tomllib.load` 抛 `TOMLDecodeError` → `except Exception` 吞掉回落 DEFAULT），删 `except Exception` 则该用例因解析异常转红（真实承重）；(2) INV-2(a) 拆绑为 (a1) 删 `except Exception` → 畸形 TOML 用例红、(a2) 删 isinstance/非空守卫 → 空列表/错误类型用例红；(3) 同步 Acceptance tests §3、C1 mutation-probe、B2 计数同步（实际计数见下方 rev5「测试计数校正」note）。
+
+**测试计数校正（codex rev4 finding #3 已闭环）**：rev4 及之前的 focused/全量计数与实际 `def test_` 数不符（B1 Step 4 标 8、B2 Step 4 标 12、B6/DoD 标 ~21）。codex rev4 用 grep 精确数出 B1=7、B2 追加=4（`test_quota_fallback.py` 合计 11）、B3=5、B4/B5=10，全量新增=26（编排者独立 grep 复核一致：26 个 `def test_`）。rev5 据实校正 B1 Step 4→`7 passed`、B2 Step 4→`11 passed`、B6 Step 1→`新增 26 个`、brief DoD→`新增 26 个`；纯文档计数，未动源码/架构/adapter/gate（遵 codex「不应扩大到源码、架构、adapter 或 gate」）。

@@ -56,16 +56,43 @@
 ### 4.1 `src/agentic_loop/quota_fallback.py`（新增，纯函数，无 I/O 副作用）
 
 ```python
+# codex consult rev1 finding #1：默认清单必须**语境化**（额度/账户/API 限制上下文），
+# 不得保留 `insufficient`/`balance`/`credit`/`exceeded`/`billing`/`rate.?limit` 等无上下文
+# 单词的裸匹配——否则会误判 `test count exceeded` / `insufficient permissions` /
+# `billing module failed` / `credit card processor error` 等普通错误为额度失败，触发
+# flash 重派而掩盖真实错误（违反 AGENTS.md §7）。B1 TDD 必须为每条歧义边界写负例。
 DEFAULT_QUOTA_PATTERNS: tuple[str, ...] = (
-    r"额度", r"配额", r"套餐", r"用量", r"余额",
-    r"quota", r"insufficient", r"balance", r"credit",
-    r"exceeded", r"rate.?limit", r"too many requests",
-    r"billing", r"\b429\b", r"\b402\b",
+    # 中文：语义明确，保留裸匹配
+    r"额度", r"配额", r"套餐", r"余额不足",
+    # 英文：quota 语义明确，保留裸匹配
+    r"\bquota\b",
+    # 英文：ambiguous 形容词/动词必须与账户/额度名词共现（前后近距）
+    r"(insufficient|exceeded|exhausted|depleted|out of|no remaining|used up|not enough)\W{0,10}(balance|credit|credits|funds|quota|allowance|budget|subscription)",
+    r"(balance|credit|credits|funds|quota|allowance|budget|subscription)\W{0,20}(insufficient|exceeded|exhausted|depleted|too low|not enough|used up|out of|empty|zero)",
+    # HTTP 状态码：429/402 需与额度/付费语境共现，避免命中端口号/行数
+    r"\b429\b.{0,80}(too many requests|rate.?limit|quota|usage)",
+    r"(too many requests|rate.?limit).{0,80}\b429\b",
+    r"\b402\b.{0,80}(payment|billing|quota|balance|credit|subscription)",
+    r"(payment|billing).{0,20}\b402\b",
+    # 明确的付费/订阅/限速短语
+    r"payment\s+required",
+    r"too\s+many\s+requests",
+    r"rate.?limit\s+(exceeded|reached|hit|exhausted)",
+    r"(subscription|payment)\s+(expired|overdue|failed|required)",
+    r"weekly.{0,15}(usage|quota|limit).{0,25}(reached|exceeded|reset)",
+    r"daily.{0,15}(usage|quota|limit).{0,25}(reached|exceeded|reset)",
 )
 
 def is_quota_error(output: str, patterns: Sequence[str] | None = None) -> bool:
     """纯字符串判定：output 命中任一额度模式（大小写不敏感）即 True。
-    空输出 / 普通错误 / 成功输出一律 False（正向命中才触发，避免误判）。"""
+    空输出 / 普通错误 / 成功输出一律 False（正向命中才触发，避免误判）。
+    歧义边界（B1 TDD 必测负例）：
+      - 'test count exceeded' -> False（`exceeded` 无账户上下文）
+      - 'insufficient permissions' -> False（`insufficient` 无账户上下文）
+      - 'billing module failed' -> False（`billing` 单独不匹配）
+      - 'credit card processor returned error' -> False（`credit` 无耗尽语境）
+      - 'AssertionError: rate_limit should be 5' -> False（`rate_limit` 无 exceeded/reached）
+    """
 
 def load_quota_patterns(repo: Path | None = None) -> tuple[str, ...]:
     """读可选 [quota_fallback] patterns；缺省/解析失败回落 DEFAULT_QUOTA_PATTERNS（fail-safe）。"""
@@ -126,9 +153,15 @@ def _dispatch_with_quota_fallback(adapter, worktree, brief, prompt, dry_run,
 - **密钥安全**（AGENTS.md §6）：flash binding 用 `api_key_env = "DEEPSEEK_API_KEY"`，
   **绝不落盘明文**；`KimiAdapter._run` 已对输出 `redact_env_value` 脱敏；`is_quota_error`
   与所有日志均跑在已脱敏输出上，不回显 key。临时 config 0600、用后即删（既有 `_temp_config` 保证）。
-- **独立性评级不受影响**：按 `.agentic/config.toml` L42-46，developer 的 `identity_model`
-  不参与独立性评级（仅 `review.decision == "N/A"` 时用 `executor.tool` 名构造 implementer_id，
-  那里只有 tool 名没有 model）。故切 flash **不改动信任根/评级语义**。实现时加断言测试确认此不变式。
+  **消费面口径（brief 不变式）**：`is_quota_error` 与 `_dispatch_with_quota_fallback` 的
+  日志**只**消费 `ImplementResult.output`（已脱敏），不得直接调 adapter 的原始
+  stdout/stderr、不得读 env 值、不得在异常消息里回显 config 内容。
+- **独立性评级不受影响**：主档 `developer` 无 `provider` 键 → `resolve_role_binding("developer")`
+  返回 `("kimi", None)` → gate 在 `binding is None` 时**不生成** implementer identity
+  （`gate/__init__.py:765` 短路，codex rev1 已核实）；无论 `review.decision` 是 `N/A`
+  还是 `ACCEPT`，评级路径都不消费 fallback provider 的 `identity_model`。故切 flash
+  **不改动信任根/评级语义**。B5 断言测试 `test_project_config_primary_developer_stays_native`
+  锁定此不变式（`adapter_name == "kimi"` 且 `binding is None`）。
 - **circuit-breaker / 锁 / autonomy 语义不变**：回退发生在已获取 WP 锁、已过 heartbeat、
   已过 circuit-breaker 之后的派发子步骤内，不新增写状态、不动锁、不触网。
 - **已知边界（诚实标注）**：若额度**硬耗尽**到连极小的 probe 都失败，probe 门会先 STOP，
