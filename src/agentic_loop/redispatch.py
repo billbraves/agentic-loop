@@ -31,10 +31,12 @@ from agentic_loop.adapters.claude import ClaudeAdapter
 from agentic_loop.cli import resolve_wrapper
 from agentic_loop.independence import evaluate
 from agentic_loop.provider_binding import ProviderBinding
+from agentic_loop.quota_fallback import is_quota_error, load_quota_patterns
 from agentic_loop.resolve_paths import get_roles
 from agentic_loop.resolve_paths import iterations_dir
 from agentic_loop.resolve_paths import main_repo
 from agentic_loop.resolve_paths import resolve_role_binding
+from agentic_loop.resolve_paths import resolve_role_fallback_binding
 
 
 def _err(message: str) -> None:
@@ -259,6 +261,46 @@ def _dispatch(
             command=(),
             dry_run=dry_run,
         )
+
+
+def _dispatch_with_quota_fallback(
+    adapter: Adapter,
+    worktree: Path,
+    brief: str,
+    prompt: str,
+    dry_run: bool,
+    *,
+    fallback_binding: ProviderBinding | None = None,
+    fallback_factory=None,
+    quota_patterns=None,
+) -> tuple[ImplementResult, str | None]:
+    """派发；若失败且命中额度模式，用 fallback binding 重派一次（单跳）。
+
+    返回 ``(最终 result, 实际生效的 fallback provider 名 or None)``。
+    - 成功 / dry_run / 非额度失败 / 未配回退 → 不触发回退（provider=None）。
+    - 额度失败且配了回退 → 构造 flash adapter 重派一次；flash 也额度失败则单跳到底
+      （原样返回失败 result，由 main() 打 REDISPATCH_STOP），绝不三跳/无限重试。
+    本函数不写 status、不动锁、不计 redispatch_count（计数仍由 main() 在成功后 +1）。
+    """
+    result = _dispatch(adapter, worktree, brief, prompt, dry_run)
+    if dry_run or result.dispatched:
+        return result, None
+    if not is_quota_error(result.output, quota_patterns):
+        return result, None
+    if fallback_binding is None:
+        _log("quota detected but no fallback_provider configured; not retrying")
+        return result, None
+    if fallback_factory is None:
+        def fallback_factory(b):  # noqa: E306
+            return KimiAdapter(kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=b)
+    fb_adapter = fallback_factory(fallback_binding)
+    _log(f"quota detected on primary dispatch; retrying with fallback "
+         f"provider={fallback_binding.provider}")
+    fb_result = _dispatch(fb_adapter, worktree, brief, prompt, dry_run)
+    if not fb_result.dispatched and is_quota_error(fb_result.output, quota_patterns):
+        _log(f"fallback provider={fallback_binding.provider} ALSO hit quota; "
+             f"single-hop exhausted -> STOP (hand to human)")
+    return fb_result, fallback_binding.provider
 
 
 def _rate_independence(
