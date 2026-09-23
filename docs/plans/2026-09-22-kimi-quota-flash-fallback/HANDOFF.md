@@ -57,3 +57,18 @@
 - kqff worktree：branch=`plan/2026-09-22-kimi-quota-flash-fallback`、HEAD=`2ff9e96`、**clean**。
 - 本 plan 尚未建任何 status 文件、未取任何锁、未派发 kimi。
 - `main` tip=`7c318f4`（本 plan base）。
+
+## 2026-09-23 原位收敛验证记录
+
+- 执行角色：Orchestrator；实际工具：Qoder。用户已明确批准合并并 push，并选择保留其他改动的原位手工收敛。
+- 合并提交：`b49ba9d708914aeb4955b04b954b774b2cd766f3`；第二父（计划集成 tip）：`dbf53bd7a67d48ae64877fbb736e32c05addb4a8`。合并前 `agentic plan lint` 为 clean，WP 状态提交恰为 freeze + finalize。
+- 合并结果树与集成 tip 完全相同；`agentic plan finalize` 已实际执行，状态以同目录 PLAN-01.status.json 为准。
+- 合并提交的独立洁净副本全量验证：`env -u AGENTIC_PYTHON GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q`；退出码 0，**807 passed, 4 skipped in 165.75s**。仅进程级设置默认分支，不修改仓库或全局 Git 配置。
+- 纠正上文历史环境归因：本次原环境四项三签测试失败是临时仓库没有 main 分支，不是 sibling worktree 占用；默认分支环境对照可消除这四项失败。
+- 绝对 PYTHONPATH 下既有 pre-push 状态目录问题仍未修复；本次是已 MERGED 的 main 收敛，单独校验计划证据与全量测试，不依赖活动 WP 发现来证明通过。
+- 执行时 core.hooksPath 未配置且默认 hooks/pre-push 不存在；不改 Git 配置，push 前原样执行已跟踪的 .githooks/pre-push。生产启用前仍须非生产凭据验证 flash id/selector。
+- main 中其他工作文件保留，合并前后 SHA-256 一致（未暂存、未提交）：
+  - `src/agentic_loop/adapters/kimi.py`：`5f932cea84b39e02f05f8ba9b6616fd6bcad214f908e29806994fd3e669b6fbc`
+  - `src/agentic_loop/provider_binding.py`：`7358e9394d2cf0fdb633b4b53f5580082a67c4924db4926bab872608337ca469`
+  - `tests/test_kimi_managed_k3.py`：`66aafdeb2dab2b76328475fdd341134a8402a80248fcb79bc7d028287020791a`
+  - `uv.lock`：`d11edd8fe4c7c632ba80f3e202fbbe7b87466ff3beef2f815f602e6d13a534ca`
