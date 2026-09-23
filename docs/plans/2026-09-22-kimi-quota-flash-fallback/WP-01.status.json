@@ -4,11 +4,11 @@
   "iteration_id": "2026-09-22-kimi-quota-flash-fallback",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "6f806b78-4269-42d2-9635-bdd2a0c7b368"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -16,15 +16,16 @@
   },
   "reviewer": {
     "tool": "claude-code",
-    "session": ""
+    "session": "kqff-b"
   },
   "git": {
     "base_branch": "plan/2026-09-22-kimi-quota-flash-fallback",
     "base_commit": "1af1c770d4e6c99d4a4c18a9321a2bd5958210da",
-    "dispatch_commit": "",
-    "branch": "",
-    "worktree": "",
-    "commit": ""
+    "dispatch_commit": "f89d36cedb9b0c79d9574511329e8b83cd6c86f3",
+    "branch": "feature/kqff-wp01-quota-fallback",
+    "worktree": "/Users/admin/vibe/.worktrees/kqff-wp01",
+    "commit": "4035f06d535d0675b559b8f10f52ec9ac47af1be",
+    "merged_commit": "3c6c68675eb5d71a564ae938f984075c147b4aa9"
   },
   "scope": {
     "allowed_paths": [
@@ -59,21 +60,149 @@
   "evidence": {
     "brief": {
       "path": "docs/plans/2026-09-22-kimi-quota-flash-fallback/WP-01-brief.md",
-      "sha256": "8583673a4fcab066da2e2bb415f486f7b1da6e266f8b4fd69e461cda81bd0a76",
-      "rev": 5,
+      "sha256": "a5b72c39a97b380568e199c74487e447836ce4a7b22d489aa028b4d090b24ebd",
+      "rev": 7,
       "supersedes_rev1_sha256": "a2aeba0ddb7097a58997335c6a6fd918da5b8e2a561b0ba610f1701b62266e6f",
       "supersedes_rev2_sha256": "1dbdb8bfb0d69048f82fcbd1a16d054b8bf308500c8165b6eec3e25482872308",
       "supersedes_rev3_sha256": "0883b6a18b9cffbc44d374a60833bedb5fabe4b4f879fcdbe1f44a5b218fa2a2",
       "supersedes_rev4_sha256": "5a694a7ea27dd7a8b6095d353a90cf62b65dfedaadbeaa244d821ce8f6575f13",
-      "outcome": "codex consult rev5 = ACCEPT (pre-freeze brief consult); see WP-01-consult-codex-rev5-answer.md. rev1->rev5 收敛：rev1 4 findings -> rev2 2 -> rev3 1 部分 -> rev4 1 部分（测试计数）-> rev5 全闭环（finding#1 畸形 TOML 承重测试 test_load_patterns_fails_safe_on_malformed_toml 绑 load_quota_patterns except Exception；finding#2 INV-2 三拆绑 (a1) except Exception/(a2) isinstance 非空守卫/(b) is_quota_error except re.error 各绑专属 witness；finding#3 计数校正 26=B1 7+B2 追加 4(文件合计 11)+B3 5+B4/B5 10）。codex 独立 grep 复核 26 个 def test_ 逐一一致，brief sha256=8583673a… 与 status.evidence.brief.rev=5 锚点相符、rev1-rev4 supersedes 链完整，无新 brief 级阻断项。Cleared to freeze (DRAFT->APPROVED). Post-impl merge-gate consult (agentic gate write_consult_block) still required per double-sign."
+      "outcome": "codex brief consult rev7 = ACCEPT (pre-freeze brief re-consult, session 01a0cb50-facd-7ce1-863d-7b1168f704eb, gpt-5.6-sol, high effort, read-only); see WP-01-consult-codex-rev7-answer.md. Re-freeze chain rev5->rev6->rev7: rev5 frozen baseline (sha 8583673a...) -> rev6 draft (sha f3b6d504..., never frozen) REWORKed by codex brief consult (F1/F2/F3) -> orchestrator independently verified F1/F2/F3 all valid -> user adjudicated F1=NARROW (narrow the invariant; malformed TOML annotated as a pre-existing failure shared with resolve_role_binding, out of scope) + approved rev7 re-freeze -> rev7: F1 §R1 NARROW (only widen build_binding catch to except Exception narrow-scope; tests selectors string/list; NO malformed-TOML case); F2 delete entire §R2a (codex off-ramp; keep full-text re.search + docstring operator-trusted); F3 §R4 recount total new = 30 (12+7+11). codex rev7 independently verified and adopted NARROW (citing redispatch.py:480,532,538 primary-first call order; BROADEN-only on fallback gives the dispatch chain no protection and creates asymmetry). brief sha256=a5b72c39... matches status.evidence.brief.rev=7 anchor; rev1-rev5 supersedes chain intact. Cleared to re-freeze rev7 (state -> CHANGES_REQUESTED, awaiting kimi rework dispatch). impl double-sign (review/consult on implementation) still required after kimi rework via C1'/C2'; gated behind C2 merge gate.",
+      "supersedes_rev5_sha256": "8583673a4fcab066da2e2bb415f486f7b1da6e266f8b4fd69e461cda81bd0a76",
+      "rev6_rejected_draft_sha256": "f3b6d5044d351281efaff9d092fdb24df9560638b129dbd1b38c8c8a93ec7c13",
+      "rev6_rejected_note": "rev6 (sha256 f3b6d5044d351281..., 229 lines) was an intermediate re-freeze draft that codex brief consult returned REWORK on (F1 §R1 invariant stronger than impl/tests + missing malformed-TOML witness; F2 §R2a tail-window bounds length not time + introduces detection regression; F3 §R4 test count omits §R2b). rev6 was NEVER frozen (never promoted to WP-01-brief.md, never a status.evidence.brief baseline); superseded by rev7. See WP-01-consult-codex-rev6-answer.md."
     },
-    "tests": []
+    "tests": [
+      {
+        "command": "env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests/test_quota_fallback.py tests/test_resolve_fallback_binding.py tests/test_redispatch_quota_fallback.py -q",
+        "exit_code": 0,
+        "result": "30 passed (12+7+11) — 编排者 C1' 独立复跑，计数精确匹配 rev7 §R4；kimi 报告一致"
+      },
+      {
+        "command": "env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "result": "803 passed, 4 failed, 4 skipped (177.88s) — 4 failed 全部预存 test_finalize_merge_triple_sign.py（git checkout main 环境基线，main 被 sibling worktree 占用）；零新增失败；803 = 799(rev1)+4(rework 新测试)"
+      },
+      {
+        "command": "git diff --stat 42e6d85...HEAD  (C1' 范围守卫等价核验)",
+        "exit_code": 0,
+        "result": "SCOPE_GUARD_PASS — rework delta 恰好 5 个 allowed 文件 (+99/-5)：2 源 (resolve_paths.py/quota_fallback.py) + 3 测试；无 forbidden、无 docs/plans/、无 redispatch.py/config.toml（§R 本轮不改）；编排者独立核实"
+      },
+      {
+        "command": "python3.11 .kqff-wp01-c1prime-probe.py  (C1' INV-3/INV-4/脱敏 probe)",
+        "exit_code": 0,
+        "result": "OVERALL PASS — INV-3 fallback(selectors=string)=None 不抛（#1 闭环）；INV-4 primary=('kimi',None) 未削弱（主档零回归）；§R1 诊断脱敏（哨兵 absent）；is_quota_error('...weekly quota reset...')=True → §R3 真承重；resolve_paths.py:16 import sys 存在（无 NameError）"
+      },
+      {
+        "command": "env -u AGENTIC_PYTHON PYTHONPATH=src python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "result": "合并后集成工作树：803 passed, 4 failed, 4 skipped in 143.93s。4个失败均为 test_finalize_merge_triple_sign.py 的临时仓库缺 main；此前 sibling worktree 占用的归因不能用于本次结果。默认分支仅进程级指定后的洁净源质量门结果另见 finalization.clean_source_gate。",
+        "cwd": "/Users/admin/vibe/.worktrees/kqff"
+      }
+    ],
+    "finalization": {
+      "role": "Orchestrator",
+      "tool": "Qoder",
+      "lock_owner": "claude-kqff-b",
+      "method": "用户批准的手工等价 c-04；标准 merge/finalize 受主仓分支布局限制。未冒称执行 agentic gate/merge/finalize。",
+      "merge_commit": "3c6c68675eb5d71a564ae938f984075c147b4aa9",
+      "reviewed_commit": "4035f06d535d0675b559b8f10f52ec9ac47af1be",
+      "unique_second_parent_match": true,
+      "clean_source_gate": {
+        "merge_commit": "3c6c68675eb5d71a564ae938f984075c147b4aa9",
+        "tree": "79b2f77ab75240277a2d77405902c71c8a7e43b0",
+        "command": [
+          "bash",
+          "/Users/admin/vibe/agentic_loop/src/agentic_loop/wrappers/quality-gate.sh",
+          "/Users/admin/vibe/agentic_loop/.agentic/kqff-c04-g3xm1ngv/WP-01.quality-snapshot.json"
+        ],
+        "cwd": "/Users/admin/vibe/agentic_loop/.agentic/kqff-c04-g3xm1ngv/repo",
+        "exit_code": 0,
+        "output": "STATUS_VALID\nQUALITY_GATE_PLAN: python3.11 -m pytest tests -q\n........................................................................ [  8%]\n........................................................................ [ 17%]\n........................................................................ [ 26%]\n.....................................s.................................. [ 35%]\n........................................................................ [ 44%]\n........................................................................ [ 53%]\n........................................................................ [ 62%]\n........................................................................ [ 71%]\n........................................................................ [ 79%]\n...................................................................sss.. [ 88%]\n........................................................................ [ 97%]\n...................                                                      [100%]\n807 passed, 4 skipped in 145.98s (0:02:25)\nQUALITY_GATE_RESULT=PASS\n",
+        "changed_paths": [
+          ".agentic/config.toml",
+          "src/agentic_loop/quota_fallback.py",
+          "src/agentic_loop/redispatch.py",
+          "src/agentic_loop/resolve_paths.py",
+          "tests/test_quota_fallback.py",
+          "tests/test_redispatch_quota_fallback.py",
+          "tests/test_resolve_fallback_binding.py"
+        ],
+        "verified_at": "2026-09-23T15:18:48.494470+00:00"
+      },
+      "clean_source_note": "独立本地 clone 的提交树与 M 及 reviewed_commit 完全一致；外置临时 status 将范围基准设为 dispatch_commit，原样执行主仓质量门 wrapper；使用冻结验收命令的相对 PYTHONPATH=src，AGENTIC_PYTHON 清除且 init.defaultBranch 仅进程级指定。未修改权威 scope/base_branch，未过滤失败测试。",
+      "additional_environment_finding": "首次洁净门使用绝对 PYTHONPATH 时为806 passed/1 failed/4 skipped：test_prepush_hook_targets_current_worktree_status_in_linked_worktree。Debug 子代理对照验证：绝对路径使 hook 可导入框架，iterations_dir() 选主仓而非当前 worktree；相对 PYTHONPATH=src 则走已有 fallback，单测通过。集成树与 clone 均可复现绝对路径失败，freeze→M 未改相关逻辑；这是既有 hook 路径缺陷，不是本 WP 回归，相对路径下门禁通过不代表该路径缺陷已修复。",
+      "focused_result": "合并后集成工作树：30 passed in 0.07s，exit=0",
+      "remaining": [
+        "c-05 plan→main 延后，等待另行指示；未 push，未改其他在途工作树",
+        "生产启用前须以非生产凭据验证 flash id/selector；本次未网络探测",
+        "既有脱敏测试弱 OR 建议后续收紧，本次未扩实现范围",
+        "c-05/push 前须处置或明确裁定绝对 PYTHONPATH 下 pre-push 状态目录错误的既有缺陷；本次未修复"
+      ]
+    }
   },
-  "review": {},
-  "consult": {},
+  "review": {
+    "tool": "claude-code",
+    "session": "kqff-b",
+    "decision": "ACCEPT",
+    "reviewed_commit": "4035f06d535d0675b559b8f10f52ec9ac47af1be",
+    "reviewed_at": "2026-09-22T23:30:24Z",
+    "rationale": "C1' 独立复核 rev7 rework（base 42e6d85 → HEAD 4035f06，一次 feat 提交，5 allowed 文件 +99/-5，无 forbidden/docs/plans/redispatch.py/config.toml）。全部自跑未只信 kimi 报告：focused 30 passed（12/7/11 精确匹配 §R4）；全量 803 passed/4 预存失败（test_finalize_merge_triple_sign.py 环境基线）/4 skipped，零新增失败。§R1（finding #1，实现阻断）闭环——build_binding 调用点 except ProviderConfigError 拓宽为 except Exception（窄作用域，get_roles_raw 仍在 try 外未动，畸形 TOML 按设计属范围外既有共享失败），docstring 精确收窄，删无用 ProviderConfigError import；C1' probe 实证 selectors=string → None 不抛（INV-3）、primary 仍 ('kimi',None)（INV-4 未削弱）、诊断脱敏（哨兵 absent）、import sys 存在（无 NameError 击穿）。§R2a 确未实现（grep _MAX_SCAN_CHARS 空，is_quota_error 全文 re.search 未改，仅加 operator-trusted docstring，无检测回归）。§R2b（#8 硬化）闭环——load_quota_patterns except 打脱敏诊断（固定文案+类名），test_load_patterns_emits_redacted_diagnostic_on_fault 承重。§R3（#4/#5 台账勘误）——test_success_with_quota_like_output_no_fallback 真承重（实证 is_quota_error('...weekly quota reset...')=True，删短路则转红）。1 处非阻断 nit：§R2b 测试 api_key 断言为弱 OR（哨兵+路径+固定前缀+恰一行已充分覆盖脱敏）。reviewer=orchestrator，独立性由 codex consult 第二签名承载（weak-attested，WP-17 先例）。详见 WP-01-review-claude-rev2.md。",
+    "findings": []
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "reviewed_by": "codex-cli",
+    "reviewed_at": "2026-09-22T23:47:08Z",
+    "session": "01a0cb7e-e89f-7042-99d8-f505029d49a5",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "reviewed_commit": "4035f06d535d0675b559b8f10f52ec9ac47af1be",
+    "notes": "独立核验 HEAD 4035f06：f89d36c..4035f06 恰为 6 个提交、最终 diff 仅 7 个 allowed 文件（+713/-2）；42e6d85..4035f06 恰为单个 rework 提交、5 个文件（+99/-5），且对 redispatch.py、.agentic/config.toml、docs/plans/ 的 rework diff 为空。Q1/#1：resolve_paths.py:404 的 get_roles_raw 仍在 try 外，而 resolve_paths.py:420-432 的 try 仅包 build_binding；except Exception 捕获 selectors 非 dict 在 provider_binding.py:31-32 触发的 AttributeError并返回 None。primary 在 resolve_paths.py:361 同样于保护外读取 config，且无 provider 时在 :374-375 返回 ('kimi', None)，所以 rev7 NARROW 将畸形 TOML 归为共享既有失败是可接受的 merge-gate 边界，无需本 WP BROADEN。该 Exception 捕获虽宽，但作用域只有可选 fallback 的纯构造调用，不捕获 BaseException，并用固定诊断保留可观测性，不构成新 major。Q2/#8：quota_fallback.py:82-90 与 resolve_paths.py:422-432 的诊断仅含固定文案和 type(exc).__name__，不拼接异常消息、配置、路径或密钥；quota_fallback.py:9-11 明示 operator-trusted 边界，:48-61 保持全文 re.search，未出现尾窗常量，正确避免尾窗导致的头部命中回归。Q3/#4/#5：tests/test_redispatch_quota_fallback.py:101-116 使用实际会被 quota_fallback.py:43 命中的 weekly quota reset 串，并断言成功时不构造 fallback；这使 redispatch.py @@ -261,6 +263,46 的 dispatched 短路独立承重。brief rev7 已把 INV-1 承重裸词更正为“额度”。Q4：独立只读探针得到 resolve_role_binding('developer') == ('kimi', None)、fallback == ('deepseekflash','deepseek-v4-flash','deepseek/v4-flash')，四个歧义串均 False；.agentic/config.toml:31-36 的 [providers.kirogpt] 无 diff，independence.py 与 gate/__init__.py 均无改动，评级语义不变。非法 fallback 输入由 resolve_paths.py:406-417 的形状守卫以及 :420-432 的构造异常回落覆盖，tests/test_resolve_fallback_binding.py:42-100 锁定 role 非 dict、缺键、缺 provider、缺字段及 selectors 字符串/列表。按禁止运行 pytest 的要求未复跑；第一签名制品 WP-01-review-claude-rev2.md:13-14 记录 focused 30 passed（12/7/11）及全量 803 passed、4 failed、4 skipped，4 个失败均为预存 test_finalize_merge_triple_sign 环境失败。Q5：上述提交范围与 brief rev7:43-71 的 §R1-§R4 完全一致。Q6：未发现新 blocker/major；两处诊断无敏感数据拼接，except Exception 的窄作用域符合可选 fallback fail-safe。tests/test_quota_fallback.py:130 的 api_key 断言使用弱 OR 是非阻断测试 nit，因为 :126-129 已锁恰一行、固定前缀、哨兵和路径不泄漏，且生产代码诊断本身为固定串；建议后续改 AND。Q7：接受 #2（只有 patterns 有内置默认，fallback 未配置即 STOP）、#3（dirty 协作制品导致的 gate 布局问题应由干净源 C2 gate 收口）和 #6（精确 flash id/selector 生产启用前 probe）的裁定；#7 的单跳、INV-W1/INV-W2 与零回归边界由 redispatch wrapper及 tests/test_redispatch_quota_fallback.py:70-127、239-284 支撑。综上，rev1 的 #1、#4、#5、#8 已闭环，#2/#3/#6 裁定可接受，#7 保持成立；本 ACCEPT 不替代后续强制 C2 clean-source gate 和生产启用前 provider probe。",
+    "findings": [
+      {
+        "severity": "note",
+        "title": "#1 已按 NARROW 充分闭环",
+        "detail": "fallback resolver 仅在 build_binding 调用处捕获 Exception；get_roles_raw 与 primary 保持原语义。对 optional fallback 来说，配置形状错误回落 None 是正确 fail-safe，畸形 TOML 的共享既有失败无需在本 WP 单边处理。",
+        "evidence": "src/agentic_loop/resolve_paths.py:361,374-375,404,420-432；src/agentic_loop/provider_binding.py:31-32；tests/test_resolve_fallback_binding.py:57-100"
+      },
+      {
+        "severity": "note",
+        "title": "#8 脱敏诊断和尾窗撤销正确",
+        "detail": "两处诊断只输出固定文本及异常类名；全文扫描未被尾窗改变，operator-trusted 信任边界已文档化，因此没有引入头部额度命中丢失。",
+        "evidence": "src/agentic_loop/quota_fallback.py:9-11,48-61,82-90；src/agentic_loop/resolve_paths.py:422-432；tests/test_quota_fallback.py:113-130"
+      },
+      {
+        "severity": "note",
+        "title": "#4/#5 success 短路现已独立承重",
+        "detail": "新增成功结果携带可命中的 weekly quota reset 文本，并断言 fallback factory 未构造；删除 dispatched 短路会使该测试失败。",
+        "evidence": "src/agentic_loop/quota_fallback.py:43；tests/test_redispatch_quota_fallback.py:101-116；src/agentic_loop/redispatch.py @@ -261,6 +263,46"
+      },
+      {
+        "severity": "note",
+        "title": "零回归与范围符合冻结 spec",
+        "detail": "主档仍解析为 ('kimi', None)，kirogpt 和 independence 实现未变；rework 仅修改指定 2 个源文件和3个测试文件，redispatch/config/docs 本轮均未触碰。",
+        "evidence": ".agentic/config.toml:31-36,55-59；src/agentic_loop/resolve_paths.py:349-385；git diff 42e6d85..4035f06 --name-status（5 files, +99/-5）"
+      },
+      {
+        "severity": "minor",
+        "title": "保留两个非阻断后续项",
+        "detail": "生产启用前仍须用非生产凭据核实 deepseek-v4-flash/deepseek/v4-flash；脱敏测试末行的 OR 应改为 AND 以增强未来变异防护，但当前固定诊断及其他断言已充分证明本实现不泄密。",
+        "evidence": ".agentic/config.toml:40-45；tests/test_quota_fallback.py:126-130"
+      }
+    ],
+    "orchestrator_adjudication": "C2' codex impl 复签 = ACCEPT（session 01a0cb7e，对其 rev1 REWORK 01a0c9dd 的复签）。5 findings 全 note/minor，零 blocker/major（反伪签门通过）。codex 独立自跑只读探针实证 primary=('kimi',None) / fallback=('deepseekflash','deepseek-v4-flash','deepseek/v4-flash') / is_quota_error('...weekly quota reset...')=True / 四歧义串均 False，与 C1' 逐项一致；自跑 git 确认 6 commits 线性、rework delta 恰 5 文件、redispatch.py/config.toml/docs/plans 本轮零改、kirogpt 无 diff；逐行引用 resolve_paths.py:361,374-375,404,420-432 + provider_binding.py:31-32 独立采纳 NARROW 范围决策（畸形 TOML 属 primary/fallback 共享既有失败，merge-gate 边界可接受）。rev1 #1/#4/#5/#8 闭环、#2/#3/#6 裁定被接受、#7 成立。保留 2 非阻断后续项：① 生产启用前非生产凭据 probe flash 精确串（C4 前置）；② 脱敏测试末行弱 OR 建议未来收紧为 AND。codex 明示本 ACCEPT 不替代后续强制 C2 clean-source gate 与生产前 provider probe。",
+    "double_sign": "SATISFIED (review=ACCEPT claude C1' on rework 4035f06 / consult=ACCEPT codex C2' on rework 4035f06; rev1 REWORK superseded)",
+    "supersedes": {
+      "rev1_decision": "REWORK",
+      "rev1_session": "01a0c9dd-212f-7e41-a3f9-9027aa102acc",
+      "rev1_answer_artifact": "docs/plans/2026-09-22-kimi-quota-flash-fallback/WP-01-consult-codex-impl-rev1-answer.md"
+    },
+    "answer_artifact": "docs/plans/2026-09-22-kimi-quota-flash-fallback/WP-01-consult-codex-impl-rev2-answer.md",
+    "request_artifact": "docs/plans/2026-09-22-kimi-quota-flash-fallback/WP-01-consult-codex-impl-rev2-request.md"
+  },
   "timestamps": {
     "created_at": "2026-09-22T02:48:11Z",
-    "updated_at": "2026-09-22T09:24:20Z",
-    "dispatched_at": ""
+    "updated_at": "2026-09-23T15:21:43.749147+00:00",
+    "dispatched_at": "2026-09-22T23:12:07Z"
   }
 }
