@@ -385,6 +385,53 @@ def resolve_role_binding(
     return adapter, binding
 
 
+def resolve_role_fallback_binding(
+    role: str, repo: Path | None = None
+) -> "Any":
+    """Resolve the OPTIONAL quota-fallback binding for ``role``.
+
+    Reads ``roles.<role>`` dict's optional ``fallback_provider`` key and builds a
+    ProviderBinding from that provider's config. Returns ``None`` (zero-regression)
+    when the role is not a dict, carries no ``fallback_provider``, or the provider
+    section is missing/invalid. Never raises for provider-config shape errors;
+    a malformed config FILE is a pre-existing failure shared with
+    ``resolve_role_binding`` (escapes from ``get_roles_raw`` outside the try),
+    out of scope for this resolver.
+    """
+    from agentic_loop.provider_binding import build_binding
+
+    repo = repo or main_repo()
+    raw_roles = get_roles_raw(repo)
+    value: Any = raw_roles.get(role, DEFAULT_ROLES.get(role))
+    if not isinstance(value, dict):
+        return None
+    fp = value.get("fallback_provider")
+    if not isinstance(fp, str) or not fp:
+        return None
+    adapter = _first_candidate(value)
+    if adapter is None:
+        return None
+    providers = get_providers(repo)
+    provider_cfg = providers.get(fp)
+    if not isinstance(provider_cfg, dict):
+        return None
+    provider_cfg = dict(provider_cfg)
+    provider_cfg["_name"] = fp
+    try:
+        return build_binding(adapter=adapter, provider_cfg=provider_cfg)
+    except Exception as exc:
+        # INV-3 强化（codex impl-rev1 #1 / brief rev7 §R1）：fallback 路径对任意
+        # provider 配置形状（selectors 为字符串/列表等触发 build_binding 内任意
+        # 异常）一律回落 None，绝不抛进派发主链。窄作用域：仅包 build_binding 调用；
+        # 一行脱敏诊断（固定文案 + 异常类名），绝不含 config 原文/路径/密钥。
+        print(
+            "resolve_role_fallback_binding: provider config invalid "
+            f"({type(exc).__name__}); falling back to no quota fallback",
+            file=sys.stderr,
+        )
+        return None
+
+
 ROOTS = {
     "main_repo": main_repo,
     "current_worktree": current_worktree,
