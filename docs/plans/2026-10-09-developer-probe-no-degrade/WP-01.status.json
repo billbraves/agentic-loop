@@ -90,16 +90,16 @@
   },
   "review": {},
   "consult": {
-    "round": "r3",
+    "round": "r4",
     "kind": "brief-second-signature",
-    "decision": "REWORK",
-    "bound_commit": "a4bc5d7",
-    "bound_brief_rev": 3,
-    "receipt": ".agentic/wp01-brief-consult-r3-attempt2.receipt.json",
-    "answer": ".agentic/wp01-brief-consult-r3-attempt2.answer.md",
-    "session_id": "01a120e8-002e-7093-9609-743226c092df",
-    "required_changes": 5,
-    "resolved_in_rev": 4,
+    "decision": "PENDING",
+    "bound_commit": "",
+    "bound_brief_rev": 4,
+    "receipt": "",
+    "answer": "",
+    "session_id": "",
+    "required_changes": null,
+    "resolved_in_rev": null,
     "prior_rounds": [
       {
         "round": "r1",
@@ -123,17 +123,29 @@
         "session_id": "01a11fa9-c455-7761-8b44-c44e7cbdac7f",
         "required_changes": 4,
         "resolved_in_rev": 3
-      }
-    ],
-    "attempt": 2,
-    "voided_attempts": [
+      },
       {
-        "attempt": 1,
-        "session_id": "01a11fe9-68b7-7b02-8f96-95ab15074a05",
-        "valid_consult": false,
-        "decision": "INVALID",
-        "cause": "answer body empty; verdict never written before budget exhaustion",
-        "receipt": ".agentic/wp01-brief-consult-r3-attempt1.receipt.json"
+        "round": "r3",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "a4bc5d7",
+        "bound_brief_rev": 3,
+        "receipt": ".agentic/wp01-brief-consult-r3-attempt2.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r3-attempt2.answer.md",
+        "session_id": "01a120e8-002e-7093-9609-743226c092df",
+        "required_changes": 5,
+        "resolved_in_rev": 4,
+        "attempt": 2,
+        "voided_attempts": [
+          {
+            "attempt": 1,
+            "session_id": "01a11fe9-68b7-7b02-8f96-95ab15074a05",
+            "valid_consult": false,
+            "decision": "INVALID",
+            "cause": "answer body empty; verdict never written before budget exhaustion",
+            "receipt": ".agentic/wp01-brief-consult-r3-attempt1.receipt.json"
+          }
+        ]
       }
     ]
   },
