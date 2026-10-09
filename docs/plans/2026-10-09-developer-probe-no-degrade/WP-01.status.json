@@ -31,8 +31,7 @@
       "src/agentic_loop/adapters/base.py",
       "src/agentic_loop/adapters/kimi.py",
       "tests/test_redispatch_quota_fallback.py",
-      "tests/test_injection_probe.py",
-      ".agentic/config.toml"
+      "tests/test_injection_probe.py"
     ],
     "forbidden_paths": [
       "src/agentic_loop/resolve_paths.py",
@@ -40,6 +39,8 @@
       "src/agentic_loop/bootstrap_cmd.py",
       "src/agentic_loop/adapters/claude.py",
       "src/agentic_loop/adapters/codex.py",
+      "src/agentic_loop/secret_redaction.py",
+      ".agentic/config.toml",
       "uv.lock"
     ]
   },
@@ -53,21 +54,43 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "840961c3790fdf33f3ddcc3bf2a253294c1030977f4ab4b816b421932ad52d67",
-      "rev": 1
+      "sha256": "a59b61649d54b5cea49013415992da50eba6a93768e642967b50f8580e033673",
+      "rev": 2,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev1.md",
+          "sha256": "840961c3790fdf33f3ddcc3bf2a253294c1030977f4ab4b816b421932ad52d67",
+          "outcome": "REWORK"
+        }
+      ]
     },
     "baseline": {
       "commit": "0ba058de2beb6c357abfcbeacbc3263f7d4483f8",
       "measured_at": "2026-10-09T03:22:26Z",
       "result": "807 passed, 4 skipped",
-      "measured_by": "orchestrator"
+      "measured_by": "orchestrator",
+      "reverified_at": "2026-10-09T07:10:55Z",
+      "reverified_result": "807 passed, 4 skipped",
+      "reverified_by": "orchestrator",
+      "reverified_note": "re-run in worktree /Users/admin/vibe/probe-no-degrade; src/ and tests/ byte-identical to base commit (git diff empty)"
     }
   },
   "review": {},
-  "consult": {},
+  "consult": {
+    "round": "r1",
+    "kind": "brief-second-signature",
+    "decision": "REWORK",
+    "answer": ".agentic/probe-wp01-brief-consult.answer.md",
+    "receipt": ".agentic/probe-wp01-brief-consult.receipt.json",
+    "bound_commit": "efd893a",
+    "bound_brief_rev": 1,
+    "required_changes": 8,
+    "resolved_in_rev": 2
+  },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-09T03:22:26Z",
+    "updated_at": "2026-10-09T07:10:55Z",
     "dispatched_at": ""
   }
 }

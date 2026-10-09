@@ -52,16 +52,27 @@ kimi 探针失败时,循环推进到 `claude`。后果:
 - 命中 `is_quota_error` → 走既有单跳 flash 回退(`resolve_role_fallback_binding`)。
 - 未命中 → `raise ProbeFailedError`,由 `main()` 打 `REDISPATCH_STOP` 交人。
 
-**R3 探针须交出输出,但不得改既有契约。** `probe_injection() -> bool` 有 5 处实现
-(`base`/`kimi`/`claude`/`codex` + base 抽象)与一个独立调用方
-`bootstrap_cmd._probe_one`(:92)。因此**加法而非改签名**:新增
+**R3 探针须交出输出,但不得改既有契约。** `probe_injection() -> bool` 共有
+**四处定义**:`adapters/base.py:193`(具体默认实现,不是抽象方法 —— 同文件
+`:188` 的 `@abc.abstractmethod` 是 `probe()`,与本契约无关)、
+`adapters/kimi.py:168`、`adapters/claude.py:126`、`adapters/codex.py:199`;
+唯一独立生产调用方是 `bootstrap_cmd._probe_one`(`:88-92`),
+`redispatch.py:162/174/182` 是本 WP 自己要改的调用点。
+(rev1 写「5 处实现」是把 base 的默认实现重复计为「base + base 抽象」,
+二签 Q5 认定为笔误。)因此**加法而非改签名**:新增
 `probe_injection_detail() -> tuple[bool, str]`,`probe_injection()` 委托给它
 取第一元。`bootstrap_cmd` 零改动,4 个现有测试文件的 bool 断言全部继续成立。
 
-**R4 配置规范化。** `identity_model` 由未列出的别名 `deepseek-v4-flash` 改为
+**R4 配置规范化 —— 已移出 WP-01(2026-10-09,二签 Q7)。**
+原取向:`identity_model` 由未列出的别名 `deepseek-v4-flash` 改为
 `GET /v1/models` 列出的规范 id `deepseek-flash`,selector 同步。两者皆可服务
 (已实测 200 + sentinel),故这是规范化而非 bug 修复;`roles.developer` 的
 `fallback_provider` 形态不变。
+**但它与本 WP 的行为目标无关**(生产权威是 `main_repo()`,不读被审 checkout 的
+config),属另一目的。故 WP-01-brief rev2 删除 F4、把 `.agentic/config.toml`
+列入 `forbidden_paths`,被审 checkout 的两条断言保持现值
+(`identity_model == "deepseek-v4-flash"`、`cli_selector == "deepseek/v4-flash"`)
+并列入「必须保持绿集合」。规范化若仍要做,另立 WP。
 
 ## 4. 范围外
 
