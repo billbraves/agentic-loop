@@ -54,13 +54,19 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "a59b61649d54b5cea49013415992da50eba6a93768e642967b50f8580e033673",
-      "rev": 2,
+      "sha256": "ea608a029fe9f2ed76ae2bcb59fdfd9cead235e0395893d7f78775d1ae9f33cf",
+      "rev": 3,
       "prior_revs": [
         {
           "rev": 1,
           "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev1.md",
           "sha256": "840961c3790fdf33f3ddcc3bf2a253294c1030977f4ab4b816b421932ad52d67",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 2,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev2.md",
+          "sha256": "a59b61649d54b5cea49013415992da50eba6a93768e642967b50f8580e033673",
           "outcome": "REWORK"
         }
       ]
@@ -78,19 +84,45 @@
   },
   "review": {},
   "consult": {
-    "round": "r1",
+    "round": "r3",
     "kind": "brief-second-signature",
-    "decision": "REWORK",
-    "answer": ".agentic/probe-wp01-brief-consult.answer.md",
-    "receipt": ".agentic/probe-wp01-brief-consult.receipt.json",
-    "bound_commit": "efd893a",
-    "bound_brief_rev": 1,
-    "required_changes": 8,
-    "resolved_in_rev": 2
+    "decision": "PENDING",
+    "bound_commit": "",
+    "bound_brief_rev": 3,
+    "receipt": "",
+    "answer": "",
+    "session_id": "",
+    "required_changes": null,
+    "resolved_in_rev": null,
+    "prior_rounds": [
+      {
+        "round": "r1",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "answer": ".agentic/probe-wp01-brief-consult.answer.md",
+        "receipt": ".agentic/probe-wp01-brief-consult.receipt.json",
+        "bound_commit": "efd893a",
+        "bound_brief_rev": 1,
+        "required_changes": 8,
+        "resolved_in_rev": 2
+      },
+      {
+        "round": "r2",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "715232d",
+        "bound_brief_rev": 2,
+        "receipt": ".agentic/wp01-brief-consult-r2.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r2.answer.md",
+        "session_id": "01a11fa9-c455-7761-8b44-c44e7cbdac7f",
+        "required_changes": 4,
+        "resolved_in_rev": 3
+      }
+    ]
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-09T07:10:55Z",
+    "updated_at": "2026-10-09T08:45:00Z",
     "dispatched_at": ""
   }
 }
