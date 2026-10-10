@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-09-developer-probe-no-degrade",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -16,7 +16,7 @@
   },
   "reviewer": {
     "tool": "claude-code",
-    "session": ""
+    "session": "orchestrator-as-reviewer"
   },
   "git": {
     "base_branch": "plan/2026-10-09-developer-probe-no-degrade",
@@ -145,7 +145,42 @@
       "reverified_note": "re-run in worktree /Users/admin/vibe/probe-no-degrade; src/ and tests/ byte-identical to base commit (git diff empty)"
     }
   },
-  "review": {},
+  "review": {
+    "decision": "REWORK",
+    "report": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-review.md",
+    "verified_independently": [
+      "full suite 838 passed / 4 skipped / 0 failed",
+      "20/20 named mutations red on their named instances, green after revert",
+      "M-B1[kimi] equivalence control stayed green",
+      "seven must-stay-green items green",
+      "scope: 5 allowed code files only, zero forbidden hits",
+      "original defect gone: no candidate loop, no fall-through to claude"
+    ],
+    "findings": [
+      {
+        "id": 1,
+        "blocking": true,
+        "summary": "redispatch.py:513 (legacy PROBE_CMD path, probe=False) does not catch ProbeFailedError, but S4 'unknown developer adapter' fires before S5b and is reachable there — a misconfigured adapter name crashes main() with a traceback instead of REDISPATCH_STOP.",
+        "why_matrix_missed_it": "D5/B3 monkeypatch _resolve_developer entirely, so the real S4 never crosses the main() boundary; A3 only covers the resolver-level raise.",
+        "classification": "not an implementation deviation — the S4 raise matches the frozen text verbatim; the brief's main() wiring requirement is incomplete. Orchestrator deliberately did NOT self-patch.",
+        "options": [
+          "brief rev10 + r9 second signature + one small implementation turn",
+          "merge as-is and file Finding 1 as its own WP (documented risk)"
+        ]
+      },
+      {
+        "id": 2,
+        "blocking": false,
+        "summary": "M-B3's frozen anchor had been split into a two-line reassignment with variable `fb`; behaviorally equivalent but mechanically unmutatable. Fixed in 7b3c99e; 20/20 on rerun."
+      },
+      {
+        "id": 3,
+        "blocking": false,
+        "summary": "A 273-error full-suite run was self-inflicted by a concurrent git checkout (several suites shell out to git). Serial rerun: 838/4/0. Recorded as a known false-failure mode."
+      }
+    ],
+    "decision_note": "REWORK in the schema's vocabulary; the WP state is CHANGES_REQUESTED. One blocking finding (#1), two non-blocking records (#2, #3)."
+  },
   "consult": {
     "round": "r8",
     "kind": "brief-second-signature",
@@ -257,7 +292,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T09:44:57.651933+00:00",
+    "updated_at": "2026-10-10T13:26:40.892510+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }
