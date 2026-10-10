@@ -21,8 +21,8 @@
     "base_branch": "plan/2026-10-09-developer-probe-no-degrade",
     "base_commit": "0ba058de2beb6c357abfcbeacbc3263f7d4483f8",
     "dispatch_commit": "",
-    "branch": "",
-    "worktree": "",
+    "branch": "plan/2026-10-09-developer-probe-no-degrade",
+    "worktree": "/Users/admin/vibe/probe-no-degrade",
     "commit": ""
   },
   "scope": {
@@ -54,8 +54,8 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "20dff7a63c84bb2f8ad0ed3ec1e502dce774d2b05e353a997cfd8e8baf8110ff",
-      "rev": 8,
+      "sha256": "03a6087c4a18a24896264480bd82e7dc685fcb5c1235ca0e573877b873bd4d0c",
+      "rev": 9,
       "prior_revs": [
         {
           "rev": 1,
@@ -99,6 +99,13 @@
           "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev7.md",
           "sha256": "027d1256c7d0782eca413a8d5245aeb0ce3210e19246b0f0a941afc796f2ccf8",
           "outcome": "REWORK"
+        },
+        {
+          "rev": 8,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
+          "sha256": "20dff7a63c84bb2f8ad0ed3ec1e502dce774d2b05e353a997cfd8e8baf8110ff",
+          "outcome": "ACCEPT",
+          "note": "r7 ACCEPT (session 01a12423). rev9 is a template-compat amendment (three English alias sections appended at EOF for dispatch-lint); no semantic delta. rev8 was not separately archived; `git diff` 695066e..rev9 proves the alias-only delta."
         }
       ]
     },
@@ -115,15 +122,15 @@
   },
   "review": {},
   "consult": {
-    "round": "r7",
+    "round": "r8",
     "kind": "brief-second-signature",
-    "decision": "ACCEPT",
-    "state": "COMPLETED",
-    "bound_commit": "695066e",
-    "bound_brief_rev": 8,
-    "receipt": ".agentic/wp01-brief-consult-r7.receipt.json",
-    "answer": ".agentic/wp01-brief-consult-r7.answer.md",
-    "session_id": "01a12423-3f91-7d80-bf35-0f0f935b0fcc",
+    "decision": null,
+    "state": "NOT_DISPATCHED",
+    "bound_commit": "",
+    "bound_brief_rev": 9,
+    "receipt": "",
+    "answer": "",
+    "session_id": "",
     "required_changes": null,
     "resolved_in_rev": null,
     "prior_rounds": [
@@ -208,12 +215,24 @@
             "receipt": ".agentic/wp01-brief-consult-r3-attempt1.receipt.json"
           }
         ]
+      },
+      {
+        "round": "r7",
+        "kind": "brief-second-signature",
+        "decision": "ACCEPT",
+        "bound_commit": "695066e",
+        "bound_brief_rev": 8,
+        "receipt": ".agentic/wp01-brief-consult-r7.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r7.answer.md",
+        "session_id": "01a12423-3f91-7d80-bf35-0f0f935b0fcc",
+        "required_changes": 0,
+        "resolved_in_rev": null
       }
     ]
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-11T04:00:00Z",
+    "updated_at": "2026-10-10T05:02:24.531247+00:00",
     "dispatched_at": ""
   }
 }

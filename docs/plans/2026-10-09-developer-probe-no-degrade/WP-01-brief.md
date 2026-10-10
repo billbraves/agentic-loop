@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev8 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev9 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev9),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev10),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -11,6 +11,7 @@
 > rev5 `WP-01-brief.rev5.md`(含 rev5 相对 rev4 的变更表)、
 > rev6 `WP-01-brief.rev6.md`(含 rev6 相对 rev5 的变更表与 r4 三项必改的关闭方式)、
 > rev7 `WP-01-brief.rev7.md`(含 rev7 的矩阵化重写说明与旧→新映射表)。
+> rev8 未单独存档:rev9 与 rev8 的全部差异即文末三个英文别名节,`git diff` 可证。
 > rev4 由第三轮二签 REWORK(`.agentic/wp01-brief-consult-r3-attempt2.answer.md`,
 > `CODEX_DECISION: REWORK`,绑定 worktree head `a4bc5d7` / brief rev3
 > sha256 `ea608a02`)驱动,逐条关闭其**五项必改**。
@@ -60,7 +61,14 @@
 > r6 的元判断:矩阵方向正确、核心「不换 adapter」覆盖已基本充分,
 > 本轮缺的是 S4/S7 两个 egress 空格(覆盖)加三处执行口径(精确性);
 > rev8 **只做定点修订,不再扩轴**。
-> rev8 冻结后须过一轮二签(r7,绑 rev8)才谈派发。
+> r7 已审 rev8:**CODEX_DECISION: ACCEPT**
+> (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
+> `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev9 是纯模板兼容修订**:派发闸 `dispatch_lint` 要求 brief 含三个英文节名
+> (`## Acceptance tests` / `## Allowed and forbidden paths` / `## Completion definition`,
+> 现行模板与 kqff WP-1 先例均带),本 brief 全中文标题不满足。
+> rev9 只在文末**追加三个英文别名节**(内容仅为指向中文正文的同义声明,
+> 见文末),**不增删改任何既有行**。绑定 r8 二签确认该 delta 无语义。
 
 ## 目标(一句话)
 
@@ -878,3 +886,17 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     - S11 非额度(raise)→ **C3**(双实例);
     另有 C4 直接锁 bound detail 返回值的脱敏。
     **将来若 F6 新增决策位点,必须同时更新本表并配上对应 oracle。**
+
+## Acceptance tests
+
+本段与上文「承重测试与必须转红的变异(矩阵式,rev7 重写)」「交付物清单」
+「完成定义(DoD)」同义,**非另一份口径**;仅为派发闸 `dispatch_lint` 的
+模板节名识别而设(现行模板与 kqff WP-01 先例均带此三别名节)。
+
+## Allowed and forbidden paths
+
+本段与上文「范围」一节的 allowed_paths / forbidden_paths 完全同义,非另一份口径。
+
+## Completion definition
+
+本段与上文「完成定义(DoD)」一节同义,非另一份口径。
