@@ -54,8 +54,8 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "027d1256c7d0782eca413a8d5245aeb0ce3210e19246b0f0a941afc796f2ccf8",
-      "rev": 7,
+      "sha256": "97168912b0b51b7ddd4cdb42ff9e3e06b900d5d806e4c909584a2867707acb04",
+      "rev": 8,
       "prior_revs": [
         {
           "rev": 1,
@@ -93,6 +93,12 @@
           "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev6.md",
           "sha256": "602c938a8b5489a6405534c0c1292d4bd9a790db420244e1cbe2e8f934cf13dd",
           "outcome": "REWORK"
+        },
+        {
+          "rev": 7,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev7.md",
+          "sha256": "027d1256c7d0782eca413a8d5245aeb0ce3210e19246b0f0a941afc796f2ccf8",
+          "outcome": "REWORK"
         }
       ]
     },
@@ -109,18 +115,30 @@
   },
   "review": {},
   "consult": {
-    "round": "r6",
+    "round": "r7",
     "kind": "brief-second-signature",
     "decision": null,
     "state": "NOT_DISPATCHED",
     "bound_commit": "",
-    "bound_brief_rev": 7,
+    "bound_brief_rev": 8,
     "receipt": "",
     "answer": "",
     "session_id": "",
     "required_changes": null,
     "resolved_in_rev": null,
     "prior_rounds": [
+      {
+        "round": "r6",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "360fce6",
+        "bound_brief_rev": 7,
+        "receipt": ".agentic/wp01-brief-consult-r6.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r6.answer.md",
+        "session_id": "01a12415-8d34-7fc3-9e76-7f7c0e5bc9c4",
+        "required_changes": 4,
+        "resolved_in_rev": 8
+      },
       {
         "round": "r5",
         "kind": "brief-second-signature",
@@ -195,7 +213,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T22:00:00Z",
+    "updated_at": "2026-10-11T02:00:00Z",
     "dispatched_at": ""
   }
 }

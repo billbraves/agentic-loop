@@ -1,15 +1,16 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev7 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev8 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev8),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev9),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
 > rev4 `WP-01-brief.rev4.md`(含 rev4 相对 rev3 的变更表)、
 > rev5 `WP-01-brief.rev5.md`(含 rev5 相对 rev4 的变更表)、
-> rev6 `WP-01-brief.rev6.md`(含 rev6 相对 rev5 的变更表与 r4 三项必改的关闭方式)。
+> rev6 `WP-01-brief.rev6.md`(含 rev6 相对 rev5 的变更表与 r4 三项必改的关闭方式)、
+> rev7 `WP-01-brief.rev7.md`(含 rev7 的矩阵化重写说明与旧→新映射表)。
 > rev4 由第三轮二签 REWORK(`.agentic/wp01-brief-consult-r3-attempt2.answer.md`,
 > `CODEX_DECISION: REWORK`,绑定 worktree head `a4bc5d7` / brief rev3
 > sha256 `ea608a02`)驱动,逐条关闭其**五项必改**。
@@ -52,7 +53,14 @@
 > 结构方向由用户在 r5 裁决后拍板。r5 Q10(b) 裁定:矩阵化后仍单 WP,不必拆包。
 > **本 brief 尚未获授权实现**:r5 receipt 记 `implementation_authorized: false`、
 > `dispatch_authorized: false`、`wp_state_at_dispatch: "DRAFT"`。
-> rev7 冻结后须过一轮二签(r6,绑 rev7)才谈派发。
+> **rev8 由第六轮二签 REWORK 驱动**
+> (`.agentic/wp01-brief-consult-r6.answer.md`,`CODEX_DECISION: REWORK`,
+> 绑定 worktree head `360fce6` / brief rev7 sha256 `027d1256`),
+> 逐条关闭其**四项必改**(见 §「rev8 相对 rev7 的变更」)。
+> r6 的元判断:矩阵方向正确、核心「不换 adapter」覆盖已基本充分,
+> 本轮缺的是 S4/S7 两个 egress 空格(覆盖)加三处执行口径(精确性);
+> rev8 **只做定点修订,不再扩轴**。
+> rev8 冻结后须过一轮二签(r7,绑 rev8)才谈派发。
 
 ## 目标(一句话)
 
@@ -60,7 +68,25 @@
 或「STOP 交人」,**绝不**推进到另一个 adapter 把 developer 静默换成 claude;
 且探针原始输出只在内存里参与额度判定,不进 reasons / 异常 / 日志 / status。
 
-## rev7 相对 rev6 的变更(r5 三项必改 + 矩阵化压缩)
+## rev8 相对 rev7 的变更(r6 四项必改)
+
+> r6 裁决原文:`.agentic/wp01-brief-consult-r6.answer.md`(`CODEX_DECISION: REWORK`,
+> 绑 rev7 @ `360fce6` / sha256 `027d1256`,`valid_consult: true`)。
+> 四项必改由编排者逐条对照 rev7 文本核实为真后采纳。
+
+| r6 必改项 | 关闭方式 | 落点 |
+|---|---|---|
+| 1. S4 与 S7 的零外流空格:A3 只查异常文案(可 `print(adapter_name)` 泄漏配置原文);B4 只查标志位(可通过支 `print(probe_output)`,直接违反 F7「探针输出唯一用途是喂 `is_quota_error`」) | **A3** 改用带哨兵的未知名(`no-such-adapter-SENTINEL4`),加 capsys 断言与变异 **M-A3b**;新增 **C0** 通过支零外流(按 binding 参数化)与变异 **M-C0** | A3;新增 C0 |
+| 2. S1-S11 锚点表缺 `probe=False` 分支,与 must-stay-green 第 5 项不闭合 | 位点表声明为 **`probe=True` 子图**,S5 与 S6 之间冻结 **S5b** `if not probe: return adapter, reasons, False`;新增 **B5** 测试该路径(探针计数 0)与变异 **M-B5** | S 表;新增 B5 |
+| 3. 硬验收对「红错实例」无处置:M-B1 的 [kimi] 是**等价控制实例**(原式与变异式等价),它转红说明变异不纯/位点错/参数化坏,不能仅作信息忽略 | DoD 新增**等价控制规则**:被显式声明为等价控制的实例(当前仅 M-B1[kimi])**必须保持绿,转红即 BLOCKED** | §DoD |
+| 4. 「报告所有实际连带红」不可机械执行(五步法只跑具名测试,无从得知全部连带) | DoD 改为:**只记录本次命令实际覆盖到的实例**;连带红讨论限于该测试自身的实例 | §DoD |
+| (r6 Q8 附带意见)CHAR-1 声称锁五种退化配置但测试只构造一种 | CHAR-1 **参数化为五种 fixture**(无 config / `[roles]` 空 / `[]` / `""` / 缺项) | CHAR-1 |
+
+**rev8 不变的部分**:矩阵轴与族结构;A/B/C/D 既有条目的断言与四元组;
+F1-F7 行为目标;范围;基线;五步法。规模:18 个测试条目 + CHAR-1
+(8 个双实例参数化),20 条具名变异。r6 明确:「不建议再扩大 adapter/outcome 轴」。
+
+
 
 > r5 裁决原文:`.agentic/wp01-brief-consult-r5.answer.md`(`CODEX_DECISION: REWORK`,
 > 绑 rev6 @ `89a03b4` / sha256 `602c938a`,`valid_consult: true`)。
@@ -363,7 +389,8 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
 > 预期实现中找不到原表达式 → 立即 BLOCKED,不得近似施加。
 > **rev7 取消全部守卫互补与连带红记账**(见 §DoD 的硬验收口径与附注 12)。
 
-**F6 冻结实现的决策位点表(变异锚点全集;实现完成后逐字存在)**:
+**F6 冻结实现的决策位点表(`probe=True` 子图 + S5b 的 `probe=False` 提前返回;**
+**变异锚点全集,实现完成后逐字存在;r6 必改项 2)**:
 
 ```python
 adapter_name, binding = resolve_role_binding("developer", repo=repo)      # S1
@@ -372,6 +399,8 @@ quota_patterns = load_quota_patterns(repo)                                # S3
 if adapter_name not in registry:                                          # S4
     raise ProbeFailedError("unknown developer adapter")
 adapter = registry[adapter_name](binding)                                 # S5
+if not probe:                                                             # S5b
+    return adapter, reasons, False
 ok, probe_output = adapter.probe_injection_detail()                       # S6
 if ok:                                                                    # S7
     return adapter, reasons, False
@@ -383,7 +412,11 @@ raise ProbeFailedError("probe failed: other")                             # S11
 ```
 
 > S4 由 rev7 从「其余」拆出(r5 Q8):未知名失败发生在**探针之前**,
-> 没有 `probe_output`,不参与额度分流,异常文案固定且不回显配置值。
+> 没有 `probe_output`,不参与额度分流,异常文案固定且不回显配置值;
+> rev8 起 A3 还直接锁该支的 stdout/stderr 零回显。
+> **S5b 由 rev8 补出**(r6 必改项 2):F5 的签名保留 `probe` 形参,
+> must-stay-green 第 5 项要求 `probe=False` 不探针直接返回首选;
+> 没有这一行,位点表与该要求不闭合。S5b 由 B5 直接锁定。
 
 **测试环境公共约定**:resolver 层测试(A/B/C 族与 D3/D4)用 stub adapter +
 monkeypatch `redispatch.resolve_role_binding` / `resolve_role_fallback_binding`
@@ -421,14 +454,26 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 
 - **A3 未知名前置支:一个工厂都不许造**(关 r5 Q8)
   `test_unknown_adapter_builds_nothing`:
-  - monkeypatch `resolve_role_binding` → `("no-such-adapter", None)`。
+  - monkeypatch `resolve_role_binding` → `("no-such-adapter-SENTINEL4", None)`
+    (rev8:未知名**自带哨兵**,使「配置值回显」可观测)。
   - 断言:抛 `ProbeFailedError`,`str(exc) == "unknown developer adapter"`
-    (**精确相等** —— 同时证明原始配置值未被回显进异常);
+    (**精确相等** —— 证明原始配置值未被回显进异常);
+    **capsys 捕获的 stdout 与 stderr 均不含 `no-such-adapter-SENTINEL4`**
+    (rev8 新增,关 r6 必改项 1 的 S4 半:配置原文也不得打印);
     **registry 内全部三个工厂计数均为 0**(首选名不在 registry,一个都不许造)。
   - **M-A3** 目标函数:`redispatch._resolve_developer` @ **S4**
     原表达式:`raise ProbeFailedError("unknown developer adapter")`
     变异表达式:`return registry["kimi"](None), reasons, False`
-    承重测试:A3。
+    承重测试:A3(换派面)。
+  - **M-A3b** 目标函数:`redispatch._resolve_developer` @ **S4**(同位点另一面)
+    原表达式:`raise ProbeFailedError("unknown developer adapter")`
+    变异表达式(两行,逐字):
+    ```python
+    print(adapter_name)
+    raise ProbeFailedError("unknown developer adapter")
+    ```
+    承重测试:A3(配置值外流面,capsys 断言转红)。
+  > M-A3 与 M-A3b 同位点不同面(换派 vs 外流),分别施加、分别记红。
 
 ### B 族:结局与状态贯通
 
@@ -479,12 +524,45 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     变异表达式:`return adapter, reasons, True`
     承重测试:B4。
 
+- **B5 `probe=False` 不探针直接返回首选**(rev8 新增,关 r6 必改项 2)
+  `test_probe_false_returns_primary_without_probing`:
+  - 以 `probe=False` 调用;registry 三个计数 stub,首选 stub 的探针
+    **若被调用即记录**(计数即证据)。
+  - 断言:正常返回 `(首选 adapter, reasons, False)`;**首选工厂的探针计数为 0**;
+    所有非首选工厂计数为 0。
+  - **M-B5** 目标函数:`redispatch._resolve_developer` @ **S5b**
+    原表达式:`if not probe:`
+    变异表达式:`if False:`
+    承重测试:B5(删掉提前返回后首选 stub 被探针,探针计数 0→1 → 红)。
+
 ### C 族:零外流(全部按 binding 参数化)
 
 > 哨兵约定:native 实例用字面量 `NATIVE_EGRESS_SENTINEL`,bound 实例用
 > `BOUND_EGRESS_SENTINEL`,两者字面值互不相同;均经 stub 的
 > `probe_injection_detail()` **返回值**注入(不真发子进程)。
 > adapter 层的真实脱敏由 C4 单独锁定;resolver 层的职责是「拿到什么都不能外吐」。
+
+- **C0 通过支零外流**(rev8 新增,关 r6 必改项 1 的 S7 半)
+  `test_zero_egress_on_probe_pass[binding_kind]`,binding_kind ∈ {native, bound}:
+  - 首选 stub 探针**通过**(`ok=True`),其 `probe_output` 含哨兵
+    (native 实例 `NATIVE_EGRESS_SENTINEL`,bound 实例 `BOUND_EGRESS_SENTINEL`);
+  - 断言:正常返回首选 adapter、`fallback_applied is False`;
+    返回的 `reasons` **每个元素**、capsys 捕获的 stdout/stderr 均不含哨兵。
+  > 通过支的输出仍是 `probe_output`,F7 的「唯一用途是喂 `is_quota_error`」
+  > 不以探针成功为例外 —— 「不是失败输出」推不出「允许输出」(r6 Q2)。
+  - **M-C0** 目标函数:`redispatch._resolve_developer` @ **S7**
+    原表达式(两行,逐字):
+    ```python
+    if ok:
+        return adapter, reasons, False
+    ```
+    变异表达式(三行,逐字):
+    ```python
+    if ok:
+        print(probe_output)
+        return adapter, reasons, False
+    ```
+    承重实例:**[native] 与 [bound] 都必须转红**。
 
 - **C1 可返回支(额度+有 fallback)零外流**
   `test_zero_egress_on_quota_flash_return[binding_kind]`,binding_kind ∈ {native, bound}:
@@ -634,7 +712,9 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 
 ### CHAR-1 空配置折叠事实的锁定(characterization,无变异,不计入承重数)
 
-对一个 `tmp_path` 下的空配置仓,断言
+对 `tmp_path` 下的**五种退化配置逐一参数化**(r6 Q8 附带意见:声称五种
+就测五种):无 `.agentic/config.toml` / `[roles]` 为空 / `developer = []` /
+`developer = ""` / developer 缺项而其他 role 存在。每种都断言
 `resolve_role_binding("developer", repo=tmp) == ("kimi", None)` 且
 `resolve_role_fallback_binding("developer", repo=tmp) is None`。
 编排者实测五种退化配置(无 config / `[roles]` 空 / `developer = []` /
@@ -667,17 +747,18 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
   **`main():538` 的 `resolve_role_fallback_binding` 补 `repo=repo_root`**(rev5);
   删除死 `get_roles` import
 - `tests/test_redispatch_quota_fallback.py`:
-  A1×2 / A2×2 / A3 / B1×2 / B2 / B3 / B4 / C1×2 / C2×2 / C3×2 / C4 /
-  D2×2 / D3 / D4 / D5 测试 + `CHAR-1` + 三元返回与新签名的 stub 同步
+  A1×2 / A2×2 / A3(双变异)/ B1×2 / B2 / B3 / B4 / B5 /
+  C0×2 / C1×2 / C2×2 / C3×2 / C4 / D2×2 / D3 / D4 / D5 测试
+  + `CHAR-1`(五 fixture 参数化)+ 三元返回与新签名的 stub 同步
 - `tests/test_injection_probe.py`:D1(继承默认的精确 bool 断言,新增)
 - 执行报告(§C 格式),含逐条变异红证 + F3 的生产/checkout 实测事实复述
 
 ## 完成定义(DoD)
 
 - [ ] F1、F2、F3、F5、F6、F7 逐项实现(F4 已删除,`config.toml` 零改动)
-- [ ] 承重矩阵的 **16 个测试条目 + CHAR-1** 全部存在并通过;7 个双实例
-      参数化条目(A1 / A2 / B1 / C1 / C2 / C3 / D2)的**两个实例**都断言到位
-- [ ] **17 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**。
+- [ ] 承重矩阵的 **18 个测试条目 + CHAR-1** 全部存在并通过;8 个双实例
+      参数化条目(A1 / A2 / B1 / C0 / C1 / C2 / C3 / D2)的**两个实例**都断言到位
+- [ ] **20 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**。
       报告逐条记录命令与输出;施加每条变异前先断言被变异的源文件确实
       与原文不同(如 `git diff --stat` 非空,杜绝空变异读成绿)
 - [ ] 每条变异记账含四元组对应关系:目标函数 / 原表达式 / 变异表达式 /
@@ -693,10 +774,18 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
       「具名承重测试的承重实例转红」**。rev5/rev6 的「对角线交叉记账」与
       「冻结连带红集合」整套机制**已删除**:参数化取代了守卫互补
       (同一无条件变异由两个实例共同承重,见附注 12),不再需要用连带绿
-      证明位点分离。连带红的处理:**报告按名列出每条变异的实际连带红,
-      但它既不构成承重证据、不触发 BLOCKED、也不与任何冻结集合比对**。
-      唯一例外规则:若某条变异的**承重实例没有转红**,无论其他测试红绿如何,
-      一律按五步法②报 BLOCKED,不得用其他测试的红替代
+      证明位点分离。连带红的处理(rev8 修正,r6 必改项 4):
+      五步法只跑具名承重测试,因此**只记录该次命令实际覆盖到的实例**;
+      连带红讨论限于该测试自身的实例,不要求、也不允许为「列出全部连带红」
+      去跑额外套件。任何连带红都不构成承重证据。
+      例外规则一:若某条变异的**承重实例没有转红**,无论其他测试红绿如何,
+      一律按五步法②报 BLOCKED,不得用其他测试的红替代。
+      例外规则二(**等价控制实例**,rev8 新增,关 r6 必改项 3):
+      被四元组显式声明为**等价控制**的实例 —— 当前仅有 **M-B1 的 [kimi]**
+      (该实例下原表达式与变异表达式等价)—— **必须保持绿**;
+      它一旦转红,说明变异不纯、测试参数隔离错误或施加范围错误,
+      **报 BLOCKED**,不得作为信息忽略。等价控制实例清单即此一处,
+      将来新增变异时若存在同类实例,须在同一四元组里显式声明
 - [ ] 「必须保持绿集合」七项全绿,按名逐一记录结果
 - [ ] **legacy `PROBE_CMD` 路径(`main():532`)有定向测试覆盖三元解包**
       (该路径只在 legacy 分支运行,漏改会在生产运行时才崩)
@@ -776,9 +865,12 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     生产默认 registry 恰好只有 `kimi`/`claude` 两键,这是巧合。
     A 族断言一律为「**所有非首选工厂**计数为 0」,并由 [codex] 参数化实例
     把该泛化钉成结构性事实;执行者不得把任何一条简化回只断 claude。
-15. **egress oracle 的格子自查表(rev7)**。F6 决策位点与零外流 oracle 的对应:
-    - S4 未知名前置支:无 `probe_output`,不产生探针输出外流面(A3 顺带锁文案);
-    - S7 通过支:不产生失败输出,无需 egress oracle;
+15. **egress oracle 的格子自查表(rev8 修正)**。F6 决策位点与零外流 oracle 的对应:
+    - S4 未知名前置支:无 `probe_output`,但有**配置值回显面** → **A3**
+      (哨兵未知名 + 文案精确 + capsys,rev8 起);文案不再只是「顺带锁」;
+    - S5b `probe=False`:不探针,无 `probe_output`,无外流面(B5 锁不探针本身);
+    - S7 通过支:输出仍是 `probe_output`,「成功」不构成外流豁免 → **C0**
+      (双实例,rev8 新增);
     - S9 额度+有 fallback(可返回)→ **C1**(双实例);
     - S10 额度+无 fallback(raise)→ **C2**(双实例);
     - S11 非额度(raise)→ **C3**(双实例);
