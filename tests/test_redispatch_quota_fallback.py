@@ -230,8 +230,7 @@ def _stub_io(monkeypatch, tmp_path):
         return _P()
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    monkeypatch.setattr("agentic_loop.redispatch.get_roles", lambda repo=None: {"developer": "kimi"})
-    monkeypatch.setattr("agentic_loop.redispatch._resolve_developer", lambda roles, probe=True: (_StubDev(), []))
+    monkeypatch.setattr("agentic_loop.redispatch._resolve_developer", lambda *, repo, registry=None, probe=True: (_StubDev(), [], False))
     monkeypatch.setattr("agentic_loop.redispatch.resolve_role_fallback_binding", lambda role, repo=None: _flash_binding())
     monkeypatch.setattr("agentic_loop.redispatch.load_quota_patterns", lambda repo=None: ("额度", "quota"))
 
@@ -282,3 +281,221 @@ def test_wiring_circuit_breaker_precedes_dispatch(tmp_path, monkeypatch):
         "circuit-breaker 必须先于任何派发/构造；非零说明派发被移到 breaker 前"
     final = json.loads(sf.read_text(encoding="utf-8"))
     assert final["executor"]["redispatch_count"] == 1, "circuit-breaker 不改写 count"
+
+
+# ======================================================================
+# A/B 族承重测试（WP-01 brief §A/§B）——resolver 层 stub adapter + monkeypatch
+# 公共约定：registry 注入 kimi/claude/codex 三工厂与探针均带计数的 stub；
+# 「所有非首选工厂计数 0」= 除首选键外每个工厂的工厂计数与探针计数均为 0。
+# ======================================================================
+import pytest
+
+from agentic_loop.quota_fallback import DEFAULT_QUOTA_PATTERNS
+from agentic_loop.redispatch import ProbeFailedError
+from agentic_loop.redispatch import _resolve_developer
+
+
+class _CountingProbeAdapter:
+    """探针结果可配置、探针调用带计数的 stub adapter（非 Adapter 子类）。"""
+
+    def __init__(self, name, *, probe_ok, probe_output):
+        self.name = name
+        self._probe_ok = probe_ok
+        self._probe_output = probe_output
+        self.probe_calls = 0
+
+    def probe_injection_detail(self):
+        self.probe_calls += 1
+        return (self._probe_ok, self._probe_output)
+
+
+def _counting_registry(*, probe_ok=False, probe_output=""):
+    """kimi/claude/codex 三工厂 + 探针均带计数的 stub registry。
+
+    返回 ``(registry, counters)``；``counters[key] = {"factory": int,
+    "bindings": [..], "adapters": [_CountingProbeAdapter, ...]}``。
+    """
+    keys = ("kimi", "claude", "codex")
+    counters = {key: {"factory": 0, "bindings": [], "adapters": []} for key in keys}
+
+    def make_factory(key):
+        def factory(binding):
+            c = counters[key]
+            c["factory"] += 1
+            c["bindings"].append(binding)
+            adapter = _CountingProbeAdapter(
+                key, probe_ok=probe_ok, probe_output=probe_output)
+            c["adapters"].append(adapter)
+            return adapter
+        return factory
+
+    registry = {key: make_factory(key) for key in keys}
+    return registry, counters
+
+
+def _patch_resolver(monkeypatch, *, primary, binding, fallback_binding):
+    """monkeypatch resolve_role_binding / resolve_role_fallback_binding /
+    load_quota_patterns，注入纯内存场景（不触网、不真发子进程）。"""
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_binding",
+        lambda role, repo=None: (primary, binding),
+    )
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_fallback_binding",
+        lambda role, repo=None: fallback_binding,
+    )
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.load_quota_patterns",
+        lambda repo=None: DEFAULT_QUOTA_PATTERNS,
+    )
+
+
+def _assert_non_primary_untouched(counters, primary):
+    """非首选工厂的工厂计数与探针计数均为 0（brief 公共约定）。"""
+    for key in counters:
+        if key != primary:
+            assert counters[key]["factory"] == 0, f"{key} 工厂不应被构造"
+            assert counters[key]["adapters"] == [], f"{key} 探针不应被调用"
+
+
+# ---- A 族：不换 adapter（本 WP 唯一目标的直接承重）----
+
+@pytest.mark.parametrize("primary", ["kimi", "codex"])
+def test_no_adapter_switch_on_nonquota_stop(primary, monkeypatch, tmp_path):
+    registry, counters = _counting_registry(
+        probe_ok=False, probe_output="compile error")
+    _patch_resolver(monkeypatch, primary=primary, binding=object(), fallback_binding=None)
+
+    with pytest.raises(ProbeFailedError) as exc:
+        _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert str(exc.value) == "probe failed: other"
+    assert counters[primary]["factory"] == 1
+    _assert_non_primary_untouched(counters, primary)
+
+
+@pytest.mark.parametrize("primary", ["kimi", "codex"])
+def test_no_adapter_switch_on_quota_stop(primary, monkeypatch, tmp_path):
+    registry, counters = _counting_registry(
+        probe_ok=False, probe_output="insufficient balance")
+    _patch_resolver(monkeypatch, primary=primary, binding=object(), fallback_binding=None)
+
+    with pytest.raises(ProbeFailedError) as exc:
+        _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert str(exc.value) == "probe failed: quota, no fallback"
+    assert counters[primary]["factory"] == 1
+    _assert_non_primary_untouched(counters, primary)
+
+
+def test_unknown_adapter_builds_nothing(monkeypatch, tmp_path, capsys):
+    registry, counters = _counting_registry()
+    sentinel = "no-such-adapter-SENTINEL4"
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_binding",
+        lambda role, repo=None: (sentinel, None),
+    )
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_fallback_binding",
+        lambda role, repo=None: None,
+    )
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.load_quota_patterns",
+        lambda repo=None: DEFAULT_QUOTA_PATTERNS,
+    )
+
+    with pytest.raises(ProbeFailedError) as exc:
+        _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert str(exc.value) == "unknown developer adapter"
+    captured = capsys.readouterr()
+    assert sentinel not in captured.out
+    assert sentinel not in captured.err
+    for key in ("kimi", "claude", "codex"):
+        assert counters[key]["factory"] == 0
+        assert counters[key]["adapters"] == []
+
+
+# ---- B 族：结局与状态贯通 ----
+
+@pytest.mark.parametrize("primary", ["kimi", "codex"])
+def test_quota_flash_returns_same_registry_key(primary, monkeypatch, tmp_path):
+    registry, counters = _counting_registry(
+        probe_ok=False, probe_output="insufficient balance")
+    fallback_binding = object()
+    _patch_resolver(monkeypatch, primary=primary, binding=object(),
+                    fallback_binding=fallback_binding)
+
+    adapter, reasons, fallback_applied = _resolve_developer(
+        repo=tmp_path, registry=registry)
+
+    assert fallback_applied is True
+    # 返回 adapter 由首选工厂构造（S9 flash 构造的那一个）
+    assert adapter is counters[primary]["adapters"][-1]
+    assert counters[primary]["factory"] == 2          # S5 探针构造 + S9 flash 构造
+    assert counters[primary]["bindings"][-1] is fallback_binding  # 最后一次实参
+    if primary == "codex":
+        assert counters["kimi"]["factory"] == 0
+
+
+def test_probe_output_is_read_by_consumer(monkeypatch, tmp_path):
+    fallback_binding = object()
+    _patch_resolver(monkeypatch, primary="kimi", binding=object(),
+                    fallback_binding=fallback_binding)
+
+    # 额度输出 → flash 返回
+    reg_q, _ = _counting_registry(
+        probe_ok=False, probe_output="insufficient balance")
+    adapter_q, reasons_q, fallback_q = _resolve_developer(
+        repo=tmp_path, registry=reg_q)
+    assert fallback_q is True
+
+    # 非额度输出 → 抛 ProbeFailedError
+    reg_n, _ = _counting_registry(probe_ok=False, probe_output="compile error")
+    with pytest.raises(ProbeFailedError) as exc:
+        _resolve_developer(repo=tmp_path, registry=reg_n)
+    assert str(exc.value) == "probe failed: other"
+
+
+def test_probe_stage_flash_disables_dispatch_flash(tmp_path, monkeypatch):
+    sf = _write_status(tmp_path, count=0)
+    _stub_io(monkeypatch, tmp_path)
+    monkeypatch.setenv("REDISPATCH_DRY_RUN", "1")
+    # 探针阶段已 flash（fb=True）→ dispatch 阶段不得再带 fallback_binding
+    monkeypatch.setattr(
+        "agentic_loop.redispatch._resolve_developer",
+        lambda *, repo, registry=None, probe=True: (_StubDev(), [], True),
+    )
+    captured = {}
+    orig = _dispatch_with_quota_fallback
+    def spy_dispatch(*a, **k):
+        captured["fallback_binding"] = k.get("fallback_binding")
+        return orig(*a, **k)
+    monkeypatch.setattr("agentic_loop.redispatch._dispatch_with_quota_fallback",
+                        spy_dispatch)
+
+    assert _redispatch_main([str(sf)]) == 0
+    assert captured["fallback_binding"] is None
+
+
+def test_fallback_flag_false_on_pass(monkeypatch, tmp_path):
+    registry, counters = _counting_registry(probe_ok=True, probe_output="")
+    _patch_resolver(monkeypatch, primary="kimi", binding=object(), fallback_binding=None)
+
+    adapter, reasons, fallback_applied = _resolve_developer(
+        repo=tmp_path, registry=registry)
+
+    assert fallback_applied is False
+
+
+def test_probe_false_returns_primary_without_probing(monkeypatch, tmp_path):
+    registry, counters = _counting_registry(probe_ok=False, probe_output="")
+    _patch_resolver(monkeypatch, primary="kimi", binding=object(), fallback_binding=None)
+
+    adapter, reasons, fallback_applied = _resolve_developer(
+        repo=tmp_path, registry=registry, probe=False)
+
+    assert fallback_applied is False
+    assert adapter is counters["kimi"]["adapters"][0]
+    assert counters["kimi"]["adapters"][0].probe_calls == 0  # 首选工厂探针计数 0
+    _assert_non_primary_untouched(counters, "kimi")

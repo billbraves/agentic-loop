@@ -165,9 +165,17 @@ class KimiAdapter(Adapter):
     _PROBE_PROMPT = "reply exactly: DEEPSEEK_PROBE_OK"
     _SENTINEL = "DEEPSEEK_PROBE_OK"
 
-    def probe_injection(self) -> bool:
+    def probe_injection_detail(self) -> tuple[bool, str]:
         if self._binding is None:
-            return self.probe()
+            try:
+                proc = subprocess.run(
+                    [self._kimi_bin, "-p", "reply PROBE_OK"],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                )
+            except OSError:
+                return (False, "")
+            out = proc.stdout or ""
+            return (proc.returncode == 0 and "PROBE_OK" in out, out)
         with self._temp_config() as cfg:
             try:
                 proc = subprocess.run(
@@ -176,5 +184,9 @@ class KimiAdapter(Adapter):
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
             except OSError:
-                return False
-        return proc.returncode == 0 and self._SENTINEL in (proc.stdout or "")
+                return (False, "")
+        out = proc.stdout or ""
+        if self._binding is not None:
+            out = redact_env_value(out, self._binding.api_key_env)
+        ok = proc.returncode == 0 and self._SENTINEL in out
+        return (ok, out)

@@ -190,14 +190,22 @@ class Adapter(abc.ABC):
         """存活探测。"""
         raise NotImplementedError
 
-    def probe_injection(self) -> bool:
-        """真实注入探针：binding 非空跑注入路径 + sentinel；否则退回 probe()。
+    def probe_injection_detail(self) -> tuple[bool, str]:
+        """真实注入探针（detail 形态）：返回 ``(ok, raw_output)``。
 
-        子类若有可注入的 completion 通道，应覆写此方法发最小请求验证 sentinel。
-        默认在无 binding 时等价于存活探测。
+        binding 非空时子类应覆写本方法，返回探针结果与真实输出。
+        默认无 binding 时等价于存活探测，输出为空字符串。
         """
         if getattr(self, "_binding", None) is None:
-            return self.probe()
+            return (self.probe(), "")
         raise NotImplementedError(
             f"adapter {self.name} must implement probe_injection for binding path"
         )
+
+    def probe_injection(self) -> bool:
+        """真实注入探针：委托 ``probe_injection_detail()`` 的布尔结果。
+
+        子类覆写 ``probe_injection_detail()`` 即可；引擎需要原始输出做额度判定时
+        调用 detail 形态，其余路径用布尔形态。
+        """
+        return self.probe_injection_detail()[0]
