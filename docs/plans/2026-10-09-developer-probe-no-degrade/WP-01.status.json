@@ -4,11 +4,11 @@
   "iteration_id": "2026-10-09-developer-probe-no-degrade",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": ""
+    "session": "staged turns; see .agentic/wp01-stage*.log"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -24,7 +24,7 @@
     "dispatch_commit": "b47c04e85f1f493719c5dda3574474dc7037bb25",
     "branch": "plan/2026-10-09-developer-probe-no-degrade",
     "worktree": "/Users/admin/vibe/probe-no-degrade",
-    "commit": ""
+    "commit": "65b52cfe2c7c6883b0e6caa800ade38b046bce65"
   },
   "scope": {
     "allowed_paths": [
@@ -52,7 +52,31 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      {
+        "command": "env -u AGENTIC_PYTHON GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
+        "exit_code": 0,
+        "passed": 838,
+        "skipped": 4,
+        "failed": 0,
+        "baseline": "807 passed, 4 skipped",
+        "run_by": "orchestrator (independent rerun)"
+      },
+      {
+        "command": "python3.11 .agentic/wp01_mutations.py  # DoD five-step, 20 named mutations",
+        "exit_code": 0,
+        "result": "20/20 PASS: every named load-bearing instance red, all reverts green, M-B1[kimi] equivalence control stayed green",
+        "receipt": ".agentic/wp01-mutations.json",
+        "run_by": "orchestrator"
+      },
+      {
+        "command": "pytest tests/test_bootstrap.py tests/test_codex_gate_capability_merge.py tests/test_injection_probe.py -q  # must-stay-green",
+        "exit_code": 0,
+        "passed": 26,
+        "failed": 0,
+        "run_by": "orchestrator"
+      }
+    ],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
       "sha256": "03a6087c4a18a24896264480bd82e7dc685fcb5c1235ca0e573877b873bd4d0c",
@@ -233,7 +257,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T05:07:02.949080+00:00",
+    "updated_at": "2026-10-10T09:44:57.651933+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }
