@@ -1,11 +1,12 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev5 | 编排者 claude-code | 执行者 kimi
-> 冻结后执行期间只读。修订走 re-freeze(rev6),不原地改。
+> 冻结日期 2026-10-10 | rev6 | 编排者 claude-code | 执行者 kimi
+> 冻结后执行期间只读。修订走 re-freeze(rev7),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
-> rev4 `WP-01-brief.rev4.md`(含 rev4 相对 rev3 的变更表)。
+> rev4 `WP-01-brief.rev4.md`(含 rev4 相对 rev3 的变更表)、
+> rev5 `WP-01-brief.rev5.md`(含 rev5 相对 rev4 的变更表)。
 > rev4 由第三轮二签 REWORK(`.agentic/wp01-brief-consult-r3-attempt2.answer.md`,
 > `CODEX_DECISION: REWORK`,绑定 worktree head `a4bc5d7` / brief rev3
 > sha256 `ea608a02`)驱动,逐条关闭其**五项必改**。
@@ -25,9 +26,24 @@
 >
 > 配置权威仍是 `main_repo()`,未改全局语义;三处修正**全部是 brief 内的测试规格
 > 与记账口径修正**,不触产品语义、不扩范围,故仍停在 REWORK 层级不升 CONSULT。
-> **本 brief 尚未获授权实现**:r3 receipt 记 `implementation_authorized: false`、
+>
+> **rev6 由第四轮二签 REWORK 驱动**
+> (`.agentic/wp01-brief-consult-r4.answer.md`,`CODEX_DECISION: REWORK`,
+> 绑定 worktree head `1b9fa9b` / brief rev5 sha256 `4ed58156`,
+> session `01a1...` 见 receipt),逐条关闭其**三项必改**
+> (见 §「rev6 相对 rev5 的变更」)。r4 是**首次在 rev5 上取得的有效裁决**
+> (`valid_consult: true`,marker 形式),也是本 WP 四轮里第三个有效轮次。
+> 三项必改中第三项(DoD 交叉记账自相矛盾)**是编排者 rev5 自己引入的回归**,
+> 已在 rev6 建模复现并修正;另两项是 rev4 遗留、rev5 未触及的漏面。
+> 三项**全部仍是 brief 内的测试规格与记账口径修正**,不触产品语义、不扩范围,
+> 故仍停在 REWORK 层级不升 CONSULT ——
+> r4 Q10 明确裁定「规格偏重但尚未到必须 CONSULT 拆 WP 的程度:生产改动仍围绕
+> 一个 adapter detail API、一个 resolver 和两个 `main()` 接线点,依赖紧密,
+> 强拆反而产生中间 API 状态」。
+>
+> **本 brief 尚未获授权实现**:r4 receipt 记 `implementation_authorized: false`、
 > `dispatch_authorized: false`、`wp_state_at_dispatch: "DRAFT"`。
-> rev5 冻结后须过一轮二签(r4,绑 rev5)才谈派发。
+> rev6 冻结后须过一轮二签(r5,绑 rev6)才谈派发。
 
 ## 目标(一句话)
 
@@ -35,10 +51,42 @@
 或「STOP 交人」,**绝不**推进到另一个 adapter 把 developer 静默换成 claude;
 且探针原始输出只在内存里参与额度判定,不进 reasons / 异常 / 日志 / status。
 
+## rev6 相对 rev5 的变更(第四轮二签 REWORK 的三项必改)
+
+> r4 裁决原文:`.agentic/wp01-brief-consult-r4.answer.md`。
+> rev5 相对 rev4 的变更表见下一节;更早的沿革见存档。
+>
+> **r4 已确认充分、rev6 不再改动的部分**(避免重复劳动):
+> R3-1(`INV-P2b` 拆支)、R3-2(两步式 `M-P8` + 签名有序断言)、R3-4(`INV-P4`
+> 改绑 base-only oracle)充分;修正 1 的 `reasons` 不可观测建模「充分成立」,
+> 且 `M-P6`/`M-P6c`/`M-P6d` 三条「本身形成干净对角线、守卫方向没有写反」;
+> 修正 2(`INV-P9b`)充分,且 r4 独立确认 `main()` 内除 `:538`/`:542` 外
+> **没有第三处**未穿 `repo` 的同类配置读取;修正 3(`INV-P2c` 计数 2 +
+> 最后一次实参)充分;`reasons` 纪律(附注 11)「充分且自洽」,
+> r4 逐条核过 `INV-P1`/`P1b`/`P2b`/`P6`/`P6d`/`P6c` 的 oracle,
+> 确认**没有**现存不变式仍在 raise 支上隐含依赖 `reasons`;
+> `INV-P1b`/`INV-P3`/`INV-P7`/must-stay-green 七项/baseline 口径均充分。
+
+| # | r4 必改项 | 为什么是缺陷(编排者已独立复现) | rev6 的关闭方式 | 落点 |
+|---|---|---|---|---|
+| 1 | **补 native「额度命中 + 无 fallback」支的零外流覆盖** | r4 指出 F6 的四支分流里,**第三支(额度命中但 `fallback_binding is None`)没有任何输出外流 oracle**。编排者 grep 核实:`INV-P2b` 的 oracle 只有「抛 `ProbeFailedError`、异常文案等于 `probe failed: quota, no fallback`、claude 工厂与探针计数为 0」,**capsys / stdout / 哨兵三个词在其规格块内出现 0 次**。于是实现可以只在这一支 `print(probe_output)`,而 `INV-P6c`(额度+**有** fallback)与 `INV-P6d`(**非**额度)都保持绿 —— 这是与 rev4 的 `M-P6c` 同类的「分支与 oracle 错配」漏面,只是换到了第三支 | 新增 **`INV-P2d`** / **`M-P2d`**:native + 额度命中 + `fallback_binding is None`,哨兵 `NATIVE_EGRESS_SENTINEL_E`,oracle = 异常文案精确相等 + capsys stdout/stderr 零哨兵;变异是三重条件守卫的 `print`,只在该支生效,保证其余三条 egress 不变式不被顶替 | §F7;**新增 INV-P2d** |
+| 2 | **把「不换 adapter」从 kimi→claude 特例泛化** | r4 指出核心目标的承重测试**全部绑在当前默认组合上**:`INV-P1`、`INV-P1b`、`INV-P2b` 只监控 `claude` 计数,而唯一用非 kimi 首选的 `INV-P2c` **只覆盖合法的 flash 路径**。编排者核实无误。于是仍可写出:**非 kimi 首选(如 codex)发生非额度失败时偷偷构造 `registry["kimi"](...)`,kimi 首选时正常抛错** —— 它通过现有 `INV-P1/P1b/P2b/P2c`、保留全部冻结原表达式、让所有既列变异照常转红。r4 的判词:「生产默认 registry 当前只有 kimi/claude,并不能把『禁止换 adapter』的规格降格为只防 kimi→claude」 | 新增 **`INV-P1d`** / **`M-P1d`**:**codex 首选 + 非额度失败 + 无 fallback**,registry 注入 `codex`/`kimi`/`claude` 三个计数工厂,断言抛 `ProbeFailedError` 且**所有非首选工厂计数全为 0**(不止 claude);并把「非首选工厂计数全为 0」立为**全族 oracle 口径**,`INV-P1`/`INV-P1b`/`INV-P2b` 的断言一并从「claude 计数 0」升级为「所有非首选工厂计数 0」 | **新增 INV-P1d**;INV-P1 / P1b / P2b 的 oracle 口径 |
+| 3 | **修正 DoD 交叉记账的自相矛盾**(**编排者 rev5 自己引入的回归**) | rev5 新增的交叉记账条款先说「`M-P1` / `M-P6` / `M-P6d` 共用同一原表达式,施加这**四条**中任意一条时须记录其余承重测试仍绿」,随后只给出 `M-P6`/`M-P6c`/`M-P6d` **三行**矩阵,`M-P1` 不在其中。编排者建模复现:`M-P1` 把非额度 raise 整条替换为返回 claude,于是 `INV-P1` 红(正是其承重)、`INV-P6` 与 `INV-P6d` 因**等不到预期异常**也红 —— **一条变异红三条**,触发同条款的「两条同时红 → 报 BLOCKED」,**正确执行者必然被逼报 BLOCKED**。r4 判词:「这不是次要文案问题,而是可重复的执行死角」 | 交叉对角线范围**明确限定为 `M-P6` / `M-P6c` / `M-P6d` 三条**,`M-P1` 从该规则**删除**;另明文记录:`M-P1` / `M-P1b` / `M-P2b`(无守卫、整条替换 raise)**预期会连带**使 `INV-P6` / `INV-P6d` 转红,**这些连带红既不构成承重证据,也不得触发 BLOCKED**;BLOCKED 只在三条对角线变异之间出现跨红时才报。rev6 新增的 `M-P1d` / `M-P2d` **带守卫、零连带红**,明文列为豁免条款的例外,出现额外转红即视为写错 | §DoD |
+
+**rev6 不变的部分**:F1/F2/F3/F5/F6/F7 的**行为目标与冻结实现文本一字未动**;
+`INV-P2 / P2c / P3 / P4 / P5 / P6 / P6b / P6c / P6d / P7 / P8 / P9 / P9b` 与
+`CHAR-P1c` 的规格未动;「必须保持绿集合」七项未动;基线数字未动。
+rev6 只新增两条不变式、统一一处 oracle 口径、修一条 DoD 自相矛盾。
+
+**rev6 承重不变式全集**(18 条带变异):
+`INV-P1 / P1b / P1d / P2 / P2b / P2c / P2d / P3 / P4 / P5 / P6 / P6b / P6c / P6d /
+P7 / P8 / P9 / P9b`
++ `CHAR-P1c`(characterization,无变异,不计入)+ 必须保持绿集合(7 项)。
+
 ## rev5 相对 rev4 的变更(编排者派发前独立复核的三项修正)
 
-> rev4 相对 rev3 的变更表见下一节(原样保留);rev3 相对 rev2 的见存档
-> `WP-01-brief.rev3.md`。
+> 本节为 rev5 原文,rev6 原样保留作为沿革记录。rev4 相对 rev3 的变更表见下一节;
+> rev3 相对 rev2 的见存档 `WP-01-brief.rev3.md`。
 
 | # | rev4 的缺陷 | 为什么是缺陷(实测) | rev5 的关闭方式 | 落点 |
 |---|---|---|---|---|
@@ -258,11 +306,20 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
 存在的片段)/ 变异表达式(逐字替换为)/ 唯一承重测试。执行者**不得**自行选择变异
 位点或措辞;若预期实现里找不到所列原表达式,**立即 BLOCKED 上报**,不得近似施加。
 
+> **全族 oracle 口径(rev6 新增,适用于 INV-P1 / P1b / P1d / P2b)**:
+> 这四条都是「失败时不得换 adapter」族。r4 Q2 指出 rev5 的断言只监控 `claude`
+> 一个键,等于把规格降格成「只防 kimi→claude」。**rev6 统一口径**:
+> 凡本族测试,registry 内**除首选键以外的每一个工厂**都必须带计数,
+> 断言为「**所有非首选工厂的工厂计数与探针计数全为 0**」,
+> 而不是只断 claude。首选工厂自身的计数按各条说明(通常为 1,
+> flash 支为 2,见 INV-P2c)。
+
 - **INV-P1「探针失败不得换 adapter」**
   测试:`registry` 注入 `kimi`(探针恒失败,输出为**非额度**文本如 `compile error`)
   与 `claude`(探针恒成功、工厂与探针均带计数的 stub);
   `fallback_binding` 为 `None`;断言抛 `ProbeFailedError`
-  **且 claude stub 的工厂与探针调用计数均为 0**。
+  **且所有非首选工厂(此处为 claude)的工厂与探针调用计数均为 0**
+  (rev6:口径由「claude 计数 0」升级为「所有非首选工厂计数 0」,见上方全族口径)。
   - **M-P1** 目标函数:`redispatch._resolve_developer`
     原表达式:`raise ProbeFailedError("probe failed: other")`
     变异表达式:`return registry["claude"](None), reasons, False`
@@ -272,12 +329,54 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
 
 - **INV-P1b「未知 adapter 名不得换 adapter」**
   测试:让 `resolve_role_binding` 返回 registry 里不存在的名字(monkeypatch 解析器
-  返回值,**不改 config 文件**),registry 里仍放带计数的 `claude` stub;
-  断言抛 `ProbeFailedError` 且 claude 计数为 0。
+  返回值,**不改 config 文件**),registry 里放带计数的 `claude` **与 `kimi`** stub;
+  断言抛 `ProbeFailedError` 且**两者计数均为 0**
+  (rev6 全族口径:未知首选时 registry 内**每一个**工厂都是非首选工厂)。
   - **M-P1b** 目标函数:`redispatch._resolve_developer`
     原表达式:`raise ProbeFailedError("unknown developer adapter")`
     变异表达式:`return registry["claude"](None), reasons, False`
     承重测试:`test_unknown_adapter_never_builds_claude`(INV-P1b)
+
+- **INV-P1d「非 kimi 首选失败时同样不得换 adapter」(rev6 新增,关闭 r4 必改项 2)**
+  r4 Q2 的漏网实现:**非 kimi 首选发生非额度失败时偷偷构造 `registry["kimi"](...)`,
+  而 kimi 首选时仍正常抛错**。它能通过 rev5 的 `INV-P1`(kimi 首选)、
+  `INV-P1b`(未知名)、`INV-P2b`(kimi 首选额度支)与 `INV-P2c`(codex 首选但只走
+  **合法 flash** 路径),并保留全部冻结原表达式、让所有既列变异照常转红。
+  根因:rev5 把唯一目标的承重面全押在「首选 = kimi」这一个生产巧合上。
+  测试 `test_non_kimi_primary_failure_never_switches_adapter`:
+  - monkeypatch `redispatch.resolve_role_binding` 返回 `("codex", binding)`
+    (**非 kimi 首选**,与 INV-P2c 同一手法);
+  - `fallback_binding` 为 `None`(monkeypatch `resolve_role_fallback_binding`);
+  - registry **同时注入三个工厂均带计数的 stub**:`codex`(探针恒失败,
+    输出为**非额度**文本如 `compile error`)、`kimi`、`claude`;
+  - 断言:抛 `ProbeFailedError`、异常文案等于 `probe failed: other`、
+    `codex` 工厂计数为 1(首选被构造一次用于探针),
+    **且 `kimi` 与 `claude` 的工厂计数与探针计数全为 0**。
+  - **M-P1d** 目标函数:`redispatch._resolve_developer`
+    原表达式:`raise ProbeFailedError("probe failed: other")`
+    变异表达式(**条件式,逐字**,两行):
+    ```python
+    if adapter_name != "kimi": return registry["kimi"](None), reasons, False
+    raise ProbeFailedError("probe failed: other")
+    ```
+    承重测试:`test_non_kimi_primary_failure_never_switches_adapter`(INV-P1d)
+  > **与 M-P1 的区别**:`M-P1` 换的是 `claude`、由 kimi 首选驱动;`M-P1d` 换的是
+  > **`kimi`**、由 **codex 首选**驱动。两者同位点但**打的面不同**
+  > (「别换成 claude」vs「别换成 registry 里的任何别人」),须分别施加、分别记红。
+  > **为何必须是条件式**(编排者建模实测):若写成无条件
+  > `return registry["kimi"](None), ...`,则 kimi 首选时也不再抛异常,
+  > `INV-P1` 会**连带转红**,无法证明本条覆盖了 `INV-P1` 覆盖不到的面。
+  > 加 `adapter_name != "kimi"` 守卫后,**`INV-P1` 保持绿、仅 `INV-P1d` 转红**
+  > —— 而这恰好**就是** r4 Q2 点名的那个漏网实现本身
+  > (「非 kimi 首选时偷偷换成 kimi,kimi 首选时正常抛错」),
+  > 因此本变异同时也是对该漏面的直接复现。
+  > **本条是零连带红的(编排者建模实测)**:`INV-P6`、`INV-P6d`、`INV-P2b`、
+  > `INV-P2d` **全部以 kimi 为首选**,而本变异的守卫是 `adapter_name != "kimi"`,
+  > 因此它们的 raise 完全不受影响、**一律保持绿**。
+  > 执行者须记录「施加 M-P1d 后 INV-P1 / INV-P6 / INV-P6d 均仍为绿,
+  > 仅 INV-P1d 转红」—— 这是本 WP 里**唯一一条既同位点、又零连带红**的变异,
+  > 其精确性正来自那个守卫。因此本条**不适用** DoD 的连带红豁免条款:
+  > 若出现任何额外转红,说明实现或变异写错,**按五步法第 2 步处理**。
 
 - **CHAR-P1c「空配置折叠事实的锁定测试」(rev3 重写;rev4 改名)**
   > **计数口径**:本条是 **characterization 前提**,不是带变异的承重不变式。
@@ -323,13 +422,54 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
   **`fallback_binding` 为 `None`**(monkeypatch `resolve_role_fallback_binding`
   返回 `None`);registry 里 `claude` 为工厂与探针均带计数的 stub;
   断言抛 `ProbeFailedError`、异常文案等于 `probe failed: quota, no fallback`、
-  **且 claude stub 的工厂与探针调用计数均为 0**。
+  **且所有非首选工厂(此处为 claude)的工厂与探针调用计数均为 0**
+  (rev6 全族口径,见 §全族 oracle 口径)。
+  > **本条不负责输出外流**:它的 oracle 不含 capsys —— 该支的零外流由
+  > **INV-P2d** 单独承担(rev6 新增,关闭 r4 必改项 1)。
   - **M-P2b** 目标函数:`redispatch._resolve_developer`
     原表达式:`raise ProbeFailedError("probe failed: quota, no fallback")`
     变异表达式:`return registry["claude"](None), reasons, False`
     承重测试:`test_quota_without_fallback_never_builds_claude`(INV-P2b)
   > 本条与 M-P1 的变异表达式逐字相同但**位点不同**(额度支的 raise vs
   > 非额度支的 raise),须分别施加、分别记红,不得合并记账 —— 同 M-P2/M-P3 的处理。
+
+- **INV-P2d「native 额度命中但无 fallback 支的零外流」(rev6 新增,关闭 r4 必改项 1)**
+  r4 Q1/Q2 指出:F6 的四支分流里,**第三支(额度命中但 `fallback_binding is None`)
+  没有任何输出外流 oracle**。编排者 grep 核实 `INV-P2b` 的规格块内
+  `capsys` / `stdout` / 哨兵三者出现 **0 次**。于是实现可以**只在这一支**
+  `print(probe_output)`,而 `INV-P6c`(额度 + **有** fallback)与
+  `INV-P6d`(**非**额度)**都保持绿** —— 与 rev4 的 `M-P6c` 同类的
+  「分支与 oracle 错配」漏面,只是换到了第三支。
+  测试 `test_native_quota_no_fallback_output_never_egresses`:
+  - monkeypatch `redispatch.resolve_role_binding` 返回 `("kimi", None)`
+    (**native,`binding` 为 `None`**);
+  - monkeypatch `redispatch.resolve_role_fallback_binding` 返回 **`None`**
+    (**无 fallback**,使本次落到第三支);
+  - 探针输出**同时**含 ① 哨兵串 **`NATIVE_EGRESS_SENTINEL_E`**
+    (与 `NATIVE_EGRESS_SENTINEL_C`、`NATIVE_EGRESS_SENTINEL_D`、
+    以及 INV-P6 的密钥哨兵**四者字面值互不相同**)与 ② 一段
+    `DEFAULT_QUOTA_PATTERNS` 能命中的额度措辞(如 `insufficient balance`),
+    且不含 `PROBE_OK` 使探针失败;
+  - 断言:抛 `ProbeFailedError`、**异常文案精确等于** `probe failed: quota, no fallback`
+    (既证落在第三支、又证零外流且非空串假过),
+    capsys 捕获的 stdout 与 stderr **均不含 `NATIVE_EGRESS_SENTINEL_E`**。
+  - **M-P2d** 目标函数:`redispatch._resolve_developer`
+    原表达式:`raise ProbeFailedError("probe failed: quota, no fallback")`
+    变异表达式(**三重条件守卫**,两行):
+    ```python
+    if binding is None and fallback_binding is None: print(probe_output)
+    raise ProbeFailedError("probe failed: quota, no fallback")
+    ```
+    承重测试:`test_native_quota_no_fallback_output_never_egresses`(INV-P2d)
+  > **为何守卫要三重**:本变异与 `M-P2b` 同位点(同一个 raise 语句)。
+  > `M-P2b` 把整条 raise 换成返回 claude(打「不换 adapter」面),
+  > `M-P2d` 保留 raise 只加一条 `print`(打「零外流」面)。
+  > 守卫限定 `binding is None and fallback_binding is None` 后,
+  > 本变异只在 native 第三支生效:`INV-P2b`(kimi 首选、bound binding)的
+  > 异常断言不受影响仍绿,`INV-P6c`/`INV-P6d` 走的是别的支也仍绿。
+  > 执行者施加本变异后须记录 **INV-P2b / INV-P6c / INV-P6d 均仍为绿**。
+  > **政策同 INV-P6c/P6d**:native detail 是 resolver 内存内的敏感值,零外流是
+  > 其安全边界;**不得**声称 adapter 已对未知 native credential 脱敏。
 
 - **INV-P2c「flash 回退必须用同一个 registry key」(rev4 新增)**
   动机见 F6「同一 registry key」:若实现把 flash 构造写成 `registry["kimi"](...)`,
@@ -666,7 +806,7 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
   **`main():538` 的 `resolve_role_fallback_binding` 补 `repo=repo_root`**(rev5);
   删除死 `get_roles` import
 - `tests/test_redispatch_quota_fallback.py`:
-  INV-P1/P1b/P2/P2b/P2c/P3/P5/P6/P6b/P6c/**P6d**/P7/P8/P9/**P9b** 测试
+  INV-P1/P1b/**P1d**/P2/P2b/P2c/**P2d**/P3/P5/P6/P6b/P6c/P6d/P7/P8/P9/P9b 测试
   + `CHAR-P1c` + 三元返回与新签名的 stub 同步
 - `tests/test_injection_probe.py`:继承默认的精确 bool 断言
 - 执行报告(§C 格式),含逐条变异红证 + F3 的生产/checkout 实测事实复述
@@ -674,8 +814,8 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
 ## 完成定义(DoD)
 
 - [ ] F1、F2、F3、F5、F6、F7 逐项实现(F4 已删除,`config.toml` 零改动)
-- [ ] INV-P1/P1b/P2/P2b/P2c/P3/P4/P5/P6/P6b/P6c/**P6d**/P7/P8/P9/**P9b**
-      (**共 16 条**)各有测试,且**各自绑定的变异实测转红**
+- [ ] INV-P1/P1b/**P1d**/P2/P2b/P2c/**P2d**/P3/P4/P5/P6/P6b/P6c/P6d/P7/P8/P9/P9b
+      (**共 18 条**)各有测试,且**各自绑定的变异实测转红**
       (报告逐条记录命令与结果;先证"变异后源文件确有不同")。
       **`CHAR-P1c` 例外**:它是 characterization 前提(只读事实锁定),
       无绑定变异(见该条说明),只需测试绿,**不计入带变异的承重不变式计数**
@@ -696,15 +836,43 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
          非承重测试的连带红/绿按各条说明单独记录,**不得**充当红证。
       5. **恢复源文件**(如 `git checkout -- <file>`)并确认回到全绿,
          再进行下一条。**禁止多条变异同时在身**——叠加后无法区分是哪条在承重。
-- [ ] **同位点互补变异的交叉记账(rev5 新增)**。`M-P1` / `M-P6` / `M-P6d` 共用
-      同一个原表达式 `raise ProbeFailedError("probe failed: other")`,
-      `M-P6c` 与它们同在 native 面但位点不同。施加这四条中任意一条时,报告须
-      **同时记录另外几条的承重测试仍为绿**,作为「位点互不顶替」的证据:
+- [ ] **同位点互补变异的交叉记账(rev5 新增,rev6 修正范围)**。
+      **本规则的适用范围恰为三条**:`M-P6` / `M-P6c` / `M-P6d`。
+      它们是刻意设计的互补守卫变异(见附注 12),施加任意一条时,报告须
+      **同时记录另两条的承重测试仍为绿**,作为「位点互不顶替」的证据:
       - 施 `M-P6` → 仅 INV-P6 红,INV-P6c / INV-P6d 绿;
       - 施 `M-P6c` → 仅 INV-P6c 红,INV-P6 / INV-P6d 绿;
       - 施 `M-P6d` → 仅 INV-P6d 红,INV-P6 / INV-P6c 绿。
-      若出现「一条变异让两条承重测试同时红」,说明守卫条件写错或 oracle 面重叠,
-      **报 BLOCKED**,不得自行调整守卫措辞
+      **仅在这三条之间**出现「一条变异让两条承重测试同时红」时,才说明守卫条件
+      写错或 oracle 面重叠 → **报 BLOCKED**,不得自行调整守卫措辞
+- [ ] **连带红是预期的,不得据此报 BLOCKED(rev6 新增,修正 rev5 的回归)**。
+      rev5 把 `M-P1` 也写进上一条的「四条中任意一条」,这是**错的**:
+      `M-P1`(以及同位点同形的 `M-P1b` / `M-P1d` / `M-P2b` / `M-P2d`)
+      把 raise 分支整条替换为返回某个 adapter,于是**等着那个异常的其他不变式
+      也会红**。编排者建模实测:施加 `M-P1` 会让 `INV-P1`(其承重,应红)、
+      `INV-P6` 与 `INV-P6d`(**因等不到预期异常而连带红**)**三条同时红**,
+      按 rev5 的字面规则会迫使**正确执行者必然报 BLOCKED** —— 这是可重复的
+      执行死角(r4 Q8 判词)。
+      **rev6 的裁定**:施加 `M-P1` / `M-P1b` / `M-P2b` 时,
+      - **唯一红证**是该条四元组点名的那一个承重测试;
+      - 其余不变式的连带红**既不构成承重证据,也不得触发 BLOCKED**;
+      - 报告须把连带红**按名列出并标注「预期连带」**,以证明不是意外失败。
+      只有当**点名的承重测试没有转红**时,才是真问题(按五步法第 2 步处理)。
+      **各条的预期连带红集合(编排者建模实测,逐条冻结)**:
+      - `M-P1` → 承重 `INV-P1` 红;预期连带 `INV-P1d` / `INV-P6` / `INV-P6d` 红
+        (该变异无守卫,非 kimi 首选与两条非额度 egress 支一并失去预期异常);
+        `INV-P2b` / `INV-P2c` / `INV-P2d` / `INV-P6c` 应**保持绿**;
+      - `M-P1b` → 承重 `INV-P1b` 红;其连带面取决于未知名的注入方式,
+        报告按实测列出即可;
+      - `M-P2b` → 承重 `INV-P2b` 红;预期连带 `INV-P2d` 红
+        (两者同在额度无 fallback 支);`INV-P1` / `INV-P6` / `INV-P6c` / `INV-P6d`
+        应**保持绿**。
+      **两条例外,不享有本豁免**(它们的守卫已把连带面消掉,编排者建模实测):
+      - `M-P1d`(守卫 `adapter_name != "kimi"`)→ 预期**仅** `INV-P1d` 红,
+        `INV-P1` / `INV-P6` / `INV-P6d` / `INV-P2b` / `INV-P2d` 全绿;
+      - `M-P2d`(守卫 `binding is None and fallback_binding is None`,且保留 raise)
+        → 预期**仅** `INV-P2d` 红,`INV-P2b` / `INV-P6` / `INV-P6c` / `INV-P6d` 全绿。
+      这两条若出现任何额外转红,说明实现或变异写错 → 按五步法第 2 步处理
 - [ ] **`reasons` 只在可返回路径上充当 oracle(rev5 新增)**。任何绑在 `raise`
       支上的不变式**不得**把「`reasons` 不含哨兵」写成红证来源(§附注 11)。
       执行报告若出现这类断言,须明确标注其为**非承重的冗余断言**
@@ -780,7 +948,22 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
     与 `M-P6d`(`binding is None`)落在**同一个 raise 语句**上,守卫方向相反,
     目的是让 bound 与 native 两个面各有独立红证、互不顶替。执行者**不得**
     「优化」成一条无条件变异 —— 那会让两条承重测试同时红,退回 rev4 的记账歧义。
-13. **`main()` 与 resolver 是两个配置权威面**(rev5 新增)。F5 让
+14. **「不换 adapter」不等于「不换成 claude」**(rev6 新增)。本 WP 的唯一目标是
+    「探针失败不得前进到另一个 adapter」,**不是**「不得前进到 claude」。
+    生产默认 registry 恰好只有 `kimi`/`claude` 两键,这是**巧合**,不构成规格降格的
+    理由(r4 Q2 判词)。因此本族(`INV-P1`/`P1b`/`P1d`/`P2b`)的断言一律写成
+    「**所有非首选工厂**计数为 0」,并由 `INV-P1d` 用**非 kimi 首选 + 换成 kimi**
+    这一组合把该泛化钉成结构性事实。执行者**不得**把任何一条简化回只断 claude。
+15. **四条 egress 不变式与 F6 四支的对应关系(rev6 新增,用于自查完整性)**。
+    F6 的四支分流各自都必须有输出外流 oracle,缺一支就是 rev4 `M-P6c` 那类漏面:
+    - 探针**通过** → 不产生失败输出,无需 egress oracle;
+    - **额度 + 有 fallback**(可返回)→ `INV-P6c`(oracle:返回的 `reasons` + capsys);
+    - **额度 + 无 fallback**(raise)→ `INV-P2d`(oracle:异常文案精确 + capsys);
+    - **非额度**(raise)→ bound 由 `INV-P6`、native 由 `INV-P6d`
+      (oracle:异常文案 + capsys);
+    另有 `INV-P6b` 直接锁 bound detail 返回值本身的脱敏。
+    **将来若 F6 新增第五支,必须同时新增与之对应的 egress 不变式。**
+16. **`main()` 与 resolver 是两个配置权威面**(rev5 新增)。F5 让
     `_resolve_developer()` 内部三处取数共用一个 `repo`(INV-P9),但 `main():538`
     的 `resolve_role_fallback_binding` 是**第四处**,由 INV-P9b 单独看守。
     两处在生产里恰好同值(`resolve_paths.py:360` 的 `repo = repo or main_repo()`),

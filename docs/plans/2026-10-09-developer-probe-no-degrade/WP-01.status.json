@@ -54,8 +54,8 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "4ed58156bedaa5ee93a5a72ff895c6ab7f99935171268f0aa141327fb9c33fc0",
-      "rev": 5,
+      "sha256": "602c938a8b5489a6405534c0c1292d4bd9a790db420244e1cbe2e8f934cf13dd",
+      "rev": 6,
       "prior_revs": [
         {
           "rev": 1,
@@ -81,6 +81,12 @@
           "sha256": "e79af044ca061b364389410932cf02efb80335289f38d2c8cd09bba6a2b10027",
           "outcome": "SUPERSEDED_BEFORE_CONSULT",
           "note": "r4 was opened PENDING against rev4 but never dispatched (no prompt, no harness, no codex verdict). The orchestrator's pre-dispatch independent review found 3 false-green defects, the decisive one being that M-P6c could not turn INV-P6c red (reasons is a function local discarded on raise). Superseded by rev5; r4 re-bound to rev5."
+        },
+        {
+          "rev": 5,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev5.md",
+          "sha256": "4ed58156bedaa5ee93a5a72ff895c6ab7f99935171268f0aa141327fb9c33fc0",
+          "outcome": "REWORK"
         }
       ]
     },
@@ -97,18 +103,30 @@
   },
   "review": {},
   "consult": {
-    "round": "r4",
+    "round": "r5",
     "kind": "brief-second-signature",
     "decision": null,
     "state": "NOT_DISPATCHED",
     "bound_commit": "",
-    "bound_brief_rev": 5,
+    "bound_brief_rev": 6,
     "receipt": "",
     "answer": "",
     "session_id": "",
     "required_changes": null,
     "resolved_in_rev": null,
     "prior_rounds": [
+      {
+        "round": "r4",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "1b9fa9b",
+        "bound_brief_rev": 5,
+        "receipt": ".agentic/wp01-brief-consult-r4.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r4.answer.md",
+        "session_id": "01a123c1-5980-71b2-8676-205c9c1dd5ca",
+        "required_changes": 3,
+        "resolved_in_rev": 6
+      },
       {
         "round": "r1",
         "kind": "brief-second-signature",
@@ -159,7 +177,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T12:00:00Z",
+    "updated_at": "2026-10-10T18:00:00Z",
     "dispatched_at": ""
   }
 }
