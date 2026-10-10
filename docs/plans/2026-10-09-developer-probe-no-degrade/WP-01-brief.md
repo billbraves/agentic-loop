@@ -88,6 +88,8 @@ F1-F7 行为目标;范围;基线;五步法。规模:18 个测试条目 + CHAR-1
 
 
 
+## rev7 相对 rev6 的变更(r5 三项必改 + 矩阵化压缩)
+
 > r5 裁决原文:`.agentic/wp01-brief-consult-r5.answer.md`(`CODEX_DECISION: REWORK`,
 > 绑 rev6 @ `89a03b4` / sha256 `602c938a`,`valid_consult: true`)。
 > 三项必改由编排者逐条独立核实为真后采纳;
