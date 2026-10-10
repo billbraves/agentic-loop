@@ -12,6 +12,7 @@ SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from agentic_loop.adapters.base import Adapter
 from agentic_loop.adapters.claude import ClaudeAdapter
 from agentic_loop.adapters.codex import CodexAdapter
 from agentic_loop.adapters.kimi import KimiAdapter
@@ -142,3 +143,33 @@ def test_codex_probe_injection_without_binding_falls_back_to_which(tmp_path):
     fake = _fake_bin(tmp_path, "codex", "exit 0\n")
     a = CodexAdapter(codex_bin=fake, binding=None)
     assert a.probe_injection() is True
+
+
+# ---- D1: base 默认 bool 契约零回归 ----
+# 只继承 Adapter、不覆写 probe_injection / probe_injection_detail 的最小子类，
+# 实现四个抽象方法 capabilities / identity / probe / review，_binding 为 None。
+class _BaseDefaultAdapter(Adapter):
+    name = "base-default"
+
+    def __init__(self, probe_result: bool) -> None:
+        self._probe_result = probe_result
+
+    def identity(self):
+        return None
+
+    def capabilities(self):
+        return None
+
+    def review(self, *, diff, brief, contract, effort):
+        return None
+
+    def probe(self) -> bool:
+        return self._probe_result
+
+
+def test_base_default_probe_injection_returns_exact_bool():
+    # probe() 返回 True / False，probe_injection() 必须用 `is` 精确等于该布尔。
+    # 若 base 变异为 `return self.probe_injection_detail()`（返回元组），
+    # 此处 `is True` / `is False` 必红（元组不是 bool）。
+    assert _BaseDefaultAdapter(True).probe_injection() is True
+    assert _BaseDefaultAdapter(False).probe_injection() is False
