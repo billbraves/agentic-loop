@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev11 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev12 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev12),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev13),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -64,6 +64,26 @@
 > r7 已审 rev8:**CODEX_DECISION: ACCEPT**
 > (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
 > `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev12 关闭 r10 二签的三条机械缺陷**(r10 判 REWORK:必改项 1/4 已闭合,
+> 2/3/5 未闭合)。三条都是**会让变异证据失真**的缺陷,不是文字问题:
+>
+> 1. **M-B6a/M-B6b 锚点不唯一**:canonical 块落地后
+>    `except ProbeFailedError:` 与 `print(STOP)\n return 0` 在主路径与 legacy
+>    路径**各出现一次**。编排者的变异 harness 原先是「count 后替换第一个匹配」,
+>    于是会**改到主路径**却声称在测 legacy —— B6 的 legacy 实例不转红,
+>    等于伪造一条红证。**编排者已先修 harness**(模糊锚点一律 fail-closed,
+>    新增 `occurrence` 精确定位),并复跑既有 20 条确认全部锚点唯一、20/20 仍 PASS。
+>    rev12 另给两条锚点各加一条**冻结唯一注释**作机械定位锚。
+> 2. **M-D6c 用了尚未定义的变量**:`iteration_dir` 在 `:503` 才定义,
+>    而变异点在 `:461` —— 测试会因 `NameError` 转红,属**错误原因红证**。
+>    改用 `:363` 已定义的 `iterations_dir_path`。
+> 3. **漏 legacy repo 位点变异**:r9 要求两个 `probe` 位点 + 两个 `repo` 位点
+>    各一条变异,rev11 只有两 probe + 一 repo。补 **M-D6d**。
+>
+> 另按 r10:D6/D7 装配明写 `repo=tmp_path`、D6 显式清/设 `PROBE_CMD`;
+> 交付物清单补 B6/D6/D7;具名变异总数 27 → **28**。
+> rev11 存档 `WP-01-brief.rev11.md`(`efa13b8f`)。
+>
 > **rev11 关闭 r9 二签的五条必改项**。r9 确认了 Finding 1 的定性,但指出
 > rev10 的 B6 **仍可假绿**,并用同一「边界被整体 stub」机理找出**两条更严重的
 > 接缝盲区**。编排者**实测复现了两条**(每条都是单改一处 + 跑全量 + 还原):
@@ -634,24 +654,32 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     ```python
         try:
             adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
-        except ProbeFailedError:
+        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")
             return 0
     ```
+    > **行尾注释 `# F8 legacy hand-off (M-B6a/M-B6b anchor)` 是冻结文本的一部分**,
+    > 不得删改:它是 M-B6a/M-B6b 的**机械定位锚**。没有它,
+    > `except ProbeFailedError:` 在主路径与 legacy 路径各出现一次,
+    > 变异 harness 无法区分(r10 指出,编排者已实证 harness 原会改错位点)。
     **不得**抽 helper、**不得**写 `as exc`、**不得**改换行、**不得**把文案提成常量
     —— 否则下面两条变异的锚点逐字不匹配即判 BLOCKED(rev9 的 M-B3 已重演过一次)。
-  - **M-B6a**(rev11,替代整块锚点)目标函数:`redispatch.main` @ legacy 调用点
-    原表达式:`        except ProbeFailedError:`
-    变异表达式:`        except RuntimeError:`
+  - **M-B6a**(rev11;rev12 改用唯一锚点)目标函数:`redispatch.main` @ legacy 调用点
+    原表达式(含冻结注释,全仓唯一):
+    `        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)`
+    变异表达式:
+    `        except RuntimeError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)`
     承重测试:B6(`ProbeFailedError` 不再被接住、穿出 `main()` → 红)。
-  - **M-B6b**(rev11)目标函数:`redispatch.main` @ legacy 调用点
-    原表达式(该 `except` 块内的 `return 0`,逐字两行):
+  - **M-B6b**(rev11;rev12 改用唯一锚点)目标函数:`redispatch.main` @ legacy 调用点
+    原表达式(含上一行的冻结注释,保证全仓唯一,逐字三行):
     ```python
+        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")
             return 0
     ```
-    变异表达式:
+    变异表达式(仅末行由 `return 0` 改为 `pass`):
     ```python
+        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")
             pass
     ```
@@ -842,6 +870,8 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
   `test_main_resolver_call_contract[path]`,path ∈ {main, legacy}:
   - spy `redispatch._resolve_developer`:**只记录**收到的 `repo` 与 `probe`,
     并返回安全 stub `(_StubDev(), [], False)`;
+  - 装配须**显式**:`main_repo()` patch 到 `tmp_path`(故期望 `repo == tmp_path`),
+    且**显式清除或设置 `PROBE_CMD`**(不得继承环境,否则路径选择不确定);
   - `path == "main"`:不设 `PROBE_CMD`,走 `:461`;
     断言唯一一次调用的 `repo == main_repo()` 且 **`probe is True`**;
   - `path == "legacy"`:设 `PROBE_CMD` 走 `:513`;
@@ -857,10 +887,20 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     原表达式:`_resolve_developer(repo=repo_root, probe=False)`
     变异表达式:`_resolve_developer(repo=repo_root, probe=True)`
     承重实例:**[legacy]**。
-  - **M-D6c** 目标函数:`redispatch.main` @ `:461`
+  - **M-D6c**(rev12 修正变量)目标函数:`redispatch.main` @ `:461`
     原表达式:`_resolve_developer(repo=repo_root, probe=True)`
-    变异表达式:`_resolve_developer(repo=iteration_dir, probe=True)`
+    变异表达式:`_resolve_developer(repo=iterations_dir_path, probe=True)`
     承重实例:**[main]**(F5 单一配置权威被破坏 → 红)。
+    > rev11 原写 `repo=iteration_dir` —— 该变量在 `:503` 才定义、变异点在 `:461`,
+    > 测试会因 `NameError` 转红,属**错误原因红证**(r10 指出)。
+    > `iterations_dir_path` 在 `:363` 已定义,且 D6 装配下
+    > `iterations_dir() == tmp_path / "iters"` ≠ `main_repo() == tmp_path`。
+  - **M-D6d**(rev12 新增,补 legacy repo 位点)目标函数:`redispatch.main` @ legacy 调用点
+    原表达式:`_resolve_developer(repo=repo_root, probe=False)`
+    变异表达式:`_resolve_developer(repo=iterations_dir_path, probe=False)`
+    承重实例:**[legacy]**。
+    > r9 要求两个 `probe` 位点 + 两个 `repo` 位点各一条变异;
+    > rev11 漏了 legacy 的 repo 位点(r10 指出)。
   > 编排者实测:M-D6a 这一改(主路径 `probe=True`→`False`)在 rev10 实现下
   > **全量 838 passed 全绿** —— 这是 D6 必须存在的直接证据。
 
@@ -872,6 +912,11 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     (记录自己被构造的次数与收到的 `binding`);
   - monkeypatch `resolve_role_binding` 返回 `(primary, sentinel_binding)`;
   - **`probe=False`**(经 S5b 提前返回,保证不起任何子进程、不触网);
+  - 调用须明写 `_resolve_developer(repo=tmp_path, probe=False)`:S2/S3 在 S4 之前执行,
+    指向 `tmp_path` 可保证它们只读临时目录里的可选配置并回落默认值,
+    **不读生产 config、不触网**(r10 核实,故无需额外 stub 它们);
+  - spy class 需接受各自的 `kimi_bin` / `claude_bin` 关键字与 `binding`
+    (或用 `**kwargs`);
   - 断言:**只有与 key 同名的那个 class 被构造**(另一个构造计数为 0),
     且它收到的 binding 与 `resolve_role_binding()` 返回的对象 **`is` 同一个**。
   - **M-D7a** 目标函数:`redispatch._resolve_developer` 默认 registry 的 `"kimi"` 条目
@@ -919,12 +964,17 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 - `src/agentic_loop/redispatch.py`:`_resolve_developer` **删 `roles_config`**
   + 必填 `repo` + 单一权威 + 单一首选 + 原因分流 + 三元返回;
   `main()` 两处调用与 `fallback_binding` 贯通;
+  **legacy 调用点补 `try/except ProbeFailedError` 交人出口 + 冻结定位注释**(rev10/rev12,F8);
   **`main():538` 的 `resolve_role_fallback_binding` 补 `repo=repo_root`**(rev5);
   删除死 `get_roles` import
 - `tests/test_redispatch_quota_fallback.py`:
   A1×2 / A2×2 / A3(双变异)/ B1×2 / B2 / B3 / B4 / B5 /
   C0×2 / C1×2 / C2×2 / C3×2 / C4 / D2×2 / D3 / D4 / D5 测试
+  + **B6**(F8 legacy 交人,四项 oracle,rev10/rev12)
+  + **D6×2**(`main()→resolver` 的 probe/repo 参数契约,rev11)
+  + **D7×2**(默认 registry 的 key→class→binding 组合,rev11)
   + `CHAR-1`(五 fixture 参数化)+ 三元返回与新签名的 stub 同步
+  + **`_stub_io()` 增加 `stub_resolver: bool = True` 开关**(B6 须以 `False` 调用)
 - `tests/test_injection_probe.py`:D1(继承默认的精确 bool 断言,新增)
 - 执行报告(§C 格式),含逐条变异红证 + F3 的生产/checkout 实测事实复述
 
@@ -933,8 +983,8 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 - [ ] F1、F2、F3、F5、F6、F7 逐项实现(F4 已删除,`config.toml` 零改动)
 - [ ] 承重矩阵的 **21 个测试条目 + CHAR-1** 全部存在并通过(rev10:B6;rev11:D6/D7);10 个双实例
       参数化条目(A1 / A2 / B1 / C0 / C1 / C2 / C3 / D2 / D6 / D7)的**两个实例**都断言到位
-- [ ] **27 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**
-      (rev10:M-B6→rev11 拆为 M-B6a/M-B6b;rev11 新增 M-D6a/M-D6b/M-D6c/M-D7a/M-D7b)。
+- [ ] **28 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**
+      (rev10:M-B6→rev11 拆为 M-B6a/M-B6b;rev11 新增 M-D6a/b/c + M-D7a/b;rev12 新增 M-D6d)。
       报告逐条记录命令与输出;施加每条变异前先断言被变异的源文件确实
       与原文不同(如 `git diff --stat` 非空,杜绝空变异读成绿)
 - [ ] 每条变异记账含四元组对应关系:目标函数 / 原表达式 / 变异表达式 /
