@@ -626,29 +626,32 @@ def test_kimi_bound_detail_redacts_api_key(monkeypatch):
 # ======================================================================
 
 
-@pytest.mark.parametrize("path", ["native", "bound"])
-def test_kimi_detail_returns_real_output(path, monkeypatch):
-    # D2 adapter 层：probe_injection_detail() 的 detail 串承载真实 stdout
-    # 内容（非空、含用例标记），而非被清空或替换为固定占位。
-    marker = f"D2_MARKER_{path}_e2d1"
-    if path == "native":
+@pytest.mark.parametrize("binding_kind", ["native", "bound"])
+def test_probe_injection_binding_modes(binding_kind, monkeypatch):
+    # D2 adapter 层承重：probe_injection_detail() 的 ok 为精确 bool，detail 串
+    # 承载真实 stdout（非空、含对应分支哨兵），而非被清空或替换为固定占位。
+    if binding_kind == "native":
         adapter = KimiAdapter(binding=None)
+        sentinel = NATIVE_EGRESS_SENTINEL
+        fake_stdout = f"PROBE_OK {sentinel}"
     else:
         binding = _flash_binding()
         monkeypatch.setenv(binding.api_key_env, "sk-d2")
         adapter = KimiAdapter(binding=binding)
+        sentinel = BOUND_EGRESS_SENTINEL
+        fake_stdout = f"DEEPSEEK_PROBE_OK {sentinel}"
 
     class _FakeProc:
         returncode = 0
-        stdout = f"DEEPSEEK_PROBE_OK {marker}"
+        stdout = fake_stdout
 
     monkeypatch.setattr("subprocess.run", lambda *a, **k: _FakeProc())
 
     ok, detail = adapter.probe_injection_detail()
 
     assert ok is True
-    assert marker in detail
     assert detail != ""
+    assert sentinel in detail
 
 
 def test_flattened_roles_cannot_select_adapter(monkeypatch, tmp_path):
@@ -728,6 +731,8 @@ def test_all_config_reads_share_one_repo(monkeypatch, tmp_path):
         assert recorded[key], f"{key} 未被调用"
         assert all(r == tmp_path for r in recorded[key]), \
             f"{key} 的 repo 透传漂移: {recorded[key]}"
+    # 三处 config 读取恰好各一次，不多不少（防重复读取/遗漏读取）。
+    assert sum(len(recorded[key]) for key in recorded) == 3
 
 
 def test_main_dispatch_fallback_binding_uses_repo_root(tmp_path, monkeypatch):
