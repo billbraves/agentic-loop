@@ -435,7 +435,7 @@ def main(argv: list[str]) -> int:
     # Step 4: Guard ① probe.
     probe_cmd = os.environ.get("PROBE_CMD")
     adapter: Adapter | None = None
-    fb: bool = False
+    fallback_applied: bool = False
     if probe_cmd is not None:
         print(f"REDISPATCH_PROBE: {probe_cmd}", file=sys.stderr)
         proc = subprocess.run(
@@ -458,7 +458,7 @@ def main(argv: list[str]) -> int:
             return 0
     else:
         try:
-            adapter, _, fb = _resolve_developer(repo=repo_root, probe=True)
+            adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=True)
         except ProbeFailedError:
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")
             return 0
@@ -510,17 +510,16 @@ def main(argv: list[str]) -> int:
 
     # Resolve adapter for dispatch if the probe guard took the legacy bash path.
     if adapter is None:
-        adapter, _, fb = _resolve_developer(repo=repo_root, probe=False)
+        adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
 
     dry_run = os.environ.get("REDISPATCH_DRY_RUN", "0") == "1"
     brief_path = iteration_dir / f"{work_package_id}-brief.md"
     brief = brief_path.read_text(encoding="utf-8") if brief_path.is_file() else ""
 
     fallback_binding = resolve_role_fallback_binding("developer", repo=repo_root)
-    fallback_binding = None if fb else fallback_binding
     result, used_fallback = _dispatch_with_quota_fallback(
         adapter, worktree, brief, prompt_text, dry_run,
-        fallback_binding=fallback_binding,
+        fallback_binding=None if fallback_applied else fallback_binding,
         quota_patterns=load_quota_patterns(repo_root),
     )
     if used_fallback:
