@@ -124,13 +124,13 @@
   "consult": {
     "round": "r8",
     "kind": "brief-second-signature",
-    "decision": null,
-    "state": "NOT_DISPATCHED",
-    "bound_commit": "",
+    "decision": "ACCEPT",
+    "state": "COMPLETED",
+    "bound_commit": "53291fb",
     "bound_brief_rev": 9,
-    "receipt": "",
-    "answer": "",
-    "session_id": "",
+    "receipt": ".agentic/wp01-brief-consult-r8.receipt.json",
+    "answer": ".agentic/wp01-brief-consult-r8.answer.md",
+    "session_id": "01a12432-dcb8-7ee2-a0c7-864048e2c448",
     "required_changes": null,
     "resolved_in_rev": null,
     "prior_rounds": [
@@ -232,7 +232,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T05:02:24.531247+00:00",
+    "updated_at": "2026-10-10T05:05:38.799258+00:00",
     "dispatched_at": ""
   }
 }
