@@ -7,9 +7,12 @@ SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+import inspect
+
 from agentic_loop.adapters.base import ImplementResult
 from agentic_loop.provider_binding import ProviderBinding
 from agentic_loop.redispatch import _dispatch_with_quota_fallback
+import agentic_loop.redispatch as redispatch
 
 
 def _result(dispatched, output, exit_code=0):
@@ -615,3 +618,163 @@ def test_kimi_bound_detail_redacts_api_key(monkeypatch):
 
     assert secret not in detail
     assert non_key_text in detail
+
+
+# ======================================================================
+# Stage 2 余项：D2/D3/D4/D5 + CHAR-1（adapter 层 detail 承重、签名与语义承重、
+# repo 透传承重、dispatch fallback 接线承重、退化配置承重）
+# ======================================================================
+
+
+@pytest.mark.parametrize("path", ["native", "bound"])
+def test_kimi_detail_returns_real_output(path, monkeypatch):
+    # D2 adapter 层：probe_injection_detail() 的 detail 串承载真实 stdout
+    # 内容（非空、含用例标记），而非被清空或替换为固定占位。
+    marker = f"D2_MARKER_{path}_e2d1"
+    if path == "native":
+        adapter = KimiAdapter(binding=None)
+    else:
+        binding = _flash_binding()
+        monkeypatch.setenv(binding.api_key_env, "sk-d2")
+        adapter = KimiAdapter(binding=binding)
+
+    class _FakeProc:
+        returncode = 0
+        stdout = f"DEEPSEEK_PROBE_OK {marker}"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: _FakeProc())
+
+    ok, detail = adapter.probe_injection_detail()
+
+    assert ok is True
+    assert marker in detail
+    assert detail != ""
+
+
+def test_flattened_roles_cannot_select_adapter(monkeypatch, tmp_path):
+    # D3 签名+语义承重：_resolve_developer 不读取任何 get_roles（redispatch 模块
+    # 里根本没有该属性）；即便强行塞一个返回 ["claude"] 的 get_roles，也不会改变
+    # 首选 adapter 的工厂/探针调用（首选仍由 resolve_role_binding 决定）。
+    registry, counters = _counting_registry(probe_ok=True, probe_output="")
+    _patch_resolver(monkeypatch, primary="kimi", binding=object(), fallback_binding=None)
+
+    # redispatch 模块无 get_roles；用 raising=False 兜住不存在的 setattr。
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.get_roles",
+        lambda repo=None: {"developer": ["claude"]},
+        raising=False,
+    )
+
+    adapter, reasons, fallback_applied = _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert fallback_applied is False
+    assert counters["kimi"]["factory"] == 1
+    assert counters["claude"]["factory"] == 0
+    assert isinstance(adapter, _CountingProbeAdapter)
+    assert adapter.name == "kimi"
+    assert adapter is counters["kimi"]["adapters"][0]
+
+    sig = inspect.signature(_resolve_developer)
+    for name, kind in [
+        ("repo", inspect.Parameter.KEYWORD_ONLY),
+        ("registry", inspect.Parameter.KEYWORD_ONLY),
+        ("probe", inspect.Parameter.KEYWORD_ONLY),
+    ]:
+        assert sig.parameters[name].kind == kind
+
+
+def test_all_config_reads_share_one_repo(monkeypatch, tmp_path):
+    # D4 repo 透传承重：_resolve_developer 的三处 config 读取
+    # （resolve_role_binding / resolve_role_fallback_binding / load_quota_patterns）
+    # 都必须把调用方传入的同一个 repo 透传下去，不得各自回退到 main_repo()/None
+    # 产生漂移。
+    registry, _ = _counting_registry(probe_ok=True, probe_output="")
+
+    recorded = {
+        "resolve_role_binding": [],
+        "resolve_role_fallback_binding": [],
+        "load_quota_patterns": [],
+    }
+
+    def spy_for(key, original):
+        def spy(*args, **kwargs):
+            if "repo" in kwargs:
+                repo = kwargs["repo"]
+            elif len(args) >= 2:
+                repo = args[1]
+            else:
+                repo = args[0]
+            recorded[key].append(repo)
+            return original(*args, **kwargs)
+        return spy
+
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_binding",
+        spy_for("resolve_role_binding", redispatch.resolve_role_binding),
+    )
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_fallback_binding",
+        spy_for("resolve_role_fallback_binding", redispatch.resolve_role_fallback_binding),
+    )
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.load_quota_patterns",
+        spy_for("load_quota_patterns", redispatch.load_quota_patterns),
+    )
+
+    adapter, reasons, fallback_applied = _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert fallback_applied is False
+    for key in recorded:
+        assert recorded[key], f"{key} 未被调用"
+        assert all(r == tmp_path for r in recorded[key]), \
+            f"{key} 的 repo 透传漂移: {recorded[key]}"
+
+
+def test_main_dispatch_fallback_binding_uses_repo_root(tmp_path, monkeypatch):
+    # D5 接线承重：main() 在 dispatch 阶段读取 fallback binding 时，必须把
+    # repo_root（main_repo() 的返回值）透传给 resolve_role_fallback_binding，
+    # 不得改传 None 或 status 文件所在目录等其它值。
+    sf = _write_status(tmp_path, count=0)
+    _stub_io(monkeypatch, tmp_path)
+    monkeypatch.setenv("REDISPATCH_DRY_RUN", "1")
+
+    recorded = []
+    def spy(*args, **kwargs):
+        if "repo" in kwargs:
+            repo = kwargs["repo"]
+        elif len(args) >= 2:
+            repo = args[1]
+        else:
+            repo = args[0]
+        recorded.append(repo)
+        return _flash_binding()
+
+    monkeypatch.setattr("agentic_loop.redispatch.resolve_role_fallback_binding", spy)
+
+    assert _redispatch_main([str(sf)]) == 0
+
+    assert len(recorded) >= 1
+    expected = redispatch.main_repo()
+    assert all(r == expected for r in recorded)
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["no_config", "empty_roles", "dev_empty_list", "dev_empty_str", "dev_missing"],
+)
+def test_degenerate_config_resolves_native_kimi_no_fallback(case, tmp_path):
+    # CHAR-1 退化配置承重：任何使 developer 角色解析为空的退化 config，
+    # 都必须稳定落到 (kimi, None) 首选 + None fallback，不抛异常、不漂移。
+    if case != "no_config":
+        cfgdir = tmp_path / ".agentic"
+        cfgdir.mkdir(parents=True, exist_ok=True)
+        body = {
+            "empty_roles": "[roles]\n",
+            "dev_empty_list": "[roles]\ndeveloper = []\n",
+            "dev_empty_str": '[roles]\ndeveloper = ""\n',
+            "dev_missing": '[roles]\nreviewer = "claude"\n',
+        }[case]
+        (cfgdir / "config.toml").write_text(body, encoding="utf-8")
+
+    assert resolve_role_binding("developer", repo=tmp_path) == ("kimi", None)
+    assert resolve_role_fallback_binding("developer", repo=tmp_path) is None
