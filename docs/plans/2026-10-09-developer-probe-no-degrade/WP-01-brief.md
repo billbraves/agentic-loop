@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev9 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev10 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev10),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev11),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -64,6 +64,16 @@
 > r7 已审 rev8:**CODEX_DECISION: ACCEPT**
 > (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
 > `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev10 关闭实现评审的 Finding 1**(阻断项,见 `WP-01-review.md`):
+> rev9 实现经编排者独立评审 —— 矩阵 19 条目全在、20 条变异全部成立 ——
+> 但发现**冻结矩阵覆盖不到的一条真实缺陷**:`main():513`(legacy `PROBE_CMD`
+> 路径,`probe=False`)**未捕获** `ProbeFailedError`,而 **S4 发生在 S5b 之前**
+> 故在该路径可达。配置里 adapter 名写错时,legacy 路径不是 `REDISPATCH_STOP`
+> 交人,而是未捕获异常 + traceback。矩阵测不到的机理:D5/B3 把
+> `_resolve_developer` 整个 monkeypatch 掉,真实 S4 从不穿过 `main()` 边界。
+> rev10 新增 **F8**(`main()` 两处调用点的异常处置)、承重测试 **B6**
+> (不 stub resolver)与变异 **M-B6**。rev9 存档 `WP-01-brief.rev9.md`(`03a6087c`)。
+>
 > **rev9 是纯模板兼容修订**:派发闸 `dispatch_lint` 要求 brief 含三个英文节名
 > (`## Acceptance tests` / `## Allowed and forbidden paths` / `## Completion definition`,
 > 现行模板与 kqff WP-1 先例均带),本 brief 全中文标题不满足。
@@ -385,6 +395,22 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
     `_run(..., redact_env=None)` 本身就是裸返回,该要求不可执行。
   - 若未来要真脱敏原生路径,须先确定原生 credential env 名与算法,属另一 WP。
 
+**F8 `main()` 两处调用点都必须把 resolver 的 raise 变成交人(rev10 新增)**
+`_resolve_developer()` 的三条 raise(S4 / S10 / S11)在 `main()` 里有**两个**
+调用点,rev9 实现只在其中一个包了 `try/except`:
+- `:461`(`probe=True`,主路径)**已有** `except ProbeFailedError` →
+  `print("REDISPATCH_STOP: probe failed — 不重派,查根因")` + `return 0`;
+- `:513`(`probe=False`,legacy `PROBE_CMD` 分支)**没有**。
+
+`probe=False` 时 S5b 在探针前返回,故 S10/S11 不可达;**但 S4 在 S5b 之前**,
+配置名写错即在该路径抛出。冻结要求:**两处调用点的异常处置语义一致**,
+即 legacy 路径同样捕获 `ProbeFailedError` 并走同一 `REDISPATCH_STOP` 交人出口
+(文案与退出码与主路径一致;不得新造文案、不得 `raise`、不得静默 `pass`)。
+
+> 本 WP 的目标是「失败要交人,不要静默降级」。崩 traceback 虽然不静默,
+> 也**不是交人** —— 它没给出 `REDISPATCH_STOP` 这个可操作信号,
+> 且让 legacy 路径与主路径对同一个配置错误给出两种行为。
+
 ## 承重测试与必须转红的变异(矩阵式,rev7 重写)
 
 > rev7 结构性变化:r5 Q10(a) 判定「逐条追加编号」的边际收益已转负,
@@ -544,6 +570,37 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     原表达式:`if not probe:`
     变异表达式:`if False:`
     承重测试:B5(删掉提前返回后首选 stub 被探针,探针计数 0→1 → 红)。
+
+- **B6 legacy `probe=False` 路径的 S4 raise 必须被 `main()` 接成交人**
+  (rev10 新增,关实现评审 Finding 1)
+  `test_legacy_path_unknown_adapter_stops_not_crashes`:
+  - **不得** monkeypatch `_resolve_developer` —— 否则真实 S4 不穿过 `main()`,
+    那正是 D5/B3 漏掉这条的原因;改为 monkeypatch
+    `redispatch.resolve_role_binding` 返回带哨兵的未知名
+    `("no-such-adapter-SENTINEL6", None)`;
+  - 设 `PROBE_CMD` 走 legacy 分支(使 `:513` 的 `probe=False` 调用发生),
+    并设 `REDISPATCH_DRY_RUN=1` 不真派发、不触网;
+  - 断言三项:① `main()` **返回 0**(不抛异常、不非零退出);
+    ② capsys 捕获的输出含 `REDISPATCH_STOP`;
+    ③ stdout/stderr **均不含**哨兵 `no-such-adapter-SENTINEL6`
+    (S4 的零外流面在 `main()` 边界同样成立)。
+  - **M-B6** 目标函数:`redispatch.main` @ legacy 调用点
+    原表达式(逐字,rev10 实现后应存在):
+    ```python
+        try:
+            adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
+        except ProbeFailedError:
+            print("REDISPATCH_STOP: probe failed — 不重派,查根因")
+            return 0
+    ```
+    变异表达式(去掉接收端,回到 rev9 形态):
+    ```python
+        adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
+    ```
+    承重测试:B6(未捕获异常穿出 `main()` → 转红)。
+  > M-B6 与 M-A3/M-A3b 不同层:后两条锁 resolver **是否 raise**,
+  > M-B6 锁 `main()` **是否接**。resolver 层全绿不蕴含 `main()` 层已接 ——
+  > 这正是 rev9 漏掉 Finding 1 的机理。
 
 ### C 族:零外流(全部按 binding 参数化)
 
@@ -766,9 +823,9 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 ## 完成定义(DoD)
 
 - [ ] F1、F2、F3、F5、F6、F7 逐项实现(F4 已删除,`config.toml` 零改动)
-- [ ] 承重矩阵的 **18 个测试条目 + CHAR-1** 全部存在并通过;8 个双实例
+- [ ] 承重矩阵的 **19 个测试条目 + CHAR-1** 全部存在并通过(rev10:B6 新增);8 个双实例
       参数化条目(A1 / A2 / B1 / C0 / C1 / C2 / C3 / D2)的**两个实例**都断言到位
-- [ ] **20 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**。
+- [ ] **21 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**(rev10:M-B6 新增)。
       报告逐条记录命令与输出;施加每条变异前先断言被变异的源文件确实
       与原文不同(如 `git diff --stat` 非空,杜绝空变异读成绿)
 - [ ] 每条变异记账含四元组对应关系:目标函数 / 原表达式 / 变异表达式 /
@@ -799,6 +856,9 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 - [ ] 「必须保持绿集合」七项全绿,按名逐一记录结果
 - [ ] **legacy `PROBE_CMD` 路径(`main():532`)有定向测试覆盖三元解包**
       (该路径只在 legacy 分支运行,漏改会在生产运行时才崩)
+- [ ] **F8:`main()` 两处调用点的异常处置语义一致**,legacy 路径的
+      `ProbeFailedError` 同样走 `REDISPATCH_STOP` 交人出口(由 **B6** / **M-B6** 锁定);
+      B6 **不得** monkeypatch `_resolve_developer`
 - [ ] `bootstrap_cmd.py`、`adapters/claude.py`、`adapters/codex.py`、
       `resolve_paths.py`、`quota_fallback.py`、`secret_redaction.py`、
       `.agentic/config.toml` diff 均为空
