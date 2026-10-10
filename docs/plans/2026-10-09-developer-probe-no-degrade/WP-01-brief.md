@@ -1,19 +1,33 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev4 | 编排者 claude-code | 执行者 kimi
-> 冻结后执行期间只读。修订走 re-freeze(rev5),不原地改。
+> 冻结日期 2026-10-10 | rev5 | 编排者 claude-code | 执行者 kimi
+> 冻结后执行期间只读。修订走 re-freeze(rev6),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
-> rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)。
+> rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
+> rev4 `WP-01-brief.rev4.md`(含 rev4 相对 rev3 的变更表)。
 > rev4 由第三轮二签 REWORK(`.agentic/wp01-brief-consult-r3-attempt2.answer.md`,
 > `CODEX_DECISION: REWORK`,绑定 worktree head `a4bc5d7` / brief rev3
-> sha256 `ea608a02`)驱动,逐条关闭其**五项必改**(见 §「rev4 相对 rev3 的变更」)。
+> sha256 `ea608a02`)驱动,逐条关闭其**五项必改**。
 > 该轮 r3 attempt 1 已作废(answer 空体、verdict 未写出即耗尽预算),
 > 见 receipt 的 `voided_attempts`。
-> 配置权威仍是 `main_repo()`,未改全局语义,故本轮仍停在 REWORK 不升 CONSULT。
+>
+> **rev5 的来源不是二签,是编排者自己的派发前独立复核。**
+> r4 已在 `WP-01.status.json` 开为 `PENDING` 并绑 rev4,但**提示词与 harness 从未写出,
+> 从未派发**,因此 **rev4 没有、也不会有 codex 裁决**;其 `prior_revs` 记为
+> `SUPERSEDED_BEFORE_CONSULT`。编排者在动手写 r4 提示词前按 `CLAUDE.md`
+> §Review「不得因为是自己写的计划就放行」复核 rev4,实测发现**三处新引入的假绿面**
+> (见 §「rev5 相对 rev4 的变更」),其中第一处会让 rev4 新增的承重不变式
+> **恒绿、不可能转红**。带着它派发只会烧掉一轮预算去确认已知事实,故先出 rev5,
+> 再把 r4 一次性打在 rev5 上。
+> 本次 re-freeze 由用户 2026-10-10 明确指示,`freeze_scope` 的 `AUTONOMY_STOP`
+> 已据此放行(`AGENTIC_AUTONOMY_APPROVE=1`,仅限该步)。
+>
+> 配置权威仍是 `main_repo()`,未改全局语义;三处修正**全部是 brief 内的测试规格
+> 与记账口径修正**,不触产品语义、不扩范围,故仍停在 REWORK 层级不升 CONSULT。
 > **本 brief 尚未获授权实现**:r3 receipt 记 `implementation_authorized: false`、
 > `dispatch_authorized: false`、`wp_state_at_dispatch: "DRAFT"`。
-> rev4 冻结后须再过一轮二签(r4)才谈派发。
+> rev5 冻结后须过一轮二签(r4,绑 rev5)才谈派发。
 
 ## 目标(一句话)
 
@@ -21,9 +35,31 @@
 或「STOP 交人」,**绝不**推进到另一个 adapter 把 developer 静默换成 claude;
 且探针原始输出只在内存里参与额度判定,不进 reasons / 异常 / 日志 / status。
 
+## rev5 相对 rev4 的变更(编排者派发前独立复核的三项修正)
+
+> rev4 相对 rev3 的变更表见下一节(原样保留);rev3 相对 rev2 的见存档
+> `WP-01-brief.rev3.md`。
+
+| # | rev4 的缺陷 | 为什么是缺陷(实测) | rev5 的关闭方式 | 落点 |
+|---|---|---|---|---|
+| 1 | **`M-P6c` 不可能让 `INV-P6c` 转红**(决定性) | rev4 把变异冻结为在探针调用行后插入 `if binding is None: reasons.append(probe_output)`,而 `INV-P6c` 走的是**非额度支**即 `raise ProbeFailedError` 收场。`reasons` 是 `_resolve_developer` 的**函数局部变量**,raise 时随栈帧丢弃;brief 全文无任何条款要求把它挂到异常上(`:173` 只管正常返回的三元组),`ProbeFailedError` 类体也是空的(`redispatch.py:98`)。于是测试**拿不到 `reasons` 的任何句柄**,两次运行的异常文案逐字相同。编排者按冻结文本建模实跑:变异产生**零可观测差异**,`INV-P6c` 恒绿。这与 r3 Q9 否掉 rev2 `M-P6b` 的理由(「去掉脱敏后密钥只存在内存,oracle 看不见」)是**同一个错误换了位置重现** —— r3 必改项 3 因此并未真正关闭 | 把 native 零外流**拆成两条,各自绑定可观测面**:`INV-P6c` 改走**额度支且有 fallback 的可返回路径**(此时 `reasons` 随三元组返回,测试可直接断言每个元素);新增 `INV-P6d` 专管**非额度 raise 支**,oracle 只认**异常文案 + capsys 的 stdout/stderr**。两条的变异都用 `binding is None` / `is not None` 守卫,保证位点互不顶替 | §F7;INV-P6c;**新增 INV-P6d** |
+| 2 | **F5 漏掉 `main():538` 的第二个配置权威** | `INV-P9` 的注释(rev4 `:495-496`)自己点名「`main():538` 的 `resolve_role_fallback_binding("developer")` 不传 `repo`,而 `:542` 的 `load_quota_patterns(repo_root)` 传了 —— 两个权威视图」,但 rev4 **只在 `_resolve_developer()` 内部修了这件事**,`main()` 里的原始双权威留在原地(实测 `redispatch.py:538` 仍是无 `repo` 调用)。而 `INV-P9` 的 spy 只包 `_resolve_developer` 的三处调用,**查不出 `main()` 的那一处** | F5 的连带面补上 `main():538` 的显式穿参;新增 `INV-P9b` / `M-P9b` 用 spy 钉住 `main()` 这一处收到的实参是 `repo_root` | §F5;**新增 INV-P9b** |
+| 3 | **`INV-P2c` 的工厂计数口径算错一次,且未要求注入 registry 键** | rev4 断言「codex 工厂计数 1」。但 F6 冻结的实现必须先 `registry[adapter_name](binding)` 构造出 adapter 才能调 `probe_injection_detail()`,探针失败后再 `registry[adapter_name](fallback_binding)` 构造 flash —— **同一个工厂被调两次**。按「计数 1」写断言会让**正确实现**也转红,执行者据此报无谓 BLOCKED 或反向把实现改坏。另外默认 registry 只有 `kimi`/`claude` 两键(`redispatch.py:137-143` 实测),不显式注入 `codex` 会先撞上 F6 的「adapter 名不在 registry → raise」支,本条退化成 `INV-P1b` 的重复覆盖;`kimi` 键缺失则 `M-P2c` 会抛 `KeyError`,红的因果与宣称语义不符 | 计数改为 **2**,实参断言改为「**最后一次**调用收到的 **is** `fallback_binding`」;写明 registry 必须同时注入 `codex` 与 `kimi` 两个计数 stub,并冻结 `M-P2c` 施加后的期望红证 | INV-P2c |
+| 附 | `INV-P6` 的 oracle 清单含 `reasons`,在 raise 支上是**空断言** | 同缺陷 1 的根因:`INV-P6` 也走非额度 raise 支,`reasons` 同样不可观测。保留它会让人误以为那是一道真 oracle | `INV-P6` 的 oracle 清单删去 `reasons`,只留异常文案 + capsys;并把「raise 支上 `reasons` 不可观测」写进 §附注 11 作为全局记账纪律 | INV-P6;附注 11 |
+| 附 | `M-P6` 的变异是**无条件**泄漏 | 无条件泄漏会让 `INV-P6`(bound)与新增的 `INV-P6d`(native)**同时转红**,无法区分哪条在承重,违反本 brief 自己的「一变异一承重测试」纪律 | `M-P6` 改为 `binding is not None` 守卫的条件式泄漏,与 `M-P6d` 的 `binding is None` 守卫严格互补 | M-P6 / M-P6d |
+
+**rev5 不变的部分**(避免误读):F1/F2/F3/F5/F6/F7 的**行为目标与冻结实现文本一字未动**;
+`INV-P1 / P1b / P2 / P2b / P3 / P4 / P5 / P6b / P7 / P8 / P9` 与 `CHAR-P1c` 的规格未动;
+「必须保持绿集合」七项未动;基线数字未动。rev5 只动**测试规格、变异守卫、记账口径**
+与 F5 的一处漏改。
+
+**rev5 承重不变式全集**(16 条带变异):
+`INV-P1 / P1b / P2 / P2b / P2c / P3 / P4 / P5 / P6 / P6b / P6c / P6d / P7 / P8 / P9 / P9b`
++ `CHAR-P1c`(characterization,无变异,不计入)+ 必须保持绿集合(7 项)。
+
 ## rev4 相对 rev3 的变更(五项必改的关闭方式)
 
-> rev3 相对 rev2 的变更表见存档 `WP-01-brief.rev3.md`。
+> 本节为 rev4 原文,rev5 原样保留作为沿革记录。
 
 | r3 必改项 | 关闭方式 | 落点 |
 |---|---|---|
@@ -137,6 +173,15 @@ probe: bool = True) -> tuple[Adapter, list[str], bool]`。
   - `tests/test_redispatch_quota_fallback.py:234` 的 monkeypatch
     `lambda roles, probe=True: (_StubDev(), [])`
     → `lambda *, repo, registry=None, probe=True: (_StubDev(), [], False)`
+- **`main()` 内的第二个配置权威(rev5 新增,关闭 rev4 漏面)**:
+  `redispatch.py:538` 的 `fallback_binding = resolve_role_fallback_binding("developer")`
+  **不传 `repo`**,而紧邻的 `:542` `load_quota_patterns(repo_root)` 传了。
+  这正是 INV-P9 注释点名的「两个权威视图」**缺陷本体**,rev4 却只在
+  `_resolve_developer()` 内部修掉,`main()` 里的原始双权威留在原地;
+  且 INV-P9 的 spy 只包 `_resolve_developer` 的调用,**查不出这一处**。
+  **改为** `fallback_binding = resolve_role_fallback_binding("developer", repo=repo_root)`。
+  `repo_root = main_repo()` 已在 `main():382` 就位,**先于** `:538`,无需移动。
+  由 **INV-P9b** / **M-P9b** 锁定。
 - `get_roles` 在 `redispatch.py` 删后只剩 `:35` 的 import 成为死引用,**一并删除**
   (全仓检索:redispatch 内除 import 外仅 `:480` / `:532` 两处调用)。
   `resolve_paths.get_roles` 本身不动(仍被其他模块使用)。
@@ -292,9 +337,25 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
   测试:monkeypatch `resolve_role_binding` 返回 `("codex", binding)`
   (**非 kimi 首选**);registry 里 `codex` 为探针恒失败(输出额度措辞)、
   工厂带计数的 stub,`kimi` 亦为工厂带计数的 stub;`fallback_binding` 为 flash binding;
-  断言:返回 adapter 由 **`codex` 工厂**构造(codex 工厂计数 1、
-  **`kimi` 工厂计数 0**)、该工厂收到的实参 **is** `fallback_binding`、
-  `fallback_applied is True`。
+  断言:返回 adapter 由 **`codex` 工厂**构造(codex 工厂计数 **2**、
+  **`kimi` 工厂计数 0**)、**最后一次** codex 工厂调用收到的实参
+  **is** `fallback_binding`、`fallback_applied is True`。
+  > **rev5 修正 ①(计数口径)**:rev4 写「codex 工厂计数 1」是**错的**。
+  > F6 冻结的实现必须先 `registry[adapter_name](binding)` 构造出 adapter 才能调
+  > `probe_injection_detail()`,探针失败判定额度后再
+  > `registry[adapter_name](fallback_binding)` 构造 flash —— **同一个工厂被调两次**
+  > (第一次收主 `binding`,第二次收 `fallback_binding`)。按 rev4 的「计数 1」写断言,
+  > **正确实现也会转红**,执行者据此报无谓 BLOCKED,或反向把实现改坏去凑计数。
+  > 因此实参断言必须限定为「**最后一次**调用」,不能写成「该工厂收到的实参」。
+  > **rev5 修正 ②(registry 必须显式注入两个键)**:`registry` 须同时注入
+  > `codex`(探针恒失败、输出额度措辞、工厂带计数)**与** `kimi`(工厂带计数)。
+  > 默认 registry 只有 `kimi` / `claude` 两键(`redispatch.py:137-143` 实测),
+  > 不注入 `codex` 会先撞上 F6 的「`adapter_name` 不在 registry → raise」分支,
+  > 本条退化为 INV-P1b 的重复覆盖(假通过);`kimi` 键缺失则 M-P2c 的
+  > `registry["kimi"](fallback_binding)` 抛 `KeyError` —— 虽也转红,但红的因果
+  > 与本不变式宣称的语义不符,记账会失真。
+  > **M-P2c 施加后的期望红证(冻结)**:`kimi` 工厂计数由 0 变 1、
+  > 返回 adapter 是 kimi stub、无 `KeyError`。
   - **M-P2c** 目标函数:`redispatch._resolve_developer`
     原表达式:`registry[adapter_name](fallback_binding)`
     变异表达式:`registry["kimi"](fallback_binding)`
@@ -364,18 +425,30 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
     变异表达式:`fallback_binding=fallback_binding`
     承重测试:`test_probe_stage_flash_disables_dispatch_flash`(INV-P5)
 
-- **INV-P6「探针原始输出不外流」**
+- **INV-P6「bound 路径探针输出不外流」(rev5 修正 oracle 清单与变异守卫)**
   测试:让 kimi 探针 stdout 同时含 (a) 一个密钥哨兵值(通过
   `binding.api_key_env` 指向的 env 注入)、(b) 端点 URL、(c) 错误体文本;
-  走完 `_resolve_developer()` 的失败分流,断言**所有可观测输出**
-  (`ProbeFailedError` 文案、`reasons`、捕获的 stdout/stderr)
+  `binding` **非空**(密钥哨兵正是经 `binding.api_key_env` 注入的,故本条
+  **只覆盖 bound 路径**),走完 `_resolve_developer()` 的**非额度失败**分流,
+  断言**可观测输出**(`ProbeFailedError` 文案、capsys 捕获的 stdout/stderr)
   均不含哨兵值、不含该端点原文、不含探针输出片段。
   - **M-P6** 目标函数:`redispatch._resolve_developer`
     原表达式:`raise ProbeFailedError("probe failed: other")`
-    变异表达式:`raise ProbeFailedError(f"probe failed: other: {probe_output}")`
+    变异表达式(**rev5 改为 bound 条件式**,单行):
+    `raise ProbeFailedError(f"probe failed: other: {probe_output}" if binding is not None else "probe failed: other")`
     承重测试:`test_probe_output_never_egresses`(INV-P6)
   > rev2 的「拼进 reasons 或异常」是执行者可自由选择的描述,不是冻结变异 ——
-  > 二签 r2 Q9 第三条。本 rev 冻结为上述唯一异常文案替换。
+  > 二签 r2 Q9 第三条。rev3 据此冻结为唯一异常文案替换。
+  > **rev5 修正 ①(oracle 清单删去 `reasons`)**:本条走的是 `raise` 支,
+  > `reasons` 是 `_resolve_developer` 的**函数局部变量**,raise 时随栈帧丢弃,
+  > 测试**拿不到任何句柄**(详见 §附注 11)。rev4 把它列进 oracle 是**空断言**,
+  > 留着会让人误以为那是一道真 oracle。本条的红证只认**异常文案**。
+  > **rev5 修正 ②(变异加 bound 守卫)**:rev4 的无条件泄漏会让本条与新增的
+  > `INV-P6d`(native 同一位点)**同时转红**,无法区分哪条在承重,违反本 brief
+  > 自己的「一变异一承重测试」纪律。加 `binding is not None` 守卫后,
+  > M-P6 **只让 INV-P6 红**,M-P6d(`binding is None` 守卫)**只让 INV-P6d 红**,
+  > 两者严格互补。执行者施加 M-P6 后须同时记录 **INV-P6d 仍为绿**,
+  > 作为位点区分的证据。
 
 - **INV-P6b「bound detail 返回值本身不含密钥」(rev3 新增直接 oracle)**
   rev2 的 M-P6b 不保证转红:去掉脱敏后,未脱敏密钥可能只存在于 detail 返回值与
@@ -391,34 +464,82 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
     变异表达式:`out = out`
     承重测试:`test_kimi_bound_detail_redacts_api_key`(INV-P6b)
 
-- **INV-P6c「native detail 零外流」(rev4 新增,关闭 r3 必改项 3)**
-  二签 r3 Q7:native 路径**确实不脱敏**(`_run(..., redact_env=None)` 走
-  `if redact_env:` 守卫直接跳过替换,`kimi.py:125`),而 rev3 的 INV-P6 只用
-  `binding.api_key_env` 注入哨兵,**实质只覆盖 bound 路径**。实现完全可以
-  「仅当 `binding is None` 时把 `probe_output` 拼进 `reasons`」而 INV-P6 全绿。
-  本不变式给 native 路径单独立 oracle:
-  测试:monkeypatch `redispatch.resolve_role_binding` 返回
-  `("kimi", None)`(**native,binding 为 `None`**),monkeypatch
-  `subprocess.run` 让 kimi 探针 **stdout 含一个 native 专属哨兵串**
-  (与 INV-P6/P6b 的密钥哨兵**取不同字面值**,避免两条测试互相顶替)
-  且不含 `PROBE_OK`(使探针失败),quota patterns 不命中该文本(走非额度支);
-  捕获 `ProbeFailedError` 后断言:异常文案、`reasons` 全部元素、
-  capsys 捕获的 stdout 与 stderr **均不含该 native 哨兵串**;
-  并断言异常文案**等于**固定类别文案 `probe failed: other`(证明不是空串假过)。
+- **INV-P6c「native detail 不外流到 `reasons`」(rev5 重写:改绑可返回路径)**
+  二签 r3 Q7 的原始动机不变:native 路径**确实不脱敏**
+  (`_run(..., redact_env=None)` 走 `if redact_env:` 守卫直接跳过替换,`kimi.py:125`),
+  而 INV-P6 的哨兵经 `binding.api_key_env` 注入,**实质只覆盖 bound 路径**。
+  实现完全可以「仅当 `binding is None` 时把 `probe_output` 拼进 `reasons`」
+  而 INV-P6 全绿。native 路径必须有自己的 oracle。
+  > **rev5 为何重写**:rev4 把本条绑在**非额度 raise 支**上,oracle 写成
+  > 「异常文案 + `reasons` 全部元素 + capsys」。但 raise 时 `reasons` 随栈帧丢弃,
+  > 测试**拿不到句柄**(§附注 11),而变异只往 `reasons` 里泄漏、不碰异常文案,
+  > 于是**变异前后可观测输出逐字相同,本条恒绿、M-P6c 不可能转红**。
+  > 编排者按冻结文本建模实跑证实了这一点。这与 r3 Q9 否掉 rev2 M-P6b 的理由
+  > (「去掉脱敏后密钥只存在内存,oracle 看不见」)是同一个错误换位置重现。
+  > rev5 的关闭办法:**把本条移到 `reasons` 真正可观测的那条路径上** ——
+  > 额度支且有 fallback,`_resolve_developer()` 正常返回三元组,`reasons` 随之交出;
+  > 非额度 raise 支的 native 零外流由**新增的 INV-P6d** 单独承担。
+
+  测试 `test_native_probe_output_never_egresses_via_reasons`:
+  - monkeypatch `redispatch.resolve_role_binding` 返回 `("kimi", None)`
+    (**native,`binding` 为 `None`**);
+  - monkeypatch `redispatch.resolve_role_fallback_binding` 返回 **flash binding**
+    (非空,使本次走可返回的额度支);
+  - monkeypatch `subprocess.run`(或注入探针恒失败的 kimi stub)让探针输出
+    **同时**含 ① 一个 **native 专属哨兵串 `NATIVE_EGRESS_SENTINEL_C`**
+    (与 INV-P6/P6b 的密钥哨兵、与 INV-P6d 的哨兵**三者字面值互不相同**,
+    避免测试之间互相顶替)与 ② 一段 `DEFAULT_QUOTA_PATTERNS` 能命中的额度措辞
+    (如 `insufficient balance`),且不含 `PROBE_OK` 使探针失败;
+  - 断言:调用**正常返回**三元组 `(adapter, reasons, fallback_applied)`,
+    `fallback_applied is True`、返回 adapter 的 binding `provider == "deepseekflash"`
+    (证明确实走到额度支、不是别的路径假过),
+    且 **`reasons` 的每一个元素**、capsys 捕获的 stdout 与 stderr
+    **均不含 `NATIVE_EGRESS_SENTINEL_C`**。
   - **M-P6c** 目标函数:`redispatch._resolve_developer`
     原表达式:`ok, probe_output = adapter.probe_injection_detail()`
-    变异表达式:`ok, probe_output = adapter.probe_injection_detail()
-    if binding is None: reasons.append(probe_output)`
-    承重测试:`test_native_probe_output_never_egresses`(INV-P6c)
-  > **为何必须是条件泄漏**:M-P6 已占住「异常文案拼接」这个位点
-  > (`raise ProbeFailedError(f"probe failed: other: {probe_output}")`),
-  > 无条件泄漏会让 INV-P6 与 INV-P6c 同时转红,无法区分是哪条在承重。
-  > 本变异用 `if binding is None:` 守住,只在 native 路径泄漏,
-  > 故 **INV-P6 保持绿、仅 INV-P6c 转红** —— 这正是「native 专属 oracle」的证明。
-  > 执行者施加本变异后须同时记录 INV-P6 **仍为绿**,作为位点区分的证据。
-  > **政策不变**(见 §附注):native detail 是 resolver 内存内的敏感值,
+    变异表达式(两行,逐字):
+    ```python
+    ok, probe_output = adapter.probe_injection_detail()
+    if binding is None: reasons.append(probe_output)
+    ```
+    承重测试:`test_native_probe_output_never_egresses_via_reasons`(INV-P6c)
+  > **为何这次一定能红**:变异把哨兵塞进 `reasons`,而本条走的是**正常返回**路径,
+  > `reasons` 作为返回值第二元**在测试手里**,`not in` 断言必然失败。
+  > **为何仍是条件泄漏**:`if binding is None:` 守卫保证本变异只在 native 路径生效,
+  > 故 **INV-P6(bound)保持绿、仅 INV-P6c 转红**。执行者施加本变异后须同时记录
+  > INV-P6 与 INV-P6d **仍为绿**,作为位点区分的证据。
+  > **政策不变**(见 §附注 5):native detail 是 resolver 内存内的敏感值,
   > **零外流**是其安全边界;**不得**在代码注释、docstring 或报告里声称
   > adapter 已对未知 native credential 脱敏 —— 它没有。
+
+- **INV-P6d「native 非额度 STOP 支的异常文案零外流」(rev5 新增)**
+  INV-P6c 搬到可返回路径后,**native + 非额度 → raise** 这条路径就空出来了,
+  而它恰恰是生产里最常见的 native 失败形态(探针挂了且不是额度问题)。
+  实现若「仅当 `binding is None` 时把 `probe_output` 拼进异常文案」,
+  INV-P6(bound 守卫)与 INV-P6c(额度支)都查不出来。本条补上这个面。
+  测试 `test_native_probe_output_never_egresses_via_exception`:
+  - monkeypatch `redispatch.resolve_role_binding` 返回 `("kimi", None)`(native);
+  - `fallback_binding` 为 `None`(monkeypatch `resolve_role_fallback_binding`),
+    探针输出为 **native 专属哨兵串 `NATIVE_EGRESS_SENTINEL_D`**
+    (与 `NATIVE_EGRESS_SENTINEL_C`、与 INV-P6 的密钥哨兵**均不同字面值**)
+    且**不含**任何 `DEFAULT_QUOTA_PATTERNS` 能命中的措辞(确保走**非额度**支)、
+    不含 `PROBE_OK`(使探针失败);
+  - 断言:抛 `ProbeFailedError`,且**异常文案 `str(exc)` 等于**固定类别文案
+    `probe failed: other`(**精确相等**,既证零外流又证不是空串假过),
+    capsys 捕获的 stdout 与 stderr **均不含 `NATIVE_EGRESS_SENTINEL_D`**。
+  - **M-P6d** 目标函数:`redispatch._resolve_developer`
+    原表达式:`raise ProbeFailedError("probe failed: other")`
+    变异表达式(**native 条件式**,单行):
+    `raise ProbeFailedError(f"probe failed: other: {probe_output}" if binding is None else "probe failed: other")`
+    承重测试:`test_native_probe_output_never_egresses_via_exception`(INV-P6d)
+  > **与 M-P6 严格互补**:M-P6 的守卫是 `binding is not None`(只泄 bound),
+  > M-P6d 的守卫是 `binding is None`(只泄 native),两者**同位点、互不重叠**,
+  > 因此各自只让自己那一条转红。执行者施加 M-P6d 后须同时记录
+  > **INV-P6 与 INV-P6c 仍为绿**。
+  > **`reasons` 不在本条 oracle 清单内**:raise 支上它不可观测(§附注 11)。
+  > M-P1 / M-P6 / M-P6d 三条变异共用 `raise ProbeFailedError("probe failed: other")`
+  > 这一个原表达式但**各打不同面**(换人 / bound 泄漏 / native 泄漏),
+  > 须分别施加、分别记红,不得合并记账 —— 同 M-P2/M-P3、M-P1/M-P2b 的处理。
 
 - **INV-P8「`roles_config` 来源已消失:冲突输入不能影响选择」(rev4 重写变异)**
   测试 `test_flattened_roles_cannot_select_adapter`:
@@ -494,6 +615,35 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
     承重测试:`test_all_config_reads_share_one_repo`(INV-P9)
   > 这正是现状缺陷:`main():538` 的 `resolve_role_fallback_binding("developer")`
   > 不传 `repo`,而 `:542` 的 `load_quota_patterns(repo_root)` 传了 —— 两个权威视图。
+  > **但本条只覆盖 `_resolve_developer()` 内部的三处取数**:spy 包的是
+  > resolver 自己的调用,`main():538` 那一处它看不见。那一处由 **INV-P9b** 负责。
+
+- **INV-P9b「`main()` 的 fallback 取数也必须收到 `repo_root`」(rev5 新增)**
+  INV-P9 的注释点名了 `main():538` 的无 `repo` 调用,rev4 却只修了
+  `_resolve_developer()` 内部,`main()` 里的原始双权威**留在原地且无人看守**
+  (实测 `redispatch.py:538` 仍是 `resolve_role_fallback_binding("developer")`)。
+  测试 `test_main_dispatch_fallback_binding_uses_repo_root`:
+  - 复用 INV-P5 的 `main()` 装配(`REDISPATCH_DRY_RUN=1`,不真派发、不触网),
+    monkeypatch `redispatch._resolve_developer` 返回
+    `(_StubDev(), [], False)` —— **`fallback_applied` 取 `False`**,
+    使 F6 的 `fallback_binding=None if fallback_applied else fallback_binding`
+    让实参原样透传到 `_dispatch_with_quota_fallback`,否则被置 `None` 会把本条
+    与 INV-P5 的面搅在一起;
+  - 用 spy 包住 `redispatch.resolve_role_fallback_binding`,记录每次收到的
+    `repo` 实参(位置参数与关键字都要记);
+  - 断言:`main()` 路径上该函数**被调到**(计数 ≥ 1),且**每次**收到的 `repo`
+    都 `== main_repo()`(即 `repo_root`),**不是 `None`**。
+  - **M-P9b** 目标函数:`redispatch.main`
+    原表达式:`resolve_role_fallback_binding("developer", repo=repo_root)`
+    变异表达式:`resolve_role_fallback_binding("developer")`
+    承重测试:`test_main_dispatch_fallback_binding_uses_repo_root`(INV-P9b)
+  > **与 M-P9 同形但位点不同**(resolver 内部 vs `main()`),须分别施加、
+  > 分别记红,不得合并记账。
+  > **注意不要用「`repo` 为 `None` 时解析器会回落 `main_repo()`,结果一样」
+  > 为由跳过本条**:两者在生产里恰好同值,但那是**偶然**(`resolve_paths.py:360`
+  > 的 `repo = repo or main_repo()`)。一旦调用方的权威不再是 `main_repo()`,
+  > 无 `repo` 调用就会静默读到另一个配置视图 —— 这正是本 WP 要消灭的那类缺陷。
+  > 断言必须打在**实参**上,不能打在解析结果上。
 
 **必须保持绿集合**(防止 INV-P1 系列的收紧过度杀伤合法路径):
 - `test_project_config_primary_developer_stays_native`
@@ -512,18 +662,20 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
   两条路径真实输出 + bound 路径脱敏
 - `src/agentic_loop/redispatch.py`:`_resolve_developer` **删 `roles_config`**
   + 必填 `repo` + 单一权威 + 单一首选 + 原因分流 + 三元返回;
-  `main()` 两处调用与 `fallback_binding` 贯通;删除死 `get_roles` import
+  `main()` 两处调用与 `fallback_binding` 贯通;
+  **`main():538` 的 `resolve_role_fallback_binding` 补 `repo=repo_root`**(rev5);
+  删除死 `get_roles` import
 - `tests/test_redispatch_quota_fallback.py`:
-  INV-P1/P1b/P2/P2b/P2c/P3/P5/P6/P6b/P6c/P7/P8/P9 测试 + `CHAR-P1c`
-  + 三元返回与新签名的 stub 同步
+  INV-P1/P1b/P2/P2b/P2c/P3/P5/P6/P6b/P6c/**P6d**/P7/P8/P9/**P9b** 测试
+  + `CHAR-P1c` + 三元返回与新签名的 stub 同步
 - `tests/test_injection_probe.py`:继承默认的精确 bool 断言
 - 执行报告(§C 格式),含逐条变异红证 + F3 的生产/checkout 实测事实复述
 
 ## 完成定义(DoD)
 
 - [ ] F1、F2、F3、F5、F6、F7 逐项实现(F4 已删除,`config.toml` 零改动)
-- [ ] INV-P1/P1b/P2/P2b/P2c/P3/P4/P5/P6/P6b/P6c/P7/P8/P9 各有测试,
-      且**各自绑定的变异实测转红**
+- [ ] INV-P1/P1b/P2/P2b/P2c/P3/P4/P5/P6/P6b/P6c/**P6d**/P7/P8/P9/**P9b**
+      (**共 16 条**)各有测试,且**各自绑定的变异实测转红**
       (报告逐条记录命令与结果;先证"变异后源文件确有不同")。
       **`CHAR-P1c` 例外**:它是 characterization 前提(只读事实锁定),
       无绑定变异(见该条说明),只需测试绿,**不计入带变异的承重不变式计数**
@@ -544,6 +696,18 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
          非承重测试的连带红/绿按各条说明单独记录,**不得**充当红证。
       5. **恢复源文件**(如 `git checkout -- <file>`)并确认回到全绿,
          再进行下一条。**禁止多条变异同时在身**——叠加后无法区分是哪条在承重。
+- [ ] **同位点互补变异的交叉记账(rev5 新增)**。`M-P1` / `M-P6` / `M-P6d` 共用
+      同一个原表达式 `raise ProbeFailedError("probe failed: other")`,
+      `M-P6c` 与它们同在 native 面但位点不同。施加这四条中任意一条时,报告须
+      **同时记录另外几条的承重测试仍为绿**,作为「位点互不顶替」的证据:
+      - 施 `M-P6` → 仅 INV-P6 红,INV-P6c / INV-P6d 绿;
+      - 施 `M-P6c` → 仅 INV-P6c 红,INV-P6 / INV-P6d 绿;
+      - 施 `M-P6d` → 仅 INV-P6d 红,INV-P6 / INV-P6c 绿。
+      若出现「一条变异让两条承重测试同时红」,说明守卫条件写错或 oracle 面重叠,
+      **报 BLOCKED**,不得自行调整守卫措辞
+- [ ] **`reasons` 只在可返回路径上充当 oracle(rev5 新增)**。任何绑在 `raise`
+      支上的不变式**不得**把「`reasons` 不含哨兵」写成红证来源(§附注 11)。
+      执行报告若出现这类断言,须明确标注其为**非承重的冗余断言**
 - [ ] 「必须保持绿集合」全部七项全绿
 - [ ] **legacy `PROBE_CMD` 路径(`main():532`)有定向测试覆盖三元解包**
       (二签 r2 Q3/Q10:该路径只在 legacy 分支运行,漏改会在生产运行时才崩)
@@ -601,3 +765,23 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
    并用 `CHAR-P1c` 把该前提钉成测试;**不得**为了"空配置 STOP"去改 `resolve_paths.py`。
 10. **M-P2 与 M-P3 变异同一行不同面**:一个把谓词置假,一个把入参置空。
     两条都要单独施加、单独记红,不得合并记账。
+11. **`raise` 支上的 `reasons` 不可观测(rev5 新增,全局记账纪律)**。
+    `reasons` 是 `_resolve_developer()` 的**函数局部变量**:正常返回时它作为
+    三元组第二元交到调用方手里,**可以**做 oracle;但一旦函数以
+    `raise ProbeFailedError(...)` 收场,该列表随栈帧丢弃 —— brief 没有任何条款
+    要求把它挂到异常上(F6 只冻结异常**文案**),`ProbeFailedError` 类体也是空的
+    (`redispatch.py:98`)。因此 **raise 支上「断言 `reasons` 不含哨兵」是空断言**,
+    既不可能转红,也不构成任何安全证据。rev4 的 INV-P6c 正是栽在这里
+    (变异只往 `reasons` 泄漏 → 异常文案逐字不变 → 恒绿)。
+    纪律:**要测 `reasons`,就把不变式绑到能正常返回的路径上**(如 INV-P6c);
+    **要测 raise 支,oracle 只能是异常文案与 capsys**(如 INV-P6d)。
+    这条同样适用于将来新增的任何不变式。
+12. **互补守卫是刻意设计,不是重复**(rev5 新增)。`M-P6`(`binding is not None`)
+    与 `M-P6d`(`binding is None`)落在**同一个 raise 语句**上,守卫方向相反,
+    目的是让 bound 与 native 两个面各有独立红证、互不顶替。执行者**不得**
+    「优化」成一条无条件变异 —— 那会让两条承重测试同时红,退回 rev4 的记账歧义。
+13. **`main()` 与 resolver 是两个配置权威面**(rev5 新增)。F5 让
+    `_resolve_developer()` 内部三处取数共用一个 `repo`(INV-P9),但 `main():538`
+    的 `resolve_role_fallback_binding` 是**第四处**,由 INV-P9b 单独看守。
+    两处在生产里恰好同值(`resolve_paths.py:360` 的 `repo = repo or main_repo()`),
+    那是偶然,不是保证;断言必须打在**实参**上而非解析结果上。
