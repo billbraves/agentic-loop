@@ -499,3 +499,119 @@ def test_probe_false_returns_primary_without_probing(monkeypatch, tmp_path):
     assert adapter is counters["kimi"]["adapters"][0]
     assert counters["kimi"]["adapters"][0].probe_calls == 0  # 首选工厂探针计数 0
     _assert_non_primary_untouched(counters, "kimi")
+
+
+# ======================================================================
+# C 族：零外流（resolver 层 stub adapter + monkeypatch）
+# 哨兵经 stub 的 probe_injection_detail() 返回值注入（不真发子进程）；
+# native 实例用 NATIVE_EGRESS_SENTINEL，bound 实例用 BOUND_EGRESS_SENTINEL。
+# ======================================================================
+from agentic_loop.adapters.kimi import KimiAdapter
+
+NATIVE_EGRESS_SENTINEL = "NATIVE_EGRESS_SENTINEL_7f9a"
+BOUND_EGRESS_SENTINEL = "BOUND_EGRESS_SENTINEL_3c8e"
+
+
+class _StubProviderBinding:
+    """bound 实例的 binding stub；resolver 仅透传该对象给工厂，不读字段。"""
+
+    pass
+
+
+def _egress_binding(binding_kind):
+    """binding_kind -> (binding, sentinel)。native -> (None, NATIVE 哨兵)；bound -> (stub, BOUND 哨兵)。"""
+    if binding_kind == "native":
+        return None, NATIVE_EGRESS_SENTINEL
+    return _StubProviderBinding(), BOUND_EGRESS_SENTINEL
+
+
+@pytest.mark.parametrize("binding_kind", ["native", "bound"])
+def test_zero_egress_on_probe_pass(binding_kind, monkeypatch, tmp_path, capsys):
+    # C0 通过支零外流：首选探针通过（ok=True），probe_output 含哨兵也不外吐。
+    binding, sentinel = _egress_binding(binding_kind)
+    registry, counters = _counting_registry(probe_ok=True, probe_output=sentinel)
+    _patch_resolver(monkeypatch, primary="kimi", binding=binding, fallback_binding=None)
+
+    adapter, reasons, fallback_applied = _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert fallback_applied is False
+    assert adapter is counters["kimi"]["adapters"][0]   # 正常返回首选 adapter
+    for item in reasons:
+        assert sentinel not in item
+    captured = capsys.readouterr()
+    assert sentinel not in captured.out
+    assert sentinel not in captured.err
+
+
+@pytest.mark.parametrize("binding_kind", ["native", "bound"])
+def test_zero_egress_on_quota_flash_return(binding_kind, monkeypatch, tmp_path, capsys):
+    # C1 可返回支（额度 + 有 fallback）零外流：探针输出含哨兵也不外吐。
+    binding, sentinel = _egress_binding(binding_kind)
+    registry, counters = _counting_registry(
+        probe_ok=False, probe_output=f"insufficient balance {sentinel}")
+    _patch_resolver(monkeypatch, primary="kimi", binding=binding,
+                    fallback_binding=_StubProviderBinding())
+
+    adapter, reasons, fallback_applied = _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert fallback_applied is True   # 确实走了可返回支，防空路径假过
+    for item in reasons:
+        assert sentinel not in item
+    captured = capsys.readouterr()
+    assert sentinel not in captured.out
+    assert sentinel not in captured.err
+
+
+@pytest.mark.parametrize("binding_kind", ["native", "bound"])
+def test_zero_egress_on_quota_stop(binding_kind, monkeypatch, tmp_path, capsys):
+    # C2 额度 + 无 fallback STOP 支零外流。
+    binding, sentinel = _egress_binding(binding_kind)
+    registry, counters = _counting_registry(
+        probe_ok=False, probe_output=f"insufficient balance {sentinel}")
+    _patch_resolver(monkeypatch, primary="kimi", binding=binding, fallback_binding=None)
+
+    with pytest.raises(ProbeFailedError) as exc:
+        _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert str(exc.value) == "probe failed: quota, no fallback"
+    captured = capsys.readouterr()
+    assert sentinel not in captured.out
+    assert sentinel not in captured.err
+
+
+@pytest.mark.parametrize("binding_kind", ["native", "bound"])
+def test_zero_egress_on_nonquota_stop(binding_kind, monkeypatch, tmp_path, capsys):
+    # C3 非额度 STOP 支零外流。
+    binding, sentinel = _egress_binding(binding_kind)
+    registry, counters = _counting_registry(
+        probe_ok=False, probe_output=f"compile error {sentinel}")
+    _patch_resolver(monkeypatch, primary="kimi", binding=binding, fallback_binding=None)
+
+    with pytest.raises(ProbeFailedError) as exc:
+        _resolve_developer(repo=tmp_path, registry=registry)
+
+    assert str(exc.value) == "probe failed: other"
+    captured = capsys.readouterr()
+    assert sentinel not in captured.out
+    assert sentinel not in captured.err
+
+
+def test_kimi_bound_detail_redacts_api_key(monkeypatch):
+    # C4 adapter 层 oracle：bound 支 probe_injection_detail 的 detail 串
+    # 不含 api_key_env 指向的密钥值，且仍含 stdout 里另一段非密钥文本。
+    binding = _flash_binding()
+    secret = "sk-secret-api-key-1a2b3c4d5e6f"
+    non_key_text = "deepseek probe body text"
+    monkeypatch.setenv(binding.api_key_env, secret)
+
+    class _FakeProc:
+        returncode = 0
+        stdout = f"prefix {secret} suffix {non_key_text}"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: _FakeProc())
+
+    adapter = KimiAdapter(binding=binding)
+    ok, detail = adapter.probe_injection_detail()
+
+    assert secret not in detail
+    assert non_key_text in detail
