@@ -79,8 +79,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "941d5544d7f88f3ac310a015ea3809ccf1bff02872d9b18d0b7c3c52346567cf",
-      "rev": 10,
+      "sha256": "efa13b8fdd0ac877ad8463c304927955d28e243088f03e4e453b33afc47a1a00",
+      "rev": 11,
       "prior_revs": [
         {
           "rev": 1,
@@ -138,6 +138,13 @@
           "sha256": "03a6087c4a18a24896264480bd82e7dc685fcb5c1235ca0e573877b873bd4d0c",
           "outcome": "CHANGES_REQUESTED",
           "note": "r7+r8 ACCEPT; implementation reviewed by the orchestrator and found sound on the matrix, but Finding 1 (legacy path S4 raise uncaught in main()) lies outside the frozen matrix. rev10 adds F8 + B6 + M-B6."
+        },
+        {
+          "rev": 10,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev10.md",
+          "sha256": "941d5544d7f88f3ac310a015ea3809ccf1bff02872d9b18d0b7c3c52346567cf",
+          "outcome": "REWORK",
+          "note": "r9 REWORK, 5 required changes: B6 was escapable via `except: print(STOP); pass`; _stub_io() itself patches _resolve_developer (neutering B6); and two further seam blind spots the orchestrator reproduced empirically — default registry 'kimi'->ClaudeAdapter and main-path probe=True->False each kept all 838 tests green."
         }
       ]
     },
@@ -189,12 +196,12 @@
     "decision_note": "REWORK in the schema's vocabulary; the WP state is CHANGES_REQUESTED. One blocking finding (#1), two non-blocking records (#2, #3)."
   },
   "consult": {
-    "round": "r9",
+    "round": "r10",
     "kind": "brief-second-signature",
     "decision": null,
     "state": "NOT_DISPATCHED",
     "bound_commit": "",
-    "bound_brief_rev": 10,
+    "bound_brief_rev": 11,
     "receipt": "",
     "answer": "",
     "session_id": "",
@@ -306,12 +313,24 @@
         "session_id": "01a12432-dcb8-7ee2-a0c7-864048e2c448",
         "required_changes": 0,
         "resolved_in_rev": null
+      },
+      {
+        "round": "r9",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "22cb3dd",
+        "bound_brief_rev": 10,
+        "receipt": ".agentic/wp01-brief-consult-r9.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r9.answer.md",
+        "session_id": "01a12626-cbb1-7de1-931b-55fdd201c8d8",
+        "required_changes": 5,
+        "resolved_in_rev": 11
       }
     ]
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T13:53:49.749547+00:00",
+    "updated_at": "2026-10-10T15:16:50.751470+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }

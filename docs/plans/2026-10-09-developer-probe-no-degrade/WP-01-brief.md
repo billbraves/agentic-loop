@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev10 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev11 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev11),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev12),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -64,6 +64,24 @@
 > r7 已审 rev8:**CODEX_DECISION: ACCEPT**
 > (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
 > `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev11 关闭 r9 二签的五条必改项**。r9 确认了 Finding 1 的定性,但指出
+> rev10 的 B6 **仍可假绿**,并用同一「边界被整体 stub」机理找出**两条更严重的
+> 接缝盲区**。编排者**实测复现了两条**(每条都是单改一处 + 跑全量 + 还原):
+>
+> - 把默认 registry 的 `"kimi"` key 改成构造 `ClaudeAdapter`
+>   —— **即本 WP 要禁止的静默换 adapter 本身** —— **838 passed 全绿**;
+> - 把主路径 `probe=True` 改成 `probe=False`
+>   —— **生产注入探针被整体关闭** —— **838 passed 全绿**。
+>
+> 即:20/20 变异红证成立的同时,存在两条能直接击穿本 WP 目标却被全套测试
+> 放过的生产接线面。机理:矩阵只锁 resolver **内部**决策,
+> 而「`main()` 用什么参数调 resolver」「默认 registry 的 key→class→binding 组合」
+> 这两处跨边界接线,被 `_stub_io()` 的 `_resolve_developer` 整体替换
+> (`tests/...:35`,该 lambda **忽略 `repo` 与 `probe`**)与「所有 resolver 测试
+> 都注入自定义 registry」双双遮蔽。
+> rev11 新增 **F9**、**B6 加固**、**M-B6a/M-B6b**、**D6**、**D7** 及其变异。
+> rev10 存档 `WP-01-brief.rev10.md`(`941d5544`)。
+>
 > **rev10 关闭实现评审的 Finding 1**(阻断项,见 `WP-01-review.md`):
 > rev9 实现经编排者独立评审 —— 矩阵 19 条目全在、20 条变异全部成立 ——
 > 但发现**冻结矩阵覆盖不到的一条真实缺陷**:`main():513`(legacy `PROBE_CMD`
@@ -411,6 +429,24 @@ flash 支上只是**偶然**成立 —— 因为生产首选恰好是 kimi;一�
 > 也**不是交人** —— 它没给出 `REDISPATCH_STOP` 这个可操作信号,
 > 且让 legacy 路径与主路径对同一个配置错误给出两种行为。
 
+**F9 跨边界接线必须被锁(rev11 新增,关 r9 必改项 3/4)**
+本 WP 的目标是「developer 探针失败不得静默换 adapter」。
+除 resolver 内部决策外,**两处跨边界接线**同样能单独击穿该目标,必须各自承重:
+
+1. **`main()` 调 resolver 的参数契约**:主路径必须 `probe=True`、
+   legacy 路径必须 `probe=False`、两处都必须 `repo=repo_root`(即 `main_repo()`)。
+   `probe=True → False` 会**整体关闭生产注入探针**;`repo` 改别处会破坏 F5 的
+   单一配置权威。由 **D6** 锁定。
+2. **默认 registry 的 key→class→binding 组合**:不传 `registry` 时,
+   `"kimi"` key 必须构造 `KimiAdapter`、`"claude"` key 必须构造 `ClaudeAdapter`,
+   且构造时收到的 binding 必须与 `resolve_role_binding()` 返回的对象 **`is` 同一个**
+   (不得丢弃 binding 使真实 adapter 退回 native 路径)。
+   `"kimi"` key 构造 `ClaudeAdapter` **就是本 WP 要禁止的静默换 adapter**。
+   由 **D7** 锁定。
+
+> 编排者 rev11 冻结前实测:上述两条各自单改一处,**全量 838 passed 全绿**。
+> 这不是覆盖洁癖,是两条已证实的假绿面。
+
 ## 承重测试与必须转红的变异(矩阵式,rev7 重写)
 
 > rev7 结构性变化:r5 Q10(a) 判定「逐条追加编号」的边际收益已转负,
@@ -580,12 +616,21 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     `("no-such-adapter-SENTINEL6", None)`;
   - 设 `PROBE_CMD` 走 legacy 分支(使 `:513` 的 `probe=False` 调用发生),
     并设 `REDISPATCH_DRY_RUN=1` 不真派发、不触网;
-  - 断言三项:① `main()` **返回 0**(不抛异常、不非零退出);
-    ② capsys 捕获的输出含 `REDISPATCH_STOP`;
-    ③ stdout/stderr **均不含**哨兵 `no-such-adapter-SENTINEL6`
+  - **不得复用现形态的 `_stub_io()`**:该 helper 自身
+    (`tests/test_redispatch_quota_fallback.py:35`)会 monkeypatch
+    `_resolve_developer`,直接抵消本条的全部意义。必须给 helper 加
+    `stub_resolver: bool = True` 开关并以 `stub_resolver=False` 调用,
+    或为 B6 单独装配其余 I/O stub(两种都可,但 resolver 必须是真的)。
+  - 断言**四项**(rev11 按 r9 必改项 1 加固):
+    ① `main()` **返回 0**(不抛异常、不非零退出);
+    ② **`_dispatch_with_quota_fallback` 调用次数为 0** —— 用 spy/bomb 替换,
+       被调到即失败。这是「接住后**立即停止**」的控制流 oracle,
+       缺它则 `except: print(STOP); pass` 可以三项全绿却继续往下派发(r9 实证);
+    ③ capsys 的 stdout **精确等于**那一行 STOP 文案(收紧为相等,不是包含),
+       防 STOP 之后继续打印 dry-run JSON;
+    ④ stdout/stderr **均不含**哨兵 `no-such-adapter-SENTINEL6`
     (S4 的零外流面在 `main()` 边界同样成立)。
-  - **M-B6** 目标函数:`redispatch.main` @ legacy 调用点
-    原表达式(逐字,rev10 实现后应存在):
+  - **冻结实现形态(canonical,逐字)**:legacy 调用点必须写成
     ```python
         try:
             adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
@@ -593,11 +638,27 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")
             return 0
     ```
-    变异表达式(去掉接收端,回到 rev9 形态):
+    **不得**抽 helper、**不得**写 `as exc`、**不得**改换行、**不得**把文案提成常量
+    —— 否则下面两条变异的锚点逐字不匹配即判 BLOCKED(rev9 的 M-B3 已重演过一次)。
+  - **M-B6a**(rev11,替代整块锚点)目标函数:`redispatch.main` @ legacy 调用点
+    原表达式:`        except ProbeFailedError:`
+    变异表达式:`        except RuntimeError:`
+    承重测试:B6(`ProbeFailedError` 不再被接住、穿出 `main()` → 红)。
+  - **M-B6b**(rev11)目标函数:`redispatch.main` @ legacy 调用点
+    原表达式(该 `except` 块内的 `return 0`,逐字两行):
     ```python
-        adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
+            print("REDISPATCH_STOP: probe failed — 不重派,查根因")
+            return 0
     ```
-    承重测试:B6(未捕获异常穿出 `main()` → 转红)。
+    变异表达式:
+    ```python
+            print("REDISPATCH_STOP: probe failed — 不重派,查根因")
+            pass
+    ```
+    承重测试:B6(接住却不停止 → 断言②的 dispatch bomb 被调到 / 断言③出现
+    额外 dry-run 输出 → 红)。
+  > **为何拆两条**:M-B6a 锁「是否接住」,M-B6b 锁「接住后是否立即停止」。
+  > 两条锚点都是单行/两行的稳定形态,比整块五行锚点抗重写。
   > M-B6 与 M-A3/M-A3b 不同层:后两条锁 resolver **是否 raise**,
   > M-B6 锁 `main()` **是否接**。resolver 层全绿不蕴含 `main()` 层已接 ——
   > 这正是 rev9 漏掉 Finding 1 的机理。
@@ -777,6 +838,53 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
   > 不得以「`repo=None` 时解析器回落 `main_repo()`,结果一样」为由跳过:
   > 那是 `resolve_paths.py:360` 的偶然同值;断言打在**实参**上,不是解析结果上。
 
+- **D6 `main()` 调 resolver 的参数契约**(rev11 新增,关 r9 必改项 3)
+  `test_main_resolver_call_contract[path]`,path ∈ {main, legacy}:
+  - spy `redispatch._resolve_developer`:**只记录**收到的 `repo` 与 `probe`,
+    并返回安全 stub `(_StubDev(), [], False)`;
+  - `path == "main"`:不设 `PROBE_CMD`,走 `:461`;
+    断言唯一一次调用的 `repo == main_repo()` 且 **`probe is True`**;
+  - `path == "legacy"`:设 `PROBE_CMD` 走 `:513`;
+    断言唯一一次调用的 `repo == main_repo()` 且 **`probe is False`**;
+  - 两实例都断言调用次数**恰为 1**(防两条路径都被走一遍)。
+  > 这里 patch `_resolve_developer` 是**正当**的:本条的 oracle 正是
+  > **跨边界的调用参数本身**,不是 resolver 内部行为。
+  - **M-D6a** 目标函数:`redispatch.main` @ `:461`
+    原表达式:`_resolve_developer(repo=repo_root, probe=True)`
+    变异表达式:`_resolve_developer(repo=repo_root, probe=False)`
+    承重实例:**[main]**(生产注入探针被整体关闭 → 红)。
+  - **M-D6b** 目标函数:`redispatch.main` @ legacy 调用点
+    原表达式:`_resolve_developer(repo=repo_root, probe=False)`
+    变异表达式:`_resolve_developer(repo=repo_root, probe=True)`
+    承重实例:**[legacy]**。
+  - **M-D6c** 目标函数:`redispatch.main` @ `:461`
+    原表达式:`_resolve_developer(repo=repo_root, probe=True)`
+    变异表达式:`_resolve_developer(repo=iteration_dir, probe=True)`
+    承重实例:**[main]**(F5 单一配置权威被破坏 → 红)。
+  > 编排者实测:M-D6a 这一改(主路径 `probe=True`→`False`)在 rev10 实现下
+  > **全量 838 passed 全绿** —— 这是 D6 必须存在的直接证据。
+
+- **D7 默认 registry 的 key→class→binding 组合**(rev11 新增,关 r9 必改项 4)
+  `test_default_registry_preserves_adapter_and_binding[primary]`,
+  primary ∈ {kimi, claude}:
+  - **不传 `registry`**,走真实 `_resolve_developer` 的默认 registry;
+  - monkeypatch 模块内的 `KimiAdapter` / `ClaudeAdapter` 为**带构造计数的 spy class**
+    (记录自己被构造的次数与收到的 `binding`);
+  - monkeypatch `resolve_role_binding` 返回 `(primary, sentinel_binding)`;
+  - **`probe=False`**(经 S5b 提前返回,保证不起任何子进程、不触网);
+  - 断言:**只有与 key 同名的那个 class 被构造**(另一个构造计数为 0),
+    且它收到的 binding 与 `resolve_role_binding()` 返回的对象 **`is` 同一个**。
+  - **M-D7a** 目标函数:`redispatch._resolve_developer` 默认 registry 的 `"kimi"` 条目
+    原表达式:`"kimi": lambda b: KimiAdapter(`
+    变异表达式:`"kimi": lambda b: ClaudeAdapter(`
+    承重实例:**[kimi]**(**本 WP 要禁止的静默换 adapter 本身**)。
+  - **M-D7b** 目标函数:同上
+    原表达式:`kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=b)`
+    变异表达式:`kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=None)`
+    承重实例:**[kimi]**(binding 被丢弃,真实 adapter 退回 native 路径 → 红)。
+  > 编排者实测:M-D7a 这一改在 rev10 实现下**全量 838 passed 全绿**。
+  > 「所有 resolver 测试都注入自定义 registry」把生产默认 registry 整个遮蔽了。
+
 ### CHAR-1 空配置折叠事实的锁定(characterization,无变异,不计入承重数)
 
 对 `tmp_path` 下的**五种退化配置逐一参数化**(r6 Q8 附带意见:声称五种
@@ -823,9 +931,10 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 ## 完成定义(DoD)
 
 - [ ] F1、F2、F3、F5、F6、F7 逐项实现(F4 已删除,`config.toml` 零改动)
-- [ ] 承重矩阵的 **19 个测试条目 + CHAR-1** 全部存在并通过(rev10:B6 新增);8 个双实例
-      参数化条目(A1 / A2 / B1 / C0 / C1 / C2 / C3 / D2)的**两个实例**都断言到位
-- [ ] **21 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**(rev10:M-B6 新增)。
+- [ ] 承重矩阵的 **21 个测试条目 + CHAR-1** 全部存在并通过(rev10:B6;rev11:D6/D7);10 个双实例
+      参数化条目(A1 / A2 / B1 / C0 / C1 / C2 / C3 / D2 / D6 / D7)的**两个实例**都断言到位
+- [ ] **27 条具名变异各自使其四元组点名的承重测试(与承重实例)转红**
+      (rev10:M-B6→rev11 拆为 M-B6a/M-B6b;rev11 新增 M-D6a/M-D6b/M-D6c/M-D7a/M-D7b)。
       报告逐条记录命令与输出;施加每条变异前先断言被变异的源文件确实
       与原文不同(如 `git diff --stat` 非空,杜绝空变异读成绿)
 - [ ] 每条变异记账含四元组对应关系:目标函数 / 原表达式 / 变异表达式 /
@@ -857,8 +966,13 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
 - [ ] **legacy `PROBE_CMD` 路径(`main():532`)有定向测试覆盖三元解包**
       (该路径只在 legacy 分支运行,漏改会在生产运行时才崩)
 - [ ] **F8:`main()` 两处调用点的异常处置语义一致**,legacy 路径的
-      `ProbeFailedError` 同样走 `REDISPATCH_STOP` 交人出口(由 **B6** / **M-B6** 锁定);
-      B6 **不得** monkeypatch `_resolve_developer`
+      `ProbeFailedError` 同样走 `REDISPATCH_STOP` 交人出口
+      (由 **B6** / **M-B6a** / **M-B6b** 锁定);B6 **不得** monkeypatch
+      `_resolve_developer`,且必须带 `_dispatch_with_quota_fallback` 零调用 oracle
+- [ ] **F9:两处跨边界接线各自承重** —— `main()→resolver` 的 `probe`/`repo` 参数契约
+      (**D6** + M-D6a/b/c)与默认 registry 的 key→class→binding 组合
+      (**D7** + M-D7a/b)。两者在 rev10 实现下均**全量全绿可假绿**,编排者已实测,
+      故这两条是硬性 DoD 项,不得以「diff review 已看过」替代
 - [ ] `bootstrap_cmd.py`、`adapters/claude.py`、`adapters/codex.py`、
       `resolve_paths.py`、`quota_fallback.py`、`secret_redaction.py`、
       `.agentic/config.toml` diff 均为空
