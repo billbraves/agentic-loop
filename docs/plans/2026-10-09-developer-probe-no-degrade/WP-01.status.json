@@ -206,7 +206,7 @@
     "round": "r11",
     "kind": "brief-second-signature",
     "decision": null,
-    "state": "NOT_DISPATCHED",
+    "state": "QUOTA_BLOCKED",
     "bound_commit": "",
     "bound_brief_rev": 12,
     "receipt": "",
@@ -345,11 +345,21 @@
         "required_changes": 5,
         "resolved_in_rev": 12
       }
+    ],
+    "voided_attempts": [
+      {
+        "attempt": 1,
+        "session_id": "01a127e3-c741-7df3-96fb-d78d5c6753ae",
+        "valid_consult": false,
+        "decision": "INVALID",
+        "cause": "consultant quota exhausted: kirogpt gateway returned 402 Payment Required (monthly request limit, model group gpt-5.6-sol, no fallbacks) after 5 reconnects; empty answer body in 24s",
+        "receipt": ".agentic/wp01-brief-consult-r11.receipt.json"
+      }
     ]
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-10T22:14:46.765538+00:00",
+    "updated_at": "2026-10-10T22:17:59.395047+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }
