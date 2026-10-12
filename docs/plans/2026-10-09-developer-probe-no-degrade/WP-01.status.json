@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-09-developer-probe-no-degrade",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -24,7 +24,9 @@
     "dispatch_commit": "b47c04e85f1f493719c5dda3574474dc7037bb25",
     "branch": "plan/2026-10-09-developer-probe-no-degrade",
     "worktree": "/Users/admin/vibe/probe-no-degrade",
-    "commit": "e6709915fd6db96c3eb08d7cdb2a47b7dbb9d667"
+    "commit": "e6709915fd6db96c3eb08d7cdb2a47b7dbb9d667",
+    "merged_commit": "e6709915fd6db96c3eb08d7cdb2a47b7dbb9d667",
+    "merged_commit_note": "SEQUENTIAL_SINGLE_WP_PLAN: git.branch == git.base_branch, so no WP->integration merge commit exists and `agentic finalize` cannot resolve one (verified: 0 candidates from its rev-list --merges --parents probe). Per AGENTS.md §4.3 a sequential WP works directly on the integration branch; the WP's final implementation commit IS its integration point. Stamped manually by the orchestrator under user-authorized route B. The tool gap (finalize assumes a parallel-lane branch) is recorded as follow-up WP-02."
   },
   "scope": {
     "allowed_paths": [
@@ -451,7 +453,8 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-12T07:19:40.907185+00:00",
+    "updated_at": "2026-10-12T09:15:00Z",
+    "merged_at": "2026-10-12T09:15:00Z",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }
