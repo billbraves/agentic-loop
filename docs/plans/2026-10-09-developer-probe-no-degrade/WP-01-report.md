@@ -136,3 +136,79 @@ checkout)必须保持绿。
 - (c) **shell-out-to-git 测试在并发 git 操作下可能假失败**:`test_wp_template_dispatch_lint.py` /
   `test_finalize_merge_triple_sign.py` 在并发 checkout 时编排者观察到 273 个错误；串行重跑后
   838 passed / 0 failed。
+
+---
+
+## 7. rev10-rev15 增量(评审后)
+
+> 本节补充 rev10–rev15 期间（Finding 1 修复、8 条新变异、变异 harness 加固、五次 re-sign）的
+> 执行增量。终态:**843 passed / 4 skipped / 0 failed**（838 → 843，净 +5 实例 = B6 + D6×2 +
+> D7×2）；变异:**28/28 PASS**（20 旧 + 8 新）。增量实现提交:`af10c0a`。
+
+### 7.1 Finding 1 原委
+
+独立评审 Finding 1 指出 `main():513` 的 legacy `PROBE_CMD` 分支缺少 `except ProbeFailedError`：
+S4（unknown developer adapter）在 S5b 之前即可达，触发时是 traceback 而非 `REDISPATCH_STOP`。
+18 条目矩阵此前看不见它，是因为 D5 / B3 对整个 resolver 边界做了 monkeypatch（把异常吞在
+边界内），而 A3 只断言「resolver 会 raise」，从未断言「`main()` 会 catch」。修复方式为 rev10
+新增 **F8**（两条调用点 main / legacy 的异常处理语义一致），并新增 **B6**
+（`test_legacy_path_unknown_adapter_stops_not_crashes`，含四个 oracle）把 legacy 路径锁死。
+
+### 7.2 两条已确认的假绿（本增量最重要的发现）
+
+评审过程中，编排者用「单行改动 + 全套测试」实证复现了两条假绿面——这两处各改一行、目标语义
+即被破坏，但全部 838 用例仍全绿：
+
+- **默认 registry 的 `"kimi"` 键改为构造 `ClaudeAdapter`**（静默切换 adapter）——单行改动，
+  838 全绿。现已由 **M-D7a** 锁红（`test_default_registry_preserves_adapter_and_binding` 的
+  `[kimi]` 实例）。
+- **主路径 `probe=True` 改为 `probe=False`**（关闭 probe 注入）——单行改动，838 全绿。现已由
+  **M-D6a** 锁红（`test_main_resolver_call_contract` 的 `[main]` 实例）。
+
+也就是说，此前「20/20 变异全绿」与这两条「一行即坏目标、却 838 全绿」的假绿**同时并存**：旧
+20 条变异覆盖的是已被冻结的表达式，而这两处关键 seam 尚未被任何变异锚定。rev10 起通过 D6 /
+D7 两条承重测试把它们纳入矩阵，才关闭这两个假绿面。
+
+### 7.3 变异 harness 缺陷与修复
+
+编排者自己的变异 harness 最初是「先计数、再替换首个匹配」。当 canonical 块落地后，
+`except ProbeFailedError:` 在 main 与 legacy 两处同时存在，harness 会替换错位置，从而**伪造
+假红**。修复方式：锚点改为模糊匹配 + 命中不唯一即 fail-closed（报 BLOCKED 而非捏造红），并
+新增 `occurrence` 精确位置声明。对既有 20 条变异重跑后仍是 20/20，未回退。
+
+### 7.4 新增 8 条变异
+
+| 变异名 | 承重测试 | 实际转红实例 | 恢复后回绿 |
+|---|---|---|---|
+| M-B6a | B6 `test_legacy_path_unknown_adapter_stops_not_crashes` | 转红（单实例，四 oracle 之一）| 回绿 |
+| M-B6b | B6 同上 | 转红（另一 oracle 面）| 回绿 |
+| M-D6a | D6 `test_main_resolver_call_contract` | `[main]` 实例转红 | 回绿 |
+| M-D6b | D6 同上 | `[legacy]` 实例转红 | 回绿 |
+| M-D6c | D6 同上 | `[main]` 实例转红 | 回绿 |
+| M-D6d | D6 同上 | `[legacy]` 实例转红 | 回绿 |
+| M-D7a | D7 `test_default_registry_preserves_adapter_and_binding` | `[kimi]` 实例转红 | 回绿 |
+| M-D7b | D7 同上 | `[kimi]` 实例转红（`occurrence=1` 精确定位）| 回绿 |
+
+承重测试落点:B6 为 F8 的 legacy 交接（四 oracle）；D6 两条实例（`main` / `legacy`）各锁定主
+路径与 legacy 路径的 resolver 调用契约；D7 两条实例锁定默认 registry 的 adapter 与 binding
+不被静默改写。**F9** 把跨边界接线（resolver 调用契约 + 默认 registry）整体锁死。
+
+### 7.5 M-D7b 由 BLOCKED 转 PASS
+
+首轮重跑结果为 **27 PASS + M-D7b BLOCKED**：其锚点在 `redispatch.py` 命中两处——`:144`
+默认 registry（目标）与 `:275` flash 工厂（无关）。加固后的 harness 如实报 BLOCKED，而非伪造
+红。rev15 增加 `occurrence=1` 声明后重跑，**28/28 PASS**。
+
+### 7.6 re-sign 台账
+
+| 轮次 | 结论 | 要求 |
+|---|---|---|
+| rev9 | CHANGES_REQUESTED | Finding 1；rev10 补 F8 + B6 + M-B6 |
+| r9 | REWORK | 5 项（含:B6 可用 `except: print(STOP); pass` 逃逸、`_stub_io()` 补丁 `_resolve_developer`、两条 seam 盲点——默认 registry `kimi`→ClaudeAdapter 与主路径 `probe=True`→`False` 均 838 全绿）|
+| r10 | REWORK | 3 项机械缺陷（M-B6a/b 锚点不唯一；M-D6c 用了未定义的 `iteration_dir`；legacy repo-site M-D6d 缺失）|
+| r11 | REWORK | 3 项精度修正（D6 legacy probe-success fixture 未冻结；F9 DoD 缺 M-D6d；锚点措辞）。第 1 次 attempt 因顾问额度耗尽（402 月度上限）作废，第 2 次 attempt 有效 |
+| r12 | REWORK | 措辞残留（第 1–2 项已闭环；第 3 项锚点措辞残留 4 处旧表述 + 一处断引用，rev14 全部清除）|
+| r13 | ACCEPT | 增量落于 `af10c0a`（843/4/0）；随后 M-D7b 锚点歧义被 harness 如实报 BLOCKED，rev15 加 `occurrence` 后 28/28 |
+
+增量实现提交:`af10c0a`；全套测试 **843 passed / 4 skipped / 0 failed**（838 → 843，净 +5
+实例）；变异 **28/28 PASS**。
