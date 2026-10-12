@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev13 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev14 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev14),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev15),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -64,13 +64,19 @@
 > r7 已审 rev8:**CODEX_DECISION: ACCEPT**
 > (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
 > `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev14 关闭 r12 二签的措辞/格式残留**:r12 确认 r11 的三条中前两条闭合,
+> 第三条(锚点措辞)未闭合 —— 编排者 rev13 只改了主说明处,全文仍残留 4 处
+> 旧措辞与 1 处旧行数表述,且 rev13 新加的一处说明漏了行首 `>` 中断 blockquote。
+> rev14 全部清除(修订后机械确认:两个旧词组零匹配)。
+> rev13 存档 `WP-01-brief.rev13.md`(`32813cea`)。
+>
 > **rev13 关闭 r11 二签的三条精确性修正**。r11 确认 r10 的三条原始缺陷
 > **均已实质解决**,只剩三处小修:
 > ① D6[legacy] 装配未冻结「probe stub 必须 `returncode==0` 且 stdout 含 `PROBE_OK`」
 >    —— 不冻结则流程到不了 `:513`,执行者会得到调用计数 0 的假失败;
 > ② F9 的 DoD 行漏列 M-D6d(编排者 rev12 加变异时漏改);
-> ③ 锚点措辞:「全仓唯一」改为「**目标源码文件内**唯一」(brief 自身也含锚点文本,
->    harness 只统计目标源码文件),「单行/两行」改为「单行/三行」(M-B6b 是三行)。
+> ③ 锚点措辞修订:`M-B6a` 为单行锚点、`M-B6b` 为三行锚点;锚点唯一性口径为
+>    「目标源码文件内唯一」(brief 自身也含锚点文本,harness 只统计目标源码文件)。
 > rev12 存档 `WP-01-brief.rev12.md`(`5a522523`)。
 >
 > **rev12 关闭 r10 二签的三条机械缺陷**(r10 判 REWORK:必改项 1/4 已闭合,
@@ -668,20 +674,21 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
             return 0
     ```
     > **行尾注释 `# F8 legacy hand-off (M-B6a/M-B6b anchor)` 是冻结文本的一部分**,
-    > 不得删改:它是 M-B6a/M-B6b 的**机械定位锚**(使锚点在**目标源码文件内**唯一;brief 自身
-    为定义变异也含同文本,故不是字面全仓唯一 —— harness 只统计目标源码文件)。没有它,
+    > 不得删改:它是 M-B6a/M-B6b 的**机械定位锚**(使锚点在**目标源码文件内**唯一;
+    > brief 自身为定义变异也含同文本,故并非仓库级唯一 —— harness 只统计目标源码文件)。
+    > 没有它,
     > `except ProbeFailedError:` 在主路径与 legacy 路径各出现一次,
     > 变异 harness 无法区分(r10 指出,编排者已实证 harness 原会改错位点)。
     **不得**抽 helper、**不得**写 `as exc`、**不得**改换行、**不得**把文案提成常量
     —— 否则下面两条变异的锚点逐字不匹配即判 BLOCKED(rev9 的 M-B3 已重演过一次)。
   - **M-B6a**(rev11;rev12 改用唯一锚点)目标函数:`redispatch.main` @ legacy 调用点
-    原表达式(含冻结注释,全仓唯一):
+    原表达式(含冻结注释,目标源码文件内唯一):
     `        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)`
     变异表达式:
     `        except RuntimeError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)`
     承重测试:B6(`ProbeFailedError` 不再被接住、穿出 `main()` → 红)。
   - **M-B6b**(rev11;rev12 改用唯一锚点)目标函数:`redispatch.main` @ legacy 调用点
-    原表达式(含上一行的冻结注释,保证全仓唯一,逐字三行):
+    原表达式(含上一行的冻结注释,目标源码文件内唯一,逐字三行):
     ```python
         except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")

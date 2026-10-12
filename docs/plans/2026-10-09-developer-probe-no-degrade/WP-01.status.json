@@ -79,8 +79,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "32813cea5319e3acb8c6f061e446b1cbac6de4ce95abf4f191903b88d254890e",
-      "rev": 13,
+      "sha256": "ad38fc7e022cd6065a3a663955997123609dabbdaf18bf3ebc182ec16b058095",
+      "rev": 14,
       "prior_revs": [
         {
           "rev": 1,
@@ -159,6 +159,13 @@
           "sha256": "5a522523880b56cf1de62bf885f569a7786546855efc64bbd08bd03a4073eefe",
           "outcome": "REWORK",
           "note": "r11 REWORK (attempt 2; attempt 1 voided by consultant quota). The three r10 defects confirmed substantively closed; three precision fixes remain: D6[legacy] probe-success fixture not frozen, F9 DoD line missing M-D6d, anchor wording (file-scoped uniqueness, three-line M-B6b)."
+        },
+        {
+          "rev": 13,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev13.md",
+          "sha256": "32813cea5319e3acb8c6f061e446b1cbac6de4ce95abf4f191903b88d254890e",
+          "outcome": "REWORK",
+          "note": "r12 REWORK: items 1-2 closed; item 3 (anchor wording) incomplete — four residual occurrences of the old phrasing plus one broken blockquote. rev14 removes all; post-edit grep for both old phrases returns zero."
         }
       ]
     },
@@ -210,12 +217,12 @@
     "decision_note": "REWORK in the schema's vocabulary; the WP state is CHANGES_REQUESTED. One blocking finding (#1), two non-blocking records (#2, #3)."
   },
   "consult": {
-    "round": "r12",
+    "round": "r13",
     "kind": "brief-second-signature",
     "decision": null,
     "state": "NOT_DISPATCHED",
     "bound_commit": "",
-    "bound_brief_rev": 13,
+    "bound_brief_rev": 14,
     "receipt": "",
     "answer": "",
     "session_id": "",
@@ -373,12 +380,24 @@
             "receipt": ".agentic/wp01-brief-consult-r11-attempt1.receipt.json"
           }
         ]
+      },
+      {
+        "round": "r12",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "d1510b8",
+        "bound_brief_rev": 13,
+        "receipt": ".agentic/wp01-brief-consult-r12.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r12.answer.md",
+        "session_id": "01a12e54-6bcc-7a01-a3a0-c3abdf6dd4b3",
+        "required_changes": 4,
+        "resolved_in_rev": 14
       }
     ]
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-12T04:15:49.555896+00:00",
+    "updated_at": "2026-10-12T04:20:08.740193+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }
