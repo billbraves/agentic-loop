@@ -24,7 +24,7 @@
     "dispatch_commit": "b47c04e85f1f493719c5dda3574474dc7037bb25",
     "branch": "plan/2026-10-09-developer-probe-no-degrade",
     "worktree": "/Users/admin/vibe/probe-no-degrade",
-    "commit": "65b52cfe2c7c6883b0e6caa800ade38b046bce65"
+    "commit": "af10c0a"
   },
   "scope": {
     "allowed_paths": [
@@ -56,31 +56,25 @@
       {
         "command": "env -u AGENTIC_PYTHON GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
         "exit_code": 0,
-        "passed": 838,
+        "passed": 843,
         "skipped": 4,
         "failed": 0,
         "baseline": "807 passed, 4 skipped",
+        "note": "838 after the rev9 matrix, 843 after the rev10-14 delta (B6 + D6x2 + D7x2)",
         "run_by": "orchestrator (independent rerun)"
       },
       {
-        "command": "python3.11 .agentic/wp01_mutations.py  # DoD five-step, 20 named mutations",
+        "command": "python3.11 .agentic/wp01_mutations.py  # DoD five-step, 28 named mutations",
         "exit_code": 0,
-        "result": "20/20 PASS: every named load-bearing instance red, all reverts green, M-B1[kimi] equivalence control stayed green",
+        "result": "28/28 PASS: every named load-bearing instance red, all reverts green. M-B1[kimi] equivalence control stayed green. M-D7a (registry kimi key -> ClaudeAdapter) and M-D6a (main-path probe=True -> False) now turn red — both were verified green across the whole suite before D6/D7 existed, so these two false-green faces are now closed.",
         "receipt": ".agentic/wp01-mutations.json",
-        "run_by": "orchestrator"
-      },
-      {
-        "command": "pytest tests/test_bootstrap.py tests/test_codex_gate_capability_merge.py tests/test_injection_probe.py -q  # must-stay-green",
-        "exit_code": 0,
-        "passed": 26,
-        "failed": 0,
         "run_by": "orchestrator"
       }
     ],
     "brief": {
       "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
-      "sha256": "ad38fc7e022cd6065a3a663955997123609dabbdaf18bf3ebc182ec16b058095",
-      "rev": 14,
+      "sha256": "ebba724e1697020c6fce1277a0f2b5f899c2a4238121fad99f9f3389410a7a54",
+      "rev": 15,
       "prior_revs": [
         {
           "rev": 1,
@@ -166,6 +160,13 @@
           "sha256": "32813cea5319e3acb8c6f061e446b1cbac6de4ce95abf4f191903b88d254890e",
           "outcome": "REWORK",
           "note": "r12 REWORK: items 1-2 closed; item 3 (anchor wording) incomplete — four residual occurrences of the old phrasing plus one broken blockquote. rev14 removes all; post-edit grep for both old phrases returns zero."
+        },
+        {
+          "rev": 14,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev14.md",
+          "sha256": "ad38fc7e022cd6065a3a663955997123609dabbdaf18bf3ebc182ec16b058095",
+          "outcome": "ACCEPT",
+          "note": "r13 ACCEPT. Delta implemented at af10c0a (843 passed/4 skipped/0 failed). Mutation rerun then found M-D7b's anchor ambiguous (two matches in redispatch.py); the hardened harness reported BLOCKED instead of fabricating a red, and rev15 adds the occurrence declaration."
         }
       ]
     },
@@ -398,7 +399,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-12T04:22:49.859282+00:00",
+    "updated_at": "2026-10-12T04:57:25.437742+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }

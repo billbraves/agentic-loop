@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev14 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev15 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev15),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev16),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -64,6 +64,17 @@
 > r7 已审 rev8:**CODEX_DECISION: ACCEPT**
 > (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
 > `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev15 修一条锚点消歧缺陷(实施期发现)**:rev10-14 的增量实现完成后
+> (`af10c0a`,全量 **843 passed / 4 skipped / 0 failed**),编排者复跑 28 条变异,
+> **27 条 PASS、M-D7b 判 BLOCKED** —— 其原表达式
+> `kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=b)` 在
+> `redispatch.py` 内有**两处匹配**:`:144`(`_resolve_developer` 默认 registry,
+> 本条的目标)与 `:275`(`_dispatch_with_quota_fallback` 的 flash 工厂,不相干)。
+> 加固后的 harness 对未声明 `occurrence` 的多重匹配 fail-closed,
+> **因此没有伪造红证,而是如实报 BLOCKED** —— r10 要求修 harness 的价值在此兑现。
+> rev15 给 M-D7b 补 `occurrence` 声明;补后复跑 **28/28 PASS**。
+> rev14 存档 `WP-01-brief.rev14.md`(`ad38fc7e`)。
+>
 > **rev14 关闭 r12 二签的措辞/格式残留**:r12 确认 r11 的三条中前两条闭合,
 > 第三条(锚点措辞)未闭合 —— 编排者 rev13 只改了主说明处,全文仍残留 4 处
 > 旧措辞与 1 处旧行数表述,且 rev13 新加的一处说明漏了行首 `>` 中断 blockquote。
@@ -945,6 +956,10 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     承重实例:**[kimi]**(**本 WP 要禁止的静默换 adapter 本身**)。
   - **M-D7b** 目标函数:同上
     原表达式:`kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=b)`
+    **`occurrence = 1`**(rev15 补:该文本在 `redispatch.py` 内有两处 ——
+    `:144` 的 `_resolve_developer` 默认 registry 条目是本条目标,
+    `:275` 的 `_dispatch_with_quota_fallback` flash 工厂**不是**;
+    施加时必须取**第一处**。harness 对未声明 `occurrence` 的多重匹配 fail-closed)
     变异表达式:`kimi_bin=os.environ.get("KIMI_BIN", "kimi"), binding=None)`
     承重实例:**[kimi]**(binding 被丢弃,真实 adapter 退回 native 路径 → 红)。
   > 编排者实测:M-D7a 这一改在 rev10 实现下**全量 838 passed 全绿**。
