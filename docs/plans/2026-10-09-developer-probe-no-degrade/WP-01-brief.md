@@ -1,9 +1,9 @@
 # WP-01: developer 探针失败不得静默降级到 claude
 
-> 冻结日期 2026-10-10 | rev12 | 编排者 claude-code 角色 | 执行者 kimi
+> 冻结日期 2026-10-10 | rev13 | 编排者 claude-code 角色 | 执行者 kimi
 > (rev7 起编排者会话的实际执行工具切换为 kimi-coding/k3;角色与独立性不变,
 >  评审仍由编排者角色、二签仍由 codex 承担,记录以与实际工具一致为准。)
-> 冻结后执行期间只读。修订走 re-freeze(rev13),不原地改。
+> 冻结后执行期间只读。修订走 re-freeze(rev14),不原地改。
 > 基线 `main` `0ba058d`。设计见同目录 `DESIGN.md`。
 > 存档:rev1 `WP-01-brief.rev1.md`、rev2 `WP-01-brief.rev2.md`、
 > rev3 `WP-01-brief.rev3.md`(含 rev3 相对 rev2 的变更表)、
@@ -64,6 +64,15 @@
 > r7 已审 rev8:**CODEX_DECISION: ACCEPT**
 > (`.agentic/wp01-brief-consult-r7.answer.md`,绑 `695066e` / rev8 sha256 `20dff7a6`,
 > `valid_consult: true`,七轮后首个 ACCEPT)。
+> **rev13 关闭 r11 二签的三条精确性修正**。r11 确认 r10 的三条原始缺陷
+> **均已实质解决**,只剩三处小修:
+> ① D6[legacy] 装配未冻结「probe stub 必须 `returncode==0` 且 stdout 含 `PROBE_OK`」
+>    —— 不冻结则流程到不了 `:513`,执行者会得到调用计数 0 的假失败;
+> ② F9 的 DoD 行漏列 M-D6d(编排者 rev12 加变异时漏改);
+> ③ 锚点措辞:「全仓唯一」改为「**目标源码文件内**唯一」(brief 自身也含锚点文本,
+>    harness 只统计目标源码文件),「单行/两行」改为「单行/三行」(M-B6b 是三行)。
+> rev12 存档 `WP-01-brief.rev12.md`(`5a522523`)。
+>
 > **rev12 关闭 r10 二签的三条机械缺陷**(r10 判 REWORK:必改项 1/4 已闭合,
 > 2/3/5 未闭合)。三条都是**会让变异证据失真**的缺陷,不是文字问题:
 >
@@ -659,7 +668,8 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
             return 0
     ```
     > **行尾注释 `# F8 legacy hand-off (M-B6a/M-B6b anchor)` 是冻结文本的一部分**,
-    > 不得删改:它是 M-B6a/M-B6b 的**机械定位锚**。没有它,
+    > 不得删改:它是 M-B6a/M-B6b 的**机械定位锚**(使锚点在**目标源码文件内**唯一;brief 自身
+    为定义变异也含同文本,故不是字面全仓唯一 —— harness 只统计目标源码文件)。没有它,
     > `except ProbeFailedError:` 在主路径与 legacy 路径各出现一次,
     > 变异 harness 无法区分(r10 指出,编排者已实证 harness 原会改错位点)。
     **不得**抽 helper、**不得**写 `as exc`、**不得**改换行、**不得**把文案提成常量
@@ -686,7 +696,7 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     承重测试:B6(接住却不停止 → 断言②的 dispatch bomb 被调到 / 断言③出现
     额外 dry-run 输出 → 红)。
   > **为何拆两条**:M-B6a 锁「是否接住」,M-B6b 锁「接住后是否立即停止」。
-  > 两条锚点都是单行/两行的稳定形态,比整块五行锚点抗重写。
+  > 两条锚点是单行/三行的稳定形态,比整块五行锚点抗重写。
   > M-B6 与 M-A3/M-A3b 不同层:后两条锁 resolver **是否 raise**,
   > M-B6 锁 `main()` **是否接**。resolver 层全绿不蕴含 `main()` 层已接 ——
   > 这正是 rev9 漏掉 Finding 1 的机理。
@@ -874,7 +884,10 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
     且**显式清除或设置 `PROBE_CMD`**(不得继承环境,否则路径选择不确定);
   - `path == "main"`:不设 `PROBE_CMD`,走 `:461`;
     断言唯一一次调用的 `repo == main_repo()` 且 **`probe is True`**;
-  - `path == "legacy"`:设 `PROBE_CMD` 走 `:513`;
+  - `path == "legacy"`:设 `PROBE_CMD` 走 `:513`;**且 probe stub 必须返回
+    `returncode == 0` 且 stdout 含 `PROBE_OK`**(冻结)——否则 legacy guard 提前
+    return,流程到不了 `:513`,调用计数为 0,测试会因错误原因失败(假失败)。
+    现有 `_stub_io()` 的 `fake_run` 已满足此行为,复用即可;
     断言唯一一次调用的 `repo == main_repo()` 且 **`probe is False`**;
   - 两实例都断言调用次数**恰为 1**(防两条路径都被走一遍)。
   > 这里 patch `_resolve_developer` 是**正当**的:本条的 oracle 正是
@@ -1020,7 +1033,7 @@ registry 内除首选键外**每一个**工厂的工厂计数与探针计数均�
       (由 **B6** / **M-B6a** / **M-B6b** 锁定);B6 **不得** monkeypatch
       `_resolve_developer`,且必须带 `_dispatch_with_quota_fallback` 零调用 oracle
 - [ ] **F9:两处跨边界接线各自承重** —— `main()→resolver` 的 `probe`/`repo` 参数契约
-      (**D6** + M-D6a/b/c)与默认 registry 的 key→class→binding 组合
+      (**D6** + M-D6a/b/c/d)与默认 registry 的 key→class→binding 组合
       (**D7** + M-D7a/b)。两者在 rev10 实现下均**全量全绿可假绿**,编排者已实测,
       故这两条是硬性 DoD 项,不得以「diff review 已看过」替代
 - [ ] `bootstrap_cmd.py`、`adapters/claude.py`、`adapters/codex.py`、
