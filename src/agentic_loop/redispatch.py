@@ -32,7 +32,6 @@ from agentic_loop.cli import resolve_wrapper
 from agentic_loop.independence import evaluate
 from agentic_loop.provider_binding import ProviderBinding
 from agentic_loop.quota_fallback import is_quota_error, load_quota_patterns
-from agentic_loop.resolve_paths import get_roles
 from agentic_loop.resolve_paths import iterations_dir
 from agentic_loop.resolve_paths import main_repo
 from agentic_loop.resolve_paths import resolve_role_binding
@@ -124,15 +123,20 @@ def _soft_limit_note(signal: str, repo=None) -> str:
 
 
 def _resolve_developer(
-    roles_config: dict[str, Any] | list[str] | str | None,
+    *,
+    repo: Path,
     registry: dict[str, Any] | None = None,
     probe: bool = True,
-) -> tuple[Adapter, list[str]]:
-    """Resolve the developer adapter from config, with optional fallback probing.
+) -> tuple[Adapter, list[str], bool]:
+    """Resolve the developer adapter by preferred binding with failure-reason routing.
 
-    ``registry`` is a mapping from adapter name to a factory taking an optional
-    ``ProviderBinding``. It is exposed for injection in unit tests (e.g. a stub
-    ``claude`` adapter).
+    Returns ``(adapter, reasons, fallback_applied)``. Routing:
+    - probe OK -> primary adapter, ``fallback_applied=False``;
+    - quota probe failure + fallback binding configured -> flash fallback adapter,
+      ``fallback_applied=True`` (single hop);
+    - quota probe failure without fallback, or any other probe failure -> raise.
+    ``registry`` maps adapter name to a factory taking an optional
+    ``ProviderBinding``; exposed for injection in unit tests.
     """
     if registry is None:
         registry = {
@@ -143,46 +147,22 @@ def _resolve_developer(
         }
 
     reasons: list[str] = []
-    binding: ProviderBinding | None = resolve_role_binding("developer")[1]
-    value: Any = None
-    if isinstance(roles_config, dict):
-        value = roles_config.get("developer")
-    else:
-        value = roles_config
-
-    candidates: list[str] = []
-    if isinstance(value, str):
-        candidates = [value]
-    elif isinstance(value, (list, tuple)):
-        candidates = list(value)
-
-    if not candidates:
-        reasons.append("config roles.developer unavailable; falling back to built-in kimi")
-        fallback = registry["kimi"](binding)
-        if probe and not fallback.probe_injection():
-            reasons.append("built-in kimi probe failed")
-            raise ProbeFailedError("; ".join(reasons))
-        return fallback, reasons
-
-    for candidate in candidates:
-        factory = registry.get(candidate)
-        if factory is None:
-            reasons.append(f"unknown developer adapter '{candidate}'")
-            continue
-        adapter = factory(binding)
-        if probe:
-            if adapter.probe_injection():
-                return adapter, reasons
-            reasons.append(f"developer adapter '{candidate}' probe failed; falling back")
-        else:
-            return adapter, reasons
-
-    reasons.append("all configured developer adapters failed probe; falling back to built-in kimi")
-    fallback = registry["kimi"](binding)
-    if probe and not fallback.probe_injection():
-        reasons.append("built-in kimi probe failed")
-        raise ProbeFailedError("; ".join(reasons))
-    return fallback, reasons
+    adapter_name, binding = resolve_role_binding("developer", repo=repo)
+    fallback_binding = resolve_role_fallback_binding("developer", repo=repo)
+    quota_patterns = load_quota_patterns(repo)
+    if adapter_name not in registry:
+        raise ProbeFailedError("unknown developer adapter")
+    adapter = registry[adapter_name](binding)
+    if not probe:
+        return adapter, reasons, False
+    ok, probe_output = adapter.probe_injection_detail()
+    if ok:
+        return adapter, reasons, False
+    if is_quota_error(probe_output, quota_patterns):
+        if fallback_binding is not None:
+            return registry[adapter_name](fallback_binding), reasons, True
+        raise ProbeFailedError("probe failed: quota, no fallback")
+    raise ProbeFailedError("probe failed: other")
 
 
 def _build_prompt(
@@ -455,6 +435,7 @@ def main(argv: list[str]) -> int:
     # Step 4: Guard ① probe.
     probe_cmd = os.environ.get("PROBE_CMD")
     adapter: Adapter | None = None
+    fallback_applied: bool = False
     if probe_cmd is not None:
         print(f"REDISPATCH_PROBE: {probe_cmd}", file=sys.stderr)
         proc = subprocess.run(
@@ -477,7 +458,7 @@ def main(argv: list[str]) -> int:
             return 0
     else:
         try:
-            adapter, _ = _resolve_developer(get_roles(), probe=True)
+            adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=True)
         except ProbeFailedError:
             print("REDISPATCH_STOP: probe failed — 不重派,查根因")
             return 0
@@ -529,16 +510,20 @@ def main(argv: list[str]) -> int:
 
     # Resolve adapter for dispatch if the probe guard took the legacy bash path.
     if adapter is None:
-        adapter, _ = _resolve_developer(get_roles(), probe=False)
+        try:
+            adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
+        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)
+            print("REDISPATCH_STOP: probe failed — 不重派,查根因")
+            return 0
 
     dry_run = os.environ.get("REDISPATCH_DRY_RUN", "0") == "1"
     brief_path = iteration_dir / f"{work_package_id}-brief.md"
     brief = brief_path.read_text(encoding="utf-8") if brief_path.is_file() else ""
 
-    fallback_binding = resolve_role_fallback_binding("developer")
+    fallback_binding = resolve_role_fallback_binding("developer", repo=repo_root)
     result, used_fallback = _dispatch_with_quota_fallback(
         adapter, worktree, brief, prompt_text, dry_run,
-        fallback_binding=fallback_binding,
+        fallback_binding=None if fallback_applied else fallback_binding,
         quota_patterns=load_quota_patterns(repo_root),
     )
     if used_fallback:

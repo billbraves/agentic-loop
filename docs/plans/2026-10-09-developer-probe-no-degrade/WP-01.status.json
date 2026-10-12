@@ -1,0 +1,460 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-01",
+  "iteration_id": "2026-10-09-developer-probe-no-degrade",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "session": "staged turns; see .agentic/wp01-stage*.log"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "orchestrator-as-reviewer"
+  },
+  "git": {
+    "base_branch": "plan/2026-10-09-developer-probe-no-degrade",
+    "base_commit": "0ba058de2beb6c357abfcbeacbc3263f7d4483f8",
+    "dispatch_commit": "b47c04e85f1f493719c5dda3574474dc7037bb25",
+    "branch": "plan/2026-10-09-developer-probe-no-degrade",
+    "worktree": "/Users/admin/vibe/probe-no-degrade",
+    "commit": "e6709915fd6db96c3eb08d7cdb2a47b7dbb9d667",
+    "merged_commit": "e6709915fd6db96c3eb08d7cdb2a47b7dbb9d667",
+    "merged_commit_note": "SEQUENTIAL_SINGLE_WP_PLAN: git.branch == git.base_branch, so no WP->integration merge commit exists and `agentic finalize` cannot resolve one (verified: 0 candidates from its rev-list --merges --parents probe). Per AGENTS.md §4.3 a sequential WP works directly on the integration branch; the WP's final implementation commit IS its integration point. Stamped manually by the orchestrator under user-authorized route B. The tool gap (finalize assumes a parallel-lane branch) is recorded as follow-up WP-02."
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/redispatch.py",
+      "src/agentic_loop/adapters/base.py",
+      "src/agentic_loop/adapters/kimi.py",
+      "tests/test_redispatch_quota_fallback.py",
+      "tests/test_injection_probe.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/resolve_paths.py",
+      "src/agentic_loop/quota_fallback.py",
+      "src/agentic_loop/bootstrap_cmd.py",
+      "src/agentic_loop/adapters/claude.py",
+      "src/agentic_loop/adapters/codex.py",
+      "src/agentic_loop/secret_redaction.py",
+      ".agentic/config.toml",
+      "uv.lock"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "env -u AGENTIC_PYTHON GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
+        "exit_code": 0,
+        "passed": 843,
+        "skipped": 4,
+        "failed": 0,
+        "baseline": "807 passed, 4 skipped",
+        "note": "+31 for the rev9 matrix (838), +5 for the rev10-15 delta (B6 + D6x2 + D7x2)",
+        "run_by": "orchestrator (independent rerun)"
+      },
+      {
+        "command": "python3.11 .agentic/wp01_mutations.py  # DoD five-step, 28 named mutations",
+        "exit_code": 0,
+        "result": "28/28 PASS: every named load-bearing instance red, all reverts green; M-B1[kimi] equivalence control green throughout.",
+        "receipt": ".agentic/wp01-mutations.json",
+        "run_by": "orchestrator"
+      },
+      {
+        "command": "PROBE_CMD='echo PROBE_OK' pytest tests/test_redispatch_quota_fallback.py::test_main_resolver_call_contract -q",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "note": "environment-pollution regression: D6 was failing under an inherited PROBE_CMD before e670991; both instances green after the fix.",
+        "run_by": "orchestrator"
+      },
+      {
+        "command": "pytest tests/test_bootstrap.py tests/test_codex_gate_capability_merge.py tests/test_injection_probe.py -q  # must-stay-green",
+        "exit_code": 0,
+        "passed": 26,
+        "failed": 0,
+        "run_by": "orchestrator"
+      }
+    ],
+    "brief": {
+      "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
+      "sha256": "ebba724e1697020c6fce1277a0f2b5f899c2a4238121fad99f9f3389410a7a54",
+      "rev": 15,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev1.md",
+          "sha256": "840961c3790fdf33f3ddcc3bf2a253294c1030977f4ab4b816b421932ad52d67",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 2,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev2.md",
+          "sha256": "a59b61649d54b5cea49013415992da50eba6a93768e642967b50f8580e033673",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 3,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev3.md",
+          "sha256": "ea608a029fe9f2ed76ae2bcb59fdfd9cead235e0395893d7f78775d1ae9f33cf",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 4,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev4.md",
+          "sha256": "e79af044ca061b364389410932cf02efb80335289f38d2c8cd09bba6a2b10027",
+          "outcome": "SUPERSEDED_BEFORE_CONSULT",
+          "note": "r4 was opened PENDING against rev4 but never dispatched (no prompt, no harness, no codex verdict). The orchestrator's pre-dispatch independent review found 3 false-green defects, the decisive one being that M-P6c could not turn INV-P6c red (reasons is a function local discarded on raise). Superseded by rev5; r4 re-bound to rev5."
+        },
+        {
+          "rev": 5,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev5.md",
+          "sha256": "4ed58156bedaa5ee93a5a72ff895c6ab7f99935171268f0aa141327fb9c33fc0",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 6,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev6.md",
+          "sha256": "602c938a8b5489a6405534c0c1292d4bd9a790db420244e1cbe2e8f934cf13dd",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 7,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev7.md",
+          "sha256": "027d1256c7d0782eca413a8d5245aeb0ce3210e19246b0f0a941afc796f2ccf8",
+          "outcome": "REWORK"
+        },
+        {
+          "rev": 8,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.md",
+          "sha256": "20dff7a63c84bb2f8ad0ed3ec1e502dce774d2b05e353a997cfd8e8baf8110ff",
+          "outcome": "ACCEPT",
+          "note": "r7 ACCEPT (session 01a12423). rev9 is a template-compat amendment (three English alias sections appended at EOF for dispatch-lint); no semantic delta. rev8 was not separately archived; `git diff` 695066e..rev9 proves the alias-only delta."
+        },
+        {
+          "rev": 9,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev9.md",
+          "sha256": "03a6087c4a18a24896264480bd82e7dc685fcb5c1235ca0e573877b873bd4d0c",
+          "outcome": "CHANGES_REQUESTED",
+          "note": "r7+r8 ACCEPT; implementation reviewed by the orchestrator and found sound on the matrix, but Finding 1 (legacy path S4 raise uncaught in main()) lies outside the frozen matrix. rev10 adds F8 + B6 + M-B6."
+        },
+        {
+          "rev": 10,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev10.md",
+          "sha256": "941d5544d7f88f3ac310a015ea3809ccf1bff02872d9b18d0b7c3c52346567cf",
+          "outcome": "REWORK",
+          "note": "r9 REWORK, 5 required changes: B6 was escapable via `except: print(STOP); pass`; _stub_io() itself patches _resolve_developer (neutering B6); and two further seam blind spots the orchestrator reproduced empirically — default registry 'kimi'->ClaudeAdapter and main-path probe=True->False each kept all 838 tests green."
+        },
+        {
+          "rev": 11,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev11.md",
+          "sha256": "efa13b8fdd0ac877ad8463c304927955d28e243088f03e4e453b33afc47a1a00",
+          "outcome": "REWORK",
+          "note": "r10 REWORK, 3 mechanical defects: M-B6a/b anchors non-unique after the canonical block lands (orchestrator's own mutation harness would have mutated the main path while claiming to test legacy — harness hardened to fail closed on ambiguous anchors); M-D6c used the undefined iteration_dir (NameError would fabricate the red); legacy repo-site mutation M-D6d missing."
+        },
+        {
+          "rev": 12,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev12.md",
+          "sha256": "5a522523880b56cf1de62bf885f569a7786546855efc64bbd08bd03a4073eefe",
+          "outcome": "REWORK",
+          "note": "r11 REWORK (attempt 2; attempt 1 voided by consultant quota). The three r10 defects confirmed substantively closed; three precision fixes remain: D6[legacy] probe-success fixture not frozen, F9 DoD line missing M-D6d, anchor wording (file-scoped uniqueness, three-line M-B6b)."
+        },
+        {
+          "rev": 13,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev13.md",
+          "sha256": "32813cea5319e3acb8c6f061e446b1cbac6de4ce95abf4f191903b88d254890e",
+          "outcome": "REWORK",
+          "note": "r12 REWORK: items 1-2 closed; item 3 (anchor wording) incomplete — four residual occurrences of the old phrasing plus one broken blockquote. rev14 removes all; post-edit grep for both old phrases returns zero."
+        },
+        {
+          "rev": 14,
+          "path": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-brief.rev14.md",
+          "sha256": "ad38fc7e022cd6065a3a663955997123609dabbdaf18bf3ebc182ec16b058095",
+          "outcome": "ACCEPT",
+          "note": "r13 ACCEPT. Delta implemented at af10c0a (843 passed/4 skipped/0 failed). Mutation rerun then found M-D7b's anchor ambiguous (two matches in redispatch.py); the hardened harness reported BLOCKED instead of fabricating a red, and rev15 adds the occurrence declaration."
+        }
+      ]
+    },
+    "baseline": {
+      "commit": "0ba058de2beb6c357abfcbeacbc3263f7d4483f8",
+      "measured_at": "2026-10-09T03:22:26Z",
+      "result": "807 passed, 4 skipped",
+      "measured_by": "orchestrator",
+      "reverified_at": "2026-10-09T07:10:55Z",
+      "reverified_result": "807 passed, 4 skipped",
+      "reverified_by": "orchestrator",
+      "reverified_note": "re-run in worktree /Users/admin/vibe/probe-no-degrade; src/ and tests/ byte-identical to base commit (git diff empty)"
+    },
+    "false_green_faces_closed": [
+      {
+        "change": "default registry \"kimi\" key builds ClaudeAdapter (the silent adapter switch this WP forbids)",
+        "before": "838 passed, 4 skipped, 0 failed — entire suite green",
+        "now_locked_by": "M-D7a turns D7[kimi] red"
+      },
+      {
+        "change": "main-path probe=True -> probe=False (production injection probe disabled)",
+        "before": "838 passed, 4 skipped, 0 failed — entire suite green",
+        "now_locked_by": "M-D6a turns D6[main] red"
+      }
+    ]
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "decision_note": "Orchestrator-as-reviewer, round 2. Round 1 (WP-01-review.md) was REWORK/CHANGES_REQUESTED on Finding 1.",
+    "report": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-review2.md",
+    "prior_review": "docs/plans/2026-10-09-developer-probe-no-degrade/WP-01-review.md",
+    "verified_independently": [
+      "full suite 843 passed / 4 skipped / 0 failed",
+      "28/28 named mutations red on their named instances, green after revert",
+      "M-B1[kimi] equivalence control green throughout",
+      "F8 closure complete: 3 raises, 2 call sites, 2 catchers, identical message/exit",
+      "D7 covers the default registry exhaustively (only kimi/claude keys exist)",
+      "D7 asserts binding identity via an object() sentinel, not just equality",
+      "_stub_io stub_resolver defaults True; all 838 prior tests still green",
+      "must-stay-green: 26 passed"
+    ],
+    "findings": [
+      {
+        "id": 1,
+        "blocking": false,
+        "status": "fixed in e670991",
+        "summary": "D6[main] inherited PROBE_CMD from the environment and took the legacy branch, violating rev15's frozen 'explicitly clear or set PROBE_CMD' clause. Implementation deviation, not a brief gap. Verified: polluted env 2 passed after the fix."
+      },
+      {
+        "id": 2,
+        "blocking": false,
+        "status": "recorded",
+        "summary": "Tool-layer: the orchestrator's own mutation harness would have fabricated a red for M-B6a/M-B6b by mutating the main path while claiming the legacy path. Hardened before use (fail-closed on ambiguous anchors); the fix immediately paid off by reporting M-D7b BLOCKED instead of a false red."
+      }
+    ],
+    "residual_risks": [
+      "native kimi path has no credential redaction (separate WP; never claimed otherwise)",
+      "production source-trusted single-hop flash not verified end-to-end (stubs only)",
+      "F3: production vs checkout config.toml differ; checkout assertions are not production zero-regression",
+      "shell-out-to-git suites false-fail under concurrent git activity",
+      "verbatim mutation anchors are brittle to behaviour-preserving rewrites (M-B3 and M-B6 each demonstrated this); AST matching would be a separate WP",
+      "the MAIN-path F8 catcher has no end-to-end load-bearing test like B6 does for legacy: orchestrator verified that breaking only the main-path catcher (except ProbeFailedError -> except RuntimeError) keeps all 843 tests green. Code is correct; the guarantee rests on source review, not a mutation. Third instance of the same family as Finding 1.",
+      "D7's spy classes and hardcoded {kimi, claude} parametrisation will not automatically catch real-constructor signature drift or a future registry key"
+    ],
+    "next_gate": "implementation second signature on the full e670991 diff before merge",
+    "state_note": "review.decision=ACCEPT is the orchestrator's single signature; the WP stays READY_FOR_REVIEW until the implementation consult signs, then APPROVED_FOR_MERGE. There is no REVIEWED state in the schema."
+  },
+  "consult": {
+    "round": "impl-r1",
+    "kind": "implementation-second-signature",
+    "decision": "ACCEPT",
+    "state": "COMPLETED",
+    "bound_commit": "9388057",
+    "bound_brief_rev": 15,
+    "receipt": ".agentic/wp01-impl-consult.receipt.json",
+    "answer": ".agentic/wp01-impl-consult.answer.md",
+    "session_id": "01a12eec-7aa2-7f52-ac95-d84ab0200a0f",
+    "required_changes": 0,
+    "resolved_in_rev": null,
+    "prior_rounds": [
+      {
+        "round": "r6",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "360fce6",
+        "bound_brief_rev": 7,
+        "receipt": ".agentic/wp01-brief-consult-r6.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r6.answer.md",
+        "session_id": "01a12415-8d34-7fc3-9e76-7f7c0e5bc9c4",
+        "required_changes": 4,
+        "resolved_in_rev": 8
+      },
+      {
+        "round": "r5",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "89a03b4",
+        "bound_brief_rev": 6,
+        "receipt": ".agentic/wp01-brief-consult-r5.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r5.answer.md",
+        "session_id": "01a123fa-2c19-7261-9efe-ad96d27b4e85",
+        "required_changes": 3,
+        "resolved_in_rev": 7
+      },
+      {
+        "round": "r4",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "1b9fa9b",
+        "bound_brief_rev": 5,
+        "receipt": ".agentic/wp01-brief-consult-r4.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r4.answer.md",
+        "session_id": "01a123c1-5980-71b2-8676-205c9c1dd5ca",
+        "required_changes": 3,
+        "resolved_in_rev": 6
+      },
+      {
+        "round": "r1",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "answer": ".agentic/probe-wp01-brief-consult.answer.md",
+        "receipt": ".agentic/probe-wp01-brief-consult.receipt.json",
+        "bound_commit": "efd893a",
+        "bound_brief_rev": 1,
+        "required_changes": 8,
+        "resolved_in_rev": 2
+      },
+      {
+        "round": "r2",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "715232d",
+        "bound_brief_rev": 2,
+        "receipt": ".agentic/wp01-brief-consult-r2.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r2.answer.md",
+        "session_id": "01a11fa9-c455-7761-8b44-c44e7cbdac7f",
+        "required_changes": 4,
+        "resolved_in_rev": 3
+      },
+      {
+        "round": "r3",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "a4bc5d7",
+        "bound_brief_rev": 3,
+        "receipt": ".agentic/wp01-brief-consult-r3-attempt2.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r3-attempt2.answer.md",
+        "session_id": "01a120e8-002e-7093-9609-743226c092df",
+        "required_changes": 5,
+        "resolved_in_rev": 4,
+        "attempt": 2,
+        "voided_attempts": [
+          {
+            "attempt": 1,
+            "session_id": "01a11fe9-68b7-7b02-8f96-95ab15074a05",
+            "valid_consult": false,
+            "decision": "INVALID",
+            "cause": "answer body empty; verdict never written before budget exhaustion",
+            "receipt": ".agentic/wp01-brief-consult-r3-attempt1.receipt.json"
+          }
+        ]
+      },
+      {
+        "round": "r7",
+        "kind": "brief-second-signature",
+        "decision": "ACCEPT",
+        "bound_commit": "695066e",
+        "bound_brief_rev": 8,
+        "receipt": ".agentic/wp01-brief-consult-r7.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r7.answer.md",
+        "session_id": "01a12423-3f91-7d80-bf35-0f0f935b0fcc",
+        "required_changes": 0,
+        "resolved_in_rev": null
+      },
+      {
+        "round": "r8",
+        "kind": "brief-second-signature",
+        "decision": "ACCEPT",
+        "bound_commit": "53291fb",
+        "bound_brief_rev": 9,
+        "receipt": ".agentic/wp01-brief-consult-r8.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r8.answer.md",
+        "session_id": "01a12432-dcb8-7ee2-a0c7-864048e2c448",
+        "required_changes": 0,
+        "resolved_in_rev": null
+      },
+      {
+        "round": "r9",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "22cb3dd",
+        "bound_brief_rev": 10,
+        "receipt": ".agentic/wp01-brief-consult-r9.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r9.answer.md",
+        "session_id": "01a12626-cbb1-7de1-931b-55fdd201c8d8",
+        "required_changes": 5,
+        "resolved_in_rev": 11
+      },
+      {
+        "round": "r10",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "0280dac",
+        "bound_brief_rev": 11,
+        "receipt": ".agentic/wp01-brief-consult-r10.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r10.answer.md",
+        "session_id": "01a12673-4f21-79b2-b613-6f31bd0385ce",
+        "required_changes": 5,
+        "resolved_in_rev": 12
+      },
+      {
+        "round": "r11",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "825167d",
+        "bound_brief_rev": 12,
+        "receipt": ".agentic/wp01-brief-consult-r11-attempt2.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r11-attempt2.answer.md",
+        "session_id": "01a12e4e-0a2b-7e43-bbd4-42e94ac36f2c",
+        "required_changes": 3,
+        "resolved_in_rev": 13,
+        "attempt": 2,
+        "voided_attempts": [
+          {
+            "attempt": 1,
+            "valid_consult": false,
+            "decision": "INVALID",
+            "cause": "consultant quota exhausted (402 monthly limit)",
+            "receipt": ".agentic/wp01-brief-consult-r11-attempt1.receipt.json"
+          }
+        ]
+      },
+      {
+        "round": "r12",
+        "kind": "brief-second-signature",
+        "decision": "REWORK",
+        "bound_commit": "d1510b8",
+        "bound_brief_rev": 13,
+        "receipt": ".agentic/wp01-brief-consult-r12.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r12.answer.md",
+        "session_id": "01a12e54-6bcc-7a01-a3a0-c3abdf6dd4b3",
+        "required_changes": 4,
+        "resolved_in_rev": 14
+      },
+      {
+        "round": "r13",
+        "kind": "brief-second-signature",
+        "decision": "ACCEPT",
+        "bound_commit": "a324103",
+        "bound_brief_rev": 14,
+        "receipt": ".agentic/wp01-brief-consult-r13.receipt.json",
+        "answer": ".agentic/wp01-brief-consult-r13.answer.md",
+        "session_id": "01a12e57-eaa9-7fb2-8a26-313f4fbf8bd4",
+        "required_changes": 0,
+        "resolved_in_rev": null
+      }
+    ],
+    "voided_attempts": [
+      {
+        "attempt": 1,
+        "cause": "harness crashed writing the receipt (NameError on a removed PRIOR_ROUND constant) before the answer was persisted; no verdict produced",
+        "archive": ".agentic/wp01-impl-consult-attempt1-crashed/"
+      }
+    ],
+    "consultant_note": "declined to claim an independent pytest rerun: the read-only sandbox has no writable tmpdir, so it verified 843/28-of-28 from the orchestrator's evidence and the readable mutation receipt instead of fabricating a run",
+    "gate_note": "This block is the merge gate. It now carries the IMPLEMENTATION second signature (impl-r1 ACCEPT on commit 9388057). The brief second-signature chain (r7/r8 ACCEPT, r9-r12 REWORK, r13 ACCEPT on rev14) is in prior_rounds."
+  },
+  "timestamps": {
+    "created_at": "2026-10-09T03:22:26Z",
+    "updated_at": "2026-10-12T09:15:00Z",
+    "merged_at": "2026-10-12T09:15:00Z",
+    "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
+  }
+}
