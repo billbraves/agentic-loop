@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-09-developer-probe-no-degrade",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -24,7 +24,7 @@
     "dispatch_commit": "b47c04e85f1f493719c5dda3574474dc7037bb25",
     "branch": "plan/2026-10-09-developer-probe-no-degrade",
     "worktree": "/Users/admin/vibe/probe-no-degrade",
-    "commit": "af10c0a"
+    "commit": "e6709915fd6db96c3eb08d7cdb2a47b7dbb9d667"
   },
   "scope": {
     "allowed_paths": [
@@ -60,14 +60,29 @@
         "skipped": 4,
         "failed": 0,
         "baseline": "807 passed, 4 skipped",
-        "note": "838 after the rev9 matrix, 843 after the rev10-14 delta (B6 + D6x2 + D7x2)",
+        "note": "+31 for the rev9 matrix (838), +5 for the rev10-15 delta (B6 + D6x2 + D7x2)",
         "run_by": "orchestrator (independent rerun)"
       },
       {
         "command": "python3.11 .agentic/wp01_mutations.py  # DoD five-step, 28 named mutations",
         "exit_code": 0,
-        "result": "28/28 PASS: every named load-bearing instance red, all reverts green. M-B1[kimi] equivalence control stayed green. M-D7a (registry kimi key -> ClaudeAdapter) and M-D6a (main-path probe=True -> False) now turn red — both were verified green across the whole suite before D6/D7 existed, so these two false-green faces are now closed.",
+        "result": "28/28 PASS: every named load-bearing instance red, all reverts green; M-B1[kimi] equivalence control green throughout.",
         "receipt": ".agentic/wp01-mutations.json",
+        "run_by": "orchestrator"
+      },
+      {
+        "command": "PROBE_CMD='echo PROBE_OK' pytest tests/test_redispatch_quota_fallback.py::test_main_resolver_call_contract -q",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "note": "environment-pollution regression: D6 was failing under an inherited PROBE_CMD before e670991; both instances green after the fix.",
+        "run_by": "orchestrator"
+      },
+      {
+        "command": "pytest tests/test_bootstrap.py tests/test_codex_gate_capability_merge.py tests/test_injection_probe.py -q  # must-stay-green",
+        "exit_code": 0,
+        "passed": 26,
+        "failed": 0,
         "run_by": "orchestrator"
       }
     ],
@@ -179,7 +194,19 @@
       "reverified_result": "807 passed, 4 skipped",
       "reverified_by": "orchestrator",
       "reverified_note": "re-run in worktree /Users/admin/vibe/probe-no-degrade; src/ and tests/ byte-identical to base commit (git diff empty)"
-    }
+    },
+    "false_green_faces_closed": [
+      {
+        "change": "default registry \"kimi\" key builds ClaudeAdapter (the silent adapter switch this WP forbids)",
+        "before": "838 passed, 4 skipped, 0 failed — entire suite green",
+        "now_locked_by": "M-D7a turns D7[kimi] red"
+      },
+      {
+        "change": "main-path probe=True -> probe=False (production injection probe disabled)",
+        "before": "838 passed, 4 skipped, 0 failed — entire suite green",
+        "now_locked_by": "M-D6a turns D6[main] red"
+      }
+    ]
   },
   "review": {
     "decision": "REWORK",
@@ -216,7 +243,7 @@
       }
     ],
     "decision_note": "REWORK in the schema's vocabulary; the WP state is CHANGES_REQUESTED. One blocking finding (#1), two non-blocking records (#2, #3).",
-    "finding1_status": "addressed-in-rev14 (F8/B6/D6/D7); implementation pending"
+    "finding1_status": "closed in rev14 (F8/B6) and implemented at af10c0a; M-B6a/M-B6b prove the main() hand-off load-bearing"
   },
   "consult": {
     "round": "r13",
@@ -399,7 +426,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-09T03:22:26Z",
-    "updated_at": "2026-10-12T04:57:25.437742+00:00",
+    "updated_at": "2026-10-12T05:25:24.905509+00:00",
     "dispatched_at": "2026-10-10T05:07:02.949080+00:00"
   }
 }
