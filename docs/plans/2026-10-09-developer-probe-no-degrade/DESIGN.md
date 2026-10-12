@@ -81,3 +81,26 @@ config),属另一目的。故 WP-01-brief rev2 删除 F4、把 `.agentic/config.
 - `wip/kimi-managed-k3-oauth` `1aa97e3` 的并入。该分支也改 `probe_injection()`
   (managed 通道新增一条裸 bool 返回路径),与 R3 接触面重叠;**后落者负责和解**。
 - `uv.lock`(历史裁决的禁区,见 `2026-09-13-parallel-throughput/CONVERGENCE-PLAN.md:125`)。
+
+## 5. 收敛期发现的两处工具缺口(本迭代范围外,待立 WP)
+
+二者均在 WP-01 双签通过后、执行 plan 收敛时被编排者实测发现,**不是本计划的
+纪律违规**,而是 `agentic` 自身对「顺序型单 WP 计划」这一形态支持不全。
+
+**G1 `agentic finalize` 无法 stamp 顺序型 WP。** 它用
+`rev-list --merges --parents <base_tip>` 找「第二父 == WP 分支尖端」的合并提交
+(`wrappers/finalize_merge.sh:380`)。顺序型 WP 的 `git.branch` 与
+`git.base_branch` 是同一分支(AGENTS.md §4.3 明确许可:顺序 WP 直接在集成分支上
+工作,只有并行道才单独开分支),故这样的合并提交**根本不存在** —— 实测候选数 0,
+脚本报 `cannot uniquely resolve merge commit` 并退出 2。而 `plan merge` 又要求
+WP 先为 `MERGED`,形成死锁。本次按用户授权的方案 B 手工 stamp
+`git.merged_commit = e670991`(WP 最终实现提交即其集成点)并附
+`merged_commit_note` 说明。修法建议:finalize 检测
+`branch == base_branch` 时走顺序型分支,接受 WP 尖端自身为集成点。
+
+**G2 `plan lint` 的 freeze+finalize 纪律对多轮重冻结计划不可达。** 该纪律要求
+WP 状态文件在集成分支上只提交两次,但它随 `0d4ff50` 落地**晚于**本计划基线
+`0ba058d`,本计划 rev1→rev15 共 15 轮 brief 重冻结 + 每轮二签各自提交状态文件,
+累计 27 次 sync 提交。`plan merge` 对此 fail-closed(实测确认),故本计划
+**仍未合入 `main`**。两条出路(squash 重写历史 vs 为既有计划豁免)都触及纪律本身,
+需用户裁决,不由编排者自行选择。
