@@ -840,6 +840,8 @@ def test_main_resolver_call_contract(tmp_path, monkeypatch, path):
 
     if path == "legacy":
         monkeypatch.setenv("PROBE_CMD", "echo PROBE_OK")
+    else:
+        monkeypatch.delenv("PROBE_CMD", raising=False)
     monkeypatch.setenv("REDISPATCH_DRY_RUN", "1")
 
     assert _redispatch_main([str(sf)]) == 0
