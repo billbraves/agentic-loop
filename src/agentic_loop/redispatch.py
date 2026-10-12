@@ -510,7 +510,11 @@ def main(argv: list[str]) -> int:
 
     # Resolve adapter for dispatch if the probe guard took the legacy bash path.
     if adapter is None:
-        adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
+        try:
+            adapter, _, fallback_applied = _resolve_developer(repo=repo_root, probe=False)
+        except ProbeFailedError:  # F8 legacy hand-off (M-B6a/M-B6b anchor)
+            print("REDISPATCH_STOP: probe failed — 不重派,查根因")
+            return 0
 
     dry_run = os.environ.get("REDISPATCH_DRY_RUN", "0") == "1"
     brief_path = iteration_dir / f"{work_package_id}-brief.md"

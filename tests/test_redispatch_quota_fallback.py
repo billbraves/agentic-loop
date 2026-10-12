@@ -199,8 +199,12 @@ class _StubFlash:         # fallback adapter（KimiAdapter 被 mock 成它）
                                command=("kimi",), dry_run=False)
 
 
-def _stub_io(monkeypatch, tmp_path):
-    """把 main() 的 IO 依赖全部导向 tmp_path / stub，使接线逻辑可离线断言。"""
+def _stub_io(monkeypatch, tmp_path, *, stub_resolver: bool = True):
+    """把 main() 的 IO 依赖全部导向 tmp_path / stub，使接线逻辑可离线断言。
+
+    ``stub_resolver=False`` 时不 patch ``_resolve_developer``，让测试能用真实
+    resolver（B6/D6 需要真实 resolver 命中未知 adapter / 校验 probe 契约）。
+    """
     monkeypatch.setattr("agentic_loop.redispatch.main_repo", lambda: tmp_path)
     monkeypatch.setattr("agentic_loop.redispatch.iterations_dir", lambda: tmp_path / "iters")
     monkeypatch.setattr("agentic_loop.redispatch._run_validator", lambda v, s: None)
@@ -233,7 +237,8 @@ def _stub_io(monkeypatch, tmp_path):
         return _P()
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    monkeypatch.setattr("agentic_loop.redispatch._resolve_developer", lambda *, repo, registry=None, probe=True: (_StubDev(), [], False))
+    if stub_resolver:
+        monkeypatch.setattr("agentic_loop.redispatch._resolve_developer", lambda *, repo, registry=None, probe=True: (_StubDev(), [], False))
     monkeypatch.setattr("agentic_loop.redispatch.resolve_role_fallback_binding", lambda role, repo=None: _flash_binding())
     monkeypatch.setattr("agentic_loop.redispatch.load_quota_patterns", lambda repo=None: ("额度", "quota"))
 
@@ -783,3 +788,90 @@ def test_degenerate_config_resolves_native_kimi_no_fallback(case, tmp_path):
 
     assert resolve_role_binding("developer", repo=tmp_path) == ("kimi", None)
     assert resolve_role_fallback_binding("developer", repo=tmp_path) is None
+
+
+# ======================================================================
+# Stage 3 余项：B6（legacy 交人出口承重）+ D6（resolver 调用契约承重）+
+# D7（默认 registry 透传 binding 承重）
+# ======================================================================
+
+
+def test_legacy_path_unknown_adapter_stops_not_crashes(tmp_path, monkeypatch, capsys):
+    # B6 F8 legacy 交人出口承重：legacy bash 探针通过后，dispatch 阶段用
+    # probe=False 的真实 resolver 命中未知 adapter → 必须打印 STOP 并 return 0
+    # （不崩溃、不派发），且未知 adapter 名（哨兵）绝不外吐。
+    sf = _write_status(tmp_path, count=0)
+    _stub_io(monkeypatch, tmp_path, stub_resolver=False)
+    sentinel = "no-such-adapter-SENTINEL6"
+    monkeypatch.setattr(
+        "agentic_loop.redispatch.resolve_role_binding",
+        lambda role, repo=None: (sentinel, None),
+    )
+    monkeypatch.setenv("PROBE_CMD", "true")
+    monkeypatch.setenv("REDISPATCH_DRY_RUN", "1")
+
+    dispatch_calls = []
+    monkeypatch.setattr(
+        "agentic_loop.redispatch._dispatch_with_quota_fallback",
+        lambda *a, **k: dispatch_calls.append(1),
+    )
+
+    assert _redispatch_main([str(sf)]) == 0
+    assert dispatch_calls == []
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "REDISPATCH_STOP: probe failed — 不重派,查根因"
+    assert sentinel not in captured.out
+    assert sentinel not in captured.err
+
+
+@pytest.mark.parametrize("path", ["main", "legacy"])
+def test_main_resolver_call_contract(tmp_path, monkeypatch, path):
+    # D6 调用契约承重：main() 调用 _resolve_developer 时，repo 必须透传
+    # main_repo() 返回值；probe 必须按分支取 True（无 PROBE_CMD，非 legacy）
+    # 或 False（legacy bash 探针已通过，dispatch 阶段补解析），且恰好一次。
+    sf = _write_status(tmp_path, count=0)
+    _stub_io(monkeypatch, tmp_path, stub_resolver=False)
+
+    recorded = []
+    def spy_resolver(*, repo, registry=None, probe=True):
+        recorded.append((repo, probe))
+        return (_StubDev(), [], False)
+    monkeypatch.setattr("agentic_loop.redispatch._resolve_developer", spy_resolver)
+
+    if path == "legacy":
+        monkeypatch.setenv("PROBE_CMD", "echo PROBE_OK")
+    monkeypatch.setenv("REDISPATCH_DRY_RUN", "1")
+
+    assert _redispatch_main([str(sf)]) == 0
+    assert len(recorded) == 1
+    repo, probe = recorded[0]
+    assert repo == redispatch.main_repo()
+    assert probe is (path == "main")
+
+
+@pytest.mark.parametrize("primary", ["kimi", "claude"])
+def test_default_registry_preserves_adapter_and_binding(primary, monkeypatch, tmp_path):
+    # D7 默认 registry 承重：不注入 registry 时，_resolve_developer 必须用默认
+    # registry 里对应首选键的工厂构造 adapter，并把 resolve_role_binding 返回的
+    # binding 原样（同一对象）透传给工厂；非首选工厂绝不构造。
+    sentinel_binding = object()
+    _patch_resolver(monkeypatch, primary=primary, binding=sentinel_binding,
+                    fallback_binding=None)
+
+    constructed = {"kimi": [], "claude": []}
+    def spy_kimi(*, kimi_bin="kimi", binding=None):
+        constructed["kimi"].append(binding)
+        return _StubDev()
+    def spy_claude(*, claude_bin="claude", binding=None):
+        constructed["claude"].append(binding)
+        return _StubDev()
+    monkeypatch.setattr("agentic_loop.redispatch.KimiAdapter", spy_kimi)
+    monkeypatch.setattr("agentic_loop.redispatch.ClaudeAdapter", spy_claude)
+
+    adapter, reasons, fallback_applied = _resolve_developer(repo=tmp_path, probe=False)
+
+    assert fallback_applied is False
+    assert isinstance(adapter, _StubDev)
+    assert constructed[primary] == [sentinel_binding]
+    other = "claude" if primary == "kimi" else "kimi"
+    assert constructed[other] == []
