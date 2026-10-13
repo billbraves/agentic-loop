@@ -51,15 +51,41 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.md",
-      "sha256": "9bc1e96b8982948952971eb2d706ca1b33dc76b81453b5ca74c8a4bf23a6390d",
-      "rev": 1
+      "sha256": "f08d8c0ed8bcc318c3a1f5f9e164df394a31ed41b862bc42462a1c2f58c7b075",
+      "rev": 2,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev1.md",
+          "sha256": "9bc1e96b8982948952971eb2d706ca1b33dc76b81453b5ca74c8a4bf23a6390d",
+          "outcome": "SUPERSEDED_AFTER_VOIDED_CONSULT",
+          "cause": "consult r1 attempt1 VOIDED (no CODEX_DECISION marker; budget exhausted before the verdict) but produced four substantive findings. Orchestrator independently verified each: 3 upheld, 1 not upheld, plus a 5th the consultant raised but did not finish checking. rev2 closes every upheld item.",
+          "superseded_by_rev": 2
+        }
+      ]
     }
   },
   "review": {},
-  "consult": {},
+  "consult": {
+    "state": "NOT_DISPATCHED",
+    "round": "r2",
+    "decision": null,
+    "bound_brief_rev": 2,
+    "prior_rounds": [
+      {
+        "round": "r1-attempt1",
+        "decision": "VOID",
+        "bound_brief_rev": 1,
+        "cause": "no CODEX_DECISION marker in the answer; budget exhausted before the verdict was written (exit 0, 555s, 4019 output tokens, binding unchanged)",
+        "receipt": ".agentic/seq-gates-brief-consult-r1-attempt1-void/seq-gates-brief-consult-r1.receipt.json",
+        "findings_salvaged": 5,
+        "resolved_in_rev": 2
+      }
+    ]
+  },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-12T13:00:00Z",
+    "updated_at": "2026-10-13T03:40:00Z",
     "dispatched_at": ""
   }
 }

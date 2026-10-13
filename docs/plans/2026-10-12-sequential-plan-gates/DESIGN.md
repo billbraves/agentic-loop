@@ -85,11 +85,47 @@ plan schema 目前只允许 `title` 一个可选顶层字段（`plan_cmd.py:86`
 `OPTIONAL_TOP_LEVEL`），这正是 probe-no-degrade 当时无法把豁免写成结构化字段、
 只能写进提交信息的原因。本迭代扩这一个字段，补上那个缺口。
 
-**R3 两个 WP 顺序执行，自身即 dogfood。** WP-02（G1）先落地，WP-03（G2）后落地。
-本迭代**自己是顺序型单 WP 形态的计划**（WP 直接在集成分支上工作），所以
-WP-02 完成后，本迭代自己的收敛就应当能用 `agentic finalize` 正常 stamp ——
-这是对 R1 的真实端到端验证，而非只靠单元测试。若 WP-02 落地后本迭代仍需手工
-stamp，说明 R1 没真正修好。
+**R3 两个 WP 顺序执行；dogfood 只能在合入之后做（rev2 修正）。**
+WP-02（G1）先落地，WP-03（G2）后落地。本迭代自己是顺序型形态的计划，
+所以它**本身**就是 R1 的端到端标的。
+
+但 rev1 在这里写错了，说「WP-02 完成后本迭代自己的收敛就应当能用
+`agentic finalize` 正常 stamp」。实测否证（详见 §2b 第 3 条）：
+`agentic` 执行的是**主仓 checkout** 工作区里的 wrapper，不是 WP worktree
+里的改动版。所以在 WP-02 合入主仓之前，dogfood 跑的仍是旧脚本，
+**验证不了**本 WP 的修复 —— 用它当验收证据是循环论证。
+
+修正后的口径：WP-02 的 DoD **不含**自验证；端到端验证由编排者在 WP-02
+合入 `main` 之后单独执行，作为本计划收敛的一部分而非 WP 的交付物。
+
+## 2b. r1 二签指认并经编排者实测核实的缺陷（rev2 已闭合）
+
+二签 r1 作废（裁决留到最后、预算先耗尽，无 `CODEX_DECISION` 标记，收据判
+`INVALID`；产物归档于 `.agentic/seq-gates-brief-consult-r1-attempt1-void/`），
+但它在 555 秒里给出四条实质发现。编排者逐条实测：三条成立、一条不成立，
+并追查了它提出但未查完的第五条。
+
+| # | 顾问指认 | 编排者实测结论 | rev2 闭合方式 |
+|---|---|---|---|
+| 1 | WP-02 的 S1 可能让 `merged_commit = base_tip` 假绿 | **成立**。顺序型下两 tip 解析自同名分支，两种实现产出相同；原 M-2 要求「改成 `base_tip` 之外的值」恰好绕开了最自然的错误写法 | 新增 INV-1b + S1b + M-2b |
+| 2 | WP-03 的 E3 只对 `approver` 做空白攻击 | **成立**。`justification` / `reviewed_at` 的非空约束无承重测试 | E3 扩到 10 形态 + M-2b 三条逐字段 |
+| 3 | 自验证（dogfood）可能走不通 | **成立，且比指认更确切**。`cli.resolve_wrapper` 优先主仓 `scripts/agentic/`（本仓库无该目录）故用包内副本；而 `agentic` 的 `agentic_loop` 包解析到主仓 checkout 的 `src/agentic_loop`（editable），与主仓内那份 wrapper sha256 一致 | R3 改写（见上）+ WP-02 附注明令不得把自验证写进交付证据 |
+| 4 | WP-02 范围自相矛盾（要求 `wrapper_sync` 绿却只许改 bundled） | **不成立**。该测试要求 canonical 与 bundled 逐字节相同，但本仓库无 `scripts/agentic/`，故 `pytest.skip` | WP-02 附注记录实测事实 + 若未 skip 则判 BLOCKED |
+
+**第 5 条（顾问提出但未查完；编排者追查确认，最严重）**：豁免来源无约束。
+`plan_cmd.py:471-472` 的 `_resolve_plan_path` 对绝对路径**无条件返回**，
+不做主仓归属判断；`plan_cmd.py` 对 `path_is_in_worktree` 的引用数为 **0**。
+对比 WP 层 `finalize_merge.sh:160` 明确拒绝 worktree 本地副本
+（§36 注释称其为「branch-local working-tree state, not the shared source of
+truth」）。即若 WP-03 只校验四字段，**任意路径上一份合法 JSON 就能放行合并**。
+**自证**：编排者在上一迭代收敛时，正是用绝对路径对 worktree 副本跑
+`agentic plan finalize` 并被接受 —— 当时写入的是合法状态，但同一条路径
+同样能送进一份伪造的豁免。rev2 以 INV-3b + E9 三子形态 + M-2c 闭合。
+
+> 方法论记录：r1 虽因预算耗尽而作废，产出的四条发现**仍然有效且已被独立
+> 核实**。这说明「作废」是对裁决有效性的判断，不是对内容价值的判断 ——
+> 丢掉这些发现去重跑一轮才是浪费。但反过来，**不得**把作废轮的意见当作
+> 二签通过：rev2 仍须走 attempt2 取得真正的 `CODEX_DECISION`。
 
 ## 3. 范围外
 

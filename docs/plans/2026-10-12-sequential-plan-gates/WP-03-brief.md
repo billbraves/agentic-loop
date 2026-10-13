@@ -67,6 +67,9 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 - **forbidden_paths**（黑名单，绝不能碰）：
   - `src/agentic_loop/wrappers/finalize_merge.sh`（WP-02 的地盘）
   - `src/agentic_loop/validate_wp_status.py`（只读其形态，不改它）
+  - `src/agentic_loop/gate/__init__.py`（**只读复用** `path_is_in_worktree`，
+    见 `:209`；INV-3b 的来源校验须 import 它，**不得**修改该谓词本身，
+    也不得在 `plan_cmd.py` 里另写一份平行实现）
   - `src/agentic_loop/wrappers/codex_merge_gate.sh`
   - `src/agentic_loop/autonomy.py`
   - `.agentic/config.toml`
@@ -105,6 +108,25 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 **INV-3（残缺豁免 fail-closed）**：四字段缺任意一项、`approved` 不是严格布尔
 `true`（含 `"true"` / `1` / `"yes"`）、或任一字符串字段为空/纯空白时，
 `plan merge` **必须**仍然拒绝（DIRTY 不放行）。
+**三个字符串字段的非空约束必须各自承重** —— 即 `approver`、`justification`、
+`reviewed_at` 每一个都要有自己的空白攻击用例。r1 二签指认：rev1 的 E3 只对
+`approver` 做空白攻击，于是「删掉 `justification` 与 `reviewed_at` 的非空校验」
+不会让任何用例转红，那两条约束不承重。
+
+**INV-3b（豁免来源必须可审计）**：合法四字段只证明「形状完整」，不证明
+「这份豁免受编排者控制且 Git 可审计」。`plan merge` 凭豁免放行时，
+该豁免**必须**来自主仓(`resolve_paths.main_repo()`)内**受 Git 跟踪**的计划
+状态文件；来自 worktree 本地副本或仓库外任意路径的豁免**必须**被拒绝。
+
+> 这是 r1 二签提出但未查完的第 5 条，编排者已实测确认旁路真实存在：
+> `plan_cmd.py:471-472` 的 `_resolve_plan_path` 对**绝对路径直接放行**，
+> 不做任何主仓绑定检查；`plan_cmd.py` 对 `path_is_in_worktree` 的引用数为 **0**。
+> 对比 WP 层：`finalize_merge.sh:160` 用 `path_is_in_worktree` 明确拒绝
+> worktree 本地副本（该文件 §36 注释称其为「branch-local working-tree state,
+> not the shared source of truth」）。plan 层缺这道闸门。
+> **自证**：编排者本人在上一个迭代收敛时，就是用绝对路径对 worktree 副本跑
+> `agentic plan finalize` 并被接受的 —— 当时写的是合法状态，但同一条路径
+> 同样能送进一份伪造的豁免。
 
 **INV-4（豁免范围最小）**：豁免只作用于 commit-discipline lint。
 `state != READY_TO_MERGE`、任一 WP 未 `MERGED`、不在目标分支、已合并、
@@ -154,10 +176,21 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
 - **E2 `[lint-output-unchanged]`** → INV-2。对同一计划分别在有/无豁免下跑
   `plan lint`，断言两次 stdout **完全相同**且都含 DIRTY 与全部 sync 条目。
 - **E3 `[partial-exemption-matrix]`** → INV-3，**本 WP 的决定性用例**。
-  参数化至少 8 种残缺形态：缺 `approved`、缺 `approver`、缺 `justification`、
-  缺 `reviewed_at`、`approved=false`、`approved="true"`（字符串）、
-  `approved=1`（整数）、`approver="   "`（纯空白）。每种都断言退出非 0
-  且目标分支 tip 未变。
+  参数化至少 **10** 种残缺形态，逐一独立参数化（不得合并成一条）：
+  缺 `approved`、缺 `approver`、缺 `justification`、缺 `reviewed_at`、
+  `approved=false`、`approved="true"`（字符串）、`approved=1`（整数）、
+  **`approver="   "`（纯空白）、`justification="   "`（纯空白）、
+  `reviewed_at="   "`（纯空白）**。每种都断言退出非 0 且目标分支 tip 未变。
+  后三条缺一不可 —— 它们各自钉住一个字符串字段的非空约束（r1 二签指认 rev1
+  只测了 `approver` 一个，另两条不承重）。
+- **E9 `[exemption-source-must-be-main-repo-tracked]`** → INV-3b，
+  **与 E3 并列为本 WP 的决定性用例**。三个子形态，每种都断言退出非 0
+  且目标分支 tip 未变：
+  1. 合法四字段豁免，但计划状态文件位于 **worktree 本地副本**（绝对路径传入）；
+  2. 合法四字段豁免，但文件位于**仓库之外**的临时目录（绝对路径传入）；
+  3. 合法四字段豁免，文件在主仓路径下但**未被 Git 跟踪**（新建未 `git add`）。
+  正向对照：同一份豁免放在主仓受跟踪的计划文件里**必须**放行（即 E1）。
+  witness 必须指向「豁免来源不可信」而非笼统的 lint 失败。
 - **E4 `[exemption-does-not-waive-convergence]`** → INV-4。有合法豁免但某个
   WP 仍是 `APPROVED_FOR_MERGE`（非 `MERGED`），断言退出非 0 且 witness 指向
   convergence 而非 lint。
@@ -187,6 +220,14 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
   → **E3 必须转红**（至少 `approved=false` 与纯空白两种形态）。
 - **M-2**：把 `approved is True` 改成真值判断（如 Python 的 `if approved:`）
   → **E3 的 `approved="true"` 与 `approved=1` 两例必须转红**。
+- **M-2b**：**逐字段**去掉非空校验，三条分别施加、分别验证：
+  去掉 `approver` 非空 → E3`[approver-blank]` 转红；
+  去掉 `justification` 非空 → E3`[justification-blank]` 转红；
+  去掉 `reviewed_at` 非空 → E3`[reviewed_at-blank]` 转红。
+  三条必须**各自**转红。若某条去掉后全绿，说明该字段的约束不承重，
+  **判 BLOCKED** 并在报告中说明，不得以「另两个字段已覆盖」作为通过理由。
+- **M-2c**：去掉 INV-3b 的来源校验（即允许任意路径的豁免放行）
+  → **E9 三个子形态必须全部转红**。若有子形态仍绿，说明该形态不承重。
 - **M-3**：让豁免同时抑制 lint 的 stdout → **E2 必须转红**。
 - **M-4**：让豁免顺带跳过 `_require_converged` → **E4 必须转红**。
 - **M-5**：去掉放行时的 approver/justification 打印 → **E6 必须转红**。
@@ -199,8 +240,10 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] E0-E8 全绿（E3 的 8 种形态逐一参数化，不得合并成一条）
-- [ ] M-1 ~ M-6 逐条红证齐备（含还原回绿），报告附逐条结果
+- [ ] E0-E9 全绿（E3 的 **10** 种形态、E9 的 3 个子形态均逐一参数化，
+      不得合并成一条）
+- [ ] M-1 ~ M-6 逐条红证齐备（含 M-2b 的三条逐字段、M-2c 的三子形态；
+      含还原回绿），报告附逐条结果
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
 - [ ] `agentic quality-gate <status.json>` 全绿
@@ -231,6 +274,22 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 - **已知陷阱 3**：豁免放行**不得**写进 `plan finalize`。finalize 本就不跑 lint
   （`cmd_finalize` 无 `_lint_report` 调用），在那里加豁免逻辑是无效代码且会误导
   后来者以为 finalize 也受 lint 管。
+- **已知陷阱 4（INV-3b 的实现要点）**：`_resolve_plan_path`
+  （`plan_cmd.py:471-472`）对**绝对路径直接返回**，不做任何归属判断：
+
+  ```python
+  if arg.is_absolute():
+      return arg          # <- 任意路径在此处无条件放行
+  ```
+
+  相对路径才会被拼到 `main_repo()` 下。所以来源校验**不能**只加在相对路径
+  那一支。另外「在主仓路径下」不等于「受 Git 跟踪」—— E9 子形态 3 专测这点，
+  实现须同时验证 Git 跟踪状态（如 `git ls-files --error-unmatch`），
+  不得只比较路径前缀。
+- **不得扩大 INV-3b 的作用面**：本 WP 只为「**凭豁免放行**」这条路径加来源校验。
+  **不要**顺手给 `plan check` / `plan lint` / `plan finalize` 也加上路径限制 ——
+  那会改变既有命令的可用性（编排者当前就在用绝对路径对 worktree 副本跑
+  `plan check`），属范围外的行为变更。若认为那些命令也该加，记入残余风险另立 WP。
 - **范围外（明确不做）**：不从根上支持多轮 re-freeze（例如允许 N 次 freeze
   提交）。那会改变纪律判据本身，属另一目的，另立 WP。本 WP 只加「显式豁免」。
 - **历史计划不回填**：kqff 与 probe-no-degrade 已合入 `main`，不追溯改写其

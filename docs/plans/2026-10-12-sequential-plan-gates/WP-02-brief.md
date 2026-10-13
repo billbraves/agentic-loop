@@ -91,6 +91,16 @@ FINALIZE_FAIL: cannot uniquely resolve merge commit for
 ACCEPT 时，`finalize` 退出 0，并把 `git.merged_commit` 写成 `wp_tip`，
 `state` 写成 `MERGED`。
 
+**INV-1b（`wp_tip` 与 `base_tip` 必须可区分）**：顺序型情形下两个 tip 解析自
+**同名分支**，所以错误实现 `merged_commit = base_tip` 与正确实现 `= wp_tip`
+在「两字段字面同值」的朴素 fixture 上**产出完全相同** —— 任何只用这种 fixture
+的用例都无法区分二者。故承重用例**必须**构造一个让二者可观测地不同的 fixture
+（做法见 S1b），否则 S1 是假绿。
+
+> r1 二签指认的第一条缺陷。它与上一迭代 `WP-01-review2.md`「两条曾被证实的
+> 假绿面」同属一个家族：**单改一行仍全绿**。原 M-2 要求「改成 `base_tip`
+> 之外的任意固定值」，恰好绕开了最自然的那个错误写法。
+
 **INV-2（并行道零回归）**：当 `branch != base_branch` 时，行为与改动前逐字节
 一致 —— 唯一候选时 stamp 该合并提交；0 候选或多候选时 fail-closed 退出 2。
 
@@ -133,6 +143,19 @@ ACCEPT 时，`finalize` 退出 0，并把 `git.merged_commit` 写成 `wp_tip`，
 
 - **S1 `[sequential-happy]`** → INV-1。造 `branch == base_branch` 的双签 WP，
   跑 finalize，断言 exit 0、`state == MERGED`、`merged_commit == wp_tip`。
+- **S1b `[sequential-tip-identity-discriminating]`** → INV-1b，
+  **与 S3 并列为本 WP 的决定性用例**。必须让 `wp_tip` 与 `base_tip` 可观测地
+  不同，否则无法区分 `= wp_tip` 与 `= base_tip` 两种实现。
+  冻结构造方式：`git.branch` 与 `git.base_branch` 填**同一个分支名**（满足顺序型
+  语义），但在 fixture 中让该名字之外**另有一个** `refs/heads/<base>` 之外的
+  解析路径不可用 —— 即构造「`branch` 字段与 `base_branch` 字段字符串相等，
+  但脚本若错误地去解析 `base_branch` 对应的另一个 ref（例如大小写不同、
+  或带 `refs/heads/` 前缀的等价写法）会得到不同提交」的形态。
+  **若该形态在 git 下不可构造**（两字段字面相等必然解析到同一提交），
+  则改用等价判别：在实现中**断言源码层面**取的是 `$wp_tip` 变量而非
+  `$base_tip`（静态断言，参见 M-2b），并在报告中写明「S1b 退化为静态断言，
+  原因是两字段相等时运行时不可区分」。两条路任选其一，但**必须**在报告里
+  明确说明选了哪条及理由，不得跳过本项。
 - **S2 `[parallel-happy]`**（正向可达性对照，oracle 第 1 项）→ INV-2。
   造真实的 `feature/x` 合并进集成分支，断言 exit 0 且 stamp 的是那个**合并提交**
   （不是 `wp_tip`）。
@@ -168,6 +191,11 @@ pytest tests/test_finalize_merge_first_call.py \
   （这正是 INV-3 要禁的那个错误实现；若 S3 不红，说明 S3 不承重。）
 - **M-2**：顺序型分支里把 `merged_commit` 由 `wp_tip` 改成 `base_tip` 之外的
   任意固定值（如 `HEAD~1`）→ **S1 必须转红**。
+- **M-2b**：顺序型分支里把 `merged_commit` 由 `$wp_tip` 改成 `$base_tip`
+  → **S1b 必须转红**（若 S1b 取静态断言形态，则该静态断言转红）。
+  这是 r1 二签指认的最自然的错误写法；M-2 刻意排除了它，故必须单列。
+  若 S1b 与 S1 都不红，说明本 WP 对「取错 tip」整体不承重，**判 BLOCKED**
+  并在报告中说明，不得以「两者当前等值所以无所谓」作为通过理由。
 - **M-3**：删掉 `:371` 的祖先前置检查 → 至少一条用例必须转红；若全绿，
   须在报告中说明该检查在哪条用例下承重，或承认它当前不承重。
 - **M-4**：在顺序型路径上跳过双签校验 → **S5 必须转红**。
@@ -213,9 +241,29 @@ pytest tests/test_finalize_merge_first_call.py \
 - **已知陷阱 3**：`set -euo pipefail` 下，用 `x=$(cmd)` 形式承接可能非零退出的
   判定会直接中断脚本（文件头 A29 注释已记录同类事故）。新增判定须用 `if !` 形式
   fail-closed，不得追加 `|| true` / `|| echo false`。
-- **dogfood 机会**：本 WP 落地后，PLAN-01 自己（顺序型形态）的收敛就应当能用
-  `agentic finalize` 正常 stamp。编排者会以此做端到端验证；若仍需手工 stamp，
-  说明 F1/F2 没真正修好。
+- **dogfood 的真实条件（r1 二签指认，编排者已实测核实）**：原 rev1 声称
+  「本 WP 落地后 PLAN-01 自己的收敛就能用 `agentic finalize` 正常 stamp」。
+  这个说法**需要前提**，不是自动成立的。实测事实：
+  - `cli.resolve_wrapper` 优先用主仓 `scripts/agentic/<name>`（dogfood），
+    否则退回包内 `agentic_loop/wrappers/<name>`。
+  - 本仓库**没有** `scripts/agentic/` 目录，故实际运行的是包内副本。
+  - `agentic` CLI 的解释器是 `~/.local/share/uv/tools/agentic-loop/bin/python`，
+    但其 `agentic_loop` 包目录解析到 **`/Users/admin/vibe/agentic_loop/src/agentic_loop`**
+    （editable 安装指向主仓 checkout），且包内 wrapper 与主仓 checkout 内的
+    那份 sha256 一致（实测前 16 位均 `31879288b37cd428`）。
+  - **推论**：`agentic finalize` 执行的是**主仓 checkout** 工作区里的脚本，
+    **不是**本 WP worktree 里的改动版。所以在本 WP 合入主仓之前，
+    dogfood **验证不了**本 WP 的修复。
+  因此：**执行者不得把「自验证通过」写进交付证据**，也不得为了让 dogfood
+  成立而去改主仓 checkout（那是 forbidden_paths 之外的越界写入）。
+  端到端验证由编排者在本 WP 合入 `main` 之后单独做，不属本 WP 的 DoD。
+- **`test_finalize_merge_wrapper_sync.py` 的实际行为（编排者实测）**：
+  该测试要求 canonical（`scripts/agentic/`）与 bundled（`agentic_loop/wrappers/`）
+  两份**逐字节相同**；但本仓库 canonical 副本不存在，测试会 `pytest.skip`。
+  故「只改 bundled 副本」与「保持该测试绿」**当前不冲突**（r1 二签担心的范围
+  矛盾在当前布局下不成立）。但若执行者发现它未 skip 而是比对失败，
+  **立即停手判 BLOCKED**，不得为了让它绿而新建 `scripts/agentic/` 副本
+  或修改该测试 —— 两者都在 allowed_paths 之外。
 - 口径权威源引用：`src/agentic_loop/wrappers/finalize_merge.sh:380`（候选解析）、
   `:371`（祖先前置）、`:398`（状态闸门）；AGENTS.md §4.3（顺序 WP 在集成分支上工作）。
 

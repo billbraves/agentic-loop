@@ -52,8 +52,18 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
-      "sha256": "6ef18fabb91a8e4931659e2455fc68a5d80db0a31a826bf5038bb129249c098f",
-      "rev": 1
+      "sha256": "3e37fd5e73c03350a024b94590474d89d9e042d382d085865e1c8d08dcdee518",
+      "rev": 2,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.rev1.md",
+          "sha256": "6ef18fabb91a8e4931659e2455fc68a5d80db0a31a826bf5038bb129249c098f",
+          "outcome": "SUPERSEDED_AFTER_VOIDED_CONSULT",
+          "cause": "consult r1 attempt1 VOIDED but found E3 covered only the approver blank-attack, leaving justification/reviewed_at non-empty constraints unload-bearing; orchestrator additionally confirmed the exemption-source bypass (_resolve_plan_path returns absolute paths unconditionally; plan_cmd.py references path_is_in_worktree zero times).",
+          "superseded_by_rev": 2
+        }
+      ]
     },
     "depends_on": [
       "WP-02 must be MERGED first (same integration branch, sequential execution)"
@@ -63,7 +73,7 @@
   "consult": {},
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-12T13:00:00Z",
+    "updated_at": "2026-10-13T03:40:00Z",
     "dispatched_at": ""
   }
 }
