@@ -127,6 +127,41 @@ truth」）。即若 WP-03 只校验四字段，**任意路径上一份合法 JS
 > 丢掉这些发现去重跑一轮才是浪费。但反过来，**不得**把作废轮的意见当作
 > 二签通过：rev2 仍须走 attempt2 取得真正的 `CODEX_DECISION`。
 
+## 2c. r2 二签（有效，REWORK）及 rev3 的闭合
+
+r2 取得有效裁决 `CODEX_DECISION: REWORK`（form=marker，收据
+`.agentic/seq-gates-brief-consult-r2.receipt.json`）。prompt 从 6 问压到 3 问
+并明确限制探查范围，这一轮没有再被预算耗尽。顾问自述验证范围：
+核对了 HEAD、工作区干净状态与四个 SHA-256，查了三处源码现场，**未执行 pytest**
+（如实声明，未伪造）。
+
+两条必改，编排者均已实测核实后在 rev3 闭合：
+
+**C1 symlink 旁路（Q1）**。INV-3b 的 rev2 写法不完整：主仓内一个**受跟踪的
+symlink** 可指向主仓内**未跟踪**的 JSON；只检查逻辑路径前缀与 `ls-files`
+会把 symlink 自身视为已跟踪，却实际读取未审计目标。
+**实测确认**：`git add` 一个 symlink 后，`ls-files --error-unmatch` 对 symlink
+报「已跟踪」、对其目标报「未跟踪」，而读取 symlink 得到的是那份未跟踪内容。
+rev3 把判定顺序**冻结为三步**（先 `resolve(strict=True)` → 再归属 +
+`path_is_in_worktree` → 最后用解析后相对路径跑精确 `ls-files`），
+E9 增加子形态 4，并新增 M-2d 专打判定顺序。
+
+**C2 S1b 的退化出口过宽且其运行时构造不可实现（Q2）**。rev2 给了「运行时
+fixture 或静态断言二选一」的出口，并提议用大小写 / `refs/heads/` 前缀等价
+写法构造 tip 差异。**r2 指出该构造不存在，编排者实测确认**：两字段字面相等时
+`rev-parse refs/heads/<name>` 必然返回同一提交；且 macOS 文件系统大小写不敏感，
+`git branch Main` 直接报「已存在」。rev3 删除该出口，S1b 固定为**强制静态
+数据流断言**（须排除注释与 dead code、须定位赋值语句本身、不得退化为全文搜索），
+M-2b 改为必须修改实际赋值语句并附红/绿双证，执行者不得跳过或仅以文字理由代替。
+
+三条残余风险（顾问指认，rev3 已写入 WP-03「残余风险」一节）：
+tracked ≠ committed、校验与读取之间的 TOCTOU 窗口、`main_repo()` 自身对
+repository-selection 环境变量的信任边界。顾问同时澄清 submodule 情形
+无需额外用例。
+
+裁决要点：**当前不可冻结、不可派发 WP-02**，须先修订、生成新 rev 与 SHA-256。
+rev3 即为此而生，冻结前须再走一轮二签。
+
 ## 3. 范围外
 
 - **不改 freeze+finalize 纪律本身的判据**（仍是 1 + 1 + 0 sync）。豁免只在

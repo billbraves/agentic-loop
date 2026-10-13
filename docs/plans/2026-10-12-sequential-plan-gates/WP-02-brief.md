@@ -91,15 +91,19 @@ FINALIZE_FAIL: cannot uniquely resolve merge commit for
 ACCEPT 时，`finalize` 退出 0，并把 `git.merged_commit` 写成 `wp_tip`，
 `state` 写成 `MERGED`。
 
-**INV-1b（`wp_tip` 与 `base_tip` 必须可区分）**：顺序型情形下两个 tip 解析自
-**同名分支**，所以错误实现 `merged_commit = base_tip` 与正确实现 `= wp_tip`
-在「两字段字面同值」的朴素 fixture 上**产出完全相同** —— 任何只用这种 fixture
-的用例都无法区分二者。故承重用例**必须**构造一个让二者可观测地不同的 fixture
-（做法见 S1b），否则 S1 是假绿。
+**INV-1b（取错 tip 必须被静态数据流钉死）**：顺序型情形下两个 tip 解析自
+**同名分支**，`rev-parse refs/heads/<name>` 必然返回同一提交，所以错误实现
+`merged_commit = base_tip` 与正确实现 `= wp_tip` 在运行时**不可区分** ——
+任何纯运行时用例都无法区分二者，S1 单独是假绿。
 
-> r1 二签指认的第一条缺陷。它与上一迭代 `WP-01-review2.md`「两条曾被证实的
-> 假绿面」同属一个家族：**单改一行仍全绿**。原 M-2 要求「改成 `base_tip`
-> 之外的任意固定值」，恰好绕开了最自然的那个错误写法。
+故本项以**强制静态数据流断言**承重（S1b）：断言顺序型可执行分支里
+`merged_commit` 的**最终赋值来源**是 `$wp_tip`。该断言必须排除注释与
+dead code，且**不得**退化为「全文搜索 `$wp_tip` 是否出现」。
+
+> r1 二签指认缺陷、r2 二签收紧。rev2 曾给「运行时 fixture 或静态断言二选一」
+> 的出口并提议用大小写/`refs/heads/` 前缀等价写法构造差异 —— r2 指出该构造
+> 不可实现，编排者实测确认：macOS 文件系统大小写不敏感，`git branch Main`
+> 报「已存在」，两种写法解析到同一提交。该出口已删除，S1b 不再可选。
 
 **INV-2（并行道零回归）**：当 `branch != base_branch` 时，行为与改动前逐字节
 一致 —— 唯一候选时 stamp 该合并提交；0 候选或多候选时 fail-closed 退出 2。
@@ -143,19 +147,19 @@ ACCEPT 时，`finalize` 退出 0，并把 `git.merged_commit` 写成 `wp_tip`，
 
 - **S1 `[sequential-happy]`** → INV-1。造 `branch == base_branch` 的双签 WP，
   跑 finalize，断言 exit 0、`state == MERGED`、`merged_commit == wp_tip`。
-- **S1b `[sequential-tip-identity-discriminating]`** → INV-1b，
-  **与 S3 并列为本 WP 的决定性用例**。必须让 `wp_tip` 与 `base_tip` 可观测地
-  不同，否则无法区分 `= wp_tip` 与 `= base_tip` 两种实现。
-  冻结构造方式：`git.branch` 与 `git.base_branch` 填**同一个分支名**（满足顺序型
-  语义），但在 fixture 中让该名字之外**另有一个** `refs/heads/<base>` 之外的
-  解析路径不可用 —— 即构造「`branch` 字段与 `base_branch` 字段字符串相等，
-  但脚本若错误地去解析 `base_branch` 对应的另一个 ref（例如大小写不同、
-  或带 `refs/heads/` 前缀的等价写法）会得到不同提交」的形态。
-  **若该形态在 git 下不可构造**（两字段字面相等必然解析到同一提交），
-  则改用等价判别：在实现中**断言源码层面**取的是 `$wp_tip` 变量而非
-  `$base_tip`（静态断言，参见 M-2b），并在报告中写明「S1b 退化为静态断言，
-  原因是两字段相等时运行时不可区分」。两条路任选其一，但**必须**在报告里
-  明确说明选了哪条及理由，不得跳过本项。
+- **S1b `[sequential-tip-source-static-assert]`** → INV-1b，
+  **与 S3 并列为本 WP 的决定性用例**。固定为**静态数据流断言**，无可选项：
+  解析 `finalize_merge.sh` 的文本，定位 `branch == base_branch` 的顺序型
+  可执行分支，断言该分支内 `merged_commit` 的**最终赋值**取自 `$wp_tip`。
+  硬性要求：
+  1. **必须**排除注释行与 dead code（不可达分支），只看可执行路径；
+  2. **不得**实现为「全文搜索 `$wp_tip` 是否出现」—— 那样即使赋值用的是
+     `$base_tip`、而 `$wp_tip` 只出现在别处或注释里，断言也会假绿；
+  3. 必须定位到**赋值语句本身**，而非该分支内任意一处提及。
+  S1 仍保留为真实子进程的运行时验证（二者分工：S1 证明流程可达终点，
+  S1b 证明取的是正确的 tip）。
+  > 为何不做运行时区分：两字段字面相等时 `rev-parse refs/heads/<name>`
+  > 必然返回同一提交（r2 二签指认，编排者实测确认），运行时无从区分。
 - **S2 `[parallel-happy]`**（正向可达性对照，oracle 第 1 项）→ INV-2。
   造真实的 `feature/x` 合并进集成分支，断言 exit 0 且 stamp 的是那个**合并提交**
   （不是 `wp_tip`）。
@@ -191,11 +195,12 @@ pytest tests/test_finalize_merge_first_call.py \
   （这正是 INV-3 要禁的那个错误实现；若 S3 不红，说明 S3 不承重。）
 - **M-2**：顺序型分支里把 `merged_commit` 由 `wp_tip` 改成 `base_tip` 之外的
   任意固定值（如 `HEAD~1`）→ **S1 必须转红**。
-- **M-2b**：顺序型分支里把 `merged_commit` 由 `$wp_tip` 改成 `$base_tip`
-  → **S1b 必须转红**（若 S1b 取静态断言形态，则该静态断言转红）。
-  这是 r1 二签指认的最自然的错误写法；M-2 刻意排除了它，故必须单列。
-  若 S1b 与 S1 都不红，说明本 WP 对「取错 tip」整体不承重，**判 BLOCKED**
-  并在报告中说明，不得以「两者当前等值所以无所谓」作为通过理由。
+- **M-2b**：把顺序型分支内 `merged_commit` 的**实际赋值语句**由 `$wp_tip`
+  改成 `$base_tip` → **S1b 必须转红**，还原后必须回绿，报告须附红/绿两份证据。
+  这是最自然的错误写法；M-2 刻意排除了它，故必须单列。
+  **执行者不得自行选择跳过本项，也不得仅以文字理由代替红证**
+  （r2 二签明确收紧这一点）。若 S1b 不红，说明静态断言没定位到赋值语句，
+  **判 BLOCKED**，不得以「两者当前等值所以无所谓」作为通过理由。
 - **M-3**：删掉 `:371` 的祖先前置检查 → 至少一条用例必须转红；若全绿，
   须在报告中说明该检查在哪条用例下承重，或承认它当前不承重。
 - **M-4**：在顺序型路径上跳过双签校验 → **S5 必须转红**。

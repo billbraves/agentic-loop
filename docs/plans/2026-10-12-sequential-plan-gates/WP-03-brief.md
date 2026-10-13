@@ -118,6 +118,20 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 该豁免**必须**来自主仓(`resolve_paths.main_repo()`)内**受 Git 跟踪**的计划
 状态文件；来自 worktree 本地副本或仓库外任意路径的豁免**必须**被拒绝。
 
+**判定顺序是冻结的**（r2 二签指定，不得调整）：
+
+1. 先对计划路径与 `main_repo()` 各做 `Path.resolve(strict=True)`；
+2. 对**解析后的目标**做主仓归属判断 + `path_is_in_worktree`；
+3. 用**解析后、相对主仓**的目标路径执行精确的
+   `git -C <main_repo> ls-files --error-unmatch -- <path>`。
+
+必须先 `resolve` 再判断：否则一个主仓内**受跟踪的 symlink** 可指向主仓内
+**未跟踪**的 JSON —— 只检查逻辑路径前缀与 `ls-files` 会把 symlink 自身视为
+已跟踪,却实际读取未审计的目标。
+**编排者已实测确认该旁路成立**：`git add` 一个 symlink 后，
+`ls-files --error-unmatch` 对 symlink 返回「已跟踪」、对其目标返回「未跟踪」，
+而读取 symlink 实际读到的是那份未跟踪内容。
+
 > 这是 r1 二签提出但未查完的第 5 条，编排者已实测确认旁路真实存在：
 > `plan_cmd.py:471-472` 的 `_resolve_plan_path` 对**绝对路径直接放行**，
 > 不做任何主仓绑定检查；`plan_cmd.py` 对 `path_is_in_worktree` 的引用数为 **0**。
@@ -184,11 +198,15 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
   后三条缺一不可 —— 它们各自钉住一个字符串字段的非空约束（r1 二签指认 rev1
   只测了 `approver` 一个，另两条不承重）。
 - **E9 `[exemption-source-must-be-main-repo-tracked]`** → INV-3b，
-  **与 E3 并列为本 WP 的决定性用例**。三个子形态，每种都断言退出非 0
+  **与 E3 并列为本 WP 的决定性用例**。**四个**子形态，每种都断言退出非 0
   且目标分支 tip 未变：
   1. 合法四字段豁免，但计划状态文件位于 **worktree 本地副本**（绝对路径传入）；
   2. 合法四字段豁免，但文件位于**仓库之外**的临时目录（绝对路径传入）；
-  3. 合法四字段豁免，文件在主仓路径下但**未被 Git 跟踪**（新建未 `git add`）。
+  3. 合法四字段豁免，文件在主仓路径下但**未被 Git 跟踪**（新建未 `git add`）；
+  4. **`[tracked-symlink-to-untracked]`**（r2 二签新增）：主仓内一个**受跟踪的
+     symlink** 指向主仓内**未跟踪**的合法豁免 JSON。必须拒绝。
+     这条专钉「先判断后 resolve」的实现错误 —— 若实现只看逻辑路径，
+     该形态会被误判为已跟踪而放行。
   正向对照：同一份豁免放在主仓受跟踪的计划文件里**必须**放行（即 E1）。
   witness 必须指向「豁免来源不可信」而非笼统的 lint 失败。
 - **E4 `[exemption-does-not-waive-convergence]`** → INV-4。有合法豁免但某个
@@ -227,7 +245,11 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
   三条必须**各自**转红。若某条去掉后全绿，说明该字段的约束不承重，
   **判 BLOCKED** 并在报告中说明，不得以「另两个字段已覆盖」作为通过理由。
 - **M-2c**：去掉 INV-3b 的来源校验（即允许任意路径的豁免放行）
-  → **E9 三个子形态必须全部转红**。若有子形态仍绿，说明该形态不承重。
+  → **E9 四个子形态必须全部转红**。若有子形态仍绿，说明该形态不承重。
+- **M-2d**（r2 二签新增，专打 symlink 形态）：把判定顺序由「先 `resolve`
+  再判断」改成「先判断逻辑路径再读取」（即删掉 `resolve(strict=True)`）
+  → **E9 子形态 4 必须转红**。其余三个子形态此时可能仍绿 —— 这正是
+  为什么子形态 4 必须单列：它是唯一能钉死判定顺序的那条。
 - **M-3**：让豁免同时抑制 lint 的 stdout → **E2 必须转红**。
 - **M-4**：让豁免顺带跳过 `_require_converged` → **E4 必须转红**。
 - **M-5**：去掉放行时的 approver/justification 打印 → **E6 必须转红**。
@@ -240,16 +262,37 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] E0-E9 全绿（E3 的 **10** 种形态、E9 的 3 个子形态均逐一参数化，
+- [ ] E0-E9 全绿（E3 的 **10** 种形态、E9 的 **4** 个子形态均逐一参数化，
       不得合并成一条）
-- [ ] M-1 ~ M-6 逐条红证齐备（含 M-2b 的三条逐字段、M-2c 的三子形态；
-      含还原回绿），报告附逐条结果
+- [ ] M-1 ~ M-6 逐条红证齐备（含 M-2b 的三条逐字段、M-2c 的四子形态、
+      M-2d 的判定顺序；含还原回绿），报告附逐条结果
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
 - [ ] `agentic quality-gate <status.json>` 全绿
 - [ ] 无 forbidden_paths / 跨 owner 写入
 - [ ] 无生产写入、无网络、无通知、无推送
 - [ ] commit message 符合规范
+
+## 残余风险（r2 二签指认，本 WP 范围外但须声明）
+
+以下三项**不在**本 WP 的修复范围内，但必须记入文档，不得当作已解决：
+
+1. **tracked ≠ committed**：「路径受 Git 跟踪」不等于「当前读到的豁免内容已提交」。
+   一个 tracked-but-dirty 的计划文件仍可携带未提交、因而不可追溯的豁免。
+   本 WP 的 INV-3b 只要求「受跟踪」，不要求「工作区与 HEAD 一致」。
+   若要闭合，需另立 WP 判定 `git diff --quiet HEAD -- <path>`。
+2. **校验与读取之间的 TOCTOU 窗口**：路径校验通过之后、实际读取文件之前，
+   仍可被 symlink 替换或文件替换。WP 层 `finalize_merge.sh` 用单次
+   `O_NOFOLLOW` 打开把判断与读取收敛到同一个 fd（见该文件 A34 注释）来消除此窗口；
+   plan 层本 WP **不做**同等加固，属已声明的残余面。
+3. **`main_repo()` 自身的信任边界**：本 WP 约束的是「同一个已选定仓库内」的
+   豁免来源。`resolve_paths.main_repo()` 及其后续 git 子进程如何受
+   repository-selection 类环境变量（`GIT_DIR` / `GIT_WORK_TREE` /
+   `GIT_COMMON_DIR` 等）影响，是更上层的仓库选择信任边界，本 WP 不刻画。
+   r2 二签明确指出这属残余风险而非同层旁路。
+
+另：submodule 内的文件只要始终由 superproject 执行上述**精确** `ls-files`，
+不会因 gitlink 而被误认为「具体文件已跟踪」（r2 二签澄清，无需额外用例）。
 
 ## 风险声明
 
@@ -284,8 +327,11 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 
   相对路径才会被拼到 `main_repo()` 下。所以来源校验**不能**只加在相对路径
   那一支。另外「在主仓路径下」不等于「受 Git 跟踪」—— E9 子形态 3 专测这点，
-  实现须同时验证 Git 跟踪状态（如 `git ls-files --error-unmatch`），
-  不得只比较路径前缀。
+  实现须同时验证 Git 跟踪状态，且**必须按 INV-3b 冻结的三步顺序**：
+  先 `resolve(strict=True)`，再对解析后的目标做归属 + `path_is_in_worktree`
+  判断，最后用解析后的相对路径跑精确的
+  `git -C <main_repo> ls-files --error-unmatch -- <path>`。
+  颠倒顺序会漏掉受跟踪 symlink 指向未跟踪目标的形态（E9 子形态 4）。
 - **不得扩大 INV-3b 的作用面**：本 WP 只为「**凭豁免放行**」这条路径加来源校验。
   **不要**顺手给 `plan check` / `plan lint` / `plan finalize` 也加上路径限制 ——
   那会改变既有命令的可用性（编排者当前就在用绝对路径对 worktree 副本跑

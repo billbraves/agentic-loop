@@ -51,8 +51,8 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.md",
-      "sha256": "f08d8c0ed8bcc318c3a1f5f9e164df394a31ed41b862bc42462a1c2f58c7b075",
-      "rev": 2,
+      "sha256": "2a0e7ac43818e9385a152abd66afec7bc5e2dc5d4fb21b4ac48703f86c223676",
+      "rev": 3,
       "prior_revs": [
         {
           "rev": 1,
@@ -61,6 +61,14 @@
           "outcome": "SUPERSEDED_AFTER_VOIDED_CONSULT",
           "cause": "consult r1 attempt1 VOIDED (no CODEX_DECISION marker; budget exhausted before the verdict) but produced four substantive findings. Orchestrator independently verified each: 3 upheld, 1 not upheld, plus a 5th the consultant raised but did not finish checking. rev2 closes every upheld item.",
           "superseded_by_rev": 2
+        },
+        {
+          "rev": 2,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev2.md",
+          "sha256": "f08d8c0ed8bcc318c3a1f5f9e164df394a31ed41b862bc42462a1c2f58c7b075",
+          "outcome": "REWORK",
+          "cause": "consult r2 returned a VALID REWORK (marker form). Two required changes, both verified by the orchestrator before closing: (C1) a tracked symlink pointing at an untracked JSON bypasses a logical-path-only tracking check (measured: ls-files reports the symlink tracked and its target untracked, while reading the symlink yields the untracked content); (C2) S1b's runtime-fixture escape hatch is unimplementable -- equal branch fields always rev-parse to the same commit, and macOS is case-insensitive so `git branch Main` errors as already-existing.",
+          "superseded_by_rev": 3
         }
       ]
     }
@@ -68,9 +76,9 @@
   "review": {},
   "consult": {
     "state": "NOT_DISPATCHED",
-    "round": "r2",
+    "round": "r3",
     "decision": null,
-    "bound_brief_rev": 2,
+    "bound_brief_rev": 3,
     "prior_rounds": [
       {
         "round": "r1-attempt1",
@@ -80,12 +88,22 @@
         "receipt": ".agentic/seq-gates-brief-consult-r1-attempt1-void/seq-gates-brief-consult-r1.receipt.json",
         "findings_salvaged": 5,
         "resolved_in_rev": 2
+      },
+      {
+        "round": "r2",
+        "decision": "REWORK",
+        "bound_brief_rev": 2,
+        "receipt": ".agentic/seq-gates-brief-consult-r2.receipt.json",
+        "answer": ".agentic/seq-gates-brief-consult-r2.answer.md",
+        "required_changes": 2,
+        "residual_risks_raised": 3,
+        "resolved_in_rev": 3
       }
     ]
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T03:40:00Z",
+    "updated_at": "2026-10-13T04:20:00Z",
     "dispatched_at": ""
   }
 }
