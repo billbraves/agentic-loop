@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DISPATCHED",
   "role": "Developer",
   "executor": {
     "tool": "kimi"
@@ -20,7 +20,7 @@
   "git": {
     "base_branch": "plan/2026-10-12-sequential-plan-gates",
     "base_commit": "5a469f203f7b4125d64871f871cb7ac029a0fc14",
-    "dispatch_commit": "",
+    "dispatch_commit": "e967fb2c97aa9706397563da4bdf28eca3ef14db",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
     "commit": ""
@@ -113,8 +113,8 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T05:05:00Z",
-    "dispatched_at": "",
+    "updated_at": "2026-10-13T05:10:00Z",
+    "dispatched_at": "2026-10-13T05:10:00Z",
     "approved_at": "2026-10-13T05:05:00Z"
   }
 }
