@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi"
@@ -23,7 +23,7 @@
     "dispatch_commit": "e967fb2c97aa9706397563da4bdf28eca3ef14db",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": ""
+    "commit": "cdb459015793463b5dffbf117bc0be6a13fcef44"
   },
   "scope": {
     "allowed_paths": [
@@ -48,7 +48,21 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      {
+        "command": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "853 passed, 4 skipped, 0 failed in 148.48s",
+        "baseline": "839 passed (pre-change, same invocation yields 0 failures once init.defaultBranch=main; the developer's reported 4 failures are environment-dependent, not regressions)",
+        "run_by": "orchestrator (independent re-run, not copied from the developer report)",
+        "exit_code": 0
+      },
+      {
+        "command": "pytest tests/test_finalize_merge_sequential.py -q",
+        "result": "10 passed",
+        "run_by": "orchestrator (independent)",
+        "exit_code": 0
+      }
+    ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.md",
       "sha256": "2a0e7ac43818e9385a152abd66afec7bc5e2dc5d4fb21b4ac48703f86c223676",
@@ -113,7 +127,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T05:10:00Z",
+    "updated_at": "2026-10-13T06:00:00Z",
     "dispatched_at": "2026-10-13T05:10:00Z",
     "approved_at": "2026-10-13T05:05:00Z"
   }
