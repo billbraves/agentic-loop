@@ -380,18 +380,45 @@ fi
 candidates=$(git -C "$repo_root" rev-list --merges --parents "$base_tip" | awk -v t="$wp_tip" '$3==t{print $1}')
 candidate_count=$(printf '%s' "$candidates" | grep -c '^[0-9a-f]\{40\}$' || true)
 
+# A36 (WP-02): two WP layouts reach their integration commit differently, and
+# the discriminator between them is BRANCH IDENTITY -- the two status fields
+# git.branch and git.base_branch comparing equal as strings. It is deliberately
+# NOT "the candidate list came back empty".
+#
+#   - parallel lane (branch != base_branch): a real merge commit must exist in
+#     base history whose second parent is wp_tip. 0 or multiple candidates stay
+#     fail-closed exactly as before this change.
+#   - sequential (branch == base_branch, permitted by AGENTS.md 4.3): the WP
+#     works directly on the integration branch, so wp_tip == base_tip and a
+#     "second parent == wp_tip" merge commit cannot exist by construction. The
+#     WP's own tip IS its integration point.
+#
+# Why not key the split on `candidate_count -eq 0`: an empty candidate list is
+# ALSO what a genuine parallel-lane failure looks like -- the branch was never
+# merged, or a rebase rewrote its merge commit away. Keying on emptiness would
+# route that failure into the sequential path and forge a merged_commit for a WP
+# that is not integrated at all, converting a hard stop into a successful stamp.
+# Branch identity cannot be confused that way: it is a property of the layout
+# the status DECLARES, not of how the resolution happened to turn out.
+if [[ "$branch" == "$base_branch" ]]; then
+  merged_commit="$wp_tip"
+  resolution_count=1
+else
+  merged_commit=$(printf '%s' "$candidates")
+  resolution_count=$candidate_count
+fi
+
 # Step 7: idempotency for an already-finalized WP.
 if [[ "$state" == "MERGED" && -n "$merged_commit_recorded" ]]; then
-  if [[ "$candidate_count" -ne 1 ]]; then
-    echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $candidate_count)" >&2
+  if [[ "$resolution_count" -ne 1 ]]; then
+    echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $resolution_count)" >&2
     exit 2
   fi
-  resolved=$(printf '%s' "$candidates")
-  if [[ "$merged_commit_recorded" != "$resolved" ]]; then
-    echo "FINALIZE_FAIL: recorded merged_commit != resolved ($merged_commit_recorded vs $resolved)" >&2
+  if [[ "$merged_commit_recorded" != "$merged_commit" ]]; then
+    echo "FINALIZE_FAIL: recorded merged_commit != resolved ($merged_commit_recorded vs $merged_commit)" >&2
     exit 2
   fi
-  echo "FINALIZE_OK merged_commit=$resolved (already finalized)"
+  echo "FINALIZE_OK merged_commit=$merged_commit (already finalized)"
   exit 0
 fi
 
@@ -400,12 +427,10 @@ if [[ "$state" != "APPROVED_FOR_MERGE" ]]; then
   exit 2
 fi
 
-if [[ "$candidate_count" -ne 1 ]]; then
-  echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $candidate_count)" >&2
+if [[ "$resolution_count" -ne 1 ]]; then
+  echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $resolution_count)" >&2
   exit 2
 fi
-
-merged_commit=$(printf '%s' "$candidates")
 
 # Step 4 & 5: atomic write with self-validation.
 updated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
