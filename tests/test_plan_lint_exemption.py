@@ -253,6 +253,22 @@ def _untrusted_source(shape: str, root: Path, repo: Path, wt_plan: Path) -> Path
         path = root / "outside/PLAN.status.json"
         _write_json(path, data)
         return path
+    if shape == "outside-alias-to-canonical":
+        # A symlink OUTSIDE the repository pointing at the real, canonical,
+        # *committed* plan file of the integration worktree.  The link
+        # resolves exactly to the canonical file and holds the committed
+        # bytes, so only the lexical-path face of the source check can reject
+        # it: a resolve-only (or bytes-only) check would trust this alias.
+        target = wt_plan / PLAN_REL
+        assert target.is_file()
+        link = root / "outside-alias.status.json"
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        link.symlink_to(target)
+        assert link.is_symlink()
+        assert link.resolve() == target.resolve()
+        assert link.read_bytes() == target.read_bytes()
+        return link
     if shape == "integration-untracked":
         # Inside the integration worktree but not at the canonical path.
         path = wt_plan / "docs/plans/it-1/UNTRACKED.status.json"
@@ -281,6 +297,7 @@ def _untrusted_source(shape: str, root: Path, repo: Path, wt_plan: Path) -> Path
     [
         "target-worktree-copy",
         "outside-repo",
+        "outside-alias-to-canonical",
         "integration-untracked",
         "canonical-symlink",
         "committed-then-dirty",

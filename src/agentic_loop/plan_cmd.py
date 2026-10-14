@@ -563,6 +563,34 @@ def _lint_exemption_is_legal(exemption: object) -> bool:
     return True
 
 
+def _lexical_absolute(path: Path) -> Path:
+    """Absolute + lexical-normalized form of ``path`` (``os.path.normpath``).
+
+    Deliberately does NOT follow symlinks: ``os.path.normpath`` only collapses
+    separators and ``.``/``..``, so a trailing symlink component survives
+    verbatim and a symlink alias can never compare equal to its target.  This
+    is the "safe absolute normalization" the source check needs before
+    comparing the caller's *lexical* path against a canonical path (INV-3b
+    rule 3)."""
+    return Path(os.path.normpath(os.path.abspath(path)))
+
+
+def _name_in_canonical_dir(plan_path: Path, canonical: Path) -> bool:
+    """True only when the caller lexically named the canonical file.
+
+    ``canonical`` is built below a registered, already-resolved worktree root.
+    Requiring exact lexical equality therefore rejects both a trailing symlink
+    and an alias in any parent component.  The independent resolved-path check
+    below then verifies that the canonical name still denotes the expected
+    real file (INV-3b rule 3).
+    """
+    try:
+        lexical = _lexical_absolute(plan_path)
+        return lexical == canonical and not lexical.is_symlink()
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
 def _lint_exemption_source_is_trusted(plan_path: Path, data: dict, raw: bytes) -> bool:
     """Bind a merge-only exemption to the integration branch's committed blob.
 
@@ -574,9 +602,14 @@ def _lint_exemption_source_is_trusted(plan_path: Path, data: dict, raw: bytes) -
     1. the file's root is a ``git worktree list``-registered worktree sharing
        the main repo's resolved ``git-common-dir``;
     2. that worktree's current branch is exactly ``git.base_branch``;
-    3. the resolved plan path equals the canonical
+    3. the caller's path IS the canonical
        ``<iterations_dir>/<iteration_id>/<plan_id>.status.json`` inside that
-       worktree (symlink/alias/outside/target-copy shapes all fail this);
+       worktree.  Both faces are checked: the *lexical* name the caller used
+       (never symlink-followed, and ``lstat``-checked so the file itself is not
+       a link) and, independently, the fully resolved path.  Equality after
+       resolving alone is NOT enough — a symlink alias placed anywhere (inside
+       or outside the repo) resolves to the canonical file, so a resolve-only
+       check would trust it (rev7 REWORK finding);
     4. the loaded raw bytes are byte-identical to
        ``git show <base_branch>:<canonical-rel-path>``.
     """
@@ -599,7 +632,17 @@ def _lint_exemption_source_is_trusted(plan_path: Path, data: dict, raw: bytes) -
                 continue
         except (OSError, RuntimeError, ValueError):
             continue
-        if resolved != wt_root / rel:
+        canonical = wt_root / rel
+        # Lexical face: the caller must have NAMED this very file, not an alias
+        # that merely points at it (the final component is never followed).
+        if not _name_in_canonical_dir(plan_path, canonical):
+            continue
+        # Resolved face: the real file behind that name must also be the
+        # canonical file (defence in depth against any residual link).
+        try:
+            if resolved != canonical.resolve(strict=True):
+                continue
+        except (OSError, RuntimeError, ValueError):
             continue
         blob = _git_bytes_may_fail(main_repo, "show", "{}:{}".format(base_branch, rel))
         return blob.returncode == 0 and blob.stdout == raw
