@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi"
@@ -23,7 +23,7 @@
     "dispatch_commit": "e967fb2c97aa9706397563da4bdf28eca3ef14db",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": "cdb459015793463b5dffbf117bc0be6a13fcef44"
+    "commit": "70a599043b9c81b5b39aa3b53d5403b263bada65"
   },
   "scope": {
     "allowed_paths": [
@@ -50,23 +50,23 @@
   "evidence": {
     "tests": [
       {
-        "command": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "853 passed, 4 skipped, 0 failed in 148.48s",
-        "baseline": "839 passed (pre-change, same invocation yields 0 failures once init.defaultBranch=main; the developer's reported 4 failures are environment-dependent, not regressions)",
-        "run_by": "orchestrator (independent re-run, not copied from the developer report)",
-        "exit_code": 0
+        "command": "pytest tests/test_finalize_merge_sequential.py -q",
+        "result": "18 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent re-run)"
       },
       {
-        "command": "pytest tests/test_finalize_merge_sequential.py -q",
-        "result": "10 passed",
-        "run_by": "orchestrator (independent)",
-        "exit_code": 0
+        "command": "pytest tests -q (init.defaultBranch=main)",
+        "result": "861 passed, 4 skipped, 0 failed in 131.57s",
+        "exit_code": 0,
+        "baseline": "853 passed pre-rev4; +8 matches the new case count exactly",
+        "run_by": "orchestrator (independent)"
       }
     ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.md",
-      "sha256": "c0e1db2034a42d9e407fe7b089b2f29ddab8cc960e2d7549c6d49eee54d60b99",
-      "rev": 4,
+      "sha256": "c588e79cc1892197328714e6bc9a4b4f4c2091ab060c9704fa6a00e01e81a77e",
+      "rev": 5,
       "prior_revs": [
         {
           "rev": 1,
@@ -91,15 +91,37 @@
           "outcome": "IMPLEMENTED_THEN_REWORK",
           "cause": "rev3 was implemented as cdb4590 and passed review on scope, mutation red-evidence and a green suite, but the implementation second signature found a merge-blocking fail-open that rev3's invariant set could not catch: INV-3 constrains the DISCRIMINATOR (branch identity, not empty candidates) but says nothing about whether the DECLARED layout is trustworthy. S3a/S3b both honour the declaration. Reproduced by the orchestrator: forging branch == base_branch while git.commit stays an unmerged feature tip yields FINALIZE_OK + state=MERGED + a forged merged_commit. rev4 adds INV-6 (first-parent topology proof), S3c, S3d, M-6 and M-6b.",
           "superseded_by_rev": 4
+        },
+        {
+          "rev": 4,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev4.md",
+          "sha256": "c0e1db2034a42d9e407fe7b089b2f29ddab8cc960e2d7549c6d49eee54d60b99",
+          "outcome": "IMPLEMENTED_WITH_TWO_DOC_CORRECTIONS",
+          "cause": "rev4's INV-6 was implemented correctly as 70a5990, but the implementer found two defects in the brief's own guidance, both reproduced by the orchestrator: (1) the suggested `rev-list --first-parent | grep -q` form false-rejects REAL commits under set -euo pipefail (grep exits on match, git takes SIGPIPE, pipefail reports 141; measured 3/3 on this repo's own history), which would deadlock a genuinely sequential WP in a fully legal state; (2) S3c needs TWO parameterized forms -- only the merged-not-first-parent one turns red under M-6b. rev5 records both.",
+          "superseded_by_rev": 5
         }
       ]
     }
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "claude-orchestrator",
-    "reviewed_at": "2026-10-13T06:45:00Z",
-    "note": "Reflowed to rev4. The prior ACCEPT (revised to REWORK) and its full verification list are preserved in the eb1b401 commit message and in consult.prior_rounds; this field now tracks the rev4 cycle."
+    "reviewed_at": "2026-10-13T07:40:00Z",
+    "basis": "independent reproduction, not acceptance of the implementer's report",
+    "verified_independently": [
+      "commit is pure insertion: 63 + 209 lines, 0 deletions -- the prior implementation is intact",
+      "M-6 (delete topology check) reproduced: BOTH S3c forms red",
+      "M-6b (weaken to plain is-ancestor) reproduced: merged-not-first-parent red, never-merged stays green -- exactly as predicted, which is why the second form is mandatory",
+      "mutations restored: script byte-identical to the committed state",
+      "ORIGINAL FAIL-OPEN CONFIRMED CLOSED: the same forged status (branch=base_branch=main, git.commit=unmerged feature tip) that previously produced FINALIZE_OK now yields FINALIZE_FAIL with a reason-specific witness, merged_commit not written, state unchanged",
+      "SIGPIPE trap reproduced 3/3 on this repo's history: the piped form returns 141 for a commit that genuinely exists",
+      "new cases: 18 passed standalone (10 prior + 8 new)"
+    ],
+    "implementer_feedback_upheld": {
+      "sigpipe_pipefail": "UPHELD and serious. My own brief suggested the piped form. Had the implementer followed it literally, a genuinely sequential WP would fail-closed in a fully legal state. Recorded in brief rev5 as a correctness requirement.",
+      "s3c_two_forms": "UPHELD. The brief named only the never-merged form, which cannot catch M-6b. The implementer added the merged-not-first-parent form on its own initiative; I verified it is the only one that reds under the weakened check.",
+      "s3d_empty_attribution": "ACCEPTED as honest reporting. The empty form is caught by the pre-existing :339 non-empty guard, not by INV-6. The implementer said so rather than letting it pose as INV-6 red evidence, and asserted on the outcome."
+    }
   },
   "consult": {
     "state": "NOT_DISPATCHED",
@@ -159,7 +181,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T07:00:00Z",
+    "updated_at": "2026-10-13T07:40:00Z",
     "dispatched_at": "2026-10-13T05:10:00Z",
     "approved_at": "2026-10-13T05:05:00Z"
   }

@@ -151,6 +151,28 @@ dead code，且**不得**退化为「全文搜索 `$wp_tip` 是否出现」。
 > 它对「被声明的布局本身是否可信」没有任何要求。S3a/S3b 都尊重声明,
 > 所以两条都抓不到本缺口 —— 这是 brief 不变式集合的盲区,起草者的漏洞。
 
+**实现陷阱（rev4 执行者实测发现,编排者已独立复现 3/3,必须遵守）**：
+判断 first-parent 成员关系**不得**用管道 + `grep`：
+
+```bash
+# 错误：在 set -euo pipefail 下对真实存在的提交误判为假
+git rev-list --first-parent "$base_tip" | grep -qxF "$sha"
+```
+
+`grep -q` 命中后立即退出 → `git` 收到 SIGPIPE → `pipefail` 把整条管道报成
+**141**。在本仓库规模的历史上**必然**误判（编排者实测:同一真实提交
+连续 3 次全部 exit 141;小仓库偶尔侥幸通过,更危险）。
+后果:真顺序型 WP 在**完全合法**的状态下被 fail-closed 卡死。
+
+正确写法:先捕获全量输出,再做字符串边界匹配(两端包 `\n` 防前缀误匹配):
+
+```bash
+if ! fp=$(git -C "$repo_root" rev-list --first-parent "$base_tip"); then exit 2; fi
+if [[ $'\n'"$fp"$'\n' != *$'\n'"$sha"$'\n'* ]]; then exit 2; fi
+```
+
+这不是风格偏好,是正确性要求。
+
 **实现提示（已实测可行,非建议）**：`git.dispatch_commit` 是冻结时点的提交,
 在 Git 历史里不可事后伪造,可作为顾问要求的「冻结布局证据」。实测确认本检查
 能判真伪：WP-02 自身（真顺序型）的 `git.commit` 与 `dispatch_commit` 均在
@@ -206,6 +228,14 @@ dead code，且**不得**退化为「全文搜索 `$wp_tip` 是否出现」。
   含 `cannot uniquely resolve merge commit`（原因特异 witness，oracle 第 2 项）。
   断言 `merged_commit` **未被**写入，尤其不得等于 `wp_tip`。
 - **S3c `[declared-sequential-but-not-integrated]`** → INV-6,
+  **必须参数化为两种形态**（rev4 执行者发现,编排者实测确认）：
+  1. `never-merged`：feature 分支从未合入 base —— `is-ancestor` 为假;
+  2. `merged-not-first-parent`：feature 已被 `--no-ff` 合入 base ——
+     `is-ancestor` 为**真**但不在 first-parent 历史中。
+  **第二形态不可省**：实测 M-6b（弱化为普通 `is-ancestor`）下只有它转红,
+  `never-merged` 保持绿。只写第一形态则 M-6b 拿不到红证,
+  「取错判据」这一面不承重。
+
   **rev4 新增,与 S3b 并列为本 WP 的决定性用例**。这是实测缺口的回归用例：
   造一个 `feature/x` **从未合入** `base` 的真实仓库,状态**伪造**成
   `branch == base_branch == <base>`（谎称顺序型）,但 `git.commit` 保留那个
