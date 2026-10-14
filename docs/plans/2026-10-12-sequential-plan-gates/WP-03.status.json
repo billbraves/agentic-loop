@@ -40,7 +40,8 @@
       "uv.lock",
       "docs/plans/2026-10-09-developer-probe-no-degrade",
       "docs/plans/2026-09-22-kimi-quota-flash-fallback"
-    ]
+    ],
+    "deferral_note": "DEFERRED while still DRAFT (never dispatched). User-approved scope narrowing on 2026-10-13 removed this WP from PLAN-01.work_packages so the verified WP-02 fix could land without waiting on the riskier half. Nothing here is broken: the brief reached rev3 through three consult rounds (r1 VOID, r2 REWORK, r3 ACCEPT) and is committed at 2f61e3a with rev1/rev2 alongside. Re-open as its own iteration; do NOT re-draft from scratch. Carry forward INV-3b's exemption-source binding (resolve-first ordering, E9's four sub-forms, M-2c/M-2d) and the three recorded residual risks: tracked != committed, the check/read TOCTOU window, and the main_repo() repository-selection trust boundary. NOT marked BLOCKED because that state requires an assigned executor and means dispatched work got stuck -- this was never dispatched."
   },
   "risk": {
     "production_writes": "FORBIDDEN",
@@ -81,7 +82,7 @@
   "consult": {},
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T04:20:00Z",
+    "updated_at": "2026-10-13T08:30:00Z",
     "dispatched_at": ""
   }
 }

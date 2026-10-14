@@ -2,7 +2,7 @@
   "schema_version": "agentic-plan-status/v1",
   "plan_id": "PLAN-01",
   "iteration_id": "2026-10-12-sequential-plan-gates",
-  "state": "ACTIVE",
+  "state": "READY_TO_MERGE",
   "title": "顺序型计划的收敛闸门：finalize 分流 + 显式豁免记录",
   "git": {
     "base_branch": "plan/2026-10-12-sequential-plan-gates",
@@ -10,11 +10,21 @@
     "merged_commit": ""
   },
   "work_packages": [
-    "WP-02",
-    "WP-03"
+    "WP-02"
   ],
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T05:05:00Z"
-  }
+    "updated_at": "2026-10-13T08:30:00Z"
+  },
+  "deferred_work_packages": [
+    {
+      "id": "WP-03",
+      "state_at_deferral": "DRAFT",
+      "brief_rev": 3,
+      "brief": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
+      "reason": "User-approved scope narrowing. WP-02 (G1) is a pure layout split that relaxes nothing and is now double-signed and verified, so it can land immediately and lift the real deadlock that forced manual stamping on the previous iteration. WP-03 (G2) instead opens a hole in a fail-closed gate (the lint exemption), and 4 of the findings across the brief consult rounds landed on it -- including the exemption-source bypass that the orchestrator self-evidenced. Keeping it in this plan would block a verified fix behind the riskier half.",
+      "carried_forward": "The rev3 brief and its full revision history (rev1, rev2) are committed on this branch at 2f61e3a and survive the narrowing. WP-03 should be re-opened as its own iteration, where INV-3b's exemption-source binding and the three recorded residual risks (tracked != committed, the check/read TOCTOU window, and the main_repo() trust boundary) get their own design pass.",
+      "deferred_at": "2026-10-13T08:30:00Z"
+    }
+  ]
 }
