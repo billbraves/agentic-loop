@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -26,7 +26,7 @@
     "dispatch_commit": "f95ca0c03c4d7c5f2c4db975ab90b09cf6c2a992",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78"
+    "commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
   },
   "scope": {
     "allowed_paths": [
@@ -55,21 +55,32 @@
     "tests": [
       {
         "command": "python3.11 -m pytest tests/test_plan_lint_exemption.py -q",
-        "result": "31 passed in 10.25s",
+        "result": "32 passed in 11.52s",
         "exit_code": 0,
+        "at_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
+        "baseline": "31 passed at e7712dd; +1 exact parent-dir-symlink node",
         "run_by": "orchestrator independent"
       },
       {
         "command": "python3.11 -m pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
-        "result": "66 passed in 11.60s",
+        "result": "66 passed in 13.05s",
         "exit_code": 0,
+        "at_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
         "run_by": "orchestrator independent"
       },
       {
         "command": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "892 passed, 4 skipped in 148.64s",
+        "result": "893 passed, 4 skipped in 158.66s",
         "exit_code": 0,
-        "baseline": "891 passed, 4 skipped at 0e85e76; +1 exact outside-alias regression",
+        "at_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
+        "baseline": "892 passed, 4 skipped at e7712dd; +1 exact parent-dir-symlink regression",
+        "run_by": "orchestrator independent"
+      },
+      {
+        "command": "python3.11 -m pytest tests/test_plan_lint_exemption.py -q (prior rev7 baseline at e7712dd)",
+        "result": "31 passed in 10.25s",
+        "exit_code": 0,
+        "at_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78",
         "run_by": "orchestrator independent"
       }
     ],
@@ -97,6 +108,15 @@
         "restore": "current branch/conflict/merge use current_worktree after common-dir equality",
         "green": "E14 merges and physical-primary HEAD/index/status/dirty bytes remain identical",
         "run_by": "developer; independently covered by orchestrator targeted suite"
+      },
+      {
+        "id": "A-rev7-parent-symlink",
+        "mutation": "delete the per-component lstat call (_no_symlinked_component) from the exemption source-trust loop, keeping the new test",
+        "red": "test_e9_exemption_source_must_be_base_committed[parent-dir-symlink] FAILED: the attack reached PLAN_MERGE_OK (merged_commit emitted) instead of RC_FAIL; 1 failed, 31 passed",
+        "restore": "restored exact committed bytes from a pre-mutation copy; git diff against c5fce58 is empty",
+        "green": "32 passed in 11.52s",
+        "run_by": "orchestrator independent",
+        "pre_fix_reproduction": "Independently reproduced the fail-open at e7712dd in a real temp common repo before dispatch: with a RESOLVED fixture root the parent-directory symlink attack returned rc=0 and moved the target tip (VERDICT FAIL_OPEN), while the legitimate canonical baseline also merged at rc=0. A first attempt using an unresolved mkdtemp root gave a FALSE NEGATIVE purely from the macOS /var vs /private/var mismatch (lexical!=canonical for an unrelated reason); the new E9 node asserts lexical==canonical precisely to prevent that fake green, and pytest tmp_path was verified to be already resolved."
       },
       {
         "id": "A-rev7-alias",
@@ -169,26 +189,25 @@
   "review": {
     "decision": "ACCEPT",
     "reviewer": "kiro-orchestrator",
-    "reviewed_at": "2026-10-14T11:05:00Z",
-    "revised_from": "REWORK",
-    "revision_note": "rev7 implementation 0e85e76 closed first-introduction and current-worktree deployment blockers but independent adversarial review found an outside symlink alias to the real canonical committed PLAN still reached PLAN_MERGE_OK. The attack was reproduced in a real temporary common repo (rc=0, target tip changed). e7712dd closes it by requiring lexical canonical equality plus resolved equality and adds a load-bearing E9 shape. Independent targeted/protected/full suites pass 31/66/892 (4 skipped); scope is exactly plan_cmd.py and exemption tests. First managed-Kimi implementation completed; managed OAuth then expired on narrow redispatch, so configured deepseekflash produced the alias patch but hit max_steps before commit; orchestrator removed redundant tolerance, reran all suites, and committed only the two allowed files."
+    "reviewed_at": "2026-10-14T15:05:00Z",
+    "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
+    "revision_note": "r4 independent review of c5fce58, which closes the impl-r3 parent-directory-symlink fail-open. Before dispatch I reproduced the defect myself at e7712dd in a real temp common repo: with a resolved fixture root the attack returned rc=0 and moved the target tip. The fix adds a third fail-closed face, _no_symlinked_component(), which lstats every relative component from the registered worktree root down to the leaf; it is strictly additive (no existing face weakened), re-reads no bytes (INV-3c intact), and introduces no config knob or bypass flag (E7 scan clean). The new E9 parent-dir-symlink node self-proves the attack shape and asserts lexical==canonical, which is what prevents the macOS /var vs /private/var false green that made my own first probe a false negative; pytest tmp_path was independently confirmed already resolved. I reran all three suites myself at c5fce58: 32 targeted, 66 protected, 893 passed/4 skipped full (baseline +1 in targeted and full, no regressions), and ran my own load-bearing mutation: deleting only the new call makes the node reach PLAN_MERGE_OK, and exact restore returns green with an empty diff. Scope is exactly the two allowed files.",
+    "prior_decisions": [
+      {
+        "decision": "ACCEPT",
+        "bound_impl_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78",
+        "reviewed_at": "2026-10-14T11:05:00Z",
+        "superseded_by": "impl-r3 REWORK found the parent-directory-symlink variant of the same alias family; this review accepted e7712dd before that face was known.",
+        "note": "rev7 implementation 0e85e76 closed first-introduction and current-worktree deployment blockers but independent adversarial review found an outside symlink alias to the real canonical committed PLAN still reached PLAN_MERGE_OK. The attack was reproduced in a real temporary common repo (rc=0, target tip changed). e7712dd closes it by requiring lexical canonical equality plus resolved equality and adds a load-bearing E9 shape. Independent targeted/protected/full suites pass 31/66/892 (4 skipped); scope is exactly plan_cmd.py and exemption tests. First managed-Kimi implementation completed; managed OAuth then expired on narrow redispatch, so configured deepseekflash produced the alias patch but hit max_steps before commit; orchestrator removed redundant tolerance, reran all suites, and committed only the two allowed files."
+      }
+    ]
   },
   "consult": {
-    "state": "DECIDED",
-    "round": "wp03-impl-r3",
-    "decision": "REWORK",
+    "state": "PENDING",
+    "round": "wp03-impl-r4",
+    "decision": null,
     "kind": "implementation-second-signature",
     "bound_brief_rev": 7,
-    "receipt": ".agentic/wp03-impl-consult-r3.receipt.json",
-    "answer": ".agentic/wp03-impl-consult-r3.answer.md",
-    "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
-    "finding": "Parent-directory symlink in the canonical path still fails open. _name_in_canonical_dir() checks only lexical equality plus a leaf lstat; no parent component (docs/, plans/, ...) is lstat-checked, and the independent resolved-path face follows the same parent symlink on both sides, so all four source-trust checks pass and cmd_merge can reach PLAN_MERGE_OK and change the target tip.",
-    "required_changes": 2,
-    "required_change_detail": [
-      "lstat every relative path component from the registered worktree root down to the final PLAN status file; any symlink component must fail closed.",
-      "Add a parent-directory-symlink shape to the E9 parameter matrix in tests/test_plan_lint_exemption.py asserting a specific untrusted-source reason and an unchanged target tip; the existing matrix covers only the leaf symlink and the outside alias."
-    ],
-    "also_verified_passing": "V1 single read_bytes plus raw-byte binding, V3 main_repo/current_worktree separation, E13/E14/E15, commit scope and binding SHAs all conform to rev7.",
     "prior_rounds": [
       {
         "round": "shared-r1-attempt1",
@@ -258,13 +277,28 @@
         "answer": ".agentic/wp03-brief-consult-r3.answer.md",
         "harness_verdict": "VALID (binding_unchanged=true)",
         "verified": "Committed-blob trust plus loader raw-byte binding closes dirty/untracked/symlink sources while allowing first introduction; current_worktree mutation with common-dir equality is the minimal boundary and E13/E14 prevent the old fixture false green."
+      },
+      {
+        "round": "wp03-impl-r3",
+        "decision": "REWORK",
+        "kind": "implementation-second-signature",
+        "bound_brief_rev": 7,
+        "bound_impl_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78",
+        "receipt": ".agentic/wp03-impl-consult-r3.receipt.json",
+        "answer": ".agentic/wp03-impl-consult-r3.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
+        "finding": "Parent-directory symlink in the canonical path still fails open. _name_in_canonical_dir() checked only lexical equality plus a leaf lstat; no parent component (docs/, plans/, ...) was lstat-checked, and the independent resolved-path face follows the same parent symlink on both sides, so all four source-trust checks passed and cmd_merge could reach PLAN_MERGE_OK and change the target tip.",
+        "required_changes": 2,
+        "finding_reproduced_by_orchestrator": true,
+        "also_verified_passing": "V1 single read_bytes plus raw-byte binding, V3 main_repo/current_worktree separation, E13/E14/E15, commit scope and binding SHAs all conform to rev7.",
+        "resolved_in_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
       }
     ],
-    "bound_impl_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78"
+    "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T13:43:27Z",
+    "updated_at": "2026-10-14T15:05:00Z",
     "dispatched_at": "2026-10-14T10:36:00Z"
   }
 }
