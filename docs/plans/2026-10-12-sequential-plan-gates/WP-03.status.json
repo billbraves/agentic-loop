@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -173,10 +173,21 @@
     "revision_note": "rev7 implementation 0e85e76 closed first-introduction and current-worktree deployment blockers but independent adversarial review found an outside symlink alias to the real canonical committed PLAN still reached PLAN_MERGE_OK. The attack was reproduced in a real temporary common repo (rc=0, target tip changed). e7712dd closes it by requiring lexical canonical equality plus resolved equality and adds a load-bearing E9 shape. Independent targeted/protected/full suites pass 31/66/892 (4 skipped); scope is exactly plan_cmd.py and exemption tests. First managed-Kimi implementation completed; managed OAuth then expired on narrow redispatch, so configured deepseekflash produced the alias patch but hit max_steps before commit; orchestrator removed redundant tolerance, reran all suites, and committed only the two allowed files."
   },
   "consult": {
-    "state": "PENDING",
+    "state": "DECIDED",
     "round": "wp03-impl-r3",
-    "decision": null,
+    "decision": "REWORK",
+    "kind": "implementation-second-signature",
     "bound_brief_rev": 7,
+    "receipt": ".agentic/wp03-impl-consult-r3.receipt.json",
+    "answer": ".agentic/wp03-impl-consult-r3.answer.md",
+    "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
+    "finding": "Parent-directory symlink in the canonical path still fails open. _name_in_canonical_dir() checks only lexical equality plus a leaf lstat; no parent component (docs/, plans/, ...) is lstat-checked, and the independent resolved-path face follows the same parent symlink on both sides, so all four source-trust checks pass and cmd_merge can reach PLAN_MERGE_OK and change the target tip.",
+    "required_changes": 2,
+    "required_change_detail": [
+      "lstat every relative path component from the registered worktree root down to the final PLAN status file; any symlink component must fail closed.",
+      "Add a parent-directory-symlink shape to the E9 parameter matrix in tests/test_plan_lint_exemption.py asserting a specific untrusted-source reason and an unchanged target tip; the existing matrix covers only the leaf symlink and the outside alias."
+    ],
+    "also_verified_passing": "V1 single read_bytes plus raw-byte binding, V3 main_repo/current_worktree separation, E13/E14/E15, commit scope and binding SHAs all conform to rev7.",
     "prior_rounds": [
       {
         "round": "shared-r1-attempt1",
@@ -252,7 +263,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T11:05:00Z",
+    "updated_at": "2026-10-14T13:43:27Z",
     "dispatched_at": "2026-10-14T10:36:00Z"
   }
 }
