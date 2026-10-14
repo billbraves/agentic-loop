@@ -1,7 +1,7 @@
 # WP-03: plan merge 的显式豁免记录（多轮 re-freeze 计划）
 
-> rev4 re-freeze 日期 2026-10-13 | 编排者 claude-code（DSH 会话）| 执行者 kimi。
-> 第 4 次 re-freeze 已获用户明确批准（“恢复 WP-03”）；只修订执行依赖，不改验收不变式。
+> rev5 re-freeze 日期 2026-10-14 | 编排者 claude-code（DSH 会话）| 执行者 kimi。
+> 用户已明确批准恢复并完成 WP-03；rev5 只闭合专属二签 r1 的两项 REWORK：同步依赖口径，并让 INV-4 声称保护的三个后置/独立闸门各自承重。
 > 所属 Plan：PLAN-01（集成到 `plan/2026-10-12-sequential-plan-gates`，不直接合入 main）。
 > 冻结后执行期间不得修改；需修订走 re-freeze（规则见「Re-freeze 规则」一节）。
 
@@ -228,6 +228,17 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
   且不读任何 `*SKIP*LINT*` 环境变量。
 - **E8 `[clean-plan-unaffected]`** → INV-7。lint 本就 clean 的计划，
   有/无豁免两种情况都退出 0 且行为一致。
+- **E10 `[exemption-does-not-waive-autonomy]`** → INV-4。DIRTY + 合法且可信来源的
+  豁免，但 `local_merge_no_ff` autonomy 返回 STOP 且没有单步人工批准。断言退出
+  `RC_STOP`、witness 指向 autonomy、目标分支 tip 未变。不得因豁免提前返回成功。
+- **E11 `[exemption-does-not-waive-target-branch]`** → INV-4。DIRTY + 合法且可信来源
+  的豁免，所有 WP 已 `MERGED`，但当前分支不是 `git.target_branch`。断言退出
+  `RC_FAIL`、witness 精确包含 `must run on target branch`、目标分支 tip 未变。
+  该闸门位于现有 lint 拒绝层之后，是最容易被“豁免即 return 0”跳过的一面。
+- **E12 `[exemption-does-not-waive-already-merged]`** → INV-4。DIRTY + 合法且可信来源
+  的豁免，当前分支正确，但 integration branch 已是 target 的祖先。断言退出
+  `RC_FAIL`、witness 精确包含 `already merged`，且不得产生第二个合并提交。
+  该闸门同样位于现有 lint 拒绝层之后，必须单独承重。
 
 ### 必须保持绿的集合（零回归）
 
@@ -259,6 +270,12 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
   为什么子形态 4 必须单列：它是唯一能钉死判定顺序的那条。
 - **M-3**：让豁免同时抑制 lint 的 stdout → **E2 必须转红**。
 - **M-4**：让豁免顺带跳过 `_require_converged` → **E4 必须转红**。
+- **M-4b**：让合法豁免在 autonomy 检查前直接返回成功 → **E10 必须转红**。
+- **M-4c**：让合法豁免在 lint DIRTY 分支内直接返回成功、从而不执行后续目标分支
+  检查 → **E11 必须转红**。
+- **M-4d**：让合法豁免在 lint DIRTY 分支内直接返回成功、从而不执行后续
+  already-merged 检查 → **E12 必须转红**。M-4c/M-4d 可共享同一错误变异，
+  但两条用例必须分别转红并提供各自 witness；不得以一条覆盖另一条。
 - **M-5**：去掉放行时的 approver/justification 打印 → **E6 必须转红**。
 - **M-6**：把豁免块加进 `REQUIRED_TOP_LEVEL` 而非 `OPTIONAL_TOP_LEVEL`
   → 既有 `tests/test_plan.py` 必须转红（证明未破坏既有计划的 schema 兼容）。
@@ -269,10 +286,11 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] E0-E9 全绿（E3 的 **10** 种形态、E9 的 **4** 个子形态均逐一参数化，
+- [ ] E0-E12 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **4** 个子形态均逐一参数化，
       不得合并成一条）
-- [ ] M-1 ~ M-6 逐条红证齐备（含 M-2b 的三条逐字段、M-2c 的四子形态、
-      M-2d 的判定顺序；含还原回绿），报告附逐条结果
+- [ ] M-1 ~ M-6 + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的三条逐字段、
+      M-2c 的四子形态、M-2d 的判定顺序，以及 autonomy/target/already-merged
+      三个独立闸门；含还原回绿），报告附逐条结果
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
 - [ ] `agentic quality-gate <status.json>` 全绿

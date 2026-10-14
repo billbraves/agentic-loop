@@ -52,8 +52,8 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
-      "sha256": "3235e3ab1f4cc0667b4463ad623097da3bfafeeaa88a51933e76ae206897544b",
-      "rev": 4,
+      "sha256": "e909c660804d0252e69f402d73b0139965b22d2397f519dc5b86653128929f36",
+      "rev": 5,
       "prior_revs": [
         {
           "rev": 1,
@@ -78,19 +78,27 @@
           "outcome": "REFROZEN_WITH_USER_APPROVAL",
           "cause": "After WP-02 reached APPROVED_FOR_MERGE, main_repo() was proven to always resolve to the physical primary checkout, so WP-02 cannot standard-finalize from the linked plan worktree. PLAN lint simultaneously blocks convergence on the historical sync commits that WP-03 is designed to exempt. Requiring WP-02 to be MERGED before WP-03 therefore creates a real dependency cycle. User explicitly approved restoring WP-03; rev4 changes only this execution dependency, not any invariant, case, mutation, scope, or residual risk.",
           "superseded_by_rev": 4
+        },
+        {
+          "rev": 4,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.rev4.md",
+          "sha256": "3235e3ab1f4cc0667b4463ad623097da3bfafeeaa88a51933e76ae206897544b",
+          "outcome": "REWORK",
+          "cause": "Dedicated WP-03 consult r1 was valid and found two blockers: evidence.depends_on still contradicted the rev4 dependency correction; and INV-4 claimed autonomy/target-branch/already-merged remained fail-closed without giving those three faces cause-specific tests or load-bearing mutations. rev5 synchronizes the dependency and adds E10-E12 plus M-4b/M-4c/M-4d.",
+          "superseded_by_rev": 5
         }
       ]
     },
     "depends_on": [
-      "WP-02 must be MERGED first (same integration branch, sequential execution)"
+      "WP-02 implementation commit 70a5990, review ACCEPT, consult ACCEPT, state APPROVED_FOR_MERGE; both WPs finalize only after WP-03 implementation and signatures complete, then PLAN-01 merges after both are MERGED."
     ]
   },
   "review": {},
   "consult": {
     "state": "NOT_DISPATCHED",
-    "round": "wp03-brief-r1",
+    "round": "wp03-brief-r2",
     "decision": null,
-    "bound_brief_rev": 4,
+    "bound_brief_rev": 5,
     "prior_rounds": [
       {
         "round": "shared-r1-attempt1",
@@ -109,12 +117,21 @@
         "decision": "ACCEPT",
         "bound_brief_rev": 3,
         "note": "Narrow shared round accepted closure of the r2 findings, including WP-03 C1, but its final authorization sentence named WP-02 only. It is evidence, not a substitute for this dedicated WP-03 decision."
+      },
+      {
+        "round": "wp03-brief-r1",
+        "decision": "REWORK",
+        "bound_brief_rev": 4,
+        "receipt": ".agentic/wp03-brief-consult-r1.receipt.json",
+        "answer": ".agentic/wp03-brief-consult-r1.answer.md",
+        "required_changes": 2,
+        "resolved_in_rev": 5
       }
     ]
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T09:15:00Z",
+    "updated_at": "2026-10-14T07:45:00Z",
     "dispatched_at": ""
   }
 }
