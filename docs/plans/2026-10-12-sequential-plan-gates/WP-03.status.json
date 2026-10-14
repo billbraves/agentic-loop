@@ -4,12 +4,12 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "pending-rev7-redispatch",
-    "redispatch_count": 1
+    "session": "managed-kimi:3a78c8fc-9120-429c-99b0-8ec840835851; deepseekflash:0727f01e-52a7-4473-91cd-f61d2c153631",
+    "redispatch_count": 2
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -25,7 +25,7 @@
     "dispatch_commit": "f95ca0c03c4d7c5f2c4db975ab90b09cf6c2a992",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": "40cb5b15b60cf1f0b83ab94f540ab0c7ddd23423"
+    "commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78"
   },
   "scope": {
     "allowed_paths": [
@@ -53,22 +53,22 @@
   "evidence": {
     "tests": [
       {
-        "command": "pytest tests/test_plan_lint_exemption.py -q",
-        "result": "27 passed",
+        "command": "python3.11 -m pytest tests/test_plan_lint_exemption.py -q",
+        "result": "31 passed in 10.25s",
         "exit_code": 0,
         "run_by": "orchestrator independent"
       },
       {
-        "command": "pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
-        "result": "66 passed in 11.44s",
+        "command": "python3.11 -m pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
+        "result": "66 passed in 11.60s",
         "exit_code": 0,
         "run_by": "orchestrator independent"
       },
       {
         "command": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "888 passed, 4 skipped in 131.45s",
+        "result": "892 passed, 4 skipped in 148.64s",
         "exit_code": 0,
-        "baseline": "861 passed, 4 skipped; +27 exactly matches new cases",
+        "baseline": "891 passed, 4 skipped at 0e85e76; +1 exact outside-alias regression",
         "run_by": "orchestrator independent"
       }
     ],
@@ -79,6 +79,30 @@
         "red": "exact E9 pathspec-metachar-untracked node failed because the untracked literal metacharacter plan was accepted and reached PLAN_MERGE_OK",
         "restore": "restored exact committed bytes",
         "green": "exact E9 pathspec-metachar-untracked node passed",
+        "run_by": "orchestrator independent"
+      },
+      {
+        "id": "M-2d",
+        "mutation": "swap the canonical file back to committed bytes after the loader parsed forged exemption bytes",
+        "red": "E15 rejects with lint exemption source is untrusted and target tip unchanged",
+        "restore": "run the same fixture with originally loaded bytes equal to committed blob",
+        "green": "E15 positive control reaches PLAN_MERGE_OK",
+        "run_by": "developer; independently covered by orchestrator targeted suite"
+      },
+      {
+        "id": "M-2f",
+        "mutation": "route checkout mutation back to physical main_repo while it is off-target and dirty",
+        "red": "E14 fails instead of merging in the clean target linked worktree",
+        "restore": "current branch/conflict/merge use current_worktree after common-dir equality",
+        "green": "E14 merges and physical-primary HEAD/index/status/dirty bytes remain identical",
+        "run_by": "developer; independently covered by orchestrator targeted suite"
+      },
+      {
+        "id": "A-rev7-alias",
+        "mutation": "outside symlink alias points to the real canonical committed integration PLAN file",
+        "red": "at 0e85e76 the exact attack reached PLAN_MERGE_OK and changed target tip (rc=0)",
+        "restore": "require lexical absolute path == registered-worktree canonical path plus independent resolved equality",
+        "green": "new E9 outside-alias-to-canonical rejects as untrusted; targeted suite 31 passed",
         "run_by": "orchestrator independent"
       }
     ],
@@ -142,16 +166,16 @@
     ]
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "kiro-orchestrator",
-    "reviewed_at": "2026-10-14T08:50:00Z",
-    "revised_from": "ACCEPT",
-    "revision_note": "rev6 implementation review and impl-r2 ACCEPT remain valid for literal-pathspec closure. End-to-end convergence exposed an untested deployment blocker: target-first PLAN tracking is required by rev6 trust but prevents the first-introduction merge, and cmd_merge mutates physical-primary rather than the caller's clean target worktree. Real temporary-repo reproductions: normal staged file makes merge exit 2; intent-to-add and skip-worktree make merge exit 128. rev7 requires integration committed-blob equality plus current target-worktree execution."
+    "reviewed_at": "2026-10-14T11:05:00Z",
+    "revised_from": "REWORK",
+    "revision_note": "rev7 implementation 0e85e76 closed first-introduction and current-worktree deployment blockers but independent adversarial review found an outside symlink alias to the real canonical committed PLAN still reached PLAN_MERGE_OK. The attack was reproduced in a real temporary common repo (rc=0, target tip changed). e7712dd closes it by requiring lexical canonical equality plus resolved equality and adds a load-bearing E9 shape. Independent targeted/protected/full suites pass 31/66/892 (4 skipped); scope is exactly plan_cmd.py and exemption tests. First managed-Kimi implementation completed; managed OAuth then expired on narrow redispatch, so configured deepseekflash produced the alias patch but hit max_steps before commit; orchestrator removed redundant tolerance, reran all suites, and committed only the two allowed files."
   },
   "consult": {
-    "state": "DECIDED",
-    "round": "wp03-brief-r3",
-    "decision": "ACCEPT",
+    "state": "PENDING",
+    "round": "wp03-impl-r3",
+    "decision": null,
     "bound_brief_rev": 7,
     "prior_rounds": [
       {
@@ -224,11 +248,11 @@
         "verified": "Committed-blob trust plus loader raw-byte binding closes dirty/untracked/symlink sources while allowing first introduction; current_worktree mutation with common-dir equality is the minimal boundary and E13/E14 prevent the old fixture false green."
       }
     ],
-    "bound_impl_commit": "40cb5b15b60cf1f0b83ab94f540ab0c7ddd23423"
+    "bound_impl_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T10:36:00Z",
+    "updated_at": "2026-10-14T11:05:00Z",
     "dispatched_at": "2026-10-14T10:36:00Z"
   }
 }
