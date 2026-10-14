@@ -256,6 +256,34 @@ def _untrusted_source(
             check=False,
         ).returncode != 0
         return link
+    if shape == "pathspec-metachar-untracked":
+        # The source path itself is untracked, but without Git's global
+        # --literal-pathspecs option its '*' would match this tracked peer and
+        # make `ls-files --error-unmatch` return zero.
+        tracked_peer = repo / "docs/plans/it-1/TRACKED.status.json"
+        _write_json(tracked_peer, {"tracked": True})
+        _git(repo, "add", "docs/plans/it-1/TRACKED.status.json")
+        _git(repo, "commit", "-q", "-m", "track pathspec match peer")
+        path = repo / "docs/plans/it-1/*.status.json"
+        _write_json(path, data)
+        relative = "docs/plans/it-1/*.status.json"
+        assert _git(
+            repo,
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            relative,
+        ).returncode == 0
+        assert _git(
+            repo,
+            "--literal-pathspecs",
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            relative,
+            check=False,
+        ).returncode != 0
+        return path
     raise AssertionError(shape)
 
 
@@ -266,6 +294,7 @@ def _untrusted_source(
         "outside-repo",
         "main-untracked",
         "tracked-symlink-to-untracked",
+        "pathspec-metachar-untracked",
     ],
 )
 def test_e9_exemption_source_must_be_main_repo_tracked(

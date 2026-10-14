@@ -523,6 +523,7 @@ def _lint_exemption_source_is_trusted(plan_path: Path) -> bool:
 
     tracked = _git_may_fail(
         resolved_repo,
+        "--literal-pathspecs",
         "ls-files",
         "--error-unmatch",
         "--",
