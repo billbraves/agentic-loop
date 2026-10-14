@@ -1,7 +1,8 @@
 # WP-03: plan merge 的显式豁免记录（多轮 re-freeze 计划）
 
-> rev10 re-freeze 日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
-> **用户已明确批准 rev8 的方向 A（canonicalize once）；rev9/rev10 不改方向，只补齐规格自身的缺陷。**
+> rev11 re-freeze 日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> **用户已明确批准 rev8 的方向 A（canonicalize once）；rev9–rev11 不改方向，只补齐规格自身的缺陷。**
+> rev11 修正 rev10 的一处**过度收紧**（brief 二签 `wp03-brief-r6` 有效 REWORK，编排者已独立实测）：rev10 要求「存在的候选文件唯一」，但本仓支持 parallel lanes，lane worktree 从 integration branch 分出后会继承同一相对路径的文件 —— 实测某 canonical 相对拼写在当前 17 个 registered worktree 中有 **11 个**存在同名文件，故 rev10 会拒掉**完全合法**的相对调用。rev11 把唯一性判据移到「**通过信任校验的候选**」上，并新增 E18(c1)/M-2n 使「不得误拒」这一侧也承重。
 > rev10 修正 rev9 的一处自举矛盾（brief 二签 `wp03-brief-r5` 有效 REWORK，编排者已独立实测）：rev9 的 R3-a 规定阶段 1 按**现有** `_resolve_plan_path()` 定位文件，但该函数把相对路径拼到 `main_repo()`，而 PLAN 文件只提交在 integration worktree —— 实测 `_resolve_plan_path("docs/plans/<iter>/PLAN-01.status.json")` 指向 `/Users/admin/vibe/agentic_loop/...` 且 `exists() == False`。于是 rev9 的 E16(b)（相对拼写必须成功）与 R3-a 不可同时满足。rev10 为相对形态单独冻结**确定性候选发现 + 唯一候选 + 自洽复核**，并新增 E18/M-2l 使其承重。
 > rev8 的 brief 二签（`wp03-brief-r4`）返回有效 REWORK，三项均经编排者独立在代码中核实：
 > (1) **推导自举循环**——CLI 唯一输入就是路径，而 `iteration_id` / `plan_id` / `base_branch` 都在尚未读取的 JSON 里，rev8 却同时禁止用调用者路径去 open/read，实现者无法同时满足两者；
@@ -141,9 +142,13 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
    **阶段 1（不信任的单次读取）**：按形态定位文件并**只读一次**，解析出 `iteration_id` / `plan_id` / `git.base_branch`。该次读取**不授予任何信任**，其字节仅用于取出这些字段，且必须保留为 `raw`（INV-3c 要求的那一份）。两种形态的定位规则不同，**必须分别冻结**：
 
    - **绝对形态**：直接使用该绝对路径本身。
-   - **canonical 相对形态（rev10 改正）**：**不得**使用现有 `_resolve_plan_path()`。该函数把相对路径拼到 `main_repo()`，而真实部署里 PLAN 文件**只**提交在 integration worktree、physical-primary 中根本不存在（这正是 E13 冻结的首次引入场景；编排者实测 `_resolve_plan_path("docs/plans/<iter>/PLAN-01.status.json")` 指向 `/Users/admin/vibe/agentic_loop/...` 且 `exists() == False`）。因此相对形态必须走**确定性候选发现**：在 rule 1 的 registered worktree 集合中，把该 canonical 相对拼写分别拼到**每个** worktree root 下，收集实际存在的候选；**要求候选唯一**（零个或多个均 fail-closed），然后只读取那唯一候选。
+   - **canonical 相对形态（rev10 立规 / rev11 修正唯一性判据）**：**不得**使用现有 `_resolve_plan_path()`。该函数把相对路径拼到 `main_repo()`，而真实部署里 PLAN 文件**只**提交在 integration worktree、physical-primary 中根本不存在（这正是 E13 冻结的首次引入场景；编排者实测 `_resolve_plan_path("docs/plans/<iter>/PLAN-01.status.json")` 指向 `/Users/admin/vibe/agentic_loop/...` 且 `exists() == False`）。因此相对形态必须走**确定性候选发现**：在 rule 1 的 registered worktree 集合中，把该 canonical 相对拼写分别拼到**每个** worktree root 下，收集**所有实际存在**的候选。
 
-   **阶段 2（受信任的复核）**：用阶段 1 得到的字段按 rule 1/2 选出 registered worktree root，拼出唯一 trusted path，再做 R3-c 的相等比较。相对形态还必须额外复核**自洽性**：阶段 1 选中的候选 worktree 必须与阶段 2 依 `base_branch` 选出的 worktree **是同一个**，且文件内的 `iteration_id` / `plan_id` 必须与该相对拼写的对应路径组件**逐字节一致** —— 否则攻击者可用一份字段伪造的文件把信任转移到另一个 worktree。比较与自洽复核全部通过后，**rule 4 的 blob 比对只用推导路径**，且比对对象仍是阶段 1 的 `raw`（**不得为了比对而重新读取任何路径** —— 重读即违反 INV-3c）。
+     **唯一性判据作用在「通过信任校验的候选」上，而不是「存在的文件」上（rev11 改正）。** 对每个候选**最多读取一次**，各自独立跑完整的 stage-2 信任校验（INV-3e 安全字段、候选 worktree 当前分支严格等于该候选文件声明的 `git.base_branch`、路径组件与文件内 ID 逐字节一致、containment、逐组件 `lstat`、以及该候选的 `raw` 与对应 committed blob 逐字节相等）。随后**要求「通过全部校验的候选」唯一**：零个或多于一个均 fail-closed，且两种失败必须给出**各自特异**的 witness（`no trusted candidate` 与 `trusted candidate not unique`），不得混同。
+
+     **为何不能收紧到「存在即唯一」（编排者实测）**：本仓支持 parallel lanes，lane worktree 从 integration branch 分出后会**继承**同一相对路径的文件。实测相对拼写 `docs/plans/2026-09-22-kimi-quota-flash-fallback/PLAN-01.status.json` 在当前 17 个 registered worktree 中有 **11 个**存在该文件（含 physical-primary、`main` 检出、以及多个 feature lane）。若按「存在即唯一」判定，这类**完全合法**的 canonical 相对调用会被直接拒绝 —— 而 stage-2 本可无歧义排除它们：那些 worktree 的当前分支都不等于文件声明的 `base_branch`。**失败闭合必须来自信任校验，不得来自文件系统上的偶然同名。**
+
+   **阶段 2（受信任的复核）**：用该候选字节得到的字段按 rule 1/2 选出 registered worktree root，拼出唯一 trusted path，再做 R3-c 的相等比较。**绝对形态**只有一个候选，直接校验即可；**相对形态**按上条对每个候选**分别**跑本阶段。相对形态还必须复核**自洽性**：该候选所在 worktree 的当前分支必须严格等于该候选文件声明的 `git.base_branch`，且文件内的 `iteration_id` / `plan_id` 必须与该相对拼写的对应路径组件**逐字节一致** —— 否则攻击者可用一份字段伪造的文件把信任转移到另一个 worktree。比较与自洽复核全部通过后，**rule 4 的 blob 比对只用推导路径**，且比对对象仍是该候选在阶段 1 读到的那份 `raw`（**不得为了比对而重新读取任何路径** —— 重读即违反 INV-3c）。最终被接受的 `raw` 就是那个唯一通过校验的候选的字节。
 
    明确授权：阶段 1 的 `open/read` 是**允许且必需**的，它不构成「用调用者路径建立信任」。DoD 的「调用者路径只用于相等比较」据此精确化为：**除阶段 1 的单次读取外**，调用者路径不得再被 open/read/resolve，更不得用于 rule 4 的 blob 比对。
 
@@ -243,8 +248,9 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
 - **E17 `[path-fields-must-be-single-component]`**（rev9 新增）→ INV-3e。参数化至少六个形态，每个都断言 fail-closed 且 target tip 不变：`iteration_id` 取 `"../../etc"`、`"it-1/.."`、`"."`、`".."`、含分隔符的 `"a/b"`，以及 `plan_id` 取 `"../PLAN-1"`。断言必须指向**字段校验**（`PLAN_INVALID` 一类的特异原因），而不是落到「文件不存在」之类的偶然失败 —— 后者会在字段校验被删除后依然为绿，从而不承重。
 - **E18 `[relative-form-candidate-discovery]`**（rev10 新增）→ INV-3b R3-a 相对形态。四个分支，全部用真实 common repo + 多个 linked worktree：
   (a) **唯一候选放行**：PLAN 只存在于 integration worktree，从 target worktree 用 canonical 相对拼写调用 → 成功合并（与 E16(b) 同向，但显式断言候选发现选中的是 integration worktree，而不是 CWD 或 main repo）；
-  (b) **零候选 fail-closed**：没有任何 registered worktree 存在该相对路径 → 拒绝，且原因**不得**是 `_resolve_plan_path()` 落到 main_repo 的「文件不存在」；
-  (c) **多候选 fail-closed**：两个 registered worktree 同时存在该相对路径（例如 integration 与另一个同样检出该分支系的 worktree）→ 必须因「候选不唯一」拒绝，不得任选其一；
+  (b) **零可信候选 fail-closed**：没有任何候选通过信任校验 → 拒绝，witness 必须是专门的 `no trusted candidate`，**不得**是 `_resolve_plan_path()` 落到 main_repo 的「文件不存在」；
+  (c1) **继承同名文件不得误拒（rev11 新增，防过度收紧）**：integration worktree 与一个从该分支分出、因而**继承**同一相对路径文件的 parallel-lane worktree 同时存在 → 必须**成功**，且必须选中 integration（lane 的当前分支不等于文件声明的 `base_branch`，stage-2 据此排除它）。编排者实测该形态在本仓真实存在：某相对拼写在 17 个 registered worktree 中有 11 个存在同名文件；
+  (c2) **可信候选不唯一才 fail-closed**：构造两个**各自**与自身 worktree 分支及 committed blob 完全自洽的候选 → 必须因「trusted candidate not unique」拒绝，不得任选其一；
   (d) **自洽复核**：阶段 1 候选文件内的 `iteration_id` / `plan_id` 与相对拼写的路径组件不一致（字段伪造）→ 拒绝。该分支证明字段不能把信任转移到另一个 worktree。
   **本用例必须显式断言 `_resolve_plan_path()` 未参与相对形态的定位**（例如断言 main repo 下不存在该文件却仍成功，即 (a) 分支天然成立）。
 - **E15 `[loaded-bytes-are-bound]`** → INV-3c。测试双读攻击：若来源 helper 尝试重新读路径，则第二次提供 committed 字节，而首次解析的是带伪造豁免的不同字节；必须拒绝或确保 helper 只接收首次加载的 raw bytes，绝不能合并。
@@ -299,7 +305,8 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 - **M-2h（rev8 新增，本轮决定性变异）**：把 rule 3 的「比较调用者原始拼写与推导路径」退回成「先 `normpath`/`resolve` 再比较」（即 rev7 的做法）→ **E9 的 `..`-抵消 symlink hop 形态必须转红，且红的形态必须是到达 `PLAN_MERGE_OK`**（不是因别的原因报错）。报告须附红/绿两次的实际输出。
 - **M-2i（rev8 新增）**：去掉推导路径的逐组件 `lstat` → **E9 的父目录 symlink 形态必须转红**。该变异与 M-2h 必须**分别**施加、分别验证：两者同时存在才说明「推导」与「真实性校验」两半都承重。
 - **M-2l（rev10 新增）**：把相对形态的阶段 1 定位退回成现有 `_resolve_plan_path()`（即 rev9 的写法）→ **E18(a) 与 E16(b) 必须转红**，且红的原因必须是 main-repo 下文件不存在。该变异证明候选发现本身承重，并锁死 rev9 那处自举矛盾不会被重新引入。
-- **M-2m（rev10 新增）**：去掉「候选必须唯一」的约束（多候选时任选第一个）→ **E18(c) 必须转红**。
+- **M-2m（rev10 新增 / rev11 改判据）**：去掉「**可信**候选最终唯一」的约束（在多个可信候选中任选第一个）→ **E18(c2) 必须转红**。注意**不得**把该变异写成「任何存在候选必须唯一」—— 那个判据本身就是 rev11 要消除的过度收紧。
+- **M-2n（rev11 新增，防过度收紧）**：把唯一性判据从「可信候选」收紧回「存在的候选」→ **E18(c1) 必须转红**。该变异锁死 rev10 那处会拒掉合法 parallel-lane 调用的边界。
 - **M-2j（rev9 新增）**：去掉 INV-3e 的单一组件校验（恢复成「只要是非空字符串即可」）→ **E17 必须转红**。红的形态必须是推导路径逃出 worktree root（而非「文件不存在」的偶然失败）。
 - **M-2k（rev9 新增，防过度收紧）**：把 R3-c 的接受集**收窄为仅绝对拼写** → **E16 的相对拼写分支必须转红**。该变异证明兼容性要求本身承重，防止实现以「一律只收绝对路径」的方式悄悄做出 CLI 破坏性变更。
 - **M-2d**：只比较重新读取的路径字节，不比较 loader 实际解析的 raw bytes → E15 必须转红。
@@ -325,20 +332,22 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 
 - [ ] 交付物逐项就绪
 - [ ] E0-E18 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **8** 个拒绝形态、E17 的
-      **6** 个字段形态均逐一参数化，不得合并成一条；**E16 两个 canonical 拼写分支、E18 四个
-      候选发现分支都必须绿**）
-- [ ] M-1 ~ M-6 + M-2f/M-2g/M-2h/M-2i/M-2j/M-2k/M-2l/M-2m + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的
+      **6** 个字段形态均逐一参数化，不得合并成一条；**E16 两个 canonical 拼写分支、E18 五个
+      候选发现分支（a/b/c1/c2/d）都必须绿**）
+- [ ] M-1 ~ M-6 + M-2f/M-2g/M-2h/M-2i/M-2j/M-2k/M-2l/M-2m/M-2n + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的
       三条逐字段、M-2c committed-blob、M-2d loaded-bytes、M-2f current-worktree、
       M-2g bootstrap fixture、**M-2h 词法规范化退回**、**M-2i 去掉逐组件 lstat**、
       **M-2j 去掉单一组件校验**、**M-2k 收窄为仅绝对拼写**、**M-2l 相对定位退回
-      `_resolve_plan_path()`**、**M-2m 去掉候选唯一性**，以及 autonomy/target/already-merged
-      三个独立闸门；含还原回绿），报告附逐条结果
+      `_resolve_plan_path()`**、**M-2m 去掉可信候选唯一性**、**M-2n 把唯一性收紧回存在候选**，
+      以及 autonomy/target/already-merged 三个独立闸门；含还原回绿），报告附逐条结果
 - [ ] **rev10 结构性自检**：报告须明确说明受信任路径是**推导**得出的，并指出代码中调用者
       路径被使用的位置**恰好**是两处：R3-a 阶段 1 的单次读取（明确授权）与与推导路径的
       相等比较。rule 4 的 blob 比对必须用**推导路径** + 阶段 1 的 `raw`；若调用者路径出现
       在 blob 比对、或出现第二次 open/read/resolve，视为未满足 rev10。
-- [ ] **rev10 相对形态自检**：报告须说明相对形态的阶段 1 定位走的是候选发现，并明确
-      `_resolve_plan_path()` 未参与该路径（否则 E13 的首次引入场景不可部署）。
+- [ ] **rev11 相对形态自检**：报告须说明相对形态的阶段 1 定位走的是候选发现、`_resolve_plan_path()`
+      未参与该路径（否则 E13 的首次引入场景不可部署），且唯一性判据作用在**通过信任校验的
+      候选**上。报告须附一条实测：在真实多 worktree 拓扑下，存在同名文件的候选数 > 1 时
+      仍能正确选中 integration worktree。
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
 - [ ] `agentic quality-gate <status.json>` 全绿
@@ -348,7 +357,7 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 
 ## 残余风险
 
-rev6 声明的 `tracked-but-dirty` 与“解析后重新读取”的 TOCTOU 风险在 rev7 通过 loaded raw bytes == base committed blob 一并闭合。rev8 以「只认推导路径」终结了调用者拼写别名家族（rev7 的枚举式判据曾被三种拼写连续攻破）；rev9 补上 rev8 自身的三处规格缺陷（推导自举次序、相对路径兼容语义、路径字段必须是单一安全组件）；rev10 再修正 rev9 把相对形态首读错误地指向 `_resolve_plan_path()` 的自举矛盾，改为候选发现 + 唯一候选 + 自洽复核。仍保留两项：
+rev6 声明的 `tracked-but-dirty` 与“解析后重新读取”的 TOCTOU 风险在 rev7 通过 loaded raw bytes == base committed blob 一并闭合。rev8 以「只认推导路径」终结了调用者拼写别名家族（rev7 的枚举式判据曾被三种拼写连续攻破）；rev9 补上 rev8 自身的三处规格缺陷（推导自举次序、相对路径兼容语义、路径字段必须是单一安全组件）；rev10 再修正 rev9 把相对形态首读错误地指向 `_resolve_plan_path()` 的自举矛盾，改为候选发现 + 自洽复核；rev11 再把唯一性判据从「存在的候选」改到「通过信任校验的候选」，以免拒掉继承同名文件的合法 parallel-lane 调用。仍保留两项：
 
 1. **判定后 refs/worktree 并发变化**：来源字节通过后，其他进程仍可能移动 branch ref 或切换 worktree。真实 merge 会基于执行时 Git 状态继续 fail-closed，但本 WP 不引入跨整个命令的全局事务锁。
 2. **`main_repo()`/`current_worktree()` 仓库选择信任边界**：rev7 要求两者 resolved common-dir 相同，但 repository-selection 环境变量的更上层净化仍由既有 resolver/gate 边界负责，不在本 WP 重写。
