@@ -61,6 +61,7 @@ from pathlib import Path
 
 from agentic_loop import autonomy as _autonomy
 from agentic_loop import resolve_paths as _rp
+from agentic_loop.gate import path_is_in_worktree
 
 SCHEMA_VERSION = "agentic-plan-status/v1"
 
@@ -83,7 +84,7 @@ REQUIRED_TOP_LEVEL = {
     "timestamps",
 }
 
-OPTIONAL_TOP_LEVEL = {"title"}
+OPTIONAL_TOP_LEVEL = {"title", "lint_exemption"}
 
 # Default lane a WP lands in when its object entry has no `lane` (and every WP
 # in the legacy string form). A lane is defined as *serial*: at any instant,
@@ -482,6 +483,54 @@ def _load_and_validate(plan_arg: str) -> tuple:
     return data, path
 
 
+def _lint_exemption_is_legal(exemption: object) -> bool:
+    """Return True only for the repository's strict four-field approval shape."""
+    if not isinstance(exemption, dict):
+        return False
+    if exemption.get("approved") is not True:
+        return False
+    approver = exemption.get("approver")
+    if not isinstance(approver, str) or not approver.strip():
+        return False
+    justification = exemption.get("justification")
+    if not isinstance(justification, str) or not justification.strip():
+        return False
+    reviewed_at = exemption.get("reviewed_at")
+    if not isinstance(reviewed_at, str) or not reviewed_at.strip():
+        return False
+    return True
+
+
+def _lint_exemption_source_is_trusted(plan_path: Path) -> bool:
+    """Bind a merge-only exemption to a tracked file in the physical main repo.
+
+    Resolution deliberately precedes every ownership and Git-index check.  In
+    particular, this makes a tracked symlink to an untracked JSON target fail
+    the final exact ``ls-files`` check on the target that was actually read.
+    """
+    try:
+        resolved_path = plan_path.resolve(strict=True)
+        resolved_repo = _rp.main_repo().resolve(strict=True)
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        return False
+
+    try:
+        relative = resolved_path.relative_to(resolved_repo)
+    except ValueError:
+        return False
+    if path_is_in_worktree(resolved_path):
+        return False
+
+    tracked = _git_may_fail(
+        resolved_repo,
+        "ls-files",
+        "--error-unmatch",
+        "--",
+        relative.as_posix(),
+    )
+    return tracked.returncode == 0
+
+
 def _require_converged(data: dict, repo: Path) -> None:
     """Fail-closed: every declared WP must be MERGED (and agree on plan_id)."""
     base = data["git"]["base_branch"]
@@ -743,17 +792,35 @@ def cmd_merge(plan_arg: str) -> int:
     # Fail-closed on evidence: every declared WP must actually be MERGED.
     _require_converged(data, repo)
 
-    # Fail-closed on commit discipline: no review/consult/override "sync" commits.
+    # Fail-closed on commit discipline.  A legal exemption waives only this one
+    # finding, and only when it came from the tracked physical-main-repo file
+    # that was actually read.
     dirty, lines = _lint_report(data, repo)
     if dirty:
-        for line in lines:
-            print(line, file=sys.stderr)
+        exemption = data.get("lint_exemption")
+        if not _lint_exemption_is_legal(exemption):
+            for line in lines:
+                print(line, file=sys.stderr)
+            print(
+                "PLAN_FAIL: status-sync commits present; squash to freeze + finalize "
+                "first (see `agentic plan lint`)",
+                file=sys.stderr,
+            )
+            return RC_FAIL
+        if not _lint_exemption_source_is_trusted(path):
+            for line in lines:
+                print(line, file=sys.stderr)
+            print(
+                "PLAN_FAIL: lint exemption source is untrusted; use a Git-tracked "
+                "plan status file in the physical main repo",
+                file=sys.stderr,
+            )
+            return RC_FAIL
         print(
-            "PLAN_FAIL: status-sync commits present; squash to freeze + finalize "
-            "first (see `agentic plan lint`)",
-            file=sys.stderr,
+            "PLAN_LINT_EXEMPTION approver={} justification={}".format(
+                exemption["approver"], exemption["justification"]
+            )
         )
-        return RC_FAIL
 
     current = _git(repo, "branch", "--show-current")
     if current != target_branch:
