@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -24,7 +24,7 @@
     "dispatch_commit": "885c857422347ba5baf713ad795fa1bc326b4c96",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": "1c22553102c86587e7a2215a8d49e3e32b27977e"
+    "commit": "40cb5b15b60cf1f0b83ab94f540ab0c7ddd23423"
   },
   "scope": {
     "allowed_paths": [
@@ -53,21 +53,31 @@
     "tests": [
       {
         "command": "pytest tests/test_plan_lint_exemption.py -q",
-        "result": "26 passed",
+        "result": "27 passed",
         "exit_code": 0,
         "run_by": "orchestrator independent"
       },
       {
         "command": "pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
-        "result": "66 passed",
+        "result": "66 passed in 11.44s",
         "exit_code": 0,
         "run_by": "orchestrator independent"
       },
       {
-        "command": "pytest tests -q with init.defaultBranch=main",
-        "result": "887 passed, 4 skipped, 0 failed in 135.09s",
+        "command": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "888 passed, 4 skipped in 131.45s",
         "exit_code": 0,
-        "baseline": "861 passed, 4 skipped; +26 exactly matches new cases",
+        "baseline": "861 passed, 4 skipped; +27 exactly matches new cases",
+        "run_by": "orchestrator independent"
+      }
+    ],
+    "mutations": [
+      {
+        "id": "M-2e",
+        "mutation": "remove --literal-pathspecs from the final ls-files trust check",
+        "red": "exact E9 pathspec-metachar-untracked node failed because the untracked literal metacharacter plan was accepted and reached PLAN_MERGE_OK",
+        "restore": "restored exact committed bytes",
+        "green": "exact E9 pathspec-metachar-untracked node passed",
         "run_by": "orchestrator independent"
       }
     ],
@@ -123,16 +133,16 @@
     ]
   },
   "review": {
-    "decision": "REWORK",
+    "decision": "ACCEPT",
     "reviewer": "kiro-orchestrator",
     "reviewed_at": "2026-10-14T08:35:00Z",
-    "revised_from": "ACCEPT",
-    "revision_note": "Prior review remains valid for scope, strict shape, resolve-first symlink defense, post-lint gates, 887 tests and sampled mutations, but missed Git pathspec interpretation at the exact ls-files boundary. Consultant finding independently reproduced; add literal pathspec enforcement, E9 form 5 and M-2e."
+    "revised_from": "REWORK",
+    "revision_note": "The sole r1 blocker is closed at 40cb5b1: the resolved relative path is passed through Git's global --literal-pathspecs option before ls-files. E9 form 5 self-proves ordinary pathspec matching would return 0 against a tracked peer, while the production literal check rejects it. Independent dedicated/protected/full suites are green (27/66/888), and M-2e turns the exact E9 node red by reaching PLAN_MERGE_OK, then green after exact restore. Scope remains limited to the three allowed implementation paths; review ACCEPT."
   },
   "consult": {
-    "state": "DECIDED",
-    "round": "wp03-impl-r1",
-    "decision": "REWORK",
+    "state": "PENDING",
+    "round": "wp03-impl-r2",
+    "decision": null,
     "bound_brief_rev": 6,
     "prior_rounds": [
       {
@@ -184,7 +194,7 @@
         "finding_reproduced_by_orchestrator": true
       }
     ],
-    "bound_impl_commit": "1c22553102c86587e7a2215a8d49e3e32b27977e"
+    "bound_impl_commit": "40cb5b15b60cf1f0b83ab94f540ab0c7ddd23423"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
