@@ -4,11 +4,11 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
-    "session": "pending-dispatch"
+    "session": "d1f36661-2ad8-4a4e-af3f-c6af4011096b"
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -24,7 +24,7 @@
     "dispatch_commit": "885c857422347ba5baf713ad795fa1bc326b4c96",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": ""
+    "commit": "1c22553102c86587e7a2215a8d49e3e32b27977e"
   },
   "scope": {
     "allowed_paths": [
@@ -50,7 +50,27 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      {
+        "command": "pytest tests/test_plan_lint_exemption.py -q",
+        "result": "26 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator independent"
+      },
+      {
+        "command": "pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
+        "result": "66 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator independent"
+      },
+      {
+        "command": "pytest tests -q with init.defaultBranch=main",
+        "result": "887 passed, 4 skipped, 0 failed in 135.09s",
+        "exit_code": 0,
+        "baseline": "861 passed, 4 skipped; +26 exactly matches new cases",
+        "run_by": "orchestrator independent"
+      }
+    ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
       "sha256": "e909c660804d0252e69f402d73b0139965b22d2397f519dc5b86653128929f36",
@@ -94,11 +114,26 @@
       "WP-02 implementation commit 70a5990, review ACCEPT, consult ACCEPT, state APPROVED_FOR_MERGE; both WPs finalize only after WP-03 implementation and signatures complete, then PLAN-01 merges after both are MERGED."
     ]
   },
-  "review": {},
-  "consult": {
-    "state": "DECIDED",
-    "round": "wp03-brief-r2",
+  "review": {
     "decision": "ACCEPT",
+    "reviewer": "kiro-orchestrator",
+    "reviewed_at": "2026-10-14T08:20:00Z",
+    "basis": "independent source inspection, tests, and representative byte-level mutations; not acceptance of developer report",
+    "verified_independently": [
+      "scope: exactly three allowed paths; worktree clean; no forbidden changes",
+      "strict four-field shape is line-for-line equivalent in strength to validate_wp_status._override_dict_is_legal",
+      "source order is resolve(strict=True) -> resolved target ownership/worktree -> exact ls-files on resolved relative target",
+      "M-2d reproduced: deleting resolve-first lets tracked symlink to untracked target print exemption and perform PLAN_MERGE_OK; restore green",
+      "M-4c/M-4d reproduced: returning RC_OK immediately after exemption makes E11 and E12 both red; restore green",
+      "valid exemption logs audit fields but does not return; target and already-merged gates execute afterward",
+      "26 dedicated + 66 protected + full 887 passed / 4 skipped / 0 failed",
+      "compileall, JSON template parse, git diff --check pass; mutations restored byte-identical"
+    ]
+  },
+  "consult": {
+    "state": "NOT_DISPATCHED",
+    "round": "wp03-impl-r1",
+    "decision": null,
     "bound_brief_rev": 5,
     "prior_rounds": [
       {
@@ -137,11 +172,12 @@
         "harness_verdict": "VALID (binding_unchanged=true)",
         "verified": "Dependency cycle resolved without weakening final convergence; E10/M-4b, E11/M-4c and E12/M-4d independently load-bear autonomy, target-branch and already-merged."
       }
-    ]
+    ],
+    "bound_impl_commit": "1c22553102c86587e7a2215a8d49e3e32b27977e"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T08:00:00Z",
+    "updated_at": "2026-10-14T08:20:00Z",
     "dispatched_at": "2026-10-14T08:00:00Z"
   }
 }
