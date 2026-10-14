@@ -1,6 +1,7 @@
 # WP-03: plan merge 的显式豁免记录（多轮 re-freeze 计划）
 
-> 冻结日期 2026-10-12 | 编排者 claude-code（DSH 会话）| 执行者 kimi。
+> rev4 re-freeze 日期 2026-10-13 | 编排者 claude-code（DSH 会话）| 执行者 kimi。
+> 第 4 次 re-freeze 已获用户明确批准（“恢复 WP-03”）；只修订执行依赖，不改验收不变式。
 > 所属 Plan：PLAN-01（集成到 `plan/2026-10-12-sequential-plan-gates`，不直接合入 main）。
 > 冻结后执行期间不得修改；需修订走 re-freeze（规则见「Re-freeze 规则」一节）。
 
@@ -80,7 +81,13 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 
 ## 输入
 
-- 依赖的上游 WP 产出：WP-02 已 MERGED（同一集成分支，顺序执行）
+- 依赖的上游 WP 产出：WP-02 已完成实现、独立 review ACCEPT、实现二签 ACCEPT，
+  当前为 `APPROVED_FOR_MERGE`；其实现提交 `70a5990` 已在同一集成分支上。
+  **不再要求 WP-02 先达到 `MERGED`**：实测闭环证明 WP-02 的标准 finalize 要求
+  主 checkout 的状态副本，而 PLAN-01 的 commit-discipline lint 又会因多轮状态同步
+  判 DIRTY；解决该 DIRTY 正是本 WP 的目标。若仍要求 WP-02 先 MERGED，WP-02 与
+  WP-03 将互相等待。执行顺序冻结为：先实现并双签 WP-03 → 对 WP-02/WP-03 依次
+  finalize → 用本 WP 的结构化豁免通过 plan merge。
 - 参考文档：本迭代 `DESIGN.md` §1 G2 / §2 R2；AGENTS.md §4.3
 - 现场：`src/agentic_loop/plan_cmd.py:76-86`（schema 字段集）、
   `:518-570`（commit-discipline lint）、`:719-802`（`cmd_merge`）
