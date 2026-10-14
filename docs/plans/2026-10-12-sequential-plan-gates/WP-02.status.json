@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "IMPLEMENTING",
   "role": "Developer",
   "executor": {
     "tool": "kimi"
@@ -87,11 +87,41 @@
       ]
     }
   },
-  "review": {},
+  "review": {
+    "decision": "REWORK",
+    "reviewer": "claude-orchestrator",
+    "reviewed_at": "2026-10-13T06:20:00Z",
+    "basis": "independent re-run, not acceptance of the developer report",
+    "verified_independently": [
+      "scope: only the two allowed_paths changed; forbidden_paths untouched; main repo unwritten",
+      "discriminator is branch identity ([[ \"$branch\" == \"$base_branch\" ]]), satisfying INV-3",
+      "parallel-lane path unchanged: same candidate list, same uniqueness requirement, same fail-closed exits",
+      ":371 ancestor precondition intact",
+      "new test file: 10 passed standalone",
+      "M-1 reproduced by the reviewer: S3b red",
+      "M-2b reproduced by the reviewer: S1b red while S1 stays GREEN (empirically confirms INV-1b's premise)",
+      "M-4 reproduced by the reviewer: S5b red while S5a stays GREEN (confirms the brief's S5 would not have been load-bearing)",
+      "mutations restored: script byte-identical to the committed state",
+      "full suite with init.defaultBranch=main: 853 passed / 4 skipped / 0 failed",
+      "agentic quality-gate: PASS",
+      "S1b is a real shell parser (strips comments, delimits by if/fi nesting, takes the block's own level, uses the FINAL assignment) with a meta-check against vacuous green -- not a full-text search"
+    ],
+    "deviations_assessed": {
+      "a_s3_split": "UPHELD. :371 precedes :380, so a never-merged branch exits with 'merge not detected' and can never reach the brief's named witness. The brief put two mutually exclusive conditions in one case -- an authoring error by the orchestrator. S3b is the case that pins INV-3.",
+      "b_s5b_added": "UPHELD and the most valuable finding. The validator itself rejects consult != ACCEPT at v2 APPROVED_FOR_MERGE, masking the script's own gate. Reviewer measured M-4: S5a stays green, only S5b turns red. Written as briefed, M-4 would have had no red evidence.",
+      "c_s4_commit_tree": "UPHELD. Re-merging an already-merged branch is a no-op, so the brief's 'merge twice' construction cannot produce a second merge commit. The brief explicitly allowed a documented alternative construction."
+    },
+    "corrections_to_developer_report": [
+      "The developer attributed the 4 pre-existing failures to a hardcoded `git checkout main` in test_finalize_merge_triple_sign.py. That string does not exist in the file. The real mechanism is a dependency on the default branch name (this host sets init.defaultBranch=master). The conclusion (environment-dependent, not a regression) stands and was verified: the file is byte-identical to d81717d and passes 5/5 with init.defaultBranch=main."
+    ],
+    "superseded_note": "The orchestrator's ACCEPT was based on scope, mutation red-evidence and a green suite, all of which still hold. It did NOT probe whether the discriminator's own inputs are trustworthy. The consultant's V1 shows they are not. Recorded as superseded rather than deleted, because the miss is itself evidence about what this review did and did not cover.",
+    "revised_from": "ACCEPT",
+    "revision_note": "Originally ACCEPT. Revised to REWORK after the implementation second signature found a merge-blocking fail-open (consult.blocking_finding V1) that this review did not probe. What the ACCEPT did verify still holds -- scope, mutation red evidence, 853 passed, quality-gate PASS -- but none of it tests whether the discriminator's own inputs can be trusted, which is exactly the gap. Kept visible rather than silently rewritten."
+  },
   "consult": {
     "state": "DECIDED",
-    "round": "r3",
-    "decision": "ACCEPT",
+    "round": "impl-r1",
+    "decision": "REWORK",
     "bound_brief_rev": 3,
     "prior_rounds": [
       {
@@ -122,12 +152,31 @@
         "scope": "narrow round verifying only the closure of the two r2 required changes",
         "verified": "V1 C1 closed (resolve-first ordering + E9 sub-form 4 + M-2d); V2 C2 closed (S1b locates the assignment, excludes comments/dead code/full-text search; M-2b forces red+green evidence)",
         "consultant_declared": "checked HEAD, clean tree and all four SHA-256; did NOT additionally read source sites"
+      },
+      {
+        "round": "impl-r1",
+        "decision": "REWORK",
+        "kind": "implementation-second-signature",
+        "bound_impl_commit": "cdb459015793463b5dffbf117bc0be6a13fcef44",
+        "receipt": ".agentic/wp02-impl-consult-r1.receipt.json",
+        "answer": ".agentic/wp02-impl-consult-r1.answer.md",
+        "harness_verdict": "INVALID (binding_unchanged=false)",
+        "harness_verdict_cause": "the ORCHESTRATOR wrote review.decision into WP-02.status.json while the consult was still running, so the bound status blob changed mid-round. Operator error, not consultant error. The three artifacts actually under review (finalize_merge.sh, the test file, the brief) were byte-identical throughout, so the finding stands on its own evidence and was independently reproduced before being accepted.",
+        "finding_reproduced_by_orchestrator": true
       }
-    ]
+    ],
+    "bound_impl_commit": "cdb459015793463b5dffbf117bc0be6a13fcef44",
+    "blocking_finding": {
+      "id": "V1",
+      "severity": "MERGE_BLOCKING",
+      "summary": "INV-3 fail-open: the discriminator trusts two mutable DECLARED fields, so a never-integrated parallel-lane WP can be stamped MERGED with a forged merged_commit simply by writing branch == base_branch.",
+      "mechanism": "wp_tip and base_tip are both resolved from BRANCH NAMES. When the status claims the sequential layout both resolve to the same commit, so the :371 `is-ancestor X X` precondition is trivially true. git.commit -- the field that records the WP's real work tip -- is only checked for non-emptiness and never participates in any topology check.",
+      "reproduced": "Orchestrator built a repo with an unmerged feature/x, forged a status claiming branch=base_branch=main while git.commit stayed the unmerged feature tip, and ran the real wrapper: FINALIZE_OK, state=MERGED, merged_commit set to the main tip -- a commit unrelated to the WP's work, which remained unintegrated."
+    }
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T06:00:00Z",
+    "updated_at": "2026-10-13T06:45:00Z",
     "dispatched_at": "2026-10-13T05:10:00Z",
     "approved_at": "2026-10-13T05:05:00Z"
   }
