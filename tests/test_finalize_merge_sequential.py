@@ -741,3 +741,212 @@ def test_s6_sequential_idempotent_then_tampered_record_fails(
     assert "FINALIZE_OK" not in combined
     # The tampered record must be left alone, not silently repaired.
     assert _git_block(status_path)["merged_commit"] == bogus
+
+
+# ==========================================================================
+# S3c [declared-sequential-but-not-integrated] -> INV-6
+# ==========================================================================
+# Regression for the measured fail-open: `branch` and `base_branch` are two
+# fields of the same status JSON, so a WP can DECLARE itself sequential by
+# writing one value into both. Before rev4 the declaration was taken at face
+# value and an un-integrated lane got stamped MERGED with base's tip.
+#
+# Two shapes, because the two named mutations attack different things:
+#   - "never-merged": git.commit is not reachable from base at all. Turns red
+#     under M-6 (the check deleted outright).
+#   - "merged-not-first-parent": git.commit IS an ancestor of base (its lane
+#     was merged in) but sits on a second-parent line, so it is absent from
+#     base's first-parent history. This is the shape that distinguishes a
+#     `--first-parent` membership test from a plain `merge-base --is-ancestor`,
+#     and therefore the one that turns red under M-6b. The brief names the
+#     never-merged construction; M-6b's own escape clause ("if S3c stays green
+#     the fixture must be changed -- let the feature tip be merged into base")
+#     requires this second shape, so both are kept.
+
+
+def _make_forged_sequential_never_merged(tmp_path: Path) -> tuple[Path, str, str, str]:
+    """Un-integrated ``feature/x``; base moved on independently.
+
+    Returns (repo, base_branch, forged_commit, base_tip). ``forged_commit`` is
+    the feature tip: NOT an ancestor of base and not in its first-parent
+    history.
+    """
+    repo, base = _init_repo(tmp_path)
+    _run_git(repo, "checkout", "-q", "-b", "feature/x")
+    (repo / "wp.txt").write_text("parallel wp work, never integrated\n", encoding="utf-8")
+    _run_git(repo, "add", "wp.txt")
+    _run_git(repo, "commit", "-q", "-m", "WP work on an un-integrated lane")
+    forged = _head(repo)
+    _run_git(repo, "checkout", "-q", base)
+    (repo / "base.txt").write_text("base moves on\n", encoding="utf-8")
+    _run_git(repo, "add", "base.txt")
+    _run_git(repo, "commit", "-q", "-m", "base work")
+    base_tip = _head(repo)
+    # Premise: genuinely not integrated, by either test.
+    assert subprocess.run(
+        ["git", "merge-base", "--is-ancestor", forged, base_tip], cwd=repo
+    ).returncode != 0
+    first_parents = _run_git(repo, "rev-list", "--first-parent", base_tip).stdout.split()
+    assert forged not in first_parents
+    return repo, base, forged, base_tip
+
+
+def _make_forged_sequential_merged_not_first_parent(
+    tmp_path: Path,
+) -> tuple[Path, str, str, str]:
+    """``feature/x`` merged --no-ff into base, so its tip is an ancestor of
+    base yet absent from base's FIRST-PARENT history.
+
+    This is the discriminating fixture: `merge-base --is-ancestor` answers
+    true here, so a weakened check (M-6b) would let the forged declaration
+    through, while a `--first-parent` membership test still refuses it.
+    Returns (repo, base_branch, forged_commit, base_tip).
+    """
+    repo, base = _init_repo(tmp_path)
+    _run_git(repo, "checkout", "-q", "-b", "feature/x")
+    (repo / "wp.txt").write_text("parallel wp work, merged in\n", encoding="utf-8")
+    _run_git(repo, "add", "wp.txt")
+    _run_git(repo, "commit", "-q", "-m", "WP work on a parallel lane")
+    forged = _head(repo)
+    _run_git(repo, "checkout", "-q", base)
+    _run_git(repo, "merge", "-q", "--no-ff", "feature/x", "-m", "Merge feature/x")
+    base_tip = _head(repo)
+    # Premise of M-6b: ancestor YES, first-parent member NO. Without this gap
+    # the weakened mutation would be indistinguishable from the real check.
+    assert subprocess.run(
+        ["git", "merge-base", "--is-ancestor", forged, base_tip], cwd=repo
+    ).returncode == 0
+    first_parents = _run_git(repo, "rev-list", "--first-parent", base_tip).stdout.split()
+    assert forged not in first_parents, (
+        "fixture must place the forged commit OFF the first-parent line"
+    )
+    return repo, base, forged, base_tip
+
+
+_FORGED_SEQUENTIAL_FIXTURES = {
+    "never-merged": _make_forged_sequential_never_merged,
+    "merged-not-first-parent": _make_forged_sequential_merged_not_first_parent,
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_FORGED_SEQUENTIAL_FIXTURES))
+def test_s3c_declared_sequential_but_not_integrated_fails_closed(
+    shape: str, tmp_path: Path, session_env
+) -> None:
+    repo, base, forged_commit, base_tip = _FORGED_SEQUENTIAL_FIXTURES[shape](tmp_path)
+
+    # The forgery: both branch fields say the integration branch (claiming the
+    # sequential layout) while git.commit still points at the lane's work.
+    status_path = _write_status(
+        repo, _status(base_branch=base, branch=base, commit=forged_commit)
+    )
+    assert "merged_commit" not in _git_block(status_path)
+
+    res = _finalize(repo, session_env)
+    combined = res.stdout + res.stderr
+
+    # 1) fail-closed
+    assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
+    assert "FINALIZE_OK" not in combined, combined
+
+    final = json.loads(status_path.read_text(encoding="utf-8"))
+    # 2) merged_commit must not be written -- above all not base's tip, which
+    #    is what the pre-rev4 script stamped.
+    assert "merged_commit" not in final["git"], final["git"]
+    assert final["git"].get("merged_commit") != base_tip
+    # 3) the lifecycle state must be untouched
+    assert final["state"] == "APPROVED_FOR_MERGE", final["state"]
+
+    # 4) cause-specific witness: the declared LAYOUT was not corroborated by
+    #    topology, not a generic "cannot resolve" failure. Asserting the
+    #    absence of the generic witness is what keeps this case honest: a
+    #    collapse into the parallel-lane resolver would also exit 2.
+    assert "declared sequential layout not confirmed by topology" in combined, combined
+    assert "first-parent history" in combined, combined
+    assert "cannot uniquely resolve merge commit" not in combined, combined
+
+
+@pytest.mark.parametrize("shape", sorted(_FORGED_SEQUENTIAL_FIXTURES))
+def test_s3c_positive_reachability_control(
+    shape: str, tmp_path: Path, session_env
+) -> None:
+    """Oracle item 1 for S3c: on the SAME fixture, a git.commit that really is
+    in base's first-parent history must reach the endpoint and stamp wp_tip.
+
+    Without this, S3c could be passing because the run died somewhere else
+    entirely (schema, signatures, ancestor precondition) rather than at INV-6.
+    """
+    repo, base, forged_commit, base_tip = _FORGED_SEQUENTIAL_FIXTURES[shape](tmp_path)
+
+    # Anything on base's own line of development qualifies; its tip is the
+    # natural choice and here equals wp_tip (branch == base_branch).
+    first_parents = _run_git(repo, "rev-list", "--first-parent", base_tip).stdout.split()
+    assert base_tip in first_parents
+    assert forged_commit not in first_parents
+
+    status_path = _write_status(
+        repo, _status(base_branch=base, branch=base, commit=base_tip)
+    )
+    res = _finalize(repo, session_env)
+
+    assert res.returncode == 0, (res.returncode, res.stdout, res.stderr)
+    assert res.stdout.strip() == f"FINALIZE_OK merged_commit={base_tip}"
+    final = json.loads(status_path.read_text(encoding="utf-8"))
+    assert final["state"] == "MERGED"
+    # Sequential layout still stamps wp_tip (INV-1b), which is base_tip here.
+    assert final["git"]["merged_commit"] == base_tip
+
+
+# ==========================================================================
+# S3d [sequential-git-commit-missing-or-unresolvable] -> INV-6 item 2
+# ==========================================================================
+# The topology check needs git.commit, so every way of NOT having a usable one
+# must refuse rather than skip the check. Each shape is parametrized
+# separately (the brief forbids collapsing them into one case).
+#
+# Note on the empty shape: git.commit is already required non-empty at :339,
+# so that form is expected to be caught by the pre-existing guard rather than
+# by INV-6. The assertion is therefore on the OUTCOME (exit 2, nothing
+# stamped), which is what INV-6 item 2 demands, not on which guard fired.
+
+_UNRESOLVABLE_GIT_COMMITS = {
+    # empty string: no commit recorded at all
+    "empty": "",
+    # syntactically not a sha
+    "not-a-sha": "not-a-valid-sha",
+    # right shape, truncated -- still not a 40-hex id
+    "short-hex": "abc1234",
+    # well-formed 40-hex that names no object in this repository
+    "dangling": "d" * 39 + "e",
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_UNRESOLVABLE_GIT_COMMITS))
+def test_s3d_sequential_git_commit_unresolvable_fails_closed(
+    shape: str, tmp_path: Path, session_env
+) -> None:
+    repo, base, wp_tip = _make_sequential_repo(tmp_path)
+    bad_commit = _UNRESOLVABLE_GIT_COMMITS[shape]
+
+    if len(bad_commit) == 40:
+        # Premise for the dangling shape: well-formed but absent from the odb.
+        assert subprocess.run(
+            ["git", "cat-file", "-e", f"{bad_commit}^{{commit}}"], cwd=repo
+        ).returncode != 0
+
+    status_path = _write_status(
+        repo, _status(base_branch=base, branch=base, commit=bad_commit)
+    )
+
+    res = _finalize(repo, session_env)
+    combined = res.stdout + res.stderr
+
+    assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
+    assert "FINALIZE_OK" not in combined, combined
+
+    final = json.loads(status_path.read_text(encoding="utf-8"))
+    assert "merged_commit" not in final["git"], final["git"]
+    # Specifically: the tip was not stamped just because the check could not
+    # obtain a commit to verify ("cannot get it, so skip" is the fail-open).
+    assert final["git"].get("merged_commit") != wp_tip
+    assert final["state"] == "APPROVED_FOR_MERGE", final["state"]

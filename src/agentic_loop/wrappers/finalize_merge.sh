@@ -401,6 +401,69 @@ candidate_count=$(printf '%s' "$candidates" | grep -c '^[0-9a-f]\{40\}$' || true
 # Branch identity cannot be confused that way: it is a property of the layout
 # the status DECLARES, not of how the resolution happened to turn out.
 if [[ "$branch" == "$base_branch" ]]; then
+  # A37 (WP-02 rev4, INV-6): branch identity is the right discriminator (A36),
+  # but it is NOT self-certifying evidence. `branch` and `base_branch` are two
+  # fields of the SAME status JSON that this script is about to stamp, so a WP
+  # can simply DECLARE itself sequential by writing one value into both. Before
+  # rev4 nothing else was consulted, and the declaration was taken at face
+  # value: a `feature/x` that was never integrated, with the status forged to
+  # `branch = base_branch = main` while `git.commit` kept the un-integrated
+  # feature tip, produced FINALIZE_OK / state=MERGED / merged_commit = main tip
+  # -- a commit with no relationship to that WP's work, stamped onto a WP whose
+  # work was not in base at all (reproduced 2026-10-12).
+  #
+  # The :371 ancestor precondition cannot catch this: `wp_tip` and `base_tip`
+  # are both resolved from a BRANCH NAME, so when the layout is declared
+  # sequential they resolve to the same commit and `is-ancestor X X` is
+  # tautologically true. `git.commit` -- the only field recording where the WP
+  # actually worked -- was previously checked for non-emptiness only (:339) and
+  # never took part in any topological check.
+  #
+  # So the declaration must be confirmed against Git topology, which no status
+  # field can rewrite: a genuinely sequential WP committed DIRECTLY on the
+  # integration branch, therefore its `git.commit` must appear in that branch's
+  # FIRST-PARENT history.
+  #
+  # Why first-parent and not `merge-base --is-ancestor`: once a parallel lane is
+  # merged into base, every commit of that lane IS an ancestor of base, so
+  # `is-ancestor` answers true for work that arrived from a side branch. It
+  # cannot distinguish "committed directly on the integration branch" from
+  # "merged in from somewhere else", which is exactly the distinction the
+  # sequential layout asserts -- and the one that licenses stamping `wp_tip`
+  # rather than resolving a merge commit. A `--first-parent` walk follows only
+  # the integration branch's own line of development, so a second-parent
+  # (merged-in) commit is absent from it. The weakened form would still admit
+  # the "merged, then mis-stamped as sequential" shape.
+  #
+  # Fail-closed on every branch of this check (missing / malformed / dangling /
+  # not in the first-parent history) and never fall through to the stamp. Both
+  # captures use the `if !` form on purpose: under `set -euo pipefail` a plain
+  # `x=$(cmd)` assignment that takes a non-zero exit aborts the script instead
+  # of refusing (A29's hazard), and `|| true` / `|| echo false` would convert a
+  # crashed git into a passing verdict -- fail-open, the very defect this adds.
+  # Deliberately pipeline-free: `rev-list --first-parent | grep -q` looks
+  # natural but makes grep exit on the first match, so git dies of SIGPIPE and
+  # `pipefail` reports 141 for a commit that IS present -- measured on this
+  # repository's own history, which would have made WP-02's real finalize
+  # fail-closed on a valid status. Membership is tested on the captured text.
+  # This check only ADDS a precondition; no existing gate is replaced, and
+  # `merged_commit` is still `$wp_tip` (INV-1b) once the layout is confirmed.
+  if [[ ! "$git_commit" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: git.commit '$git_commit' is not a 40-hex commit id" >&2
+    exit 2
+  fi
+  if ! git_commit_obj=$(git -C "$repo_root" rev-parse --verify --quiet "${git_commit}^{commit}"); then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: git.commit $git_commit does not resolve to a commit object in $repo_root" >&2
+    exit 2
+  fi
+  if ! base_first_parents=$(git -C "$repo_root" rev-list --first-parent "$base_tip"); then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: cannot walk the first-parent history of base '$base_branch' ($base_tip)" >&2
+    exit 2
+  fi
+  if [[ $'\n'"$base_first_parents"$'\n' != *$'\n'"$git_commit_obj"$'\n'* ]]; then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: git.commit $git_commit_obj is not in the first-parent history of base '$base_branch' ($base_tip); a sequential WP must have committed directly on the integration branch" >&2
+    exit 2
+  fi
   merged_commit="$wp_tip"
   resolution_count=1
 else
