@@ -127,7 +127,7 @@
     "state": "NOT_DISPATCHED",
     "round": "impl-r2",
     "decision": null,
-    "bound_brief_rev": 4,
+    "bound_brief_rev": 5,
     "prior_rounds": [
       {
         "round": "r1-attempt1",
@@ -170,7 +170,7 @@
         "finding_reproduced_by_orchestrator": true
       }
     ],
-    "bound_impl_commit": "cdb459015793463b5dffbf117bc0be6a13fcef44",
+    "bound_impl_commit": "70a599043b9c81b5b39aa3b53d5403b263bada65",
     "blocking_finding": {
       "id": "V1",
       "severity": "MERGE_BLOCKING",
