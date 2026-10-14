@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi"
@@ -124,9 +124,9 @@
     }
   },
   "consult": {
-    "state": "NOT_DISPATCHED",
+    "state": "DECIDED",
     "round": "impl-r2",
-    "decision": null,
+    "decision": "ACCEPT",
     "bound_brief_rev": 5,
     "prior_rounds": [
       {
@@ -168,6 +168,22 @@
         "harness_verdict": "INVALID (binding_unchanged=false)",
         "harness_verdict_cause": "the ORCHESTRATOR wrote review.decision into WP-02.status.json while the consult was still running, so the bound status blob changed mid-round. Operator error, not consultant error. The three artifacts actually under review (finalize_merge.sh, the test file, the brief) were byte-identical throughout, so the finding stands on its own evidence and was independently reproduced before being accepted.",
         "finding_reproduced_by_orchestrator": true
+      },
+      {
+        "round": "impl-r2",
+        "decision": "ACCEPT",
+        "kind": "implementation-second-signature",
+        "bound_brief_rev": 5,
+        "bound_impl_commit": "70a599043b9c81b5b39aa3b53d5403b263bada65",
+        "receipt": ".agentic/wp02-impl-consult-r2.receipt.json",
+        "answer": ".agentic/wp02-impl-consult-r2.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true)",
+        "verified": "A37 has no visible bypass: all four checks precede the merged_commit assignment and any status write. base_tip == wp_tip makes the old ancestor check tautological, but the new check is NOT circular -- it bears on the separately-bound git.commit field. Captures cannot be empty on success; the newline-delimited match accepts no SHA prefix or substring. S3c's two forms carry M-6 and M-6b respectively with a same-fixture positive control.",
+        "agreed_with_implementer": [
+          "sigpipe_pipefail_is_a_real_orchestrator_error",
+          "s3c_needs_both_forms",
+          "s3d_empty_attribution_is_honest_not_concealment"
+        ]
       }
     ],
     "bound_impl_commit": "70a599043b9c81b5b39aa3b53d5403b263bada65",
@@ -181,8 +197,9 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T07:40:00Z",
+    "updated_at": "2026-10-13T08:10:00Z",
     "dispatched_at": "2026-10-13T05:10:00Z",
-    "approved_at": "2026-10-13T05:05:00Z"
+    "approved_at": "2026-10-13T05:05:00Z",
+    "approved_for_merge_at": "2026-10-13T08:10:00Z"
   }
 }
