@@ -1,7 +1,7 @@
 # WP-03: plan merge 的显式豁免记录（多轮 re-freeze 计划）
 
-> rev5 re-freeze 日期 2026-10-14 | 编排者 claude-code（DSH 会话）| 执行者 kimi。
-> 用户已明确批准恢复并完成 WP-03；rev5 只闭合专属二签 r1 的两项 REWORK：同步依赖口径，并让 INV-4 声称保护的三个后置/独立闸门各自承重。
+> rev6 re-freeze 日期 2026-10-14 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> 实现二签 r1 找到真实 pathspec 注入；编排者已独立复现。rev6 只把 INV-3b 已写明的“精确路径”要求补成独立测试与变异。
 > 所属 Plan：PLAN-01（集成到 `plan/2026-10-12-sequential-plan-gates`，不直接合入 main）。
 > 冻结后执行期间不得修改；需修订走 re-freeze（规则见「Re-freeze 规则」一节）。
 
@@ -214,6 +214,13 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
      symlink** 指向主仓内**未跟踪**的合法豁免 JSON。必须拒绝。
      这条专钉「先判断后 resolve」的实现错误 —— 若实现只看逻辑路径，
      该形态会被误判为已跟踪而放行。
+  5. **`[pathspec-metachar-untracked]`**（实现二签 r1 新增）：在主仓内创建一个
+     **未跟踪**、文件名字面含 `*` / `?` / `[]` pathspec 元字符的合法豁免 JSON，
+     同目录另有能被该模式匹配的已跟踪文件。必须拒绝。Git 的 `--` 只终止 option，
+     **不会**让后续路径自动变成 literal；最终跟踪检查必须使用
+     `git --literal-pathspecs ... ls-files --error-unmatch -- <resolved-relative-path>`
+     （或严格等价的 literal 机制）。编排者实测：普通写法错误返回 0 并输出另一个
+     已跟踪文件；加 `--literal-pathspecs` 后正确返回 1。
   正向对照：同一份豁免放在主仓受跟踪的计划文件里**必须**放行（即 E1）。
   witness 必须指向「豁免来源不可信」而非笼统的 lint 失败。
 - **E4 `[exemption-does-not-waive-convergence]`** → INV-4。有合法豁免但某个
@@ -268,6 +275,9 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
   再判断」改成「先判断逻辑路径再读取」（即删掉 `resolve(strict=True)`）
   → **E9 子形态 4 必须转红**。其余三个子形态此时可能仍绿 —— 这正是
   为什么子形态 4 必须单列：它是唯一能钉死判定顺序的那条。
+- **M-2e**（实现二签 r1 新增，专打 literal 路径）：从最终 `ls-files` 调用中
+  删除 `--literal-pathspecs`（退回只有 `--` 的普通 pathspec 解释）
+  → **E9 子形态 5 必须转红**，且错误实现会真实放行并合并。还原后必须回绿。
 - **M-3**：让豁免同时抑制 lint 的 stdout → **E2 必须转红**。
 - **M-4**：让豁免顺带跳过 `_require_converged` → **E4 必须转红**。
 - **M-4b**：让合法豁免在 autonomy 检查前直接返回成功 → **E10 必须转红**。
@@ -286,10 +296,10 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] E0-E12 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **4** 个子形态均逐一参数化，
+- [ ] E0-E12 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **5** 个子形态均逐一参数化，
       不得合并成一条）
 - [ ] M-1 ~ M-6 + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的三条逐字段、
-      M-2c 的四子形态、M-2d 的判定顺序，以及 autonomy/target/already-merged
+      M-2c 的五子形态、M-2d 的判定顺序、M-2e 的 literal-pathspec，以及 autonomy/target/already-merged
       三个独立闸门；含还原回绿），报告附逐条结果
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
@@ -334,7 +344,7 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 
 - **已知陷阱 1（最危险）**：这个 WP 的本质是**给一条 fail-closed 闸门开口子**。
   最容易写出的错误实现是「`exemption` 键存在即放行」，它能让 E1 通过、
-  看起来修好了，但等于彻底废掉纪律。INV-3 + E3 八形态 + M-1/M-2 专钉这一点。
+  看起来修好了，但等于彻底废掉纪律。INV-3 + E3 十形态 + M-1/M-2 专钉这一点。
   实现时请直接复用 `_override_dict_is_legal` 的判定强度，不要自己写宽松版本。
 - **已知陷阱 2**：`approved` 必须是**严格布尔真**。Python 里
   `if override.get("approved"):` 会让字符串 `"false"` 也为真 —— 这是真实事故形态，

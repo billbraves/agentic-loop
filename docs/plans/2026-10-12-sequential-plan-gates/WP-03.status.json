@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "IMPLEMENTING",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -73,8 +73,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
-      "sha256": "e909c660804d0252e69f402d73b0139965b22d2397f519dc5b86653128929f36",
-      "rev": 5,
+      "sha256": "296be4c9dab02b5440affc93ef4482ff38ac112eea7228b73aa69201ceef957f",
+      "rev": 6,
       "prior_revs": [
         {
           "rev": 1,
@@ -107,6 +107,14 @@
           "outcome": "REWORK",
           "cause": "Dedicated WP-03 consult r1 was valid and found two blockers: evidence.depends_on still contradicted the rev4 dependency correction; and INV-4 claimed autonomy/target-branch/already-merged remained fail-closed without giving those three faces cause-specific tests or load-bearing mutations. rev5 synchronizes the dependency and adds E10-E12 plus M-4b/M-4c/M-4d.",
           "superseded_by_rev": 5
+        },
+        {
+          "rev": 5,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.rev5.md",
+          "sha256": "e909c660804d0252e69f402d73b0139965b22d2397f519dc5b86653128929f36",
+          "outcome": "IMPLEMENTED_THEN_REWORK",
+          "cause": "Implementation 1c22553 passed 887 tests and 17 mutations, but implementation second-signature r1 found a real INV-3b bypass: `git ls-files --error-unmatch -- <path>` still interprets pathspec metacharacters. An untracked plan filename containing `*`, `?`, or `[]` can match another tracked file and be falsely trusted. Orchestrator independently reproduced normal exit 0 matching TRACKED.status.json versus `git --literal-pathspecs` exit 1. rev6 adds E9 form 5 and M-2e.",
+          "superseded_by_rev": 6
         }
       ]
     },
@@ -115,26 +123,17 @@
     ]
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "kiro-orchestrator",
-    "reviewed_at": "2026-10-14T08:20:00Z",
-    "basis": "independent source inspection, tests, and representative byte-level mutations; not acceptance of developer report",
-    "verified_independently": [
-      "scope: exactly three allowed paths; worktree clean; no forbidden changes",
-      "strict four-field shape is line-for-line equivalent in strength to validate_wp_status._override_dict_is_legal",
-      "source order is resolve(strict=True) -> resolved target ownership/worktree -> exact ls-files on resolved relative target",
-      "M-2d reproduced: deleting resolve-first lets tracked symlink to untracked target print exemption and perform PLAN_MERGE_OK; restore green",
-      "M-4c/M-4d reproduced: returning RC_OK immediately after exemption makes E11 and E12 both red; restore green",
-      "valid exemption logs audit fields but does not return; target and already-merged gates execute afterward",
-      "26 dedicated + 66 protected + full 887 passed / 4 skipped / 0 failed",
-      "compileall, JSON template parse, git diff --check pass; mutations restored byte-identical"
-    ]
+    "reviewed_at": "2026-10-14T08:35:00Z",
+    "revised_from": "ACCEPT",
+    "revision_note": "Prior review remains valid for scope, strict shape, resolve-first symlink defense, post-lint gates, 887 tests and sampled mutations, but missed Git pathspec interpretation at the exact ls-files boundary. Consultant finding independently reproduced; add literal pathspec enforcement, E9 form 5 and M-2e."
   },
   "consult": {
-    "state": "NOT_DISPATCHED",
+    "state": "DECIDED",
     "round": "wp03-impl-r1",
-    "decision": null,
-    "bound_brief_rev": 5,
+    "decision": "REWORK",
+    "bound_brief_rev": 6,
     "prior_rounds": [
       {
         "round": "shared-r1-attempt1",
@@ -171,13 +170,25 @@
         "answer": ".agentic/wp03-brief-consult-r2.answer.md",
         "harness_verdict": "VALID (binding_unchanged=true)",
         "verified": "Dependency cycle resolved without weakening final convergence; E10/M-4b, E11/M-4c and E12/M-4d independently load-bear autonomy, target-branch and already-merged."
+      },
+      {
+        "round": "wp03-impl-r1",
+        "decision": "REWORK",
+        "kind": "implementation-second-signature",
+        "bound_brief_rev": 5,
+        "bound_impl_commit": "1c22553102c86587e7a2215a8d49e3e32b27977e",
+        "receipt": ".agentic/wp03-impl-consult-r1.receipt.json",
+        "answer": ".agentic/wp03-impl-consult-r1.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true)",
+        "finding": "Final ls-files call lacked --literal-pathspecs; an untracked metacharacter filename can match a tracked file and be falsely trusted.",
+        "finding_reproduced_by_orchestrator": true
       }
     ],
     "bound_impl_commit": "1c22553102c86587e7a2215a8d49e3e32b27977e"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T08:20:00Z",
+    "updated_at": "2026-10-14T08:35:00Z",
     "dispatched_at": "2026-10-14T08:00:00Z"
   }
 }
