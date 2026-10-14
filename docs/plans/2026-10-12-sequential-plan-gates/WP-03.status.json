@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -83,8 +83,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
-      "sha256": "296be4c9dab02b5440affc93ef4482ff38ac112eea7228b73aa69201ceef957f",
-      "rev": 6,
+      "sha256": "29189ea2efdbf00803e6968574f2658e22e4536b83e32589536224e1738a917b",
+      "rev": 7,
       "prior_revs": [
         {
           "rev": 1,
@@ -125,6 +125,14 @@
           "outcome": "IMPLEMENTED_THEN_REWORK",
           "cause": "Implementation 1c22553 passed 887 tests and 17 mutations, but implementation second-signature r1 found a real INV-3b bypass: `git ls-files --error-unmatch -- <path>` still interprets pathspec metacharacters. An untracked plan filename containing `*`, `?`, or `[]` can match another tracked file and be falsely trusted. Orchestrator independently reproduced normal exit 0 matching TRACKED.status.json versus `git --literal-pathspecs` exit 1. rev6 adds E9 form 5 and M-2e.",
           "superseded_by_rev": 6
+        },
+        {
+          "rev": 6,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.rev6.md",
+          "sha256": "296be4c9dab02b5440affc93ef4482ff38ac112eea7228b73aa69201ceef957f",
+          "outcome": "IMPLEMENTATION_ACCEPTED_THEN_ENDPOINT_REWORK",
+          "cause": "Implementation 40cb5b1 closed the literal-pathspec bypass and received valid independent implementation ACCEPT. Subsequent real convergence preflight found a new bootstrap deadlock outside the rev6 fixture: E1 first committed PLAN status separately on target, but PLAN-01 introduces it only through integration. Pre-staging the same file makes ls-files trust pass while git merge fails (ordinary add exit 2; intent-to-add and skip-worktree exit 128). The mutation repo was also incorrectly fixed to physical-primary, which is off-target and carries unrelated user changes. rev7 binds trust to the integration branch committed blob and executes merge in the caller's registered target worktree.",
+          "superseded_by_rev": 7
         }
       ]
     },
@@ -133,17 +141,17 @@
     ]
   },
   "review": {
-    "decision": "ACCEPT",
+    "decision": "REWORK",
     "reviewer": "kiro-orchestrator",
-    "reviewed_at": "2026-10-14T08:35:00Z",
-    "revised_from": "REWORK",
-    "revision_note": "The sole r1 blocker is closed at 40cb5b1: the resolved relative path is passed through Git's global --literal-pathspecs option before ls-files. E9 form 5 self-proves ordinary pathspec matching would return 0 against a tracked peer, while the production literal check rejects it. Independent dedicated/protected/full suites are green (27/66/888), and M-2e turns the exact E9 node red by reaching PLAN_MERGE_OK, then green after exact restore. Scope remains limited to the three allowed implementation paths; review ACCEPT."
+    "reviewed_at": "2026-10-14T08:50:00Z",
+    "revised_from": "ACCEPT",
+    "revision_note": "rev6 implementation review and impl-r2 ACCEPT remain valid for literal-pathspec closure. End-to-end convergence exposed an untested deployment blocker: target-first PLAN tracking is required by rev6 trust but prevents the first-introduction merge, and cmd_merge mutates physical-primary rather than the caller's clean target worktree. Real temporary-repo reproductions: normal staged file makes merge exit 2; intent-to-add and skip-worktree make merge exit 128. rev7 requires integration committed-blob equality plus current target-worktree execution."
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp03-impl-r2",
+    "round": "wp03-brief-r3",
     "decision": null,
-    "bound_brief_rev": 6,
+    "bound_brief_rev": 7,
     "prior_rounds": [
       {
         "round": "shared-r1-attempt1",
@@ -192,13 +200,24 @@
         "harness_verdict": "VALID (binding_unchanged=true)",
         "finding": "Final ls-files call lacked --literal-pathspecs; an untracked metacharacter filename can match a tracked file and be falsely trusted.",
         "finding_reproduced_by_orchestrator": true
+      },
+      {
+        "round": "wp03-impl-r2",
+        "decision": "ACCEPT",
+        "kind": "implementation-second-signature",
+        "bound_brief_rev": 6,
+        "bound_impl_commit": "40cb5b15b60cf1f0b83ab94f540ab0c7ddd23423",
+        "receipt": ".agentic/wp03-impl-consult-r2.receipt.json",
+        "answer": ".agentic/wp03-impl-consult-r2.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true)",
+        "verified": "The global --literal-pathspecs option precedes ls-files while resolve-first ordering remains intact; E9 form 5 uses real Git and self-proves ordinary pathspec matching; M-2e red reaches PLAN_MERGE_OK and exact restore returns green."
       }
     ],
     "bound_impl_commit": "40cb5b15b60cf1f0b83ab94f540ab0c7ddd23423"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T08:35:00Z",
+    "updated_at": "2026-10-14T08:50:00Z",
     "dispatched_at": "2026-10-14T08:00:00Z"
   }
 }

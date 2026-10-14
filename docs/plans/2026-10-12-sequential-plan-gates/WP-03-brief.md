@@ -1,7 +1,7 @@
 # WP-03: plan merge 的显式豁免记录（多轮 re-freeze 计划）
 
-> rev6 re-freeze 日期 2026-10-14 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
-> 实现二签 r1 找到真实 pathspec 注入；编排者已独立复现。rev6 只把 INV-3b 已写明的“精确路径”要求补成独立测试与变异。
+> rev7 re-freeze 日期 2026-10-14 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> rev6 的 literal-pathspec 修复已获有效实现二签 ACCEPT；随后端到端 dogfood 发现首次引入计划文件时的 bootstrap deadlock。rev7 只修正来源信任与实际 merge checkout 的部署模型，不改变 lint 判据或豁免形态。
 > 所属 Plan：PLAN-01（集成到 `plan/2026-10-12-sequential-plan-gates`，不直接合入 main）。
 > 冻结后执行期间不得修改；需修订走 re-freeze（规则见「Re-freeze 规则」一节）。
 
@@ -68,9 +68,9 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 - **forbidden_paths**（黑名单，绝不能碰）：
   - `src/agentic_loop/wrappers/finalize_merge.sh`（WP-02 的地盘）
   - `src/agentic_loop/validate_wp_status.py`（只读其形态，不改它）
-  - `src/agentic_loop/gate/__init__.py`（**只读复用** `path_is_in_worktree`，
-    见 `:209`；INV-3b 的来源校验须 import 它，**不得**修改该谓词本身，
-    也不得在 `plan_cmd.py` 里另写一份平行实现）
+  - `src/agentic_loop/gate/__init__.py`（不修改；rev7 不再以
+    `path_is_in_worktree` 拒绝所有 linked worktree，而是验证注册 worktree、branch、
+    canonical path 与 committed blob）
   - `src/agentic_loop/wrappers/codex_merge_gate.sh`
   - `src/agentic_loop/autonomy.py`
   - `.agentic/config.toml`
@@ -100,7 +100,7 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 
 - [ ] `src/agentic_loop/plan_cmd.py` — 扩 `OPTIONAL_TOP_LEVEL` + 豁免判定 + merge 放行与留痕
 - [ ] `docs/agentic/templates/PLAN.json` — 模板补注释说明该可选块（不预置生效值）
-- [ ] `tests/test_plan_lint_exemption.py` — 下列 E1-E8 全部用例
+- [ ] `tests/test_plan_lint_exemption.py` — E0–E15（编号允许跳号），含首次引入与 dirty physical-primary 的真实 linked-worktree 形态
 
 ## 验收不变式（标的）
 
@@ -120,34 +120,20 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 `approver` 做空白攻击，于是「删掉 `justification` 与 `reviewed_at` 的非空校验」
 不会让任何用例转红，那两条约束不承重。
 
-**INV-3b（豁免来源必须可审计）**：合法四字段只证明「形状完整」，不证明
-「这份豁免受编排者控制且 Git 可审计」。`plan merge` 凭豁免放行时，
-该豁免**必须**来自主仓(`resolve_paths.main_repo()`)内**受 Git 跟踪**的计划
-状态文件；来自 worktree 本地副本或仓库外任意路径的豁免**必须**被拒绝。
+**INV-3b（豁免来源必须可审计且可首次引入）**：合法四字段只证明“形状完整”。`plan merge` 凭豁免放行时，实际解析到内存的计划文件字节必须同时满足：
 
-**判定顺序是冻结的**（r2 二签指定，不得调整）：
+1. 文件所在根目录必须出现在 `git worktree list --porcelain`，且与主仓共享同一 resolved `git-common-dir`；
+2. 该 worktree 当前分支严格等于计划声明的 `git.base_branch`；
+3. 文件路径严格等于配置的 iterations 目录下 `<iteration_id>/<plan_id>.status.json`，不得是 symlink、别名、仓库外路径或 target worktree 副本；
+4. **本次解析使用的原始字节**与 `git show <base_branch>:<canonical-path>` 的 committed blob 逐字节一致。
 
-1. 先对计划路径与 `main_repo()` 各做 `Path.resolve(strict=True)`；
-2. 对**解析后的目标**做主仓归属判断 + `path_is_in_worktree`；
-3. 用**解析后、相对主仓**的目标路径执行精确的
-   `git -C <main_repo> ls-files --error-unmatch -- <path>`。
+该模型把审计权威绑定到 integration branch 的 committed blob，而不是 physical-primary checkout 的 index。它既拒绝 untracked、tracked-but-dirty、symlink、outside 与错误 worktree，又允许计划文件第一次随 integration branch 引入：target 分支在 merge 前无需预先提交同一文件。
 
-必须先 `resolve` 再判断：否则一个主仓内**受跟踪的 symlink** 可指向主仓内
-**未跟踪**的 JSON —— 只检查逻辑路径前缀与 `ls-files` 会把 symlink 自身视为
-已跟踪,却实际读取未审计的目标。
-**编排者已实测确认该旁路成立**：`git add` 一个 symlink 后，
-`ls-files --error-unmatch` 对 symlink 返回「已跟踪」、对其目标返回「未跟踪」，
-而读取 symlink 实际读到的是那份未跟踪内容。
+**INV-3c（读取与判定同一份字节）**：来源判断必须比较 `_load_and_validate` 实际解析的那份原始字节，不得在解析后重新读取路径来代替；否则“先读恶意字节、再换回 committed 字节”会让来源校验通过但内存仍持有恶意豁免。
 
-> 这是 r1 二签提出但未查完的第 5 条，编排者已实测确认旁路真实存在：
-> `plan_cmd.py:471-472` 的 `_resolve_plan_path` 对**绝对路径直接放行**，
-> 不做任何主仓绑定检查；`plan_cmd.py` 对 `path_is_in_worktree` 的引用数为 **0**。
-> 对比 WP 层：`finalize_merge.sh:160` 用 `path_is_in_worktree` 明确拒绝
-> worktree 本地副本（该文件 §36 注释称其为「branch-local working-tree state,
-> not the shared source of truth」）。plan 层缺这道闸门。
-> **自证**：编排者本人在上一个迭代收敛时，就是用绝对路径对 worktree 副本跑
-> `agentic plan finalize` 并被接受的 —— 当时写的是合法状态，但同一条路径
-> 同样能送进一份伪造的豁免。
+**INV-3d（refs 仓库与 mutation checkout 分离）**：只读 refs/lint/WP blob 查询可继续使用 `main_repo()` 所代表的 shared common repo；但 current-branch 检查、冲突检测和真实 `git merge --no-ff` 必须在调用者的 `current_worktree()` 执行。该 current worktree 必须与 main repo 共享同一 `git-common-dir`，且当前分支严格等于 `target_branch`。不得要求 physical-primary checkout 自身位于 target branch，也不得修改其 index/工作区。
+
+**端到端实证（rev7 触发原因）**：rev6 的 E1 在 `main` 上先单独提交 PLAN 状态，才执行 merge；真实 PLAN-01 的计划文件只存在于 integration branch。编排者在临时仓复现：把同内容文件预置到 target index 后，`ls-files --error-unmatch` 虽返回 0，但 `git merge --no-ff` 以“本地修改将被覆盖”/“Entry not uptodate”退出 2/128；普通 add、intent-to-add、skip-worktree 均不能闭环。physical-primary 同时处于另一分支且有大量用户改动，因此把 mutation repo 固定为它也不可部署。
 
 **INV-4（豁免范围最小）**：豁免只作用于 commit-discipline lint。
 `state != READY_TO_MERGE`、任一 WP 未 `MERGED`、不在目标分支、已合并、
@@ -204,25 +190,11 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
   `reviewed_at="   "`（纯空白）**。每种都断言退出非 0 且目标分支 tip 未变。
   后三条缺一不可 —— 它们各自钉住一个字符串字段的非空约束（r1 二签指认 rev1
   只测了 `approver` 一个，另两条不承重）。
-- **E9 `[exemption-source-must-be-main-repo-tracked]`** → INV-3b，
-  **与 E3 并列为本 WP 的决定性用例**。**四个**子形态，每种都断言退出非 0
-  且目标分支 tip 未变：
-  1. 合法四字段豁免，但计划状态文件位于 **worktree 本地副本**（绝对路径传入）；
-  2. 合法四字段豁免，但文件位于**仓库之外**的临时目录（绝对路径传入）；
-  3. 合法四字段豁免，文件在主仓路径下但**未被 Git 跟踪**（新建未 `git add`）；
-  4. **`[tracked-symlink-to-untracked]`**（r2 二签新增）：主仓内一个**受跟踪的
-     symlink** 指向主仓内**未跟踪**的合法豁免 JSON。必须拒绝。
-     这条专钉「先判断后 resolve」的实现错误 —— 若实现只看逻辑路径，
-     该形态会被误判为已跟踪而放行。
-  5. **`[pathspec-metachar-untracked]`**（实现二签 r1 新增）：在主仓内创建一个
-     **未跟踪**、文件名字面含 `*` / `?` / `[]` pathspec 元字符的合法豁免 JSON，
-     同目录另有能被该模式匹配的已跟踪文件。必须拒绝。Git 的 `--` 只终止 option，
-     **不会**让后续路径自动变成 literal；最终跟踪检查必须使用
-     `git --literal-pathspecs ... ls-files --error-unmatch -- <resolved-relative-path>`
-     （或严格等价的 literal 机制）。编排者实测：普通写法错误返回 0 并输出另一个
-     已跟踪文件；加 `--literal-pathspecs` 后正确返回 1。
-  正向对照：同一份豁免放在主仓受跟踪的计划文件里**必须**放行（即 E1）。
-  witness 必须指向「豁免来源不可信」而非笼统的 lint 失败。
+- **E9 `[exemption-source-must-be-base-committed]`** → INV-3b/3c，参数化至少五个拒绝形态，每种都断言原因特异的 untrusted failure 且 target tip 不变：target worktree 副本、仓库外路径、integration worktree 内未跟踪文件、canonical path 的 symlink、以及 committed 后被工作区修改的文件。正向对照必须从 integration worktree 的 canonical committed 文件读取并放行。
+- **E13 `[first-introduction-bootstrap]`** → INV-1/3b。真实 common repo + 两个 linked worktree：PLAN 文件在 target branch/history/index 中完全不存在，只在 integration branch committed；从 target worktree 调用 `cmd_merge(integration_plan_path)` 必须成功产生唯一 `--no-ff` merge。不得先在 target 提交或 stage PLAN 文件。
+- **E14 `[physical-primary-may-be-dirty-and-off-target]`** → INV-3d。physical-primary 停在非 target 分支并带无关 dirty 文件；另一个 linked worktree 检出 target。从 target worktree调用 merge 必须成功，physical-primary 的 HEAD/index/dirty bytes 前后完全不变。
+- **E15 `[loaded-bytes-are-bound]`** → INV-3c。测试双读攻击：若来源 helper 尝试重新读路径，则第二次提供 committed 字节，而首次解析的是带伪造豁免的不同字节；必须拒绝或确保 helper 只接收首次加载的 raw bytes，绝不能合并。
+
 - **E4 `[exemption-does-not-waive-convergence]`** → INV-4。有合法豁免但某个
   WP 仍是 `APPROVED_FOR_MERGE`（非 `MERGED`），断言退出非 0 且 witness 指向
   convergence 而非 lint。
@@ -269,15 +241,11 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
   去掉 `reviewed_at` 非空 → E3`[reviewed_at-blank]` 转红。
   三条必须**各自**转红。若某条去掉后全绿，说明该字段的约束不承重，
   **判 BLOCKED** 并在报告中说明，不得以「另两个字段已覆盖」作为通过理由。
-- **M-2c**：去掉 INV-3b 的来源校验（即允许任意路径的豁免放行）
-  → **E9 四个子形态必须全部转红**。若有子形态仍绿，说明该形态不承重。
-- **M-2d**（r2 二签新增，专打 symlink 形态）：把判定顺序由「先 `resolve`
-  再判断」改成「先判断逻辑路径再读取」（即删掉 `resolve(strict=True)`）
-  → **E9 子形态 4 必须转红**。其余三个子形态此时可能仍绿 —— 这正是
-  为什么子形态 4 必须单列：它是唯一能钉死判定顺序的那条。
-- **M-2e**（实现二签 r1 新增，专打 literal 路径）：从最终 `ls-files` 调用中
-  删除 `--literal-pathspecs`（退回只有 `--` 的普通 pathspec 解释）
-  → **E9 子形态 5 必须转红**，且错误实现会真实放行并合并。还原后必须回绿。
+- **M-2c**：去掉 committed-blob 来源校验 → E9 的 untracked/dirty/symlink 形态必须转红。
+- **M-2d**：只比较重新读取的路径字节，不比较 loader 实际解析的 raw bytes → E15 必须转红。
+- **M-2e**（保留 rev6 历史证据）：rev6 删除 `--literal-pathspecs` 时 E9 pathspec 形态真实转红；rev7 不再调用 `ls-files`，该变异标记为 SUPERSEDED_BY_EXACT_BLOB，不伪称继续承重。
+- **M-2f**：把 current-branch/merge repo 从 `current_worktree()` 退回 `main_repo()` → E14 必须转红，且 physical-primary 不得发生任何变化。
+- **M-2g**：在 E13 fixture 中先把 PLAN 文件提交或 stage 到 target → fixture 自证失败（测试必须拒绝这种前置），防止再次用错误形态获得假绿。
 - **M-3**：让豁免同时抑制 lint 的 stdout → **E2 必须转红**。
 - **M-4**：让豁免顺带跳过 `_require_converged` → **E4 必须转红**。
 - **M-4b**：让合法豁免在 autonomy 检查前直接返回成功 → **E10 必须转红**。
@@ -296,10 +264,10 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] E0-E12 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **5** 个子形态均逐一参数化，
+- [ ] E0-E15 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **5** 个拒绝形态均逐一参数化，
       不得合并成一条）
-- [ ] M-1 ~ M-6 + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的三条逐字段、
-      M-2c 的五子形态、M-2d 的判定顺序、M-2e 的 literal-pathspec，以及 autonomy/target/already-merged
+- [ ] M-1 ~ M-6 + M-2f/M-2g + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的三条逐字段、
+      M-2c committed-blob、M-2d loaded-bytes、M-2f current-worktree、M-2g bootstrap fixture，以及 autonomy/target/already-merged
       三个独立闸门；含还原回绿），报告附逐条结果
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
@@ -308,26 +276,12 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 - [ ] 无生产写入、无网络、无通知、无推送
 - [ ] commit message 符合规范
 
-## 残余风险（r2 二签指认，本 WP 范围外但须声明）
+## 残余风险
 
-以下三项**不在**本 WP 的修复范围内，但必须记入文档，不得当作已解决：
+rev6 声明的 `tracked-but-dirty` 与“解析后重新读取”的 TOCTOU 风险在 rev7 通过 loaded raw bytes == base committed blob 一并闭合。仍保留两项：
 
-1. **tracked ≠ committed**：「路径受 Git 跟踪」不等于「当前读到的豁免内容已提交」。
-   一个 tracked-but-dirty 的计划文件仍可携带未提交、因而不可追溯的豁免。
-   本 WP 的 INV-3b 只要求「受跟踪」，不要求「工作区与 HEAD 一致」。
-   若要闭合，需另立 WP 判定 `git diff --quiet HEAD -- <path>`。
-2. **校验与读取之间的 TOCTOU 窗口**：路径校验通过之后、实际读取文件之前，
-   仍可被 symlink 替换或文件替换。WP 层 `finalize_merge.sh` 用单次
-   `O_NOFOLLOW` 打开把判断与读取收敛到同一个 fd（见该文件 A34 注释）来消除此窗口；
-   plan 层本 WP **不做**同等加固，属已声明的残余面。
-3. **`main_repo()` 自身的信任边界**：本 WP 约束的是「同一个已选定仓库内」的
-   豁免来源。`resolve_paths.main_repo()` 及其后续 git 子进程如何受
-   repository-selection 类环境变量（`GIT_DIR` / `GIT_WORK_TREE` /
-   `GIT_COMMON_DIR` 等）影响，是更上层的仓库选择信任边界，本 WP 不刻画。
-   r2 二签明确指出这属残余风险而非同层旁路。
-
-另：submodule 内的文件只要始终由 superproject 执行上述**精确** `ls-files`，
-不会因 gitlink 而被误认为「具体文件已跟踪」（r2 二签澄清，无需额外用例）。
+1. **判定后 refs/worktree 并发变化**：来源字节通过后，其他进程仍可能移动 branch ref 或切换 worktree。真实 merge 会基于执行时 Git 状态继续 fail-closed，但本 WP 不引入跨整个命令的全局事务锁。
+2. **`main_repo()`/`current_worktree()` 仓库选择信任边界**：rev7 要求两者 resolved common-dir 相同，但 repository-selection 环境变量的更上层净化仍由既有 resolver/gate 边界负责，不在本 WP 重写。
 
 ## 风险声明
 
@@ -352,25 +306,10 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 - **已知陷阱 3**：豁免放行**不得**写进 `plan finalize`。finalize 本就不跑 lint
   （`cmd_finalize` 无 `_lint_report` 调用），在那里加豁免逻辑是无效代码且会误导
   后来者以为 finalize 也受 lint 管。
-- **已知陷阱 4（INV-3b 的实现要点）**：`_resolve_plan_path`
-  （`plan_cmd.py:471-472`）对**绝对路径直接返回**，不做任何归属判断：
+- **已知陷阱 4（rev7 bootstrap）**：不得再用 physical-primary index 的 `ls-files` 作为豁免权威。权威是 integration branch 的 canonical committed blob，且比较对象必须是 loader 首次解析的 raw bytes。
+- **已知陷阱 5（mutation checkout）**：`main_repo()` 是 shared refs/common-repo 定位，不等于当前应被 mutation 的 checkout。真实 merge、current branch 与 conflict 查询必须在 `current_worktree()`，并先证明 shared common-dir 相同。
+- **不得扩大作用面**：`plan check` / `plan lint` 的 read-only refs 语义与 `plan finalize` 的现有路径可用性保持不变；rev7 只调整 DIRTY exemption 来源校验与 `cmd_merge` 的 mutation checkout。
 
-  ```python
-  if arg.is_absolute():
-      return arg          # <- 任意路径在此处无条件放行
-  ```
-
-  相对路径才会被拼到 `main_repo()` 下。所以来源校验**不能**只加在相对路径
-  那一支。另外「在主仓路径下」不等于「受 Git 跟踪」—— E9 子形态 3 专测这点，
-  实现须同时验证 Git 跟踪状态，且**必须按 INV-3b 冻结的三步顺序**：
-  先 `resolve(strict=True)`，再对解析后的目标做归属 + `path_is_in_worktree`
-  判断，最后用解析后的相对路径跑精确的
-  `git -C <main_repo> ls-files --error-unmatch -- <path>`。
-  颠倒顺序会漏掉受跟踪 symlink 指向未跟踪目标的形态（E9 子形态 4）。
-- **不得扩大 INV-3b 的作用面**：本 WP 只为「**凭豁免放行**」这条路径加来源校验。
-  **不要**顺手给 `plan check` / `plan lint` / `plan finalize` 也加上路径限制 ——
-  那会改变既有命令的可用性（编排者当前就在用绝对路径对 worktree 副本跑
-  `plan check`），属范围外的行为变更。若认为那些命令也该加，记入残余风险另立 WP。
 - **范围外（明确不做）**：不从根上支持多轮 re-freeze（例如允许 N 次 freeze
   提交）。那会改变纪律判据本身，属另一目的，另立 WP。本 WP 只加「显式豁免」。
 - **历史计划不回填**：kqff 与 probe-no-degrade 已合入 `main`，不追溯改写其
