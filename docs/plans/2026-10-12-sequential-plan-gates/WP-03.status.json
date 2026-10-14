@@ -129,8 +129,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
-      "sha256": "af63919566c8f35e11beb1efb8e0f572a518119b30014789d1d6e6b888b04db2",
-      "rev": 9,
+      "sha256": "ecc8f1b15fc0417a51749afc32321bd961c8d9e19ac16eaf71b5e09837c48325",
+      "rev": 10,
       "prior_revs": [
         {
           "rev": 1,
@@ -197,6 +197,15 @@
           "cause": "Brief second signature wp03-brief-r4 returned a VALID REWORK with three defects, all independently confirmed by the orchestrator in the code: (1) derivation bootstrap circularity -- the CLI's only input is the path, while iteration_id/plan_id/base_branch live inside the not-yet-read JSON, yet rev8 simultaneously forbade using the caller's path to open/read, so no implementation could satisfy both; (2) relative-path semantics were not frozen -- the published contract form is `agentic plan merge docs/plans/<iter>/<plan>.status.json`, which rev8's byte-equality-against-an-absolute-derived-path would reject unconditionally; (3) path fields were not constrained to a single component -- validate() only requires non-empty strings, and the orchestrator measured that iteration_id='../../etc' is ACCEPTED and makes _canonical_plan_rel() emit docs/plans/../../etc/PLAN-1.status.json (iteration_id='.' emits docs/plans/PLAN-1.status.json), so 'derive from the worktree root' did not hold at all. rev9 freezes the fixes: rule 3 gains R3-a (two-phase untrusted-first-read then trusted recheck, with the stage-1 read explicitly authorized), R3-b (per-component lstat of the derived path) and R3-c (reject '..'/'.'/duplicate and trailing separators BEFORE any normalization, then accept exactly two canonical spellings -- absolute, and the published relative form mapped to the selected worktree root, never CWD); new INV-3e constrains iteration_id/plan_id to single safe components at the validate() layer; new E16 (both canonical spellings must still merge, relative one with CWD outside the integration worktree) and E17 (six field shapes fail closed with a field-specific reason); new mutations M-2j (drop the component constraint -> E17 red) and M-2k (narrow to absolute-only -> E16 relative branch red, guarding against a silent CLI break). Direction A is unchanged.",
           "user_approved_refreeze": true,
           "superseded_by_rev": 9
+        },
+        {
+          "rev": 9,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.rev9.md",
+          "sha256": "af63919566c8f35e11beb1efb8e0f572a518119b30014789d1d6e6b888b04db2",
+          "outcome": "REWORK",
+          "cause": "Brief second signature wp03-brief-r5 returned a VALID REWORK on one defect, independently measured by the orchestrator: rev9's R3-a stage 1 specified locating the file via the EXISTING _resolve_plan_path(), which joins a relative path against main_repo(). In the real deployment the PLAN file exists ONLY in the integration worktree -- _resolve_plan_path('docs/plans/<iter>/PLAN-01.status.json') points at /Users/admin/vibe/agentic_loop/... with exists()==False -- so stage 1 would fail before iteration_id/plan_id/base_branch could be extracted. rev9's own E16(b) (the published relative spelling must still merge) was therefore unsatisfiable together with R3-a; this is the same bootstrap limitation the orchestrator already hit running `agentic plan check` with a relative path. rev10 freezes a separate rule for the relative form: stage 0 lexical classification, then deterministic candidate discovery across the registered worktrees requiring a UNIQUE existing candidate (zero or several both fail closed), then a stage-2 self-consistency recheck that the discovered worktree is the same one base_branch selects and that the file's iteration_id/plan_id match the corresponding path components byte-for-byte. Adds E18 (four branches: unique candidate merges, zero candidates fail closed, multiple candidates fail closed, forged fields fail closed) and mutations M-2l (revert relative location to _resolve_plan_path -> E18(a)/E16(b) red) and M-2m (drop candidate uniqueness -> E18(c) red). Direction A unchanged. The consultant also confirmed INV-3e suffices against field traversal, that all five existing PLAN ids satisfy it, that exact string comparison rejects case/Unicode/Windows-separator/symlink-root variants, and that E17/M-2j and E16/M-2k are independently load-bearing.",
+          "user_approved_refreeze": true,
+          "superseded_by_rev": 10
         }
       ]
     },
@@ -229,11 +238,11 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp03-brief-r5",
+    "round": "wp03-brief-r6",
     "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 9,
-    "pending_note": "rev9 brief second signature. rev9 keeps user-approved direction A and only closes the three rev8 specification defects found by brief-r4. No implementation may be dispatched until this round returns ACCEPT.",
+    "bound_brief_rev": 10,
+    "pending_note": "rev10 brief second signature. Direction A unchanged; rev10 only fixes the rev9 relative-form bootstrap contradiction found by brief-r5. No implementation may be dispatched until this round returns ACCEPT.",
     "superseded_impl_round": {
       "round": "wp03-impl-r4",
       "decision": "REWORK",
@@ -366,13 +375,28 @@
         "finding_reproduced_by_orchestrator": true,
         "also_verified_passing": "The consultant confirmed that once the bootstrap ordering is fixed, 'exact comparison of the unnormalized canonical spelling + per-component lstat of the derived path + reading only the derived path' is genuinely structural rather than per-alias enumeration, and it found no surviving caller-controlled alias spelling. It also confirmed M-2h and M-2i are independently load-bearing, that the DoD self-check is falsifiable via diff and call-graph review, and that INV-3c/INV-3d/rule 4 carry no new conflict.",
         "resolved_in_rev": 9
+      },
+      {
+        "round": "wp03-brief-r5",
+        "decision": "REWORK",
+        "kind": "wp-brief-second-signature",
+        "bound_brief_rev": 9,
+        "receipt": ".agentic/wp03-brief-consult-r5.receipt.json",
+        "answer": ".agentic/wp03-brief-consult-r5.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
+        "required_changes": 1,
+        "finding": "rev9's R3-a stage 1 mandated the existing _resolve_plan_path() for locating the file, which joins relative paths against main_repo() where the PLAN does not exist; this made rev9's own E16(b) relative-spelling success unsatisfiable together with R3-a.",
+        "finding_reproduced_by_orchestrator": true,
+        "reproduction_evidence": "Measured at 1ed3e83: _resolve_plan_path('docs/plans/2026-10-12-sequential-plan-gates/PLAN-01.status.json') -> /Users/admin/vibe/agentic_loop/... exists()=False, while the file really lives under /Users/admin/vibe/seq-plan-gates/.",
+        "also_verified_passing": "INV-3e suffices against field traversal and all five existing PLAN ids satisfy it (orchestrator additionally verified that plan_cmd.validate() only ever runs on PLAN files, never on the 10 WP status files whose plan_id is null, so tightening it breaks nothing); exact string comparison rejects case, Unicode-normalization, Windows-separator and symlinked-root variants; E17/M-2j and E16/M-2k are independently load-bearing; INV-3c/INV-3d/rule 4 carry no new conflict and the post-decision ref/worktree race is already recorded under residual risk.",
+        "resolved_in_rev": 10
       }
     ],
     "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T02:40:00Z",
+    "updated_at": "2026-10-15T03:30:00Z",
     "dispatched_at": "2026-10-14T10:36:00Z"
   }
 }
