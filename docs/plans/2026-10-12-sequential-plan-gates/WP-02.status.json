@@ -65,8 +65,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.md",
-      "sha256": "2a0e7ac43818e9385a152abd66afec7bc5e2dc5d4fb21b4ac48703f86c223676",
-      "rev": 3,
+      "sha256": "c0e1db2034a42d9e407fe7b089b2f29ddab8cc960e2d7549c6d49eee54d60b99",
+      "rev": 4,
       "prior_revs": [
         {
           "rev": 1,
@@ -83,6 +83,14 @@
           "outcome": "REWORK",
           "cause": "consult r2 returned a VALID REWORK (marker form). Two required changes, both verified by the orchestrator before closing: (C1) a tracked symlink pointing at an untracked JSON bypasses a logical-path-only tracking check (measured: ls-files reports the symlink tracked and its target untracked, while reading the symlink yields the untracked content); (C2) S1b's runtime-fixture escape hatch is unimplementable -- equal branch fields always rev-parse to the same commit, and macOS is case-insensitive so `git branch Main` errors as already-existing.",
           "superseded_by_rev": 3
+        },
+        {
+          "rev": 3,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev3.md",
+          "sha256": "2a0e7ac43818e9385a152abd66afec7bc5e2dc5d4fb21b4ac48703f86c223676",
+          "outcome": "IMPLEMENTED_THEN_REWORK",
+          "cause": "rev3 was implemented as cdb4590 and passed review on scope, mutation red-evidence and a green suite, but the implementation second signature found a merge-blocking fail-open that rev3's invariant set could not catch: INV-3 constrains the DISCRIMINATOR (branch identity, not empty candidates) but says nothing about whether the DECLARED layout is trustworthy. S3a/S3b both honour the declaration. Reproduced by the orchestrator: forging branch == base_branch while git.commit stays an unmerged feature tip yields FINALIZE_OK + state=MERGED + a forged merged_commit. rev4 adds INV-6 (first-parent topology proof), S3c, S3d, M-6 and M-6b.",
+          "superseded_by_rev": 4
         }
       ]
     }
@@ -90,39 +98,14 @@
   "review": {
     "decision": "REWORK",
     "reviewer": "claude-orchestrator",
-    "reviewed_at": "2026-10-13T06:20:00Z",
-    "basis": "independent re-run, not acceptance of the developer report",
-    "verified_independently": [
-      "scope: only the two allowed_paths changed; forbidden_paths untouched; main repo unwritten",
-      "discriminator is branch identity ([[ \"$branch\" == \"$base_branch\" ]]), satisfying INV-3",
-      "parallel-lane path unchanged: same candidate list, same uniqueness requirement, same fail-closed exits",
-      ":371 ancestor precondition intact",
-      "new test file: 10 passed standalone",
-      "M-1 reproduced by the reviewer: S3b red",
-      "M-2b reproduced by the reviewer: S1b red while S1 stays GREEN (empirically confirms INV-1b's premise)",
-      "M-4 reproduced by the reviewer: S5b red while S5a stays GREEN (confirms the brief's S5 would not have been load-bearing)",
-      "mutations restored: script byte-identical to the committed state",
-      "full suite with init.defaultBranch=main: 853 passed / 4 skipped / 0 failed",
-      "agentic quality-gate: PASS",
-      "S1b is a real shell parser (strips comments, delimits by if/fi nesting, takes the block's own level, uses the FINAL assignment) with a meta-check against vacuous green -- not a full-text search"
-    ],
-    "deviations_assessed": {
-      "a_s3_split": "UPHELD. :371 precedes :380, so a never-merged branch exits with 'merge not detected' and can never reach the brief's named witness. The brief put two mutually exclusive conditions in one case -- an authoring error by the orchestrator. S3b is the case that pins INV-3.",
-      "b_s5b_added": "UPHELD and the most valuable finding. The validator itself rejects consult != ACCEPT at v2 APPROVED_FOR_MERGE, masking the script's own gate. Reviewer measured M-4: S5a stays green, only S5b turns red. Written as briefed, M-4 would have had no red evidence.",
-      "c_s4_commit_tree": "UPHELD. Re-merging an already-merged branch is a no-op, so the brief's 'merge twice' construction cannot produce a second merge commit. The brief explicitly allowed a documented alternative construction."
-    },
-    "corrections_to_developer_report": [
-      "The developer attributed the 4 pre-existing failures to a hardcoded `git checkout main` in test_finalize_merge_triple_sign.py. That string does not exist in the file. The real mechanism is a dependency on the default branch name (this host sets init.defaultBranch=master). The conclusion (environment-dependent, not a regression) stands and was verified: the file is byte-identical to d81717d and passes 5/5 with init.defaultBranch=main."
-    ],
-    "superseded_note": "The orchestrator's ACCEPT was based on scope, mutation red-evidence and a green suite, all of which still hold. It did NOT probe whether the discriminator's own inputs are trustworthy. The consultant's V1 shows they are not. Recorded as superseded rather than deleted, because the miss is itself evidence about what this review did and did not cover.",
-    "revised_from": "ACCEPT",
-    "revision_note": "Originally ACCEPT. Revised to REWORK after the implementation second signature found a merge-blocking fail-open (consult.blocking_finding V1) that this review did not probe. What the ACCEPT did verify still holds -- scope, mutation red evidence, 853 passed, quality-gate PASS -- but none of it tests whether the discriminator's own inputs can be trusted, which is exactly the gap. Kept visible rather than silently rewritten."
+    "reviewed_at": "2026-10-13T06:45:00Z",
+    "note": "Reflowed to rev4. The prior ACCEPT (revised to REWORK) and its full verification list are preserved in the eb1b401 commit message and in consult.prior_rounds; this field now tracks the rev4 cycle."
   },
   "consult": {
-    "state": "DECIDED",
-    "round": "impl-r1",
-    "decision": "REWORK",
-    "bound_brief_rev": 3,
+    "state": "NOT_DISPATCHED",
+    "round": "impl-r2",
+    "decision": null,
+    "bound_brief_rev": 4,
     "prior_rounds": [
       {
         "round": "r1-attempt1",
@@ -176,7 +159,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T06:45:00Z",
+    "updated_at": "2026-10-13T07:00:00Z",
     "dispatched_at": "2026-10-13T05:10:00Z",
     "approved_at": "2026-10-13T05:05:00Z"
   }

@@ -118,6 +118,44 @@ dead code，且**不得**退化为「全文搜索 `$wp_tip` 是否出现」。
 **INV-5（幂等）**：已 `MERGED` 且已记录 `merged_commit` 的顺序型 WP，重跑
 `finalize` 退出 0 并报 already finalized；若记录值与 `wp_tip` 不符则失败。
 
+**INV-6（被声明的顺序型布局必须被拓扑证据证实）** —— rev4 新增，
+**合并阻断级,本 WP 现在最重要的一条负面断言**：
+
+`branch == base_branch` 只是状态文件里**两个可被同时改写的声明字段**。
+进入顺序型分支前,**必须**另行用 Git 拓扑证实该声明:
+
+1. `git.commit`（WP 的真实工作提交）**必须**位于 `base_branch` 的
+   **first-parent** 历史中。普通 `merge-base --is-ancestor` **不够** ——
+   它对「被合并进来的并行道提交」同样为真,无法区分「直接提交在集成分支上」
+   与「从别处合并进来」。
+2. 该校验**必须** fail-closed：`git.commit` 缺失、不可解析、或不在
+   first-parent 历史中 → 退出 2,**不得**写 `merged_commit`。
+3. 顺序型分支里 `merged_commit` 仍取 `$wp_tip`（INV-1b 不变）。
+   本项是**附加**前置,不替换任何既有检查。
+
+> **为何必须加这条（实测缺口,非推测）**：rev3 的实现虽然正确地用分支身份
+> 而非候选数做判别（INV-3 要求的部分做对了）,但判别的**输入**是同一份 JSON
+> 里两个可写字段,而写 stamp 的也是这份 JSON。编排者实测复现：
+> 构造一个 `feature/x` 从未合入 `main` 的仓库,把状态伪造成
+> `branch = base_branch = main` 而 `git.commit` 仍是未集成的 feature tip,
+> 跑真实 wrapper 得到 **`FINALIZE_OK`、`state=MERGED`、
+> `merged_commit` = main tip** —— 一个与该 WP 工作毫无关系的提交,
+> 而它的工作仍未集成。
+>
+> `:371` 的祖先前置挡不住：`wp_tip` 与 `base_tip` 都由**分支名**解析,
+> 声明顺序型时二者解析到同一提交,`is-ancestor X X` 恒真。
+> 而 `git.commit`（唯一记录真实工作位置的字段）此前**只被检查非空**,
+> 从不参与任何拓扑校验。
+>
+> **这与 INV-3 防的不是同一个缺陷**。INV-3 禁止把「解析结果为空」当判别依据;
+> 它对「被声明的布局本身是否可信」没有任何要求。S3a/S3b 都尊重声明,
+> 所以两条都抓不到本缺口 —— 这是 brief 不变式集合的盲区,起草者的漏洞。
+
+**实现提示（已实测可行,非建议）**：`git.dispatch_commit` 是冻结时点的提交,
+在 Git 历史里不可事后伪造,可作为顾问要求的「冻结布局证据」。实测确认本检查
+能判真伪：WP-02 自身（真顺序型）的 `git.commit` 与 `dispatch_commit` 均在
+`base_branch` 的 first-parent 历史中;上述伪造场景的 feature tip 不在。
+
 ## Acceptance tests
 
 本段与上文「交付物清单」「完成定义（DoD）」中的验收测试要求同义，非另一份口径。
@@ -167,6 +205,22 @@ dead code，且**不得**退化为「全文搜索 `$wp_tip` 是否出现」。
   造 `branch != base_branch` 且**从未合并**的 WP，断言 exit 2 且 stdout/stderr
   含 `cannot uniquely resolve merge commit`（原因特异 witness，oracle 第 2 项）。
   断言 `merged_commit` **未被**写入，尤其不得等于 `wp_tip`。
+- **S3c `[declared-sequential-but-not-integrated]`** → INV-6,
+  **rev4 新增,与 S3b 并列为本 WP 的决定性用例**。这是实测缺口的回归用例：
+  造一个 `feature/x` **从未合入** `base` 的真实仓库,状态**伪造**成
+  `branch == base_branch == <base>`（谎称顺序型）,但 `git.commit` 保留那个
+  **未集成的 feature tip**。断言：
+  1. exit 2;
+  2. `merged_commit` **未被写入**,尤其不得等于 `base_tip`;
+  3. `state` 仍是 `APPROVED_FOR_MERGE`（未被改写为 `MERGED`）;
+  4. witness 必须指向「声明的布局未被拓扑证实」,而非笼统的解析失败。
+  正向可达性对照（oracle 第 1 项）：同一 fixture 把 `git.commit` 换成**真正在**
+  `base` 的 first-parent 历史里的提交 → 必须 exit 0 并 stamp `wp_tip`。
+  > 不加此对照,本用例可能因为别的原因退出 2 而假绿。
+- **S3d `[sequential-git-commit-missing-or-unresolvable]`** → INV-6 第 2 项。
+  声明顺序型,但 `git.commit` 为空字符串 / 不是合法 sha / 指向仓库中不存在的
+  对象。三种形态各断言 exit 2 且 `merged_commit` 未写入（fail-closed,
+  **不得**因为「拿不到就跳过检查」而放行）。
 - **S4 `[parallel-multi-candidate]`** → INV-2 后半。构造两个合并提交其第二父同为
   `wp_tip`（可对同一分支尖端合并两次到不同集成分支状态），断言 exit 2。
   若该图在 git 下不可构造，须在报告里写明理由并说明替代构造。
@@ -201,6 +255,16 @@ pytest tests/test_finalize_merge_first_call.py \
   **执行者不得自行选择跳过本项，也不得仅以文字理由代替红证**
   （r2 二签明确收紧这一点）。若 S1b 不红，说明静态断言没定位到赋值语句，
   **判 BLOCKED**，不得以「两者当前等值所以无所谓」作为通过理由。
+- **M-6**（rev4 新增,专打 INV-6）：删掉 INV-6 的 first-parent 拓扑校验
+  （即恢复 rev3 的行为：只比较两个声明字段就进顺序型分支）
+  → **S3c 必须转红**。若 S3c 不红,说明本 WP 对该 fail-open 整体不承重,
+  **判 BLOCKED**。
+- **M-6b**：把 INV-6 的 first-parent 校验**弱化**为普通
+  `merge-base --is-ancestor`（这是最自然的错误实现）
+  → **S3c 必须转红**。理由：并行道提交被合并进集成分支后,
+  对它 `is-ancestor` 为真但它不在 first-parent 历史中,
+  所以弱化版挡不住「合并后再误标」的形态。
+  若 S3c 在此变异下仍绿,说明 fixture 没有构造出这个区分,须改 fixture。
 - **M-3**：删掉 `:371` 的祖先前置检查 → 至少一条用例必须转红；若全绿，
   须在报告中说明该检查在哪条用例下承重，或承认它当前不承重。
 - **M-4**：在顺序型路径上跳过双签校验 → **S5 必须转红**。
@@ -214,8 +278,9 @@ pytest tests/test_finalize_merge_first_call.py \
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] S1-S6 全绿
-- [ ] M-1 ~ M-5 逐条红证齐备（含还原回绿），报告附逐条结果
+- [ ] S1 / S1b / S2 / S3a / S3b / **S3c** / **S3d** / S4 / S5a / S5b / S6 全绿
+      （S3d 的三种形态逐一参数化，不得合并成一条）
+- [ ] M-1 ~ M-5 + **M-6 / M-6b** 逐条红证齐备（含还原回绿），报告附逐条结果
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
 - [ ] `agentic quality-gate <status.json>` 全绿
