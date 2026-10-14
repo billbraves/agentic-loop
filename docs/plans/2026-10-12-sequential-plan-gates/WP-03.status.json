@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -191,6 +191,7 @@
     "reviewer": "kiro-orchestrator",
     "reviewed_at": "2026-10-14T15:05:00Z",
     "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
+    "superseded_by_consult": "wp03-impl-r4 returned a VALID REWORK on this same commit: a symlink hop cancelled by '..' in the caller's spelling still reaches PLAN_MERGE_OK (reproduced independently). This review's ACCEPT therefore does NOT authorize merge; WP-03 is CHANGES_REQUESTED. My review checked the r3 shape and the invariants and missed the dotdot-collapse spelling, which is exactly the value of the second signature.",
     "revision_note": "r4 independent review of c5fce58, which closes the impl-r3 parent-directory-symlink fail-open. Before dispatch I reproduced the defect myself at e7712dd in a real temp common repo: with a resolved fixture root the attack returned rc=0 and moved the target tip. The fix adds a third fail-closed face, _no_symlinked_component(), which lstats every relative component from the registered worktree root down to the leaf; it is strictly additive (no existing face weakened), re-reads no bytes (INV-3c intact), and introduces no config knob or bypass flag (E7 scan clean). The new E9 parent-dir-symlink node self-proves the attack shape and asserts lexical==canonical, which is what prevents the macOS /var vs /private/var false green that made my own first probe a false negative; pytest tmp_path was independently confirmed already resolved. I reran all three suites myself at c5fce58: 32 targeted, 66 protected, 893 passed/4 skipped full (baseline +1 in targeted and full, no regressions), and ran my own load-bearing mutation: deleting only the new call makes the node reach PLAN_MERGE_OK, and exact restore returns green with an empty diff. Scope is exactly the two allowed files.",
     "prior_decisions": [
       {
@@ -203,11 +204,25 @@
     ]
   },
   "consult": {
-    "state": "PENDING",
+    "state": "DECIDED",
     "round": "wp03-impl-r4",
-    "decision": null,
+    "decision": "REWORK",
     "kind": "implementation-second-signature",
     "bound_brief_rev": 7,
+    "receipt": ".agentic/wp03-impl-consult-r4.receipt.json",
+    "answer": ".agentic/wp03-impl-consult-r4.answer.md",
+    "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
+    "finding": "A third variant of the same alias family survives c5fce58: a symlink hop cancelled by '..'. _lexical_absolute() calls normpath() FIRST, which lexically collapses 'hop/..', so the symlink component never appears in any path the checks inspect; _no_symlinked_component() then walks only the CANONICAL rel, never the caller's actual spelling. Caller path <canonical_dir>/hop/../PLAN-1.status.json (where hop -> subdir is a symlink) passes lexical equality, resolved equality, leaf lstat and committed-blob equality, and reaches PLAN_MERGE_OK.",
+    "finding_reproduced_by_orchestrator": true,
+    "reproduction_evidence": "Independently reproduced at c5fce58 in a real temp common repo with a resolved fixture root: rc=0, PLAN_MERGE_OK emitted, target tip moved (VERDICT FAIL_OPEN).",
+    "second_finding_not_reproduced": "The consultant also asserted a symlinked registered-worktree root passes all checks. As literally stated it does NOT: git worktree list --porcelain already reports the REAL path, so _registered_worktrees() yields the real root and a call through the symlinked root fails lexical equality (rc=2, tip unchanged, independently measured). The adjacent true observation is that calling through the REAL relocated path still merges — but that is a legitimately registered worktree at its real location, not an alias, so it is correct behaviour, not a fail-open. Only finding A is load-bearing for the rework.",
+    "required_changes": 1,
+    "required_change_detail": [
+      "Validate the CALLER's original path spelling, not only the normpath-collapsed form: reject '..' segments in the caller path before any lexical normalization, or lstat every component of the caller's own spelling. Add an E9 node for the symlink-hop-cancelled-by-dotdot shape and prove it load-bearing by showing removal of the guard reaches PLAN_MERGE_OK."
+    ],
+    "also_verified_passing": "The r3 plain parent-directory-symlink shape is genuinely closed; the new E9 node's leaf/committed-bytes/lexical self-proof is sound; INV-3c, INV-3d and INV-4 are not weakened; c5fce58 changed only the two allowed files.",
+    "soft_limit": "rework_twice",
+    "soft_limit_note": "This is the third consecutive valid REWORK in one root-cause family (outside alias at 0e85e76, parent-directory symlink at e7712dd, dotdot-cancelled symlink hop at c5fce58). Each round closed one concrete spelling of 'the caller's path may alias the canonical file' while the underlying approach stayed enumerative. agentic autonomy signal rework_twice reports SOFT_LIMIT_ENABLED, so the orchestrator stopped instead of dispatching a fourth same-shape patch, and escalated the approach question (canonicalize-and-compare-once versus continued per-shape enumeration) to the user. Dispatch is deliberately NOT in flight.",
     "prior_rounds": [
       {
         "round": "shared-r1-attempt1",
@@ -292,13 +307,26 @@
         "finding_reproduced_by_orchestrator": true,
         "also_verified_passing": "V1 single read_bytes plus raw-byte binding, V3 main_repo/current_worktree separation, E13/E14/E15, commit scope and binding SHAs all conform to rev7.",
         "resolved_in_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
+      },
+      {
+        "round": "wp03-impl-r4",
+        "decision": "REWORK",
+        "kind": "implementation-second-signature",
+        "bound_brief_rev": 7,
+        "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
+        "receipt": ".agentic/wp03-impl-consult-r4.receipt.json",
+        "answer": ".agentic/wp03-impl-consult-r4.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
+        "finding": "Symlink hop cancelled by '..' in the caller's spelling still reaches PLAN_MERGE_OK; see the active consult block for the full reproduction and the one non-reproducing secondary claim.",
+        "finding_reproduced_by_orchestrator": true,
+        "resolved_in_commit": null
       }
     ],
     "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-14T15:05:00Z",
+    "updated_at": "2026-10-14T15:52:00Z",
     "dispatched_at": "2026-10-14T10:36:00Z"
   }
 }
