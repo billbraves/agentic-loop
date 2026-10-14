@@ -1,9 +1,14 @@
 # WP-03: plan merge 的显式豁免记录（多轮 re-freeze 计划）
 
-> rev8 re-freeze 日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
-> **用户已明确批准本次 re-freeze 并选定方向 A（canonicalize once）。**
+> rev9 re-freeze 日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> **用户已明确批准 rev8 的方向 A（canonicalize once）；rev9 不改方向，只补齐 rev8 自身的三处规格缺陷。**
+> rev8 的 brief 二签（`wp03-brief-r4`）返回有效 REWORK，三项均经编排者独立在代码中核实：
+> (1) **推导自举循环**——CLI 唯一输入就是路径，而 `iteration_id` / `plan_id` / `base_branch` 都在尚未读取的 JSON 里，rev8 却同时禁止用调用者路径去 open/read，实现者无法同时满足两者；
+> (2) **相对路径语义未冻结**——契约文档公开形式是 `agentic plan merge docs/plans/<iter>/<plan>.status.json`，rev8 的「逐字节等于推导出的绝对路径」会无条件拒绝这一合法用法；
+> (3) **ID 未约束为单一路径组件**——`validate()` 只要求 `iteration_id` / `plan_id` 为非空字符串，实测 `iteration_id="../../etc"` 可被接受且使 `_canonical_plan_rel()` 产出 `docs/plans/../../etc/PLAN-1.status.json`，「由 worktree root 推导」这一不变式本身即不成立。
+> rev9 冻结三者的解法（见 INV-3b rule 3 与新增 INV-3e、E16/E17、M-2j）。
 > rev7 的来源信任判据在三轮实现二签中连续被攻破同一根因家族：仓库外别名（`0e85e76`）、父目录 symlink（`e7712dd`）、`..` 抵消的 symlink hop（`c5fce58`）。每轮只关掉「调用者路径可别名到 canonical 文件」的一种**拼写**，方法是枚举式，故出现第四种拼写只是时间问题。rev8 把 INV-3b rule 3 从「校验调用者给的路径」改为「**只认自己推导出的路径**」，一次终结该家族。
-> rev8 只改 INV-3b rule 3 的判据形态与其配套用例/变异，**不改**豁免的四字段形态、lint 口径、INV-3c/3d/4/5/6/7、范围与禁改清单。
+> rev8/rev9 只改 INV-3b rule 3 的判据形态（并新增 INV-3e）与其配套用例/变异，**不改**豁免的四字段形态、lint 口径、INV-3c/3d/4/5/6/7、范围与禁改清单。
 > 所属 Plan：PLAN-01（集成到 `plan/2026-10-12-sequential-plan-gates`，不直接合入 main）。
 > 冻结后执行期间不得修改；需修订走 re-freeze（规则见「Re-freeze 规则」一节）。
 
@@ -102,7 +107,7 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 
 - [ ] `src/agentic_loop/plan_cmd.py` — 扩 `OPTIONAL_TOP_LEVEL` + 豁免判定 + merge 放行与留痕
 - [ ] `docs/agentic/templates/PLAN.json` — 模板补注释说明该可选块（不预置生效值）
-- [ ] `tests/test_plan_lint_exemption.py` — E0–E15（编号允许跳号），含首次引入与 dirty physical-primary 的真实 linked-worktree 形态
+- [ ] `tests/test_plan_lint_exemption.py` — E0–E17（编号允许跳号），含首次引入、dirty physical-primary 的真实 linked-worktree 形态，以及 rev9 的 canonical 双拼写正向对照（E16）与路径字段形态矩阵（E17）
 
 ## 验收不变式（标的）
 
@@ -126,13 +131,25 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 
 1. 文件所在根目录必须出现在 `git worktree list --porcelain`，且与主仓共享同一 resolved `git-common-dir`；
 2. 该 worktree 当前分支严格等于计划声明的 `git.base_branch`；
-3. **（rev8 改写：canonicalize once）** 受信任的路径必须由引擎**自行推导**，而不是去校验调用者给的拼写。实现必须：
-   - 由 registered worktree root（rule 1 已确立）与 canonical 相对路径 `<iteration_id>/<plan_id>.status.json` **拼出唯一的 trusted path**；
-   - 对该推导路径做**真实性校验**：从 worktree root 起逐组件 `lstat`，任一组件（含叶子）为 symlink 即 fail-closed；
-   - 把调用者传入的路径与该推导路径比较，**凡非逐字节相等即拒**。比较必须在**未经任何词法规范化**（不得先 `normpath` / `abspath` / `realpath` / `resolve`）的调用者原始拼写上进行，或等价地在比较前先拒绝调用者路径中出现 `..` 组件；
-   - 实际读取与 blob 比对（rule 4）只允许使用**推导路径**，不得使用调用者路径。
+3. **（rev8 立向 / rev9 定实现次序：canonicalize once）** 受信任的路径必须由引擎**自行推导**，而不是去校验调用者给的拼写。
 
-   **判据方向是「只认推导结果」，不是「枚举并封堵已知别名」。** 任何形如「再补一种 symlink/别名形态的检查」的实现都不满足 rev8：新增一个拼写就能绕过的结构即视为未完成。
+   **R3-a 两阶段读取（解除 rev8 的自举循环）。** 字段来自 JSON、而 JSON 要先读文件，这个循环用「**不信任的首读 + 受信任的复核**」解开，而**不**靠放宽路径判据：
+
+   - **阶段 1（不信任）**：按**现有** `_resolve_plan_path()` 语义定位调用者给的文件并读取一次，解析出 `iteration_id` / `plan_id` / `git.base_branch`。该次读取**不授予任何信任**，其字节仅用于取出这些字段，且必须保留为 `raw`（INV-3c 要求的那一份）。
+   - **阶段 2（受信任）**：用这些字段按 rule 1/2 选出 registered worktree root，拼出唯一 trusted path，然后把**调用者的原始拼写**与该推导路径做 R3-c 的相等比较。比较通过后，**rule 4 的 blob 比对只用推导路径**，且比对对象仍是阶段 1 的 `raw`（**不得为了比对而重新读取任何路径** —— 重读即违反 INV-3c）。
+
+   明确授权：阶段 1 的 `open/read` 是**允许且必需**的，它不构成「用调用者路径建立信任」。DoD 的「调用者路径只用于相等比较」据此精确化为：**除阶段 1 的单次读取外**，调用者路径不得再被 open/read/resolve，更不得用于 rule 4 的 blob 比对。
+
+   **R3-b 推导路径的真实性校验。** 从 worktree root 起对推导路径逐组件 `lstat`，任一组件（含叶子）为 symlink 即 fail-closed。
+
+   **R3-c 相等比较与相对路径语义（冻结）。** 比较必须在**未经词法折叠**的调用者原始拼写上进行：实现必须在任何 `normpath` / `realpath` / `resolve` 之前，**先拒绝**调用者路径中出现 `..` 组件、`.` 组件、重复分隔符与尾随分隔符。通过该前置净化后，**恰好两种拼写可被接受**，二者都必须逐字节等于对应的推导形式：
+
+   - **canonical 绝对拼写**：逐字节等于 `<worktree_root>/<iterations_dir>/<iteration_id>/<plan_id>.status.json`；
+   - **canonical 相对拼写**：逐字节等于 `<iterations_dir>/<iteration_id>/<plan_id>.status.json`（即契约文档公开的 `docs/plans/<iter>/<plan>.status.json` 形式）。该相对形式**直接映射到阶段 2 选出的 integration worktree root**，**不依赖 CWD**，也不经 `_resolve_plan_path()` 的 main-repo 拼接。
+
+   其余一切拼写（含大小写变体、符号链接别名、仓库外路径、target worktree 副本）一律拒绝。保留公开相对形式是**兼容性要求**，不是放宽：它仍只接受**唯一**的 canonical 相对拼写。
+
+   **判据方向是「只认推导结果」，不是「枚举并封堵已知别名」。** 任何形如「再补一种 symlink/别名形态的检查」的实现都不满足本不变式：新增一个拼写就能绕过的结构即视为未完成。
 4. **本次解析使用的原始字节**与 `git show <base_branch>:<canonical-path>` 的 committed blob 逐字节一致。
 
 该模型把审计权威绑定到 integration branch 的 committed blob，而不是 physical-primary checkout 的 index。它既拒绝 untracked、tracked-but-dirty、symlink、outside 与错误 worktree，又允许计划文件第一次随 integration branch 引入：target 分支在 merge 前无需预先提交同一文件。
@@ -141,6 +158,11 @@ probe-no-degrade 收敛时用户裁决**豁免**（保留 15 轮收敛记录，�
 `<canonical_dir>/hop/../PLAN-1.status.json`（`hop -> subdir` 为 symlink）时，词法相等、resolved 相等、叶子非 symlink、committed blob 字节相等**四面全过**，到达 `PLAN_MERGE_OK` 并改变 target tip。根因不是漏了某一种 symlink 位置，而是**判据建立在调用者可控的拼写上**。
 
 **一处需要如实区分的非缺陷**：impl-r4 二签同时主张「symlink 化的 registered worktree root 也可绕过」。该主张**不成立**：`git worktree list --porcelain` 本就报告真实路径，`_registered_worktrees()` 据此拿到真实 root，经 symlink root 调用过不了相等判定（实测 `rc=2`、target tip 不变）。相邻的真实现象是「经**真实**迁移后的路径调用仍可合并」——那是合法注册 worktree 处于其真实位置，不是别名，属正确行为。rev8 **不**把它当缺陷处理，也不得为它加判据。
+
+**INV-3e（rev9 新增：路径字段必须是单一安全组件）**：`iteration_id` 与 `plan_id` 参与拼装文件路径，因此各自必须是**单一相对路径组件**：非空、不含路径分隔符（`/`、`\`）、不等于 `.` 或 `..`、不以 `.` 开头、不含 NUL。校验必须在 `validate()` 层 fail-closed，而不是只在拼装处防御。推导出的路径还必须**词法上位于**所选 registered worktree root 之下（拼装后再次确认未逃出 root）。
+
+编排者实测（rev9 触发原因之一）：现 `validate()` 只要求两者是非空字符串，`iteration_id="../../etc"` 被**接受**，`_canonical_plan_rel()` 随即产出
+`docs/plans/../../etc/PLAN-1.status.json`；`iteration_id="."` 产出 `docs/plans/PLAN-1.status.json`。只要路径字段可含 `..`，「由 worktree root 推导」这一不变式本身就不成立 —— 攻击者不必再别名路径，直接用字段把推导结果指向别处即可。
 
 **INV-3c（读取与判定同一份字节）**：来源判断必须比较 `_load_and_validate` 实际解析的那份原始字节，不得在解析后重新读取路径来代替；否则“先读恶意字节、再换回 committed 字节”会让来源校验通过但内存仍持有恶意豁免。
 
@@ -210,6 +232,8 @@ autonomy STOP —— 这些条件在**有**合法豁免时仍然各自 fail-clos
   **fixture 根必须是 resolved 路径。** macOS 下 `mktemp` 给 `/var/folders/...` 而 `.resolve()` 给 `/private/var/...`，词法相等会因此以**无关原因**失败，使攻击看起来"已被拒绝"——编排者在 rev7 轮次实测到过这一**假阴性**。pytest `tmp_path` 已是 resolved，故基于 `tmp_path` 的 fixture 安全；仍须保留显式断言锁死该假绿。
 - **E13 `[first-introduction-bootstrap]`** → INV-1/3b。真实 common repo + 两个 linked worktree：PLAN 文件在 target branch/history/index 中完全不存在，只在 integration branch committed；从 target worktree 调用 `cmd_merge(integration_plan_path)` 必须成功产生唯一 `--no-ff` merge。不得先在 target 提交或 stage PLAN 文件。
 - **E14 `[physical-primary-may-be-dirty-and-off-target]`** → INV-3d。physical-primary 停在非 target 分支并带无关 dirty 文件；另一个 linked worktree 检出 target。从 target worktree调用 merge 必须成功，physical-primary 的 HEAD/index/dirty bytes 前后完全不变。
+- **E16 `[canonical-spellings-accepted]`**（rev9 新增）→ INV-3b R3-c 的**兼容性正向对照**。同一个合法 fixture，分别用两种 canonical 拼写调用 `cmd_merge` 并各自断言成功放行（`PLAN_MERGE_OK`、唯一 `--no-ff` merge）：(a) canonical **绝对**路径；(b) canonical **相对**路径 `<iterations_dir>/<iteration_id>/<plan_id>.status.json`，且该相对调用必须在 **CWD 不是 integration worktree**（例如 CWD 为 target worktree）时仍然成功 —— 以此证明相对形式映射到选出的 worktree root 而非 CWD。**本用例是防「修复把合法用法一起拒掉」的闸门，不得省略。**
+- **E17 `[path-fields-must-be-single-component]`**（rev9 新增）→ INV-3e。参数化至少六个形态，每个都断言 fail-closed 且 target tip 不变：`iteration_id` 取 `"../../etc"`、`"it-1/.."`、`"."`、`".."`、含分隔符的 `"a/b"`，以及 `plan_id` 取 `"../PLAN-1"`。断言必须指向**字段校验**（`PLAN_INVALID` 一类的特异原因），而不是落到「文件不存在」之类的偶然失败 —— 后者会在字段校验被删除后依然为绿，从而不承重。
 - **E15 `[loaded-bytes-are-bound]`** → INV-3c。测试双读攻击：若来源 helper 尝试重新读路径，则第二次提供 committed 字节，而首次解析的是带伪造豁免的不同字节；必须拒绝或确保 helper 只接收首次加载的 raw bytes，绝不能合并。
 
 - **E4 `[exemption-does-not-waive-convergence]`** → INV-4。有合法豁免但某个
@@ -261,6 +285,8 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 - **M-2c**：去掉 committed-blob 来源校验 → E9 的 untracked/dirty/symlink 形态必须转红。
 - **M-2h（rev8 新增，本轮决定性变异）**：把 rule 3 的「比较调用者原始拼写与推导路径」退回成「先 `normpath`/`resolve` 再比较」（即 rev7 的做法）→ **E9 的 `..`-抵消 symlink hop 形态必须转红，且红的形态必须是到达 `PLAN_MERGE_OK`**（不是因别的原因报错）。报告须附红/绿两次的实际输出。
 - **M-2i（rev8 新增）**：去掉推导路径的逐组件 `lstat` → **E9 的父目录 symlink 形态必须转红**。该变异与 M-2h 必须**分别**施加、分别验证：两者同时存在才说明「推导」与「真实性校验」两半都承重。
+- **M-2j（rev9 新增）**：去掉 INV-3e 的单一组件校验（恢复成「只要是非空字符串即可」）→ **E17 必须转红**。红的形态必须是推导路径逃出 worktree root（而非「文件不存在」的偶然失败）。
+- **M-2k（rev9 新增，防过度收紧）**：把 R3-c 的接受集**收窄为仅绝对拼写** → **E16 的相对拼写分支必须转红**。该变异证明兼容性要求本身承重，防止实现以「一律只收绝对路径」的方式悄悄做出 CLI 破坏性变更。
 - **M-2d**：只比较重新读取的路径字节，不比较 loader 实际解析的 raw bytes → E15 必须转红。
 - **M-2e**（保留 rev6 历史证据）：rev6 删除 `--literal-pathspecs` 时 E9 pathspec 形态真实转红；rev7 不再调用 `ls-files`，该变异标记为 SUPERSEDED_BY_EXACT_BLOB，不伪称继续承重。
 - **M-2f**：把 current-branch/merge repo 从 `current_worktree()` 退回 `main_repo()` → E14 必须转红，且 physical-primary 不得发生任何变化。
@@ -283,15 +309,17 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 ## 完成定义（DoD）
 
 - [ ] 交付物逐项就绪
-- [ ] E0-E15 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **8** 个拒绝形态均逐一参数化，
-      不得合并成一条）
-- [ ] M-1 ~ M-6 + M-2f/M-2g/M-2h/M-2i + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的三条逐字段、
-      M-2c committed-blob、M-2d loaded-bytes、M-2f current-worktree、M-2g bootstrap fixture、
-      **M-2h 词法规范化退回**、**M-2i 去掉逐组件 lstat**，以及 autonomy/target/already-merged
-      三个独立闸门；含还原回绿），报告附逐条结果
-- [ ] **rev8 结构性自检**：报告须明确说明受信任路径是**推导**得出的，并指出代码中
-      调用者路径**唯一**被使用的位置是与推导路径的相等比较（读取与 blob 比对均用推导路径）。
-      若调用者路径仍被用于 open/read/resolve，视为未满足 rev8。
+- [ ] E0-E17 全绿（编号允许跳号；E3 的 **10** 种形态、E9 的 **8** 个拒绝形态、E17 的
+      **6** 个字段形态均逐一参数化，不得合并成一条；**E16 两个 canonical 拼写分支都必须绿**）
+- [ ] M-1 ~ M-6 + M-2f/M-2g/M-2h/M-2i/M-2j/M-2k + M-4b/M-4c/M-4d 逐条红证齐备（含 M-2b 的
+      三条逐字段、M-2c committed-blob、M-2d loaded-bytes、M-2f current-worktree、
+      M-2g bootstrap fixture、**M-2h 词法规范化退回**、**M-2i 去掉逐组件 lstat**、
+      **M-2j 去掉单一组件校验**、**M-2k 收窄为仅绝对拼写**，以及
+      autonomy/target/already-merged 三个独立闸门；含还原回绿），报告附逐条结果
+- [ ] **rev9 结构性自检**：报告须明确说明受信任路径是**推导**得出的，并指出代码中调用者
+      路径被使用的位置**恰好**是两处：R3-a 阶段 1 的单次读取（明确授权）与与推导路径的
+      相等比较。rule 4 的 blob 比对必须用**推导路径** + 阶段 1 的 `raw`；若调用者路径出现
+      在 blob 比对、或出现第二次 open/read/resolve，视为未满足 rev9。
 - [ ] 「必须保持绿的集合」全绿
 - [ ] 全量 `python3.11 -m pytest tests -q` 不低于基线（基线须在报告中实测记录）
 - [ ] `agentic quality-gate <status.json>` 全绿
@@ -301,7 +329,7 @@ WP-02 新增的 `tests/test_finalize_merge_sequential.py` 也必须保持绿。
 
 ## 残余风险
 
-rev6 声明的 `tracked-but-dirty` 与“解析后重新读取”的 TOCTOU 风险在 rev7 通过 loaded raw bytes == base committed blob 一并闭合。rev8 以「只认推导路径」终结了调用者拼写别名家族（rev7 的枚举式判据曾被三种拼写连续攻破）。仍保留两项：
+rev6 声明的 `tracked-but-dirty` 与“解析后重新读取”的 TOCTOU 风险在 rev7 通过 loaded raw bytes == base committed blob 一并闭合。rev8 以「只认推导路径」终结了调用者拼写别名家族（rev7 的枚举式判据曾被三种拼写连续攻破）；rev9 补上 rev8 自身的三处规格缺陷（推导自举次序、相对路径兼容语义、路径字段必须是单一安全组件）。仍保留两项：
 
 1. **判定后 refs/worktree 并发变化**：来源字节通过后，其他进程仍可能移动 branch ref 或切换 worktree。真实 merge 会基于执行时 Git 状态继续 fail-closed，但本 WP 不引入跨整个命令的全局事务锁。
 2. **`main_repo()`/`current_worktree()` 仓库选择信任边界**：rev7 要求两者 resolved common-dir 相同，但 repository-selection 环境变量的更上层净化仍由既有 resolver/gate 边界负责，不在本 WP 重写。

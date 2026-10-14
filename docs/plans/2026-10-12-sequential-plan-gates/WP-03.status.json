@@ -129,8 +129,8 @@
     ],
     "brief": {
       "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.md",
-      "sha256": "c40147471a9f2306204f3fcdb7f082b6a079b0f9d37828cfe2199eade81b56a2",
-      "rev": 8,
+      "sha256": "af63919566c8f35e11beb1efb8e0f572a518119b30014789d1d6e6b888b04db2",
+      "rev": 9,
       "prior_revs": [
         {
           "rev": 1,
@@ -188,6 +188,15 @@
           "cause": "rev7's source-trust criterion was defeated three consecutive times by one root-cause family, each a different SPELLING of 'the caller's path may alias the canonical file': outside alias to the real canonical committed file (found at 0e85e76, closed by e7712dd), parent-directory symlink (impl-r3 on e7712dd, closed by c5fce58), and a symlink hop cancelled by '..' (impl-r4 on c5fce58, still open). The orchestrator independently reproduced all three. The root cause is structural, not a missing case: _lexical_absolute() calls normpath() first, collapsing 'hop/..' lexically so the symlink component never appears in any inspected path, and _no_symlinked_component() walks only the canonical rel rather than the caller's spelling. agentic autonomy signal rework_twice reported SOFT_LIMIT_ENABLED, so instead of a fourth same-shape patch the orchestrator escalated the approach choice to the user, who selected direction A (canonicalize once). rev8 rewrites INV-3b rule 3 to derive the trusted path from the registered worktree root plus the canonical rel, lstat it per component, compare the caller's UNNORMALIZED spelling for byte equality, and read only the derived path; it adds the dotdot-hop E9 shape and mutations M-2h/M-2i. Nothing else changes: the four-field exemption shape, lint semantics, INV-3c/3d/4/5/6/7, scope and the forbidden-path list are untouched.",
           "user_approved_refreeze": true,
           "superseded_by_rev": 8
+        },
+        {
+          "rev": 8,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-03-brief.rev8.md",
+          "sha256": "c40147471a9f2306204f3fcdb7f082b6a079b0f9d37828cfe2199eade81b56a2",
+          "outcome": "REWORK",
+          "cause": "Brief second signature wp03-brief-r4 returned a VALID REWORK with three defects, all independently confirmed by the orchestrator in the code: (1) derivation bootstrap circularity -- the CLI's only input is the path, while iteration_id/plan_id/base_branch live inside the not-yet-read JSON, yet rev8 simultaneously forbade using the caller's path to open/read, so no implementation could satisfy both; (2) relative-path semantics were not frozen -- the published contract form is `agentic plan merge docs/plans/<iter>/<plan>.status.json`, which rev8's byte-equality-against-an-absolute-derived-path would reject unconditionally; (3) path fields were not constrained to a single component -- validate() only requires non-empty strings, and the orchestrator measured that iteration_id='../../etc' is ACCEPTED and makes _canonical_plan_rel() emit docs/plans/../../etc/PLAN-1.status.json (iteration_id='.' emits docs/plans/PLAN-1.status.json), so 'derive from the worktree root' did not hold at all. rev9 freezes the fixes: rule 3 gains R3-a (two-phase untrusted-first-read then trusted recheck, with the stage-1 read explicitly authorized), R3-b (per-component lstat of the derived path) and R3-c (reject '..'/'.'/duplicate and trailing separators BEFORE any normalization, then accept exactly two canonical spellings -- absolute, and the published relative form mapped to the selected worktree root, never CWD); new INV-3e constrains iteration_id/plan_id to single safe components at the validate() layer; new E16 (both canonical spellings must still merge, relative one with CWD outside the integration worktree) and E17 (six field shapes fail closed with a field-specific reason); new mutations M-2j (drop the component constraint -> E17 red) and M-2k (narrow to absolute-only -> E16 relative branch red, guarding against a silent CLI break). Direction A is unchanged.",
+          "user_approved_refreeze": true,
+          "superseded_by_rev": 9
         }
       ]
     },
@@ -220,11 +229,11 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp03-brief-r4",
+    "round": "wp03-brief-r5",
     "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 8,
-    "pending_note": "rev8 brief second signature under direction A. No implementation may be dispatched until this round returns ACCEPT. The rev7 implementation commit c5fce58 remains bound in git.commit as the last implementation, but it is NOT accepted: impl-r4 returned a VALID REWORK on it.",
+    "bound_brief_rev": 9,
+    "pending_note": "rev9 brief second signature. rev9 keeps user-approved direction A and only closes the three rev8 specification defects found by brief-r4. No implementation may be dispatched until this round returns ACCEPT.",
     "superseded_impl_round": {
       "round": "wp03-impl-r4",
       "decision": "REWORK",
@@ -343,13 +352,27 @@
         "finding": "Symlink hop cancelled by '..' in the caller's spelling still reaches PLAN_MERGE_OK; see the active consult block for the full reproduction and the one non-reproducing secondary claim.",
         "finding_reproduced_by_orchestrator": true,
         "resolved_in_commit": null
+      },
+      {
+        "round": "wp03-brief-r4",
+        "decision": "REWORK",
+        "kind": "wp-brief-second-signature",
+        "bound_brief_rev": 8,
+        "receipt": ".agentic/wp03-brief-consult-r4.receipt.json",
+        "answer": ".agentic/wp03-brief-consult-r4.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
+        "required_changes": 3,
+        "finding": "Three specification defects in rev8: derivation bootstrap circularity, unfrozen relative-path semantics (would reject the published CLI form), and iteration_id/plan_id not constrained to single path components (measured traversal: iteration_id='../../etc' accepted).",
+        "finding_reproduced_by_orchestrator": true,
+        "also_verified_passing": "The consultant confirmed that once the bootstrap ordering is fixed, 'exact comparison of the unnormalized canonical spelling + per-component lstat of the derived path + reading only the derived path' is genuinely structural rather than per-alias enumeration, and it found no surviving caller-controlled alias spelling. It also confirmed M-2h and M-2i are independently load-bearing, that the DoD self-check is falsifiable via diff and call-graph review, and that INV-3c/INV-3d/rule 4 carry no new conflict.",
+        "resolved_in_rev": 9
       }
     ],
     "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T01:20:00Z",
+    "updated_at": "2026-10-15T02:40:00Z",
     "dispatched_at": "2026-10-14T10:36:00Z"
   }
 }
