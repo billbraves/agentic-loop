@@ -579,14 +579,41 @@ def _name_in_canonical_dir(plan_path: Path, canonical: Path) -> bool:
     """True only when the caller lexically named the canonical file.
 
     ``canonical`` is built below a registered, already-resolved worktree root.
-    Requiring exact lexical equality therefore rejects both a trailing symlink
-    and an alias in any parent component.  The independent resolved-path check
-    below then verifies that the canonical name still denotes the expected
-    real file (INV-3b rule 3).
+    Requiring exact lexical equality rejects a trailing symlink alias, and the
+    final component is ``lstat``-checked so the named file itself is not a
+    link.  Exact lexical equality alone does NOT prove the absence of a
+    symlinked PARENT component, because ``normpath``/``abspath`` never follow
+    or inspect parents: an attacker can move the whole ``docs/`` tree outside
+    the repository and leave a ``docs`` symlink in its place, keeping the same
+    lexical spelling.  That gap is closed by
+    :func:`_no_symlinked_component` (INV-3b rule 3).
     """
     try:
         lexical = _lexical_absolute(plan_path)
         return lexical == canonical and not lexical.is_symlink()
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def _no_symlinked_component(wt_root: Path, rel: str) -> bool:
+    """True only when every relative component of ``rel`` under ``wt_root``
+    exists and is a real (non-symlink) filesystem entry.
+
+    ``rel`` is the canonical repo-relative path of the plan status file
+    (``docs/plans/<iteration_id>/<plan_id>.status.json``).  Each accumulated
+    path is inspected with ``Path.is_symlink()``, which is an ``lstat`` and
+    never follows links, so a symlinked parent component (e.g. a relocated
+    ``docs`` tree) is detected instead of silently followed.  Fail-closed: any
+    ``OSError``/``RuntimeError``/``ValueError`` (including a missing or
+    dangling component) returns False.  The file's bytes are never read here
+    (INV-3c)."""
+    try:
+        current = Path(wt_root)
+        for part in Path(rel).parts:
+            current = current / part
+            if current.is_symlink():
+                return False
+        return True
     except (OSError, RuntimeError, ValueError):
         return False
 
@@ -604,12 +631,15 @@ def _lint_exemption_source_is_trusted(plan_path: Path, data: dict, raw: bytes) -
     2. that worktree's current branch is exactly ``git.base_branch``;
     3. the caller's path IS the canonical
        ``<iterations_dir>/<iteration_id>/<plan_id>.status.json`` inside that
-       worktree.  Both faces are checked: the *lexical* name the caller used
+       worktree.  Three faces are checked: the *lexical* name the caller used
        (never symlink-followed, and ``lstat``-checked so the file itself is not
-       a link) and, independently, the fully resolved path.  Equality after
-       resolving alone is NOT enough — a symlink alias placed anywhere (inside
-       or outside the repo) resolves to the canonical file, so a resolve-only
-       check would trust it (rev7 REWORK finding);
+       a link), every relative parent component from the worktree root
+       (``lstat``-checked, so a symlinked ``docs/`` parent that was relocated
+       outside the repository cannot alias the canonical file), and,
+       independently, the fully resolved path.  Equality after resolving alone
+       is NOT enough — a symlink alias placed anywhere (inside or outside the
+       repo) resolves to the canonical file, so a resolve-only check would
+       trust it (rev7 REWORK finding);
     4. the loaded raw bytes are byte-identical to
        ``git show <base_branch>:<canonical-rel-path>``.
     """
@@ -636,6 +666,11 @@ def _lint_exemption_source_is_trusted(plan_path: Path, data: dict, raw: bytes) -
         # Lexical face: the caller must have NAMED this very file, not an alias
         # that merely points at it (the final component is never followed).
         if not _name_in_canonical_dir(plan_path, canonical):
+            continue
+        # Parent face: every component from the worktree root down to the file
+        # must be a real entry.  Lexical equality alone cannot see a relocated
+        # docs/ tree replaced by a symlink of the same spelling.
+        if not _no_symlinked_component(wt_root, rel):
             continue
         # Resolved face: the real file behind that name must also be the
         # canonical file (defence in depth against any residual link).

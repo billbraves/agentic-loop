@@ -17,6 +17,8 @@ worktrees; only the working directory is pointed at the temporary repo.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -289,6 +291,39 @@ def _untrusted_source(shape: str, root: Path, repo: Path, wt_plan: Path) -> Path
         path = wt_plan / PLAN_REL
         _write_json(path, _plan(exemption={**EXEMPTION, "justification": "dirty working-tree variant"}))
         return path
+    if shape == "parent-dir-symlink":
+        # The integration worktree's whole `docs/` tree is moved OUTSIDE the
+        # repository and replaced by a symlink of the same name.  The lexical
+        # spelling the caller uses is unchanged, the leaf PLAN file is still a
+        # real file (not a link) and its bytes are still the committed blob —
+        # so the lexical-equality, leaf-lstat, resolved-equality and
+        # committed-blob faces all pass.  Only a per-component lstat of the
+        # PARENT path can reject this alias.
+        docs = wt_plan / "docs"
+        moved = root / "moved-docs"
+        if moved.exists() or moved.is_symlink():
+            shutil.rmtree(moved, ignore_errors=True)
+        moved.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(docs), str(moved))
+        docs.symlink_to(moved, target_is_directory=True)
+        path = wt_plan / PLAN_REL
+
+        # Self-proof: this is the intended attack shape, and the assertions
+        # below also guard against the macOS /var vs /private/var trap that
+        # would make the lexical check fail for an UNRELATED reason (a false
+        # green).  `root` is tmp_path, which is already resolved.
+        assert Path(wt_plan).resolve() == Path(wt_plan)
+        assert docs.is_symlink(), "parent component must be a symlink"
+        assert not path.is_symlink(), "the leaf PLAN file must not be a link"
+        assert path.read_bytes() == _git_bytes(
+            wt_plan, "show", "plan/it-1:{}".format(PLAN_REL)
+        ).stdout, "bytes must be byte-identical to the committed blob"
+        canonical = Path(wt_plan).resolve() / PLAN_REL
+        assert Path(os.path.normpath(os.path.abspath(path))) == canonical, (
+            "lexical absolute path must equal the canonical path"
+        )
+        assert path.resolve() == canonical.resolve()
+        return path
     raise AssertionError(shape)
 
 
@@ -301,6 +336,7 @@ def _untrusted_source(shape: str, root: Path, repo: Path, wt_plan: Path) -> Path
         "integration-untracked",
         "canonical-symlink",
         "committed-then-dirty",
+        "parent-dir-symlink",
     ],
 )
 def test_e9_exemption_source_must_be_base_committed(
