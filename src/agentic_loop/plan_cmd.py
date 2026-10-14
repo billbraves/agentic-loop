@@ -61,7 +61,6 @@ from pathlib import Path
 
 from agentic_loop import autonomy as _autonomy
 from agentic_loop import resolve_paths as _rp
-from agentic_loop.gate import path_is_in_worktree
 
 SCHEMA_VERSION = "agentic-plan-status/v1"
 
@@ -103,16 +102,30 @@ RC_USAGE = 64
 # JSON load + schema validation (pure)
 # ---------------------------------------------------------------------------
 
-def load_plan(path: Path) -> dict:
+def load_plan(path: Path) -> tuple:
+    """Read the plan file exactly once and parse those same raw bytes.
+
+    Returns ``(raw, data)``.  The raw bytes are the bytes actually parsed;
+    every later trust decision must compare against them, never a re-read
+    of the path (INV-3c).
+    """
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
     except FileNotFoundError:
         raise ValueError("plan status file does not exist: {}".format(path)) from None
+    except OSError as exc:
+        raise ValueError("plan status file cannot be read: {} ({})".format(path, exc)) from None
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("plan status file is not valid UTF-8: {}".format(exc)) from None
+    try:
+        value = json.loads(text)
     except json.JSONDecodeError as exc:
         raise ValueError("invalid JSON at line {}: {}".format(exc.lineno, exc.msg)) from None
     if not isinstance(value, dict):
         raise ValueError("plan status root must be a JSON object")
-    return value
+    return raw, value
 
 
 def validate(data: dict) -> list:
@@ -478,9 +491,58 @@ def _resolve_plan_path(plan_arg: str) -> Path:
 
 def _load_and_validate(plan_arg: str) -> tuple:
     path = _resolve_plan_path(plan_arg)
-    data = load_plan(path)
+    _raw, data = load_plan(path)
     _validate_or_raise(data, path.name)
-    return data, path
+    return data, path, _raw
+
+
+def _git_bytes_may_fail(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True)
+
+
+def _git_common_dir(repo: Path) -> Path:
+    """Resolved ``git-common-dir`` of ``repo`` (shared across linked worktrees)."""
+    out = _git(repo, "rev-parse", "--git-common-dir")
+    p = Path(out)
+    if not p.is_absolute():
+        p = repo / p
+    return p.resolve()
+
+
+def _registered_worktrees(repo: Path) -> dict:
+    """Map each registered worktree root (resolved) -> current branch name
+    (None when detached), from ``git worktree list --porcelain``."""
+    proc = _git_may_fail(repo, "worktree", "list", "--porcelain")
+    if proc.returncode != 0:
+        return {}
+    out: dict = {}
+    current: Path | None = None
+    for line in proc.stdout.splitlines():
+        if line.startswith("worktree "):
+            try:
+                current = Path(line[len("worktree "):]).resolve()
+            except (OSError, RuntimeError, ValueError):
+                current = None
+            if current is not None:
+                out.setdefault(current, None)
+        elif line.startswith("branch refs/heads/") and current is not None:
+            out[current] = line[len("branch refs/heads/"):]
+    return out
+
+
+def _canonical_plan_rel(data: dict):
+    """Lexically safe repo-relative canonical path of the plan status file:
+    ``<iterations_dir>/<iteration_id>/<plan_id>.status.json``. None when the
+    configured iterations_dir escapes the repo root."""
+    try:
+        repo = _rp.main_repo()
+        rel = os.path.relpath(_rp.iterations_dir(), repo)
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        return None
+    rel_path = Path(rel)
+    if rel_path.is_absolute() or rel_path.parts[:1] == ("..",):
+        return None
+    return (rel_path / data["iteration_id"] / "{}.status.json".format(data["plan_id"])).as_posix()
 
 
 def _lint_exemption_is_legal(exemption: object) -> bool:
@@ -501,35 +563,47 @@ def _lint_exemption_is_legal(exemption: object) -> bool:
     return True
 
 
-def _lint_exemption_source_is_trusted(plan_path: Path) -> bool:
-    """Bind a merge-only exemption to a tracked file in the physical main repo.
+def _lint_exemption_source_is_trusted(plan_path: Path, data: dict, raw: bytes) -> bool:
+    """Bind a merge-only exemption to the integration branch's committed blob.
 
-    Resolution deliberately precedes every ownership and Git-index check.  In
-    particular, this makes a tracked symlink to an untracked JSON target fail
-    the final exact ``ls-files`` check on the target that was actually read.
+    The audit authority is the committed blob on ``git.base_branch`` — not any
+    checkout's index (known trap 4).  All of the following must hold for the
+    raw bytes that ``_load_and_validate`` actually parsed; the path is never
+    re-read here (INV-3b/3c):
+
+    1. the file's root is a ``git worktree list``-registered worktree sharing
+       the main repo's resolved ``git-common-dir``;
+    2. that worktree's current branch is exactly ``git.base_branch``;
+    3. the resolved plan path equals the canonical
+       ``<iterations_dir>/<iteration_id>/<plan_id>.status.json`` inside that
+       worktree (symlink/alias/outside/target-copy shapes all fail this);
+    4. the loaded raw bytes are byte-identical to
+       ``git show <base_branch>:<canonical-rel-path>``.
     """
     try:
-        resolved_path = plan_path.resolve(strict=True)
-        resolved_repo = _rp.main_repo().resolve(strict=True)
+        main_repo = _rp.main_repo()
+        main_common = _git_common_dir(main_repo)
+        resolved = plan_path.resolve(strict=True)
+        rel = _canonical_plan_rel(data)
     except (OSError, RuntimeError, ValueError, SystemExit):
         return False
-
-    try:
-        relative = resolved_path.relative_to(resolved_repo)
-    except ValueError:
-        return False
-    if path_is_in_worktree(resolved_path):
+    if rel is None:
         return False
 
-    tracked = _git_may_fail(
-        resolved_repo,
-        "--literal-pathspecs",
-        "ls-files",
-        "--error-unmatch",
-        "--",
-        relative.as_posix(),
-    )
-    return tracked.returncode == 0
+    base_branch = data["git"]["base_branch"]
+    for wt_root, branch in _registered_worktrees(main_repo).items():
+        if branch != base_branch:
+            continue
+        try:
+            if _git_common_dir(wt_root) != main_common:
+                continue
+        except (OSError, RuntimeError, ValueError):
+            continue
+        if resolved != wt_root / rel:
+            continue
+        blob = _git_bytes_may_fail(main_repo, "show", "{}:{}".format(base_branch, rel))
+        return blob.returncode == 0 and blob.stdout == raw
+    return False
 
 
 def _require_converged(data: dict, repo: Path) -> None:
@@ -625,7 +699,7 @@ def _lint_report(data: dict, repo: Path) -> tuple:
 # ---------------------------------------------------------------------------
 
 def cmd_check(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
     base = data["git"]["base_branch"]
     target = data["git"]["target_branch"]
@@ -683,7 +757,7 @@ def cmd_check(plan_arg: str) -> int:
 
 
 def cmd_lint(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
     dirty, lines = _lint_report(data, repo)
     for line in lines:
@@ -703,7 +777,7 @@ def cmd_lanes(plan_arg: str) -> int:
     Read-only (git `show` only). The ready computation is a pure function
     (`_lanes_ready`) evaluated over WP states read from git — the state is the
     only dynamic input; there is no clock / no network."""
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
     base = data["git"]["base_branch"]
 
@@ -767,7 +841,7 @@ def cmd_lanes(plan_arg: str) -> int:
 
 
 def cmd_merge(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
 
     base_branch = data["git"]["base_branch"]
@@ -794,8 +868,9 @@ def cmd_merge(plan_arg: str) -> int:
     _require_converged(data, repo)
 
     # Fail-closed on commit discipline.  A legal exemption waives only this one
-    # finding, and only when it came from the tracked physical-main-repo file
-    # that was actually read.
+    # finding, and only when the bytes actually parsed are bound to the
+    # integration branch's committed canonical blob (see
+    # _lint_exemption_source_is_trusted).
     dirty, lines = _lint_report(data, repo)
     if dirty:
         exemption = data.get("lint_exemption")
@@ -808,12 +883,12 @@ def cmd_merge(plan_arg: str) -> int:
                 file=sys.stderr,
             )
             return RC_FAIL
-        if not _lint_exemption_source_is_trusted(path):
+        if not _lint_exemption_source_is_trusted(path, data, raw):
             for line in lines:
                 print(line, file=sys.stderr)
             print(
-                "PLAN_FAIL: lint exemption source is untrusted; use a Git-tracked "
-                "plan status file in the physical main repo",
+                "PLAN_FAIL: lint exemption source is untrusted; run from the "
+                "canonical plan status file committed on the integration branch",
                 file=sys.stderr,
             )
             return RC_FAIL
@@ -823,7 +898,25 @@ def cmd_merge(plan_arg: str) -> int:
             )
         )
 
-    current = _git(repo, "branch", "--show-current")
+    # Everything below consults or mutates a checkout.  It MUST run in the
+    # caller's current worktree (INV-3d) — never the physical-primary
+    # checkout, which may be on another branch with unrelated user changes
+    # (E14).  Refs-only queries above already ran against the shared main
+    # repo; the current worktree must share that repo's resolved common dir.
+    try:
+        checkout = _rp.current_worktree()
+        if _git_common_dir(checkout) != _git_common_dir(repo):
+            print(
+                "PLAN_FAIL: current worktree is not linked to the main repo "
+                "(shared git-common-dir mismatch)",
+                file=sys.stderr,
+            )
+            return RC_FAIL
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        print("PLAN_FAIL: cannot resolve the current worktree", file=sys.stderr)
+        return RC_FAIL
+
+    current = _git(checkout, "branch", "--show-current")
     if current != target_branch:
         print(
             "PLAN_FAIL: must run on target branch {} (current: {})".format(
@@ -843,16 +936,16 @@ def cmd_merge(plan_arg: str) -> int:
         )
         return RC_FAIL
 
-    proc = _git_may_fail(repo, "merge", "--no-ff", "--no-edit", base_branch)
+    proc = _git_may_fail(checkout, "merge", "--no-ff", "--no-edit", base_branch)
     if proc.returncode != 0:
-        conflicted = _git_may_fail(repo, "diff", "--name-only", "--diff-filter=U")
+        conflicted = _git_may_fail(checkout, "diff", "--name-only", "--diff-filter=U")
         if conflicted.returncode == 0 and conflicted.stdout.strip():
             print("PLAN_FAIL: merge conflicts in:", file=sys.stderr)
             for line in conflicted.stdout.splitlines():
                 if line.strip():
                     print("    - {}".format(line.strip()), file=sys.stderr)
             print(
-                "  resolve then: git -C {} merge --continue   (or abort: git merge --abort)".format(repo),
+                "  resolve then: git -C {} merge --continue   (or abort: git merge --abort)".format(checkout),
                 file=sys.stderr,
             )
         else:
@@ -860,7 +953,7 @@ def cmd_merge(plan_arg: str) -> int:
                 base_branch, proc.stderr.strip()), file=sys.stderr)
         return RC_FAIL
 
-    merged_commit = _git(repo, "rev-parse", "HEAD")
+    merged_commit = _git(checkout, "rev-parse", "HEAD")
     print(
         "PLAN_MERGE_OK merged_commit={} base_branch={} into={}".format(
             merged_commit, base_branch, target_branch
@@ -871,7 +964,7 @@ def cmd_merge(plan_arg: str) -> int:
 
 
 def cmd_finalize(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
 
     base_branch = data["git"]["base_branch"]

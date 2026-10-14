@@ -1,8 +1,18 @@
-"""WP-03 rev5: audited, merge-only plan-lint exemptions.
+"""WP-03 rev7: audited, merge-only plan-lint exemptions.
 
-Every behavioural fixture uses real Git subprocesses.  Source-binding cases use
-an actual primary repository and, where relevant, an actual linked worktree;
-only ``resolve_paths.main_repo`` is redirected to that temporary primary repo.
+Rev7 deployment model (INV-3b/3c/3d):
+
+- the plan status file is committed ONLY on the integration branch; the
+  exemption source check binds the loaded raw bytes to that branch's
+  committed canonical blob — never to any checkout's index;
+- the file is read through a linked worktree checked out at
+  ``git.base_branch``, at the canonical
+  ``<iterations_dir>/<iteration_id>/<plan_id>.status.json`` path;
+- the real ``git merge --no-ff`` runs in the caller's current worktree, which
+  may be a different linked worktree than the physical primary (E13/E14).
+
+Every behavioural fixture uses real Git subprocesses and real linked
+worktrees; only the working directory is pointed at the temporary repo.
 """
 from __future__ import annotations
 
@@ -27,6 +37,8 @@ EXEMPTION = {
     "reviewed_at": "2026-10-14T08:00:00Z",
 }
 
+PLAN_REL = "docs/plans/it-1/PLAN-1.status.json"
+
 
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -35,6 +47,10 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
         capture_output=True,
         text=True,
     )
+
+
+def _git_bytes(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True)
 
 
 def _head(repo: Path, ref: str = "HEAD") -> str:
@@ -73,8 +89,15 @@ def _make_repo(
     wp_merged: bool = True,
     exemption: object = EXEMPTION,
     state: str = "READY_TO_MERGE",
-) -> tuple[Path, Path, str]:
-    """Create a primary repo with a real target/integration commit graph."""
+) -> tuple[Path, Path, Path, str]:
+    """Primary + linked integration worktree fixture.
+
+    The plan status file is committed ONLY on the integration branch
+    ``plan/it-1`` and is read from the canonical path of a linked worktree
+    checked out at that branch.  The physical primary stays on the target
+    branch ``main`` and never receives a copy of the plan file (no fake-green
+    pre-commit on the target).
+    """
     repo = root / "repo"
     repo.mkdir(parents=True)
     _git(repo, "init", "-q")
@@ -121,19 +144,19 @@ def _make_repo(
     )
     _git(repo, "add", "docs/plans/it-1/WP-1.status.json")
     _git(repo, "commit", "-q", "-m", "finalize WP-1")
+
+    # The plan file is introduced on the integration branch only.
+    _write_json(repo / PLAN_REL, _plan(state=state, exemption=exemption))
+    _git(repo, "add", PLAN_REL)
+    _git(repo, "commit", "-q", "-m", "freeze plan status")
     integration_tip = _head(repo)
 
     _git(repo, "checkout", "-q", "main")
-    plan_path = repo / "docs/plans/it-1/PLAN-1.status.json"
-    _write_json(plan_path, _plan(state=state, exemption=exemption))
-    _git(repo, "add", "docs/plans/it-1/PLAN-1.status.json")
-    _git(repo, "commit", "-q", "-m", "track plan status")
-    return repo, plan_path, integration_tip
-
-
-def _bind_primary(monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
-    monkeypatch.setattr(plan_cmd._rp, "main_repo", lambda: repo)
-    monkeypatch.chdir(repo)
+    wt_plan = root / "wt-plan"
+    _git(repo, "worktree", "add", "-q", str(wt_plan), "plan/it-1")
+    plan_path = wt_plan / PLAN_REL
+    assert plan_path.is_file()
+    return repo, plan_path, wt_plan, integration_tip
 
 
 def _merge_rc(plan_path: Path | str) -> int:
@@ -149,8 +172,8 @@ def _merge_count(repo: Path) -> int:
 
 
 def test_e0_dirty_no_exemption_must_fail(tmp_path, monkeypatch, capsys):
-    repo, plan_path, _ = _make_repo(tmp_path, exemption=None)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, _ = _make_repo(tmp_path, exemption=None)
+    monkeypatch.chdir(repo)
     before = _head(repo, "main")
 
     assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
@@ -159,8 +182,8 @@ def test_e0_dirty_no_exemption_must_fail(tmp_path, monkeypatch, capsys):
 
 
 def test_e1_dirty_with_valid_exemption_merges(tmp_path, monkeypatch, capsys):
-    repo, plan_path, integration_tip = _make_repo(tmp_path)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, integration_tip = _make_repo(tmp_path)
+    monkeypatch.chdir(repo)
 
     assert _merge_rc(plan_path) == plan_cmd.RC_OK
     output = capsys.readouterr().out
@@ -171,8 +194,8 @@ def test_e1_dirty_with_valid_exemption_merges(tmp_path, monkeypatch, capsys):
 
 
 def test_e2_lint_output_unchanged(tmp_path, monkeypatch, capsys):
-    repo, plan_path, _ = _make_repo(tmp_path)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, wt_plan, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(repo)
 
     _write_json(plan_path, _plan(exemption=None))
     assert plan_cmd.cmd_lint(str(plan_path)) == plan_cmd.RC_STOP
@@ -206,8 +229,8 @@ INVALID_EXEMPTIONS = [
 def test_e3_partial_exemption_matrix_fails_closed(
     tmp_path, monkeypatch, capsys, invalid
 ):
-    repo, plan_path, _ = _make_repo(tmp_path, exemption=invalid)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, _ = _make_repo(tmp_path, exemption=invalid)
+    monkeypatch.chdir(repo)
     before = _head(repo, "main")
 
     assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
@@ -215,74 +238,40 @@ def test_e3_partial_exemption_matrix_fails_closed(
     assert _head(repo, "main") == before
 
 
-def _untrusted_source(
-    shape: str, root: Path, repo: Path, tracked_plan: Path
-) -> Path:
+def _untrusted_source(shape: str, root: Path, repo: Path, wt_plan: Path) -> Path:
+    """Build one rejected exemption-source shape on the real input surface
+    (file bytes in a real checkout).  The positive control is the canonical
+    committed file in wt_plan, used by E1."""
     data = _plan(exemption=EXEMPTION)
-    if shape == "linked-worktree":
-        worktree = root / "linked"
-        _git(repo, "worktree", "add", "-q", str(worktree), "plan/it-1")
-        path = worktree / "docs/plans/it-1/LOCAL.status.json"
+    if shape == "target-worktree-copy":
+        # A copy at the canonical path of the TARGET-branch checkout: the
+        # branch binding (worktree must be on git.base_branch) rejects it.
+        path = repo / PLAN_REL
         _write_json(path, data)
         return path
     if shape == "outside-repo":
         path = root / "outside/PLAN.status.json"
         _write_json(path, data)
         return path
-    if shape == "main-untracked":
-        path = repo / "docs/plans/it-1/UNTRACKED.status.json"
+    if shape == "integration-untracked":
+        # Inside the integration worktree but not at the canonical path.
+        path = wt_plan / "docs/plans/it-1/UNTRACKED.status.json"
         _write_json(path, data)
         return path
-    if shape == "tracked-symlink-to-untracked":
-        target = repo / "docs/plans/it-1/untracked-target.json"
+    if shape == "canonical-symlink":
+        # The canonical path is a symlink to an untracked file: the resolved
+        # path no longer equals the canonical path.
+        target = wt_plan / "docs/plans/it-1/untracked-target.json"
         _write_json(target, data)
-        link = repo / "docs/plans/it-1/TRACKED-LINK.status.json"
+        link = wt_plan / PLAN_REL
+        link.unlink()
         link.symlink_to(target.name)
-        _git(repo, "add", "docs/plans/it-1/TRACKED-LINK.status.json")
-        _git(repo, "commit", "-q", "-m", "track logical symlink only")
-        assert _git(
-            repo,
-            "ls-files",
-            "--error-unmatch",
-            "--",
-            "docs/plans/it-1/TRACKED-LINK.status.json",
-        ).returncode == 0
-        assert _git(
-            repo,
-            "ls-files",
-            "--error-unmatch",
-            "--",
-            "docs/plans/it-1/untracked-target.json",
-            check=False,
-        ).returncode != 0
         return link
-    if shape == "pathspec-metachar-untracked":
-        # The source path itself is untracked, but without Git's global
-        # --literal-pathspecs option its '*' would match this tracked peer and
-        # make `ls-files --error-unmatch` return zero.
-        tracked_peer = repo / "docs/plans/it-1/TRACKED.status.json"
-        _write_json(tracked_peer, {"tracked": True})
-        _git(repo, "add", "docs/plans/it-1/TRACKED.status.json")
-        _git(repo, "commit", "-q", "-m", "track pathspec match peer")
-        path = repo / "docs/plans/it-1/*.status.json"
-        _write_json(path, data)
-        relative = "docs/plans/it-1/*.status.json"
-        assert _git(
-            repo,
-            "ls-files",
-            "--error-unmatch",
-            "--",
-            relative,
-        ).returncode == 0
-        assert _git(
-            repo,
-            "--literal-pathspecs",
-            "ls-files",
-            "--error-unmatch",
-            "--",
-            relative,
-            check=False,
-        ).returncode != 0
+    if shape == "committed-then-dirty":
+        # Canonical path and branch, but the working file was modified after
+        # the commit: loaded bytes != committed blob.
+        path = wt_plan / PLAN_REL
+        _write_json(path, _plan(exemption={**EXEMPTION, "justification": "dirty working-tree variant"}))
         return path
     raise AssertionError(shape)
 
@@ -290,30 +279,132 @@ def _untrusted_source(
 @pytest.mark.parametrize(
     "shape",
     [
-        "linked-worktree",
+        "target-worktree-copy",
         "outside-repo",
-        "main-untracked",
-        "tracked-symlink-to-untracked",
-        "pathspec-metachar-untracked",
+        "integration-untracked",
+        "canonical-symlink",
+        "committed-then-dirty",
     ],
 )
-def test_e9_exemption_source_must_be_main_repo_tracked(
+def test_e9_exemption_source_must_be_base_committed(
     tmp_path, monkeypatch, capsys, shape
 ):
-    repo, tracked_plan, _ = _make_repo(tmp_path / "primary")
-    _bind_primary(monkeypatch, repo)
-    source = _untrusted_source(shape, tmp_path, repo, tracked_plan)
+    repo, plan_path, wt_plan, _ = _make_repo(tmp_path / "primary")
+    source = _untrusted_source(shape, tmp_path, repo, wt_plan)
+    monkeypatch.chdir(repo)
     before = _head(repo, "main")
 
-    assert _merge_rc(source.resolve() if shape != "tracked-symlink-to-untracked" else source) == plan_cmd.RC_FAIL
+    assert _merge_rc(source) == plan_cmd.RC_FAIL
     error = capsys.readouterr().err
     assert "lint exemption source is untrusted" in error
     assert _head(repo, "main") == before
 
 
+def test_e13_first_introduction_bootstrap(tmp_path, monkeypatch, capsys):
+    repo, plan_path, _, integration_tip = _make_repo(tmp_path / "primary")
+    # A branch can be checked out in only one worktree: park the physical
+    # primary on a holder branch so the target branch is free for wt-target.
+    _git(repo, "checkout", "-q", "-b", "holder")
+    wt_target = tmp_path / "wt-target"
+    _git(repo, "worktree", "add", "-q", str(wt_target), "main")
+
+    # M-2g fixture self-check: the PLAN file must be wholly absent from the
+    # target history, index and filesystem before the merge.  Pre-committing
+    # or staging it on the target would make this test a fake green.
+    assert _git(repo, "cat-file", "-e", "main:{}".format(PLAN_REL), check=False).returncode != 0
+    assert _git(repo, "rev-list", "--format=%H", "main", "--", PLAN_REL).stdout.strip() == ""
+    assert PLAN_REL not in _git(wt_target, "ls-files").stdout.split()
+    assert not (wt_target / PLAN_REL).exists()
+
+    monkeypatch.chdir(wt_target)
+    assert _merge_rc(plan_path) == plan_cmd.RC_OK
+    output = capsys.readouterr().out
+    assert "PLAN_MERGE_OK" in output
+
+    # Exactly one --no-ff merge on main, second parent = integration tip.
+    assert _merge_count(repo) == 1
+    parents = _git(repo, "rev-list", "--parents", "-n", "1", "main").stdout.split()
+    assert len(parents) == 3
+    assert integration_tip in parents
+    # The merge introduced the plan file into the target worktree.
+    assert (wt_target / PLAN_REL).is_file()
+
+
+def test_e14_physical_primary_may_be_dirty_and_off_target(
+    tmp_path, monkeypatch, capsys
+):
+    repo, plan_path, _, integration_tip = _make_repo(tmp_path / "primary")
+
+    # Physical primary: off-target branch + unrelated dirty bytes.
+    _git(repo, "checkout", "-q", "-b", "user-work")
+    (repo / "seed.txt").write_bytes(b"seed modified by user\n")
+    (repo / "scratch.bin").write_bytes(b"\x00\xffuser-data\xff\x00")
+    before = {
+        "head": _head(repo),
+        "branch": _git(repo, "branch", "--show-current").stdout.strip(),
+        "status": _git(repo, "status", "--porcelain").stdout,
+        "index": _git(repo, "ls-files", "--stage").stdout,
+        "seed": (repo / "seed.txt").read_bytes(),
+        "scratch": (repo / "scratch.bin").read_bytes(),
+    }
+
+    wt_target = tmp_path / "wt-target"
+    _git(repo, "worktree", "add", "-q", str(wt_target), "main")
+    monkeypatch.chdir(wt_target)
+
+    assert _merge_rc(plan_path) == plan_cmd.RC_OK
+    assert "PLAN_MERGE_OK" in capsys.readouterr().out
+    parents = _git(repo, "rev-list", "--parents", "-n", "1", "main").stdout.split()
+    assert len(parents) == 3
+    assert integration_tip in parents
+
+    # The physical-primary checkout/index/dirty bytes are byte-for-byte
+    # untouched (M-2f: mutation must not happen in main_repo()'s checkout).
+    assert _head(repo) == before["head"]
+    assert _git(repo, "branch", "--show-current").stdout.strip() == before["branch"]
+    assert _git(repo, "status", "--porcelain").stdout == before["status"]
+    assert _git(repo, "ls-files", "--stage").stdout == before["index"]
+    assert (repo / "seed.txt").read_bytes() == before["seed"]
+    assert (repo / "scratch.bin").read_bytes() == before["scratch"]
+
+
+def test_e15_loaded_bytes_are_bound(tmp_path, monkeypatch, capsys):
+    repo, plan_path, _, _ = _make_repo(tmp_path / "primary")
+    monkeypatch.chdir(repo)
+    committed = _git_bytes(repo, "show", "plan/it-1:{}".format(PLAN_REL)).stdout
+
+    # Forge different bytes that still carry a legal four-field exemption.
+    forged = _plan(exemption={**EXEMPTION, "justification": "forged in-memory variant"})
+    plan_path.write_text(json.dumps(forged, indent=2) + "\n", encoding="utf-8")
+    assert plan_path.read_bytes() != committed
+
+    # Double-read attack (INV-3c): after the loader parsed the forged bytes,
+    # restore the committed bytes to the path before the source check.  A
+    # helper that re-reads the path would compare the swapped committed bytes
+    # and pass; the binding must compare the bytes actually loaded.
+    real_lint = plan_cmd._lint_report
+
+    def swapping_lint(data, repo_):
+        plan_path.write_bytes(committed)
+        return real_lint(data, repo_)
+
+    monkeypatch.setattr(plan_cmd, "_lint_report", swapping_lint)
+    before = _head(repo, "main")
+
+    assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
+    assert "lint exemption source is untrusted" in capsys.readouterr().err
+    assert _head(repo, "main") == before
+
+    # Positive control with the same instrumentation: once the working file
+    # holds the committed bytes again, the identical fixture must merge.
+    plan_path.write_bytes(committed)
+    assert _merge_rc(plan_path) == plan_cmd.RC_OK
+    assert "PLAN_MERGE_OK" in capsys.readouterr().out
+
+
 def test_e4_exemption_does_not_waive_convergence(tmp_path, monkeypatch, capsys):
-    repo, plan_path, _ = _make_repo(tmp_path, wp_merged=False)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, _ = _make_repo(tmp_path, wp_merged=False)
+    monkeypatch.chdir(repo)
     before = _head(repo, "main")
 
     assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
@@ -322,8 +413,8 @@ def test_e4_exemption_does_not_waive_convergence(tmp_path, monkeypatch, capsys):
 
 
 def test_e5_exemption_does_not_waive_state(tmp_path, monkeypatch, capsys):
-    repo, plan_path, _ = _make_repo(tmp_path, state="ACTIVE")
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, _ = _make_repo(tmp_path, state="ACTIVE")
+    monkeypatch.chdir(repo)
     before = _head(repo, "main")
 
     assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
@@ -332,8 +423,8 @@ def test_e5_exemption_does_not_waive_state(tmp_path, monkeypatch, capsys):
 
 
 def test_e6_exemption_is_logged(tmp_path, monkeypatch, capsys):
-    repo, plan_path, _ = _make_repo(tmp_path)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(repo)
 
     assert _merge_rc(plan_path) == plan_cmd.RC_OK
     output = capsys.readouterr().out
@@ -355,10 +446,10 @@ def test_e7_no_bypass_flag_or_environment_variable():
 def test_e8_clean_plan_unaffected(tmp_path, monkeypatch, capsys):
     outcomes = []
     for name, exemption in (("without", None), ("with", EXEMPTION)):
-        repo, plan_path, integration_tip = _make_repo(
+        repo, plan_path, _, integration_tip = _make_repo(
             tmp_path / name, dirty=False, exemption=exemption
         )
-        _bind_primary(monkeypatch, repo)
+        monkeypatch.chdir(repo)
         rc = _merge_rc(plan_path)
         output = capsys.readouterr().out
         parents = _git(repo, "rev-list", "--parents", "-n", "1", "main").stdout.split()
@@ -373,8 +464,8 @@ def test_e8_clean_plan_unaffected(tmp_path, monkeypatch, capsys):
 def test_e10_exemption_does_not_waive_autonomy(
     tmp_path, monkeypatch, capsys
 ):
-    repo, plan_path, _ = _make_repo(tmp_path)
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, _, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(repo)
     config = repo / ".agentic/config.toml"
     config.parent.mkdir()
     config.write_text(
@@ -392,9 +483,8 @@ def test_e10_exemption_does_not_waive_autonomy(
 def test_e11_exemption_does_not_waive_target_branch(
     tmp_path, monkeypatch, capsys
 ):
-    repo, plan_path, _ = _make_repo(tmp_path)
-    _git(repo, "checkout", "-q", "-b", "not-main")
-    _bind_primary(monkeypatch, repo)
+    repo, plan_path, wt_plan, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(wt_plan)
     before = _head(repo, "main")
 
     assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
@@ -405,9 +495,9 @@ def test_e11_exemption_does_not_waive_target_branch(
 def test_e12_exemption_does_not_waive_already_merged(
     tmp_path, monkeypatch, capsys
 ):
-    repo, plan_path, _ = _make_repo(tmp_path)
+    repo, plan_path, _, _ = _make_repo(tmp_path)
     _git(repo, "merge", "-q", "--no-ff", "--no-edit", "plan/it-1")
-    _bind_primary(monkeypatch, repo)
+    monkeypatch.chdir(repo)
     before_tip = _head(repo, "main")
     before_merges = _merge_count(repo)
 
