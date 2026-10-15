@@ -134,7 +134,7 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp02-impl-r5",
+    "round": "wp02-impl-r5b",
     "decision": null,
     "kind": "wp-impl-second-signature",
     "bound_brief_rev": 2,
@@ -199,7 +199,7 @@
         ]
       }
     ],
-    "pending_note": "Implementation second signature r5 on the tokenize-based scanner fix.",
+    "pending_note": "Implementation second signature on the tokenize-based scanner fix; r5 was void (session had no tool interface).",
     "bound_commit": "e93ba1c7b062f5d49bbdd062be17bb029590b94b"
   },
   "timestamps": {
