@@ -21,17 +21,31 @@ directions:
 The suite below pins the post-change behaviour on the real wrappers with real
 git fixtures (``git init`` + a real ``git worktree add``), never a mock:
 
+- F1 also carries its own premise check (``test_f1_status_fixture_is_schema_valid``):
+  the fixture is schema-valid for APPROVED_FOR_MERGE, measured by running the
+  shipped validator, so the case cannot go red for an earlier reason;
 - F1/F5 exercise ``merge.sh`` end to end (refuses a sibling worktree; stays
   fail-closed when only the probe fails);
 - F2/F4 exercise ``gate.qoder_security.main`` in process, on a *real* status
-  file at an *absolute* path — ``main`` checks ``is_file()``. at:1007 before the
-  worktree decision at:1012, so a missing file would fail the wrong way;
+  file at an *absolute* path — ``main`` checks ``is_file()`` (currently :1008,
+  after WP-02's insertion; :1007 pre-edit) before the worktree decision
+  (currently :1019; :1012 pre-edit), so a missing file would fail the wrong way;
 - F3 pins the one intended relaxation (INV-C's ``L``: the main-repo
   ``.worktrees`` directory now accepted);
 - F6 is the static single-authority assertion (zero non-comment matches).
 
 The three load-bearing mutations M-A/M-B/M-C (and M-D) are applied by the
 orchestrator, one at a time, and each must turn the corresponding case red.
+
+M-A is the reason the F1 fixture carries a FULLY schema-valid status document
+(``_status``, asserted against the shipped validator by
+``test_f1_status_fixture_is_schema_valid`` rather than asserted in prose). When
+the literal is restored, ``merge.sh`` must reach its worktree decision with a
+document that passes every earlier precondition, so the red output can only be
+"this linked worktree was wrongly ACCEPTED" — the form the brief demands. An
+under-specified document would instead abort at ``STATUS_INVALID`` /
+``MERGE_FAIL: status validation failed``, i.e. an earlier failure wearing the
+refusal's exit code.
 """
 from __future__ import annotations
 
@@ -51,8 +65,18 @@ GATE_SRC = PKG_SRC / "agentic_loop" / "gate" / "__init__.py"
 QODER_SRC = PKG_SRC / "agentic_loop" / "gate" / "qoder_security.py"
 
 # The retired literal, spelled without a slash-wrapped copy of itself so that a
-# plain grep of THIS file does not collide with the F6 static scan.
+# plain grep of THIS file does not collide with the F6 static scan. (This file is
+# not under src/agentic_loop/ and F6 does not read it; the spelling is kept so a
+# repo-wide grep for the literal still points only at the real sites.)
 LITERAL = "/.worktrees/"
+
+# In merge.sh the worktree refusal and a failed status validation BOTH print a
+# `MERGE_FAIL:` prefix and exit 2. Only the first is this WP's subject, so every
+# merge.sh case that claims "the worktree decision refused this" must also prove
+# the OTHER was not what happened. Without that, a fixture whose document is
+# rejected by the validator reads as a refusal and proves nothing (this is
+# exactly how impl-r1's M-A red evidence was produced).
+VALIDATION_FAILED = "status validation failed"
 
 # Cause-specific witnesses: the exact refusal wording of each call site. Both
 # are unchanged by WP-02 (INV-D keeps the visible prefixes and exit codes).
@@ -92,10 +116,32 @@ def _status(
     branch: str = "feat/wp02",
     state: str = "APPROVED_FOR_MERGE",
 ) -> dict:
-    """A schema-valid v2 status document.
+    """A schema-valid v2 status document for the state it declares.
 
-    The worktree refusal fires long before state/scope/risk are consulted, so
-    this only has to be well-formed; the same document feeds both entry points.
+    "Schema-valid" is a MEASURED claim, not a comment: the shipped validator is
+    run over the exact bytes written (``test_f1_status_fixture_is_schema_valid``,
+    and this helper's own subprocess call) and must print STATUS_VALID. It has to
+    be, because ``merge.sh`` validates the status BEFORE its worktree decision:
+    an invalid document short-circuits at ``MERGE_FAIL: status validation
+    failed`` and never reaches the refusal. Every field STATE=APPROVED_FOR_MERGE
+    requires is therefore material, not decoration:
+
+    * ``git.worktree`` (the worktree that produced the commit) and ``git.branch``
+      — required by the ``active_states`` block;
+    * ``git.commit`` — required by the merge-state block;
+    * ``review.decision`` — must be ACCEPT **and** carry a ``consult.decision``
+      of ACCEPT, the v2 double-sign rule for a merge state. ACCEPT (not ``N/A``)
+      keeps the merge-gate formula satisfied; ``N/A`` would additionally demand
+      the consult ACCEPT that this fixture already provides.
+
+    ``git`` deliberately carries ONLY the schema keys (plus none of its own):
+    ``validate()`` rejects unknown top-level keys but not unknown nested ones.
+
+    Keeping the document valid is not a way to dodge the worktree refusal; it is
+    what lets the refusal be the thing that fires. The path handed to
+    ``path_is_in_worktree`` is the status file itself, whose git facts are the
+    enclosing worktree's — the recorded ``git.worktree`` is only read by the
+    qoder gate to locate ``--cwd`` for a scan this node never reaches.
     """
     return {
         "schema_version": "agentic-wp-status/v2",
@@ -104,15 +150,15 @@ def _status(
         "phase": "P1",
         "state": state,
         "role": "Developer",
-        "executor": {"tool": "kimi-cli", "session": ""},
-        "orchestrator": {"tool": "claude-code", "session": ""},
-        "reviewer": {"tool": "claude-code", "session": ""},
+        "executor": {"tool": "kimi", "session": "wp02-fixture-session"},
+        "orchestrator": {"tool": "claude-code", "session": "wp02-fixture-session"},
+        "reviewer": {"tool": "claude-code", "session": "wp02-fixture-session"},
         "git": {
             "base_branch": _default_branch(repo),
             "base_commit": _head(repo),
             "branch": branch,
-            "worktree": "",
-            "commit": "",
+            "worktree": str(repo),
+            "commit": _head(repo),
         },
         "scope": {"allowed_paths": ["docs/"], "forbidden_paths": [".env"]},
         "risk": {
@@ -121,14 +167,47 @@ def _status(
             "real_notifications_authorized": False,
             "irreversible_actions_authorized": False,
         },
-        "evidence": {"changed_files": [], "tests": [], "artifacts": []},
-        "review": {},
-        "consult": {},
+        "evidence": {
+            "changed_files": [],
+            "tests": [{"command": "python3.11 -m pytest tests -q", "exit_code": 0}],
+            "artifacts": [],
+        },
+        "review": {"decision": "ACCEPT", "round": "wp02-impl-r2"},
+        "consult": {"decision": "ACCEPT"},
         "timestamps": {"created_at": "2026-10-15T00:00:00Z"},
     }
 
 
-def _make_repo(tmp_path: Path, name: str = "repo") -> Path:
+def _assert_status_is_schema_valid(path: Path, env: dict | None = None) -> None:
+    """Prove the fixture is valid by RUNNING the shipped validator on it.
+
+    Called by the F1 fixture before ``merge.sh`` is invoked. The assertion it
+    makes (STATUS_VALID) is the one the orchestrator can re-check by hand:
+
+        python3.11 -m agentic_loop.validate_wp_status <file>
+    """
+    res = subprocess.run(
+        [sys.executable, "-m", "agentic_loop.validate_wp_status", str(path)],
+        capture_output=True,
+        text=True,
+        env=env or _base_env(),
+    )
+    assert res.returncode == 0 and "STATUS_VALID" in res.stdout, (
+        "the fixture status is not schema-valid, so merge.sh would abort at "
+        "MERGE_FAIL: status validation failed instead of reaching the worktree "
+        f"decision (the M-A evidence would then be worthless): "
+        f"{(res.returncode, res.stdout, res.stderr)}"
+    )
+
+
+def _make_repo(tmp_path: Path, name: str = "agentic-loop-main-codex-merge") -> Path:
+    """A real ``git init`` + commit, never a mock.
+
+    Named after the live checkout because that is the topology this WP measured:
+    a main repo whose own path contains no ``.worktrees`` segment, so the retired
+    literal sees nothing to refuse. Nothing in these cases keys off the name (the
+    predicate reads git facts); it just keeps the fixture faithful.
+    """
     repo = tmp_path / name
     repo.mkdir()
     _run_git(repo, "init", "-q")
@@ -248,36 +327,83 @@ from agentic_loop.gate import qoder_security
 # ---------------------------------------------------------------------------
 # F1 / F3: merge.sh (the shell call site)
 # ---------------------------------------------------------------------------
+def test_f1_status_fixture_is_schema_valid(tmp_path: Path) -> None:
+    """The premise M-A rests on, asserted instead of claimed: the F1 fixture is
+    schema-valid for APPROVED_FOR_MERGE, so a restored literal is caught by the
+    WORKTREE refusal rather than by an earlier validation abort.
+
+    This is deliberately not a prose comment: impl-r1 documented the fixture as
+    "schema-valid" while it was missing git.worktree / git.commit /
+    review.decision, and the resulting M-A red proved nothing.
+    """
+    repo = _make_repo(tmp_path)
+    wt = _add_sibling_worktree(repo, tmp_path, "wp02-sibling", "feat/wp02-sibling")
+    status_path = _write_status(wt, _status(repo))
+
+    env = _base_env()
+    _assert_status_is_schema_valid(status_path, env)
+    # The orchestrator's independent hand-check of the same claim:
+    #   python3.11 -m agentic_loop.validate_wp_status <this file>
+    # prints STATUS_VALID, exit 0.
+    assert env["AGENTIC_PYTHON"]
+
+
 def test_f1_merge_refuses_sibling_worktree(tmp_path: Path) -> None:
     """F1 [merge-refuses-sibling-worktree]: a linked worktree whose path has no
-    literal segment must be REFUSED. The retired literal accepts it (M-A red)."""
+    literal segment must be REFUSED. A restored literal ACCEPTS it (M-A red).
+
+    Three assertions are load-bearing together, and that is the whole point of
+    this round:
+
+    * the worktree refusal wording is present;
+    * ``status validation failed`` and ``status file not found`` are BOTH absent,
+      because merge.sh:61 (not-found) and merge.sh:68 (validation) print the same
+      ``MERGE_FAIL:`` prefix and exit 2 as the refusal at merge.sh:57. Without
+      this exclusion a validation error is indistinguishable from a refusal;
+    * the exit code and prefix stay as they are (INV-D).
+    """
     repo = _make_repo(tmp_path)
-    status = _status(repo)
     wt = _add_sibling_worktree(repo, tmp_path, "wp02-sibling", "feat/wp02-sibling")
-    status_path = _write_status(wt, status)
+    status_path = _write_status(wt, _status(repo))
 
     _assert_path_is_literal_free(status_path)
+    env = _base_env()
+    _assert_status_is_schema_valid(status_path, env)
 
-    res = _run_merge(repo, status_path, _base_env())
+    res = _run_merge(repo, status_path, env)
 
     assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
     assert WORKTREE_REFUSAL in res.stderr, (res.stdout, res.stderr)
-    # Cause-specific: the refusal is the worktree decision, not "not found" --
-    # which could only be reached by the literal failing to see the file.
+    # Cause-specific, in both directions. The worktree decision is reached only
+    # if the document survived the validator, and the refusal is the only
+    # MERGE_FAIL it can be:
+    assert VALIDATION_FAILED not in res.stderr, (res.stdout, res.stderr)
     assert "status file not found" not in res.stderr, (res.stdout, res.stderr)
+    assert res.stderr.strip().startswith("MERGE_FAIL:"), (res.stdout, res.stderr)
 
 
 def test_f3_merge_accepts_literal_dot_worktrees_dir_in_main_repo(
     tmp_path: Path,
 ) -> None:
-    """F3 [merge-accepts-literal-...]: INV-C's one relaxation. A REAL
-    ``.worktrees/fake`` directory inside the main repo is main-repo content, so
-    the git-fact predicate answers False and merge.sh proceeds past the worktree
-    refusal -- exactly the point the retired literal cut short. The assertion
-    locks that: the run is not refused as "inside a worktree", and a
-    differing-argument control proves how far past the refusal it got."""
+    """F3 [merge-accepts-literal-...]: INV-C's one relaxation, proved positively.
+
+    A REAL ``.worktrees/fake`` directory inside the main repo is main-repo
+    content, so the git-fact predicate answers False and the whole gate runs to
+    completion -- ``MERGE_OK``. The retired literal cut this run short at its
+    worktree refusal, which is the cut-short the relaxed set RESTORES.
+
+    Reaching MERGE_OK means the fixture must survive every later precondition
+    too, so the branch the document names is a real local ref whose tip is a
+    descendant of ``git.commit`` -- otherwise the run would stop at the branch
+    lookup and "accepted" would only be inferred from where it died rather than
+    observed. The control run keeps every argument identical and swaps ONLY the
+    file content, so the difference cannot come from the directory name.
+    """
     repo = _make_repo(tmp_path)
-    status = _status(repo)
+    status = _status(repo, branch="feat/wp02-f3")
+    # The document's branch must exist locally, with the recorded commit as an
+    # ancestor of its tip (merge.sh:108-115). Base commit == tip here.
+    _run_git(repo, "branch", "feat/wp02-f3")
     nested = repo / ".worktrees" / "fake"
     nested.mkdir(parents=True)
     status_path = nested / "WP-02.status.json"
@@ -288,22 +414,21 @@ def test_f3_merge_accepts_literal_dot_worktrees_dir_in_main_repo(
     assert LITERAL in str(status_path)
 
     env = _base_env()
+    _assert_status_is_schema_valid(status_path, env)
     res = _run_merge(repo, status_path, env)
-    assert WORKTREE_REFUSAL not in res.stderr, (res.returncode, res.stdout, res.stderr)
 
-    # Positive reachability control: the ONLY difference is the argument, so the
-    # SYMMETRIC refusal proves the literal is no longer cutting this path short.
-    # With the unchanged literal, the status run stops at merge.sh:37 (worktree
-    # refusal) and this control stops at merge.sh:48 (status validation); under
-    # the predicate BOTH get past the read at:41 and die at the validator.
+    # POSITIVE evidence of acceptance: exit 0 and the merge actually happened.
+    assert res.returncode == 0, (res.returncode, res.stdout, res.stderr)
+    assert "MERGE_OK" in res.stdout, (res.stdout, res.stderr)
+    assert WORKTREE_REFUSAL not in res.stdout + res.stderr, (res.stdout, res.stderr)
+
+    # Control: identical arguments, invalid content. It must be refused at the
+    # validator, proving the acceptance above was decided by the worktree
+    # predicate on a valid document and not by anything about the path.
     control = _run_merge(repo, repo / "README.md", env)
+    assert control.returncode == 2, (control.returncode, control.stdout, control.stderr)
+    assert VALIDATION_FAILED in control.stderr, (control.stdout, control.stderr)
     assert WORKTREE_REFUSAL not in control.stderr, (control.stdout, control.stderr)
-    assert "status validation failed" in control.stderr, (control.stdout, control.stderr)
-    # The status run is well-formed JSON, so it gets exactly as far as the
-    # control and no further: the worktree decision let it through, and nothing
-    # after that point depends on the directory NAME.
-    assert res.returncode == control.returncode, (res.stderr, control.stderr)
-    assert "status validation failed" in res.stderr, (res.stdout, res.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -318,9 +443,10 @@ def test_f2_qoder_refuses_sibling_worktree(tmp_path: Path) -> None:
     status_path = _write_status(wt, status)
 
     _assert_path_is_literal_free(status_path)
-    # The fixture must survive qoder_security.main's is_file() check at:1007,
-    # which runs BEFORE the worktree decision at:1012 -- otherwise this case
-    # would fail as "status file not found" (wrong reason, no evidence).
+    # The fixture must survive qoder_security.main's is_file() check (currently
+    # :1008, after WP-02's edit; :1007 in the brief's pre-edit numbering), which
+    # runs BEFORE the worktree decision -- otherwise this case would fail as
+    # "status file not found" (wrong reason, no evidence).
     assert status_path.is_file()
 
     kind, detail = _qoder_refusal(
@@ -330,6 +456,10 @@ def test_f2_qoder_refuses_sibling_worktree(tmp_path: Path) -> None:
     assert kind == "gate_error", detail
     assert WORKTREE_REFUSAL in str(detail), detail
     assert "not found" not in str(detail), detail
+    # Sibling shape of F1's cause-exclusion: the worktree refusal happens BEFORE
+    # run_validator, so a validator complaint in the transcript would mean this
+    # node was decided by something other than the worktree question.
+    assert "validator rejected status" not in str(detail), detail
 
 
 def test_f4_qoder_accepts_literal_dot_worktrees_dir_in_main_repo(
@@ -348,6 +478,7 @@ def test_f4_qoder_accepts_literal_dot_worktrees_dir_in_main_repo(
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
 
     assert LITERAL in str(status_path)
+    # Must exist: is_file() (:1008) precedes the worktree decision.
     assert status_path.is_file()
 
     kind, detail = _qoder_refusal(
@@ -406,10 +537,14 @@ def test_f5_merge_probe_failure_fails_closed(tmp_path: Path) -> None:
     probe, which is why the resolver-failure string is asserted absent."""
     repo = _make_repo(tmp_path)
     status = _status(repo)
-    # A MAIN-repo status file: without the forced probe failure this is the
-    # accepting path, so a refusal can only come from the probe.
+    # A MAIN-repo status file: this is the document shape that WITHOUT the forced
+    # probe failure reaches the ACCEPTING path -- F3 proves exactly that, on the
+    # same tree. So a refusal here can only come from the probe, not from the
+    # document being malformed (which would be the same wrong-reason failure that
+    # invalidated impl-r1's M-A evidence).
     status_path = _write_status(repo, status)
     _assert_path_is_literal_free(status_path)
+    _assert_status_is_schema_valid(status_path)
 
     shim = _make_probe_failing_python(tmp_path)
     env = _base_env()
@@ -435,6 +570,7 @@ def test_f5_merge_probe_failure_fails_closed(tmp_path: Path) -> None:
     )
     assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
     assert WORKTREE_REFUSAL in res.stderr, (res.stdout, res.stderr)
+    assert VALIDATION_FAILED not in res.stderr, (res.stdout, res.stderr)
     # Whether the verdict string survives `set -euo pipefail` or the command
     # substitution collapses to empty, the refusal is identical: only the exact
     # verdict MAIN passes. NB: under M-C (fallback removed) this file is
