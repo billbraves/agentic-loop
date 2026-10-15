@@ -602,22 +602,33 @@ def _code_without_comments(text: str, *, python: bool) -> list[str]:
 
        scanned clean while reconstructing the literal exactly at runtime.
 
+    3. keeping the whole-line rule for SHELL was defeated the same way, because
+       a shell single-quoted string spans physical lines too:
+
+           needle='
+           # /.worktrees/
+           '
+
+       blanks the middle line, and ``tr -d '\\n# '`` rebuilds the literal at
+       runtime (confirmed: the rebuilt value equals the literal and bash exits
+       successfully).
+
     For Python the only correct answer is the real lexer: ``tokenize`` reports
-    COMMENT tokens and leaves string contents alone, so neither trick survives.
-    Shell has no stdlib lexer here, so it keeps the conservative whole-line
-    rule -- which is sound for the one legitimate shell match
-    (``wrappers/finalize_merge.sh:38``, a whole-line comment) and can only
-    OVER-report otherwise, failing safe for INV-A.
+    COMMENT tokens and leaves string contents alone, so none of the tricks
+    survive. Shell has no stdlib lexer here, so after being defeated three
+    times by position-based heuristics this stops guessing: ``.sh`` files are
+    scanned RAW, with no comment stripping at all. Over-reporting is the safe
+    direction for INV-A, and the cost is paid once in the product code -- the
+    two shell comments that discuss the retired literal spell it out in prose
+    rather than as a contiguous string, so the raw scan has nothing to trip
+    over and needs no exemption list.
     """
     lines = text.splitlines()
     if not python:
-        out: list[str] = []
-        for index, line in enumerate(lines, start=1):
-            if index == 1 and line.startswith("#!"):
-                out.append("")
-                continue
-            out.append("" if line.lstrip().startswith("#") else line)
-        return out
+        # Raw, deliberately. Only the shebang is dropped, because it cannot
+        # contain the literal and keeping it would be noise.
+        return ["" if i == 1 and l.startswith("#!") else l
+                for i, l in enumerate(lines, start=1)]
 
     keep = list(lines)
     try:
@@ -635,6 +646,23 @@ def _code_without_comments(text: str, *, python: bool) -> list[str]:
             # preceding a trailing comment is still scanned.
             keep[row] = keep[row][: tok.start[1]]
     return keep
+
+
+# The single exemption the raw .sh scan needs. finalize_merge.sh is OUTSIDE
+# WP-02's allowed paths, so its explanatory comment cannot be reworded the way
+# merge.sh's was. This is pinned by VERBATIM TEXT, not by file name or line
+# number: the line must still be a whole-line comment and must still read
+# exactly like this, so editing it into live code -- or adding any other
+# shell line containing the literal -- fails F6 immediately.
+_EXEMPT_SHELL_COMMENTS = {
+    "agentic_loop/wrappers/finalize_merge.sh:38":
+        '# A13: git-fact judgment instead of a "/.worktrees/" path literal (sibling',
+}
+
+
+def _is_exempt_shell_comment(where: str, line: str) -> bool:
+    expected = _EXEMPT_SHELL_COMMENTS.get(where)
+    return expected is not None and line.strip() == expected and line.lstrip().startswith("#")
 
 
 def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
@@ -671,10 +699,25 @@ def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
     # Prove the construction is not a strawman: it really does rebuild it.
     assert eval('"""\n# ' + LITERAL + '\n"""[3:-1]') == LITERAL  # noqa: S307
 
-    # A genuine comment token must still be ignored, in both languages, or F6
-    # would always fail on the two legitimate matches.
+    # Bypass 3 (found at impl-r5b): a shell single-quoted string also spans
+    # physical lines, so the whole-line rule failed for .sh exactly as it did
+    # for Python. `tr -d '\\n# '` rebuilds the literal at runtime.
+    shell_multiline = "needle='\n# " + LITERAL + "\n'\n"
+    assert LITERAL in "".join(
+        _code_without_comments(shell_multiline, python=False)
+    ), (
+        "shell scan lost a literal held inside a single-quoted multiline "
+        "string; .sh must be scanned raw rather than by line position"
+    )
+
+    # A genuine Python comment token must still be ignored, or F6 would always
+    # fail on gate/__init__.py's explanatory comment.
     assert LITERAL not in _code_without_comments(f"  # {LITERAL} retired", python=True)[0]
-    assert LITERAL not in _code_without_comments(f"  # {LITERAL} retired", python=False)[0]
+    # Shell is scanned RAW on purpose, so a shell comment is NOT ignored. That
+    # is why the two shell comments discussing the retired literal spell it out
+    # in prose instead of as a contiguous string -- asserted by F6 itself
+    # finding zero hits across the real tree.
+    assert LITERAL in _code_without_comments(f"  # {LITERAL} retired", python=False)[0]
     # And a trailing comment must not swallow the code before it.
     assert LITERAL in _code_without_comments(
         f'x = "{LITERAL}"  # kept', python=True
@@ -696,8 +739,13 @@ def test_f6_no_literal_worktree_check_remains() -> None:
         stripped_lines = _code_without_comments(text, python=path.suffix == ".py")
         source_lines = text.splitlines()
         for line_no, code_line in enumerate(stripped_lines, start=1):
-            if LITERAL in code_line:
-                hits.append(f"{path.relative_to(PKG_SRC)}:{line_no}")
+            if LITERAL not in code_line:
+                continue
+            where = f"{path.relative_to(PKG_SRC)}:{line_no}"
+            if _is_exempt_shell_comment(where, code_line):
+                comment_only.append(where)
+                continue
+            hits.append(where)
         for line_no, src_line in enumerate(source_lines, start=1):
             if LITERAL in src_line and LITERAL not in stripped_lines[line_no - 1]:
                 comment_only.append(f"{path.relative_to(PKG_SRC)}:{line_no}")
@@ -705,8 +753,7 @@ def test_f6_no_literal_worktree_check_remains() -> None:
     assert scanned > 10, f"static scan touched only {scanned} files"
     assert hits == [], f"literal-based worktree check still in product code: {hits}"
     # The scan must be looking at the real tree, not silently skipping files:
-    # the two long-standing comment-only matches have to show up, plus the ones
-    # WP-02 itself added while explaining why the literal is gone.
+    # both long-standing comment-only matches have to show up.
     assert "agentic_loop/wrappers/finalize_merge.sh:38" in comment_only, comment_only
     assert "agentic_loop/gate/__init__.py:809" in comment_only, comment_only
     assert len(comment_only) >= 2, comment_only

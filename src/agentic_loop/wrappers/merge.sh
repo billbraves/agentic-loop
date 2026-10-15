@@ -38,9 +38,11 @@ esac
 # WORKTREE refusal semantics as preflight.sh:37-50 and finalize_merge.sh: a
 # status path that resolves inside a linked worktree is refused — the main-repo
 # copy is the single source of truth. The git-fact predicate is referenced,
-# never reimplemented: the retired `[[ "$status_file" == *"/.worktrees/"* ]]`
-# literal missed every sibling worktree (`git worktree add ../wpN-x`), the
-# layout this repo actually uses (A13, WP-19).
+# never reimplemented: the retired path-literal test (a glob match on a
+# dot-worktrees path segment) missed every sibling worktree
+# (`git worktree add ../wpN-x`), the layout this repo actually uses
+# (A13, WP-19). The literal is spelled out in prose, not as a contiguous
+# string, so F6's conservative raw scan of .sh files needs no exemption here.
 #
 # Fail-closed form (INV-B): a probe crash, missing Python, failed import or any
 # unexpected stdout collapses into PROBE_FAIL via `|| echo PROBE_FAIL`, and the
