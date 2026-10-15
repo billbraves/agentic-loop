@@ -4,13 +4,13 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "CHANGES_REQUESTED",
+  "state": "IMPLEMENTING",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
     "session": "managed-kimi:3a78c8fc-9120-429c-99b0-8ec840835851; deepseekflash:0727f01e-52a7-4473-91cd-f61d2c153631",
-    "redispatch_count": 4,
-    "redispatch_note": "rev11 implementation dispatch (direction A, canonicalize once). Brief rev11 is double-signed: orchestrator review plus wp03-brief-r7 ACCEPT with no blocking defect. Four brief rounds were needed (rev8 -> rev9 -> rev10 -> rev11), each closing a different substantive specification defect the orchestrator independently reproduced: the derivation bootstrap circularity, unfrozen relative-path semantics, path-field traversal, the _resolve_plan_path() relative-form contradiction, and finally the existence-uniqueness over-correction. Developer provider deepseekflash via kimi CLI with an isolated temp HOME. The dispatch prompt carries one authoritative correction the brief itself cannot receive without invalidating the ACCEPT's SHA binding: E18 has FIVE branches (a/b/c1/c2/d), not the four the deliverables line still says."
+    "redispatch_count": 5,
+    "redispatch_note": "impl-r5 REWORK reflow: fix the INV-3c regression (trust path must consume load_plan()'s raw instead of re-reading the accepted candidate) and restore E15 to the original double-read attack verbatim from 7e64e50, plus a new M-2o mutation. Every rev11 gain must be kept: M-2h..M-2n re-run, and the orchestrator's two repro scripts must still reject the dotdot-hop and symlinked-root cases."
   },
   "orchestrator": {
     "tool": "claude-code",
@@ -424,7 +424,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T07:45:00Z",
+    "updated_at": "2026-10-15T07:55:00Z",
     "dispatched_at": "2026-10-15T05:15:00Z"
   }
 }
