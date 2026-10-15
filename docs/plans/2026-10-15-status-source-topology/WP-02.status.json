@@ -133,9 +133,9 @@
     ]
   },
   "consult": {
-    "state": "REWORK_SOFT_LIMIT",
-    "round": "wp02-impl-r5b",
-    "decision": "REWORK",
+    "state": "PENDING",
+    "round": "wp02-impl-r6",
+    "decision": null,
     "kind": "wp-impl-second-signature",
     "bound_brief_rev": 2,
     "prior_rounds": [
@@ -212,7 +212,7 @@
         ]
       }
     ],
-    "pending_note": "Three consecutive REWORKs in one root-cause family (F6 scanner, position-based comment detection). `agentic autonomy signal rework_twice` reports SOFT_LIMIT_ENABLED. The r5b defect IS fixed and orchestrator-verified, but a further round is not auto-approved: escalated to the user.",
+    "pending_note": "Second signature r6 on the raw-.sh-scan fix. User approved one further round past the rework_twice soft limit.",
     "bound_commit": "e93ba1c7b062f5d49bbdd062be17bb029590b94b",
     "soft_limit": {
       "signal": "rework_twice",
@@ -223,7 +223,8 @@
         "wp02-impl-r4",
         "wp02-impl-r5b"
       ],
-      "note": "Each round narrowed the defect and each was orchestrator-reproduced, so the loop was productive rather than thrashing. The final fix is a root-cause change (raw .sh scan, real lexer for Python) rather than a third heuristic patch. Escalated for a user decision on whether to run another second-signature round."
+      "note": "Each round narrowed the defect and each was orchestrator-reproduced, so the loop was productive rather than thrashing. The final fix is a root-cause change (raw .sh scan, real lexer for Python) rather than a third heuristic patch. Escalated for a user decision on whether to run another second-signature round.",
+      "user_decision": "User approved one further second-signature round (r6) past SOFT_LIMIT_ENABLED, on the reasoning that each round narrowed a real defect and the last fix was root-cause."
     }
   },
   "timestamps": {
