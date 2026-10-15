@@ -472,25 +472,17 @@ def test_e15_loaded_bytes_are_bound(tmp_path, monkeypatch, capsys):
     plan_path.write_text(json.dumps(forged, indent=2) + "\n", encoding="utf-8")
     assert plan_path.read_bytes() != committed
 
-    # Double-read attack (INV-3c): the forged bytes are the ones the loader
-    # parses, so they are `raw`; the committed bytes are then put back at the
-    # path before the source check runs.  A helper that re-reads the path (or
-    # resolves then reads) compares the swapped committed bytes and merges; the
-    # binding must compare the bytes the loader actually parsed.
-    real_load_and_validate = plan_cmd._load_and_validate
+    # Double-read attack (INV-3c): after the loader parsed the forged bytes,
+    # restore the committed bytes to the path before the source check.  A
+    # helper that re-reads the path would compare the swapped committed bytes
+    # and pass; the binding must compare the bytes actually loaded.
+    real_lint = plan_cmd._lint_report
 
-    # A load-and-validate wrapper that deep-copies the parsed bytes and returns
-    # that copy as `raw`.  The bytes are value-equal (so `==` still holds when
-    # they come from the same object) but object-distinct, so an identity-bound
-    # `is` check would reject a legitimate merge: the binding must be by value.
-    def binding_loader(plan_arg):
-        data, path, raw = real_load_and_validate(plan_arg)
-        return data, path, bytes(bytearray(raw))
+    def swapping_lint(data, repo_):
+        plan_path.write_bytes(committed)
+        return real_lint(data, repo_)
 
-    # The caller supplies a path, not bytes: `_load_and_validate` must go on
-    # recording exactly the bytes it parsed, and the source check must judge
-    # those bytes.
-    monkeypatch.setattr(plan_cmd, "_load_and_validate", binding_loader)
+    monkeypatch.setattr(plan_cmd, "_lint_report", swapping_lint)
     before = _head(repo, "main")
 
     assert _merge_rc(plan_path) == plan_cmd.RC_FAIL
@@ -500,7 +492,6 @@ def test_e15_loaded_bytes_are_bound(tmp_path, monkeypatch, capsys):
     # Positive control with the same instrumentation: once the working file
     # holds the committed bytes again, the identical fixture must merge.
     plan_path.write_bytes(committed)
-    monkeypatch.setattr(plan_cmd, "_load_and_validate", plan_cmd._load_and_validate)
     assert _merge_rc(plan_path) == plan_cmd.RC_OK
     assert "PLAN_MERGE_OK" in capsys.readouterr().out
 

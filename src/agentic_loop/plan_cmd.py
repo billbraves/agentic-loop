@@ -786,16 +786,21 @@ def _stage2_candidate(
     rel: str,
     wt_root: Path,
     main_common: Path,
+    loaded_raw: bytes | None = None,
 ) -> tuple:
     """INV-3b stage 2: independently re-check one candidate's bytes.
 
-    The candidate is read AT MOST ONCE — exactly one read here, against the
-    caller's spelling (explicitly authorized by R3-a stage 1, which forbids only
-    a *second* read) — and every acceptance decision below uses that raw bytes
-    object plus the DERIVED path.  Returns ``raw`` on success and ``None`` on
-    any failure, including a failure to parse the candidate at all (a candidate
-    whose bytes cannot be parsed cannot have declared the base branch we need,
-    so it is simply not trusted).
+    ``loaded_raw`` is the byte string ``load_plan()`` actually PARSED, or
+    ``None`` when this candidate is not the one stage 1 read.  The ACCEPTED
+    candidate must be handed its parsed bytes: INV-3c forbids re-reading the
+    accepted candidate, so rule 4 compares ``loaded_raw`` against the committed
+    blob and this function does NOT touch the filesystem for it.  A DROPPED
+    candidate that was never read may be read here exactly once (R3-a stage 1
+    authorizes that read for candidate discovery; only a *second* read of the
+    accepted candidate is forbidden).  Returns the raw bytes object on success
+    and ``None`` on any failure, including a failure to parse the candidate at
+    all (a candidate whose bytes cannot be parsed cannot have declared the base
+    branch we need, so it is simply not trusted).
 
     Invariants checked, each of which alone must be able to fail closed:
 
@@ -817,7 +822,16 @@ def _stage2_candidate(
     try:
         if _git_common_dir(wt_root) != main_common:
             return None
-        raw = (Path(plan_arg) if shape == "absolute" else wt_root / rel).read_bytes()
+        if loaded_raw is None:
+            # Not stage 1's candidate: this is a dropped candidate's own first
+            # (and only) read, authorized by R3-a stage 1 as part of candidate
+            # discovery.  The accepted candidate never reaches this branch.
+            raw = (Path(plan_arg) if shape == "absolute" else wt_root / rel).read_bytes()
+        else:
+            # The accepted candidate: consume the bytes ``load_plan()`` parsed.
+            # Re-reading the path here would be INV-3c's violation — a check that
+            # re-reads judges bytes the merge decision never used.
+            raw = loaded_raw
         data = json.loads(raw.decode("utf-8"))
         if not isinstance(data, dict):
             return None
@@ -861,7 +875,8 @@ def _stage2_candidate(
     if not derived.is_file() or derived.is_symlink():
         return None
     # (6) INV-3c / rule 4: the DERIVED path names the blob to compare, and the
-    # object compared is the raw bytes read above — never a re-read.
+    # object compared is the raw bytes bound above — the loaded bytes for the
+    # accepted candidate, never a re-read.
     blob = _git_bytes_may_fail(_rp.main_repo(), "show", "{}:{}".format(base_branch, rel))
     if blob.returncode != 0 or blob.stdout != raw:
         return None
@@ -889,7 +904,11 @@ def _trusted_candidate_raw(
     The caller's path is used in exactly two places and nowhere else: the
     single read of `_load_and_validate` / `_stage2_candidate` (explicitly
     authorized by R3-a), and the byte-exact comparison below.  Rule 4's blob
-    comparison uses the DERIVED path with this function's `raw` (INV-3c).
+    comparison uses the DERIVED path; for the ACCEPTED candidate it compares
+    the caller's parsed bytes — the `raw` that `load_plan()` actually parsed —
+    and never re-reads that path (INV-3c).  Only a DROPPED candidate gets its
+    own single read, on the candidate-discovery path, and only when it was not
+    the one stage 1 loaded.
     """
     shape, rel = _plan_arg_shape(plan_arg)
     if shape == "reject":
@@ -908,7 +927,9 @@ def _trusted_candidate_raw(
         # The path is NOT re-resolved here: `path` is the very candidate that
         # `_stage1_load` already read (R3-a forbids a second open/read/resolve
         # of the caller spelling), and the lexical form is enough to locate the
-        # registered worktree root that contains it.
+        # registered worktree root that contains it.  `raw` IS that parsed byte
+        # string: the caller's spelling here contains exactly one existing
+        # candidate, so it is the accepted one and rule 4 must judge these bytes.
         for wt_root in worktrees:
             wt_root = Path(wt_root).resolve()
             try:
@@ -925,7 +946,9 @@ def _trusted_candidate_raw(
             # form, so a `..`/`.` component can never hide a symlinked parent.
             if os.path.normpath(plan_arg) != plan_arg:
                 return (False, "unaccepted spelling")
-            candidate_raw = _stage2_candidate(plan_arg, shape, candidate_rel, wt_root, main_common)
+            candidate_raw = _stage2_candidate(
+                plan_arg, shape, candidate_rel, wt_root, main_common, raw
+            )
             if candidate_raw is None:
                 continue
             # Accepted == the caller's spelling names exactly the derived form.
@@ -945,7 +968,17 @@ def _trusted_candidate_raw(
     for wt_root in worktrees:
         try:
             wt_root = Path(wt_root).resolve()
-            candidate_raw = _stage2_candidate(plan_arg, shape, rel, wt_root, main_common)
+            # Only stage 1's own candidate gets the parsed `raw`; the others are
+            # dropped candidates and may be read once each while being dropped.
+            is_stage1_candidate = os.path.abspath(wt_root / rel) == os.path.abspath(path)
+            candidate_raw = _stage2_candidate(
+                plan_arg,
+                shape,
+                rel,
+                wt_root,
+                main_common,
+                raw if is_stage1_candidate else None,
+            )
         except (OSError, RuntimeError, ValueError, SystemExit):
             continue
         if candidate_raw is not None:
