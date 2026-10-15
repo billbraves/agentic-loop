@@ -26,7 +26,7 @@
     "dispatch_commit": "",
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
-    "commit": "ecba3816bd38ec23a001f129ae28dfdecbc63f02",
+    "commit": "e8e6ba273b96b3d65e2367770c30db2f090dab80",
     "merged_commit": null
   },
   "scope": {
@@ -107,7 +107,7 @@
   "review": {
     "decision": "ACCEPT",
     "round": "wp02-impl-r2",
-    "bound_commit": "ecba3816bd38ec23a001f129ae28dfdecbc63f02",
+    "bound_commit": "e8e6ba273b96b3d65e2367770c30db2f090dab80",
     "reviewed_by": "orchestrator (independent re-run; every mutation hand-applied and reverted)",
     "findings": [
       "The code change itself is CORRECT: qoder_security.py now calls path_is_in_worktree, and merge.sh copies preflight.sh's inline-probe pattern verbatim including the `|| echo PROBE_FAIL` fail-closed form. Independently re-run by the orchestrator: targeted 7 passed, guards 19 passed with tests/test_worktree_detection.py's git diff EMPTY, protected set 36 passed.",
@@ -134,7 +134,7 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp02-impl-r3",
+    "round": "wp02-impl-r4",
     "decision": null,
     "kind": "wp-impl-second-signature",
     "bound_brief_rev": 2,
@@ -168,15 +168,29 @@
         "decision": "ACCEPT",
         "bound_brief_rev": 2,
         "kind": "wp-brief-second-signature"
+      },
+      {
+        "round": "wp02-impl-r3",
+        "decision": "REWORK",
+        "bound_commit": "ebd2407",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "e8e6ba273b96b3d65e2367770c30db2f090dab80",
+        "findings": [
+          "Q1 ACCEPT: merge.sh's probe mirrors preflight.sh:40-49 and only the exact single line MAIN passes; crash, missing interpreter, import failure, empty and extra output all reach the refusal branch. The quoted heredoc and the separate \"$status_file\" argument leave no shell-expansion hole, and 2>/dev/null hides only probe diagnostics, not the exit status. Running the probe before the file check and the validator can only refuse earlier, never skip a later gate.",
+          "Q2 ACCEPT: INV-C and INV-D hold. path_is_in_worktree returns True for linked worktrees and fails closed on git/path resolution errors; every member of the old refused set except L is still refused, and sibling linked worktrees are added. Both refusal texts and exit codes are unchanged (merge.sh MERGE_FAIL exit 2, qoder GateError via GATE_FAIL exit 2).",
+          "Q3 REWORK, ORCHESTRATOR-REPRODUCED: F6's own scanner could be bypassed. _code_without_comments() truncated the line at any '#' preceded by whitespace, including inside a string literal, so `if \" # /.worktrees/\"[3:] in str(status_file):` became `if \" ` and the scan reported ZERO hits while the code would reconstruct the literal at runtime. The consultant also confirmed M-A's red evidence IS sound: the real validator asserts STATUS_VALID on the same file merge.sh receives, so reaching the branch-tip gate at :109 necessarily means execution passed the refusal at :57, and no final MERGE_OK is needed to prove wrongful acceptance.",
+          "FIX APPLIED at e8e6ba2: trailing-comment stripping removed entirely rather than made quote-aware -- both legitimate matches are whole-line comments already handled, and keeping the rest of the line can only over-report, which fails safe for INV-A. An adversarial node (test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash) pins it and was verified red under a mutation restoring the quote-blind stripper. Targeted 9 passed, full suite 911 passed / 4 skipped.",
+          "Note: the consultant could not re-run the targeted module because the read-only sandbox has no writable temp dir; its conclusions came from the full diff, the sources and the existing evidence, with all bound SHAs matching."
+        ]
       }
     ],
-    "pending_note": "Implementation second signature on ecba381.",
-    "bound_commit": "ecba3816bd38ec23a001f129ae28dfdecbc63f02"
+    "pending_note": "Implementation second signature r4 on e8e6ba2, after the F6 scanner bypass was closed.",
+    "bound_commit": "e8e6ba273b96b3d65e2367770c30db2f090dab80"
   },
   "timestamps": {
     "created_at": "2026-10-15T14:15:00Z",
     "approved_at": "2026-10-15T14:15:00Z",
-    "updated_at": "2026-10-15T16:05:00Z",
+    "updated_at": "2026-10-15T16:45:00Z",
     "dispatched_at": "2026-10-15T14:55:00Z"
   }
 }
