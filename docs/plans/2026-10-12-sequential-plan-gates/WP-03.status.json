@@ -260,7 +260,7 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp03-impl-r6",
+    "round": "wp03-impl-r6b",
     "decision": null,
     "kind": "wp-impl-second-signature",
     "bound_brief_rev": 11,
