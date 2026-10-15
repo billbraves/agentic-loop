@@ -1,0 +1,25 @@
+{
+  "schema_version": "agentic-plan-status/v1",
+  "plan_id": "PLAN-01",
+  "iteration_id": "2026-10-15-status-source-topology",
+  "state": "DRAFT",
+  "title": "",
+  "lint_exemption": {
+    "approved": false,
+    "approver": "",
+    "justification": "",
+    "reviewed_at": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-10-15-status-source-topology",
+    "target_branch": "main",
+    "merged_commit": null
+  },
+  "work_packages": [
+    "WP-01"
+  ],
+  "timestamps": {
+    "created_at": "2026-10-15T11:00:00Z",
+    "updated_at": "2026-10-15T11:00:00Z"
+  }
+}
