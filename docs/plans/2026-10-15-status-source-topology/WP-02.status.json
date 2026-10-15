@@ -59,24 +59,45 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-15-status-source-topology/WP-02-brief.md",
-      "sha256": "aabc0366017ec934218015d29e5bf23c1c853d83d4aa87f7ae2b1b5709d43ba6",
-      "rev": 1,
-      "prior_revs": []
+      "sha256": "39a11525952c9b1ad5a2d3374da42d950f89bf242c4bffcc7bdb15c492cc465b",
+      "rev": 2,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "sha256": "aabc0366017ec934218015d29e5bf23c1c853d83d4aa87f7ae2b1b5709d43ba6",
+          "snapshot": "docs/plans/2026-10-15-status-source-topology/WP-02-brief.rev1.md",
+          "outcome": "REWORK_AT_WP02_BRIEF_R1"
+        }
+      ]
     }
   },
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "wp02-brief-r1",
+    "round": "wp02-brief-r2",
     "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 1,
-    "prior_rounds": [],
-    "pending_note": "WP-02 brief rev1 second signature. No implementation may be dispatched until ACCEPT."
+    "bound_brief_rev": 2,
+    "prior_rounds": [
+      {
+        "round": "wp02-brief-r1",
+        "decision": "REWORK",
+        "bound_brief_rev": 1,
+        "resolved_in_rev": 2,
+        "findings": [
+          "F5 DID NOT HOLD -- ORCHESTRATOR REPRODUCED IT: rev1 told the developer to make the probe fail by pointing AGENTIC_PYTHON at an always-failing executable. Measured: merge.sh:29 calls resolve_paths --root main_repo BEFORE the worktree probe at line 37, so execution dies there. Actual output `MERGE_FAIL: resolver failed to resolve main_repo`, exit 2 -- which satisfies exactly the assertions rev1 demanded (MERGE_FAIL prefix plus exit code), so the test would have gone GREEN WITHOUT EVER REACHING THE PROBE. rev2 requires a conditional shim that passes `-m agentic_loop.*` calls through to the real Python and fails only the inline probe form, and must assert the output does NOT contain 'resolver failed'.",
+          "M-C's evidence was therefore untrustworthy too: under rev1's construction F5 never reached the probe, so applying or reverting M-C could not change the result. rev2 makes proving 'F5 actually reaches the probe' a precondition of M-C's red evidence.",
+          "INV-C was self-contradictory as a set relation: rev1 said the new refused set is a SUPERSET of the old one while also permitting one loosening, but a real .worktrees directory in the main repo is in the old set and not in the new. rev2 states it precisely as R_new superset-or-equal (R_old minus L), with all linked-worktree paths in R_new.",
+          "F6 must not demand zero raw grep matches: two legitimate COMMENT-ONLY matches exist at finalize_merge.sh:38 and gate/__init__.py:809. rev2 requires zero NON-COMMENT product-code matches and that the implementation explain how it distinguishes comments from code.",
+          "Q1 otherwise confirmed sound: the consultant agreed the brief did not understate the operational impact, and that callers relying on the current acceptance are not legitimate under the documented rule. rev2 nevertheless strengthens the residual-risk section with the orchestrator's measurement that the deadlock grows from 3 entry points to 5."
+        ]
+      }
+    ],
+    "pending_note": "WP-02 brief rev2 second signature. rev2 fixes the F5 false-green, the INV-C set relation, and F6's comment handling."
   },
   "timestamps": {
     "created_at": "2026-10-15T14:15:00Z",
     "approved_at": "2026-10-15T14:15:00Z",
-    "updated_at": "2026-10-15T14:15:00Z"
+    "updated_at": "2026-10-15T14:40:00Z"
   }
 }

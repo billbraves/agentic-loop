@@ -1,7 +1,8 @@
 # WP-02 — 两处 status 来源判定改用加固判据，关闭当前已存在的 INV-5 违反
 
-> rev1 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
-> 状态：**DRAFT（待二签 ACCEPT 后派发）**。
+> rev2 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> 状态：**APPROVED（范围已冻结，待二签 ACCEPT 后派发）**。
+> rev1 快照 `WP-02-brief.rev1.md`（`aabc0366…`）被 `wp02-brief-r1` 判 REWORK。
 > 本 WP 与 WP-01 的信任根问题**无关**，可独立完成；用户已决定先做本 WP。
 
 ## 1. 问题（编排者已实测复现，与任何本次改动无关）
@@ -74,10 +75,19 @@ predicate must not*）。
 `merge.sh` 的实现必须显式处理 `PROBE_FAIL`（范式见 `preflight.sh:40`：
 `|| echo PROBE_FAIL`，随后 `!= "MAIN"` 即拒）。
 
-**INV-C（语义只收紧、不放宽）**：改造后被拒绝的输入集合必须是改造前的**超集**：原先因
-字面量命中而被拒的继续被拒；原先漏判放行的 linked worktree 路径转为拒绝。唯一允许的
-「放宽」是主仓内名为 `.worktrees` 的真实目录 —— 它本就是主仓内容，由
-`test_verdict_does_not_depend_on_directory_name` 的语义背书。
+**INV-C（语义收紧，含一处精确放宽）**：rev1 把它写成「新拒绝集是旧拒绝集的超集，同时存在
+一处放宽」，这在集合关系上**自相矛盾**（brief-r1 指出）。rev2 用精确式表述：
+
+```text
+R_new ⊇ (R_old − L)          且   { 所有 linked worktree 路径 } ⊆ R_new
+L = 主仓内仅因命中 "/.worktrees/" 字面量而被误拒的真实路径
+```
+
+即：除 `L` 之外，旧拒绝集全部保留；且所有 linked worktree 路径一律进入新拒绝集。
+`L` 的正当性由 `test_verdict_does_not_depend_on_directory_name` 的语义背书 ——
+主仓内名为 `.worktrees` 的真实目录本就是主仓内容。
+
+交付时必须在报告中用这个式子逐项对照说明，不得只写「只收紧」。
 
 **INV-D（错误文案与退出码不变）**：两处对外可见的失败文案前缀（`MERGE_FAIL:` /
 `GateError`）与退出码保持不变，避免破坏既有调用方与测试。
@@ -109,12 +119,24 @@ predicate must not*）。
   同样必须让 status 文件真实存在（见 F2 的构造注意），且该文件需能通过
   `run_validator` 之前的那段检查 —— 本节点只断言「未因 worktree 判定被拒」，
   若后续校验因别的原因失败，须在报告中说明断言是如何只锁定 worktree 判定这一步的。
-- **F5 `[merge-probe-failure-fails-closed]`**：令探针失败（例如把 `AGENTIC_PYTHON` 指向一个
-  必然失败的可执行文件）→ `merge.sh` 必须**拒绝**，不得放行。断言退出码与
-  `MERGE_FAIL:` 文案前缀。
+- **F5 `[merge-probe-failure-fails-closed]`**：令**仅探针**失败 → `merge.sh` 必须**拒绝**。
+
+  **rev1 的构造是错的（编排者已实测）**：把 `AGENTIC_PYTHON` 指向一个一律失败的可执行文件，
+  会在 `merge.sh:29` 的 `resolve_paths --root main_repo` 处**先**失败，根本到不了第 37 行的
+  worktree 探针。实测输出为 `MERGE_FAIL: resolver failed to resolve main_repo`、exit 2 ——
+  恰好同时命中 rev1 要求断言的「`MERGE_FAIL:` 前缀 + 退出码」，于是**用例会因错误原因变绿**。
+
+  **rev2 要求条件 shim**：`AGENTIC_PYTHON` 指向一个包装脚本，它把 `-m agentic_loop.*`
+  形式的调用**透传**给真实 Python，**只在**内联探针形式（参数为 `-` 且随后是 status 路径）
+  时失败。断言必须命中 **worktree/探针拒绝文案**，并**显式断言输出不含**
+  `resolver failed` —— 后者是本节点唯一的伪绿来源。
 - **F6 `[no-literal-worktree-check-remains]`**：静态断言 —— 在 `src/agentic_loop/` 下
-  grep `"/.worktrees/"`，**只允许**出现在测试文件与注释中，产品代码里的判定分支必须为 0 处。
-  该用例守 INV-A，防止回归。
+  grep `"/.worktrees/"`，**非注释的产品代码匹配必须为 0 处**。
+
+  **不得**要求原始 grep 零匹配：实测存在两处**纯注释**的合法匹配，必须精确允许或忽略 ——
+  `wrappers/finalize_merge.sh:38`（`# A13: git-fact judgment instead of a "/.worktrees/"
+  path literal …`）与 `gate/__init__.py:809`（`# (no "/.worktrees/" path literal — …`）。
+  实现须说明它是如何区分注释与代码的（例如逐行剥离 `#` 之后的内容再匹配）。
 
 ## 5. 承重变异（DoD 必做，逐条分别施加、分别验证、精确还原）
 
@@ -123,6 +145,9 @@ predicate must not*）。
 - **M-B**：把 `qoder_security.py` 的判定退回字面量 → **F2 必须转红**。
 - **M-C**：去掉 `merge.sh` 探针的 `PROBE_FAIL` 兜底（探针失败时当作 MAIN 放行）→
   **F5 必须转红**。该变异证明 INV-B 承重。
+  **前置条件**：M-C 的红证只有在 F5 采用 rev2 的条件 shim 后才可信 —— rev1 构造下 F5
+  根本到不了探针，M-C 施加与否都不会改变结果（brief-r1 指出此点）。报告须先证明 F5
+  确实到达探针（例如断言输出不含 `resolver failed`），再给 M-C 的红证。
 - **M-D**：把新判定改成「只要在任何 git 仓库内就接受」→ **F1 与 F2 必须同时转红**。
   该变异证明新判定不是把门打开。
 
@@ -162,8 +187,19 @@ M-A/M-B 与 M-C 必须分别施加：前两者证明「换成 git 事实」承�
 
 ## 8. 残余风险
 
-- 本 WP 使 `merge.sh` 与 `qoder_security.py` 开始拒绝此前被漏判放行的 linked worktree 路径。
-  这是**刻意的收紧**，但可能让此前「碰巧能用」的调用方开始失败。对本仓当前布局而言，这正是
-  WP-01 要处理的死锁的一部分 —— 本 WP 不解决该死锁，只统一判定来源；两者先后关系已在
-  WP-01 的 `scope.decisions.wp02_split` 中记录。
+- **本 WP 会把死锁从 3 处扩大到 5 处（编排者实测，必须让用户知晓）**。实测：本机 main 签出
+  的 status 路径不含 `/.worktrees/`，但加固判据对其答 `True`。因此
+
+  ```text
+  今天：  merge.sh / qoder_security  → 接受（字面量未命中）→ agentic merge 可用
+  本 WP 后：两者 → 拒绝（git 事实判定）→ agentic merge 在本机布局上不再可用
+  ```
+
+  这是**刻意的、正确的收紧**（一致性优先于「碰巧能用」），但它使当前布局下不可用的入口从
+  `preflight` / `finalize` / `gate` 三处变为**五处**。缓解完全依赖 WP-01 解除死锁 ——
+  本 WP 不解决死锁，只统一判定来源。两者先后关系已在 WP-01 的
+  `scope.decisions.wp02_split` 中记录；用户已在知悉该次序的前提下选择先做本 WP。
+
+  若在 WP-01 落地前需要临时使用 `agentic merge`，只能由操作者显式绕过，**不得**在本 WP 中
+  为此新增任何旁路开关（见 DoD 最后一条）。
 - 判定与使用之间的 ref/worktree 竞态不在本 WP 范围内（与既有判据同类）。
