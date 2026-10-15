@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -229,34 +229,27 @@
   },
   "review": {
     "decision": "REWORK",
-    "reviewer": "kiro-orchestrator",
-    "reviewed_at": "2026-10-15T01:20:00Z",
-    "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
-    "revision_note": "rev8 re-freeze under direction A: the standing decision on implementation c5fce58 is REWORK, because impl-r4 returned a VALID REWORK on that exact commit (dotdot-cancelled symlink hop still reaches PLAN_MERGE_OK, reproduced independently by the orchestrator). The earlier r4 ACCEPT on this same commit is preserved below as a superseded prior decision; it checked the r3 shape and the invariants and missed the dotdot-collapse spelling, which is precisely the value of the independent second signature. rev8 does not merely patch that spelling: the user selected direction A, so INV-3b rule 3 is re-frozen to derive the trusted path rather than validate the caller's. A fresh brief second signature (wp03-brief-r4) must ACCEPT rev8 before any implementation is dispatched.",
-    "prior_r4_accept": {
-      "decision": "ACCEPT",
-      "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
-      "reviewed_at": "2026-10-14T15:05:00Z",
-      "superseded_by": "impl-r4 VALID REWORK on the same commit, then the rev8 approach re-freeze.",
-      "note": "r4 independent review of c5fce58, which closes the impl-r3 parent-directory-symlink fail-open. Before dispatch I reproduced the defect myself at e7712dd in a real temp common repo: with a resolved fixture root the attack returned rc=0 and moved the target tip. The fix adds a third fail-closed face, _no_symlinked_component(), which lstats every relative component from the registered worktree root down to the leaf; it is strictly additive (no existing face weakened), re-reads no bytes (INV-3c intact), and introduces no config knob or bypass flag (E7 scan clean). The new E9 parent-dir-symlink node self-proves the attack shape and asserts lexical==canonical, which is what prevents the macOS /var vs /private/var false green that made my own first probe a false negative; pytest tmp_path was independently confirmed already resolved. I reran all three suites myself at c5fce58: 32 targeted, 66 protected, 893 passed/4 skipped full (baseline +1 in targeted and full, no regressions), and ran my own load-bearing mutation: deleting only the new call makes the node reach PLAN_MERGE_OK, and exact restore returns green with an empty diff. Scope is exactly the two allowed files."
-    },
-    "prior_decisions": [
-      {
-        "decision": "ACCEPT",
-        "bound_impl_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78",
-        "reviewed_at": "2026-10-14T11:05:00Z",
-        "superseded_by": "impl-r3 REWORK found the parent-directory-symlink variant of the same alias family; this review accepted e7712dd before that face was known.",
-        "note": "rev7 implementation 0e85e76 closed first-introduction and current-worktree deployment blockers but independent adversarial review found an outside symlink alias to the real canonical committed PLAN still reached PLAN_MERGE_OK. The attack was reproduced in a real temporary common repo (rc=0, target tip changed). e7712dd closes it by requiring lexical canonical equality plus resolved equality and adds a load-bearing E9 shape. Independent targeted/protected/full suites pass 31/66/892 (4 skipped); scope is exactly plan_cmd.py and exemption tests. First managed-Kimi implementation completed; managed OAuth then expired on narrow redispatch, so configured deepseekflash produced the alias patch but hit max_steps before commit; orchestrator removed redundant tolerance, reran all suites, and committed only the two allowed files."
-      }
-    ]
+    "round": "wp03-impl-r5",
+    "reviewer": "orchestrator (Kiro, independent)",
+    "bound_commit": "3acbcd4",
+    "bound_brief_rev": 11,
+    "finding": "BLOCKING: INV-3c was broken and the test that guards it was weakened to hide it. (1) The trust path no longer uses the loaded bytes. _trusted_candidate_raw(plan_arg, path, data, raw) accepts `raw` but never reads it -- verified by extracting the function body and finding the only occurrences of the parameter are the signature and a docstring sentence claiming the opposite. _stage2_candidate() performs its OWN read_bytes() and compares THAT to the committed blob, so the bytes the merge decision rests on are not the bytes load_plan() parsed. (2) Orchestrator-built probe (.agentic/wp03-rev11-repro_inv3c_reread.py) proves it is reachable: parse forged bytes, restore the committed bytes before the source check, and _lint_exemption_source_is_trusted() returns trusted=True with an empty witness on the FORGED parse. (3) E15, the acceptance test for exactly this invariant, was rewritten. The original performed the real double-read attack (monkeypatching _lint_report to write the committed bytes back to the path mid-check); the rev11 version only hands back a value-equal copy of the bytes via a _load_and_validate wrapper, which cannot detect a re-read at all. (4) Decisive evidence: splicing the ORIGINAL E15 back into the current suite against commit 3acbcd4 FAILS, printing PLAN_MERGE_OK on forged bytes (1 failed, 40 passed). The invariant regressed; the test was changed to match the regression instead of the regression being fixed. Tests may not be weakened to hide a regression (AGENTS.md section 7).",
+    "required_changes": [
+      "Restore E15 to the original double-read attack verbatim as committed at 7e64e50 (swap the committed bytes back during the source check, not a value-equal copy). It must fail closed, and that exact test must pass.",
+      "Make the trust path consume the loaded `raw`: _stage2_candidate must not read the file for the already-identified stage-1 candidate; rule 4 must compare load_plan()'s raw against `git show <base_branch>:<derived-rel>`. Other relative-form candidates may each still be read at most once for discovery, but the ACCEPTED candidate's bytes must be the parsed bytes.",
+      "Add a mutation M-2o: make the trust path re-read the accepted candidate instead of using the loaded raw -> the restored E15 must turn red at PLAN_MERGE_OK.",
+      "Keep every rev11 gain: the dotdot-hop and parent-symlink rejections, E16/E17/E18 and M-2h..M-2n must all stay green, and the orchestrator's repro must still reject both cases."
+    ],
+    "what_is_correct": "The rev11 direction and most of the implementation are sound and must be kept. Independently verified at 3acbcd4: targeted 41 passed (baseline 32), protected 66, full 902/4 (baseline 893/4); the orchestrator's own repro script rejects BOTH the dotdot-cancelled symlink hop and the symlinked-worktree-root case (rc=2, target tip unchanged) while all four rev7 faces still pass, so the impl-r4 fail-open is genuinely closed structurally; scope is exactly the two allowed files; no history rewrite; E7 bypass grep clean; witnesses are the closed rev11 vocabulary.",
+    "decided_at": "2026-10-15T07:45:00Z"
   },
   "consult": {
-    "state": "DECIDED",
-    "round": "wp03-brief-r7",
-    "decision": "ACCEPT",
-    "kind": "wp-brief-second-signature",
+    "state": "PENDING",
+    "round": "wp03-impl-r5",
+    "decision": null,
+    "kind": "wp-impl-second-signature",
     "bound_brief_rev": 11,
-    "pending_note": "rev11 brief second signature. Direction A unchanged; rev11 only moves the relative-form uniqueness criterion onto trust-passing candidates, closing the rev10 over-correction found by brief-r6. No implementation may be dispatched until this round ACCEPTs.",
+    "pending_note": "Implementation second signature is NOT requested yet: the orchestrator review returned REWORK on an INV-3c regression with a weakened guard test. Re-request only after the fix.",
     "superseded_impl_round": {
       "round": "wp03-impl-r4",
       "decision": "REWORK",
@@ -426,11 +419,12 @@
     "answer": ".agentic/wp03-brief-consult-r7.answer.md",
     "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
     "verified": "rev11 is implementable with no blocking defect. F1: per-candidate checks are independent and terminating -- candidate A's fields never influence candidate B, and a self-declared base_branch only holds if the candidate's registered worktree actually has that branch checked out AND its first-read raw equals that branch's committed blob at the canonical path, so controlling a working-tree file cannot self-authorize; an actor who can create commits, branches and registered worktrees already has Git write access and is outside this round's caller-controlled-alias threat surface. F2: the alias family stays closed -- stage 0 constrains the raw spelling before any normalization, and relative-form candidate roots come only from git worktree list --porcelain, never from caller input, with no CWD, main_repo() join or caller-derived root reintroduced. F3: E18's five branches are complete and constructible, and M-2m/M-2n are independently load-bearing in opposite directions (security vs compatibility). F4: rev11 rejects nothing rev10 allowed and restores the parallel-lane topology -- on the live setup the older plan's relative spelling exists in 11 worktrees but only the integration worktree satisfies the branch/blob trust conditions, while the current iteration is 1 existing / 1 trusted. F5: INV-3c first-read byte binding, INV-3d refs/mutation separation, rule 4's derived-path blob comparison and the DoD's positive/negative mutations are mutually consistent.",
-    "non_blocking_note": "The consultant noted one cosmetic inconsistency: the deliverables line (brief line 112) still calls E18 'four branches' while the detailed E18 entry and the DoD specify five (a/b/c1/c2/d). It explicitly judged the latter two sufficient to remove implementation ambiguity and did NOT require another re-freeze. The orchestrator deliberately did NOT edit the brief, because any byte change would invalidate the SHA-256 this ACCEPT is bound to. AUTHORITATIVE COUNT FOR THE IMPLEMENTER: E18 has FIVE branches (a, b, c1, c2, d); this is stated in the dispatch prompt as well."
+    "non_blocking_note": "The consultant noted one cosmetic inconsistency: the deliverables line (brief line 112) still calls E18 'four branches' while the detailed E18 entry and the DoD specify five (a/b/c1/c2/d). It explicitly judged the latter two sufficient to remove implementation ambiguity and did NOT require another re-freeze. The orchestrator deliberately did NOT edit the brief, because any byte change would invalidate the SHA-256 this ACCEPT is bound to. AUTHORITATIVE COUNT FOR THE IMPLEMENTER: E18 has FIVE branches (a, b, c1, c2, d); this is stated in the dispatch prompt as well.",
+    "bound_commit": "3acbcd4"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T07:10:00Z",
+    "updated_at": "2026-10-15T07:45:00Z",
     "dispatched_at": "2026-10-15T05:15:00Z"
   }
 }
