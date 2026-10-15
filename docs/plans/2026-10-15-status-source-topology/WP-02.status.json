@@ -164,12 +164,6 @@
         ]
       },
       {
-        "round": "wp02-brief-r2",
-        "decision": "ACCEPT",
-        "bound_brief_rev": 2,
-        "kind": "wp-brief-second-signature"
-      },
-      {
         "round": "wp02-impl-r3",
         "decision": "REWORK",
         "bound_commit": "ebd2407",
