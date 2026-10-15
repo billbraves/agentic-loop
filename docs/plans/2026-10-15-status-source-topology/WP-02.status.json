@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "CHANGES_REQUESTED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -26,7 +26,7 @@
     "dispatch_commit": "",
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
-    "commit": null,
+    "commit": "4b513b10c72c247dcf5f9f23cfdb10af558c6fe4",
     "merged_commit": null
   },
   "scope": {
@@ -74,7 +74,19 @@
       ]
     }
   },
-  "review": {},
+  "review": {
+    "decision": "REWORK",
+    "round": "wp02-impl-r1",
+    "bound_commit": "4b513b10c72c247dcf5f9f23cfdb10af558c6fe4",
+    "reviewed_by": "orchestrator (independent re-run and hand-applied mutation)",
+    "findings": [
+      "The code change itself is CORRECT: qoder_security.py now calls path_is_in_worktree, and merge.sh copies preflight.sh's inline-probe pattern verbatim including the `|| echo PROBE_FAIL` fail-closed form. Independently re-run by the orchestrator: targeted 7 passed, guards 19 passed with tests/test_worktree_detection.py's git diff EMPTY, protected set 36 passed.",
+      "M-A IS NOT LOAD-BEARING -- the same class of defect the consultant caught in rev1's F5. The orchestrator hand-applied M-A (restoring the literal in merge.sh) and F1 did turn red, but for the WRONG REASON: the actual stderr was 'STATUS_INVALID: git.worktree is required in state APPROVED_FOR_MERGE ... MERGE_FAIL: status validation failed'. merge.sh validates the status BEFORE reaching the worktree decision, so under M-A execution never gets there and F1 cannot demonstrate that the literal wrongly ACCEPTS a sibling worktree -- which is exactly what the brief's M-A demands ('red form must be the linked worktree being wrongly accepted').",
+      "Root cause: the _status() fixture helper documents itself as 'A schema-valid v2 status document' and asserts the worktree refusal 'fires long before state/scope/risk are consulted', but that is false for merge.sh. The document is missing git.worktree, git.commit and review.decision for state APPROVED_FOR_MERGE, so validation rejects it first.",
+      "F1 also under-constrains its cause assertion: it excludes 'status file not found' but NOT 'status validation failed', so it cannot distinguish the worktree refusal from a validation failure. F2's qoder path is unaffected (qoder_security.main decides the worktree question before run_validator), which is why only the merge.sh side is wrong.",
+      "REQUIRED FIX (no brief change needed): make the fixture status actually schema-valid for its declared state so merge.sh reaches the worktree decision, and tighten F1 to exclude 'status validation failed' as well, so a validation error can never be mistaken for the refusal. Then re-capture M-A's red evidence and show the red form is the wrongful acceptance."
+    ]
+  },
   "consult": {
     "state": "DECIDED",
     "round": "wp02-brief-r2",
@@ -112,7 +124,7 @@
   "timestamps": {
     "created_at": "2026-10-15T14:15:00Z",
     "approved_at": "2026-10-15T14:15:00Z",
-    "updated_at": "2026-10-15T14:55:00Z",
+    "updated_at": "2026-10-15T15:30:00Z",
     "dispatched_at": "2026-10-15T14:55:00Z"
   }
 }
