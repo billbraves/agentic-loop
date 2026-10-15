@@ -380,18 +380,108 @@ fi
 candidates=$(git -C "$repo_root" rev-list --merges --parents "$base_tip" | awk -v t="$wp_tip" '$3==t{print $1}')
 candidate_count=$(printf '%s' "$candidates" | grep -c '^[0-9a-f]\{40\}$' || true)
 
+# A36 (WP-02): two WP layouts reach their integration commit differently, and
+# the discriminator between them is BRANCH IDENTITY -- the two status fields
+# git.branch and git.base_branch comparing equal as strings. It is deliberately
+# NOT "the candidate list came back empty".
+#
+#   - parallel lane (branch != base_branch): a real merge commit must exist in
+#     base history whose second parent is wp_tip. 0 or multiple candidates stay
+#     fail-closed exactly as before this change.
+#   - sequential (branch == base_branch, permitted by AGENTS.md 4.3): the WP
+#     works directly on the integration branch, so wp_tip == base_tip and a
+#     "second parent == wp_tip" merge commit cannot exist by construction. The
+#     WP's own tip IS its integration point.
+#
+# Why not key the split on `candidate_count -eq 0`: an empty candidate list is
+# ALSO what a genuine parallel-lane failure looks like -- the branch was never
+# merged, or a rebase rewrote its merge commit away. Keying on emptiness would
+# route that failure into the sequential path and forge a merged_commit for a WP
+# that is not integrated at all, converting a hard stop into a successful stamp.
+# Branch identity cannot be confused that way: it is a property of the layout
+# the status DECLARES, not of how the resolution happened to turn out.
+if [[ "$branch" == "$base_branch" ]]; then
+  # A37 (WP-02 rev4, INV-6): branch identity is the right discriminator (A36),
+  # but it is NOT self-certifying evidence. `branch` and `base_branch` are two
+  # fields of the SAME status JSON that this script is about to stamp, so a WP
+  # can simply DECLARE itself sequential by writing one value into both. Before
+  # rev4 nothing else was consulted, and the declaration was taken at face
+  # value: a `feature/x` that was never integrated, with the status forged to
+  # `branch = base_branch = main` while `git.commit` kept the un-integrated
+  # feature tip, produced FINALIZE_OK / state=MERGED / merged_commit = main tip
+  # -- a commit with no relationship to that WP's work, stamped onto a WP whose
+  # work was not in base at all (reproduced 2026-10-12).
+  #
+  # The :371 ancestor precondition cannot catch this: `wp_tip` and `base_tip`
+  # are both resolved from a BRANCH NAME, so when the layout is declared
+  # sequential they resolve to the same commit and `is-ancestor X X` is
+  # tautologically true. `git.commit` -- the only field recording where the WP
+  # actually worked -- was previously checked for non-emptiness only (:339) and
+  # never took part in any topological check.
+  #
+  # So the declaration must be confirmed against Git topology, which no status
+  # field can rewrite: a genuinely sequential WP committed DIRECTLY on the
+  # integration branch, therefore its `git.commit` must appear in that branch's
+  # FIRST-PARENT history.
+  #
+  # Why first-parent and not `merge-base --is-ancestor`: once a parallel lane is
+  # merged into base, every commit of that lane IS an ancestor of base, so
+  # `is-ancestor` answers true for work that arrived from a side branch. It
+  # cannot distinguish "committed directly on the integration branch" from
+  # "merged in from somewhere else", which is exactly the distinction the
+  # sequential layout asserts -- and the one that licenses stamping `wp_tip`
+  # rather than resolving a merge commit. A `--first-parent` walk follows only
+  # the integration branch's own line of development, so a second-parent
+  # (merged-in) commit is absent from it. The weakened form would still admit
+  # the "merged, then mis-stamped as sequential" shape.
+  #
+  # Fail-closed on every branch of this check (missing / malformed / dangling /
+  # not in the first-parent history) and never fall through to the stamp. Both
+  # captures use the `if !` form on purpose: under `set -euo pipefail` a plain
+  # `x=$(cmd)` assignment that takes a non-zero exit aborts the script instead
+  # of refusing (A29's hazard), and `|| true` / `|| echo false` would convert a
+  # crashed git into a passing verdict -- fail-open, the very defect this adds.
+  # Deliberately pipeline-free: `rev-list --first-parent | grep -q` looks
+  # natural but makes grep exit on the first match, so git dies of SIGPIPE and
+  # `pipefail` reports 141 for a commit that IS present -- measured on this
+  # repository's own history, which would have made WP-02's real finalize
+  # fail-closed on a valid status. Membership is tested on the captured text.
+  # This check only ADDS a precondition; no existing gate is replaced, and
+  # `merged_commit` is still `$wp_tip` (INV-1b) once the layout is confirmed.
+  if [[ ! "$git_commit" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: git.commit '$git_commit' is not a 40-hex commit id" >&2
+    exit 2
+  fi
+  if ! git_commit_obj=$(git -C "$repo_root" rev-parse --verify --quiet "${git_commit}^{commit}"); then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: git.commit $git_commit does not resolve to a commit object in $repo_root" >&2
+    exit 2
+  fi
+  if ! base_first_parents=$(git -C "$repo_root" rev-list --first-parent "$base_tip"); then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: cannot walk the first-parent history of base '$base_branch' ($base_tip)" >&2
+    exit 2
+  fi
+  if [[ $'\n'"$base_first_parents"$'\n' != *$'\n'"$git_commit_obj"$'\n'* ]]; then
+    echo "FINALIZE_FAIL: declared sequential layout not confirmed by topology: git.commit $git_commit_obj is not in the first-parent history of base '$base_branch' ($base_tip); a sequential WP must have committed directly on the integration branch" >&2
+    exit 2
+  fi
+  merged_commit="$wp_tip"
+  resolution_count=1
+else
+  merged_commit=$(printf '%s' "$candidates")
+  resolution_count=$candidate_count
+fi
+
 # Step 7: idempotency for an already-finalized WP.
 if [[ "$state" == "MERGED" && -n "$merged_commit_recorded" ]]; then
-  if [[ "$candidate_count" -ne 1 ]]; then
-    echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $candidate_count)" >&2
+  if [[ "$resolution_count" -ne 1 ]]; then
+    echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $resolution_count)" >&2
     exit 2
   fi
-  resolved=$(printf '%s' "$candidates")
-  if [[ "$merged_commit_recorded" != "$resolved" ]]; then
-    echo "FINALIZE_FAIL: recorded merged_commit != resolved ($merged_commit_recorded vs $resolved)" >&2
+  if [[ "$merged_commit_recorded" != "$merged_commit" ]]; then
+    echo "FINALIZE_FAIL: recorded merged_commit != resolved ($merged_commit_recorded vs $merged_commit)" >&2
     exit 2
   fi
-  echo "FINALIZE_OK merged_commit=$resolved (already finalized)"
+  echo "FINALIZE_OK merged_commit=$merged_commit (already finalized)"
   exit 0
 fi
 
@@ -400,12 +490,10 @@ if [[ "$state" != "APPROVED_FOR_MERGE" ]]; then
   exit 2
 fi
 
-if [[ "$candidate_count" -ne 1 ]]; then
-  echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $candidate_count)" >&2
+if [[ "$resolution_count" -ne 1 ]]; then
+  echo "FINALIZE_FAIL: cannot uniquely resolve merge commit for $branch tip $wp_tip (found $resolution_count)" >&2
   exit 2
 fi
-
-merged_commit=$(printf '%s' "$candidates")
 
 # Step 4 & 5: atomic write with self-validation.
 updated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)

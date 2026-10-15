@@ -83,7 +83,7 @@ REQUIRED_TOP_LEVEL = {
     "timestamps",
 }
 
-OPTIONAL_TOP_LEVEL = {"title"}
+OPTIONAL_TOP_LEVEL = {"title", "lint_exemption"}
 
 # Default lane a WP lands in when its object entry has no `lane` (and every WP
 # in the legacy string form). A lane is defined as *serial*: at any instant,
@@ -102,16 +102,30 @@ RC_USAGE = 64
 # JSON load + schema validation (pure)
 # ---------------------------------------------------------------------------
 
-def load_plan(path: Path) -> dict:
+def load_plan(path: Path) -> tuple:
+    """Read the plan file exactly once and parse those same raw bytes.
+
+    Returns ``(raw, data)``.  The raw bytes are the bytes actually parsed;
+    every later trust decision must compare against them, never a re-read
+    of the path (INV-3c).
+    """
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
     except FileNotFoundError:
         raise ValueError("plan status file does not exist: {}".format(path)) from None
+    except OSError as exc:
+        raise ValueError("plan status file cannot be read: {} ({})".format(path, exc)) from None
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("plan status file is not valid UTF-8: {}".format(exc)) from None
+    try:
+        value = json.loads(text)
     except json.JSONDecodeError as exc:
         raise ValueError("invalid JSON at line {}: {}".format(exc.lineno, exc.msg)) from None
     if not isinstance(value, dict):
         raise ValueError("plan status root must be a JSON object")
-    return value
+    return raw, value
 
 
 def validate(data: dict) -> list:
@@ -136,6 +150,17 @@ def validate(data: dict) -> list:
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
             errors.append("{} must be a non-empty string".format(field))
+            continue
+        # INV-3e: both fields are concatenated into the canonical plan path,
+        # so each must be a SINGLE safe relative component.  Enforced here (not
+        # only at the concatenation site) so every caller of validate() — and
+        # therefore `plan check/lint/lanes/merge/finalize` — rejects a field of
+        # `"../../etc"` before any path is derived.
+        if not _is_single_path_component(value):
+            errors.append(
+                "{} must be a single relative path component (no '/', no "
+                "'\\', not '.' or '..', no leading dot, no NUL)".format(field)
+            )
 
     git = data.get("git")
     if not isinstance(git, dict):
@@ -475,11 +500,524 @@ def _resolve_plan_path(plan_arg: str) -> Path:
     return repo / arg
 
 
-def _load_and_validate(plan_arg: str) -> tuple:
-    path = _resolve_plan_path(plan_arg)
-    data = load_plan(path)
+def _discover_relative_candidates(rel: str) -> list:
+    """R3-a stage 1 for the canonical RELATIVE shape: deterministic candidate
+    discovery, in registered-worktree order (INV-3b rule 3).
+
+    ``_resolve_plan_path()`` is deliberately NOT used: it anchors a relative
+    spelling at ``main_repo()``, while the plan file is committed only on the
+    integration branch (E13's first-introduction case), so that spelling
+    resolves to a main-repo path that does not exist and is undeployable.  The
+    spelling is instead joined onto EVERY registered worktree root and the
+    candidates that actually exist are collected.  Nothing here grants trust:
+    the returned paths are only read once, and uniqueness is decided later on
+    the candidates that pass the full stage-2 check (rev11)."""
+    try:
+        roots = _registered_worktrees(_rp.main_repo())
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        return []
+    out = []
+    for wt_root in roots:
+        candidate = Path(wt_root) / rel
+        try:
+            if candidate.is_file():
+                out.append(candidate)
+        except (OSError, RuntimeError, ValueError):
+            continue
+    return out
+
+
+def _discover_absolute_candidates(plan_arg: str) -> list:
+    """R3-a stage 1 for the ABSOLUTE shape: exactly one candidate, the caller's
+    own spelling (INV-3b rule 3, 'absolute: use that absolute path itself').
+    No worktree is needed to locate it, so this works even when the caller is
+    not inside the repository."""
+    try:
+        path = Path(plan_arg)
+        if path.is_file():
+            return [path]
+    except (OSError, RuntimeError, ValueError):
+        return []
+    return []
+
+
+def _stage1_load(plan_arg: str) -> tuple:
+    """R3-a stages 0+1: locate the caller's spelling and read it ONCE.
+
+    Returns ``(data, path, raw)``.  The single read is explicitly authorized by
+    R3-a and grants no trust; ``raw`` is the bytes that were parsed, retained
+    for INV-3c's rule-4 comparison.  Fail-closed with a reason-specific witness:
+
+      * an unaccepted spelling is rejected lexically (stage 0), without
+        touching the filesystem at all;
+      * zero existing candidate (relative) / no such file (absolute) reports
+        ``no candidate`` rather than falling back to any other root;
+      * more than one existing candidate for the ABSOLUTE shape cannot happen
+        (the spelling is a single literal); for the RELATIVE shape existence
+        alone is NOT a rejection criterion (rev11) — every existing candidate
+        is read once and the uniqueness decision is made by stage 2 on the
+        candidates that pass the trust check.
+    """
+    shape, rel = _plan_arg_shape(plan_arg)
+    if shape == "reject":
+        print(
+            "PLAN_FAIL: plan status path has an unaccepted spelling: {}".format(
+                plan_arg
+            ),
+            file=sys.stderr,
+        )
+        raise SystemExit(RC_FAIL)
+
+    def _report(reason: str):
+        print("PLAN_FAIL: {}".format(reason), file=sys.stderr)
+        raise SystemExit(RC_FAIL)
+
+    if shape == "relative":
+        candidates = _discover_relative_candidates(rel)
+    else:
+        candidates = _discover_absolute_candidates(plan_arg)
+    if not candidates:
+        if shape == "relative":
+            _report(
+                "no trusted candidate for the plan status path {} (no registered "
+                "worktree carries it)".format(plan_arg)
+            )
+        _report("plan status file does not exist: {}".format(plan_arg))
+    path = candidates[0]
+    try:
+        _raw, data = load_plan(path)
+    except ValueError as exc:
+        _report(str(exc))
     _validate_or_raise(data, path.name)
-    return data, path
+    return data, path, _raw
+
+
+def _load_and_validate(plan_arg: str) -> tuple:
+    """Read + validate the plan file at the caller's spelling (R3-a stage 1).
+
+    Absolute spellings keep the historical single-path semantics; a canonical
+    relative spelling goes through deterministic candidate discovery so the
+    documented `agentic plan merge docs/plans/<iter>/<plan>.json` form works
+    from any CWD and from a checkout where only the integration branch carries
+    the file (rev10/rev11)."""
+    return _stage1_load(plan_arg)
+
+
+def _git_bytes_may_fail(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True)
+
+
+def _git_common_dir(repo: Path) -> Path:
+    """Resolved ``git-common-dir`` of ``repo`` (shared across linked worktrees)."""
+    out = _git(repo, "rev-parse", "--git-common-dir")
+    p = Path(out)
+    if not p.is_absolute():
+        p = repo / p
+    return p.resolve()
+
+
+def _registered_worktrees(repo: Path) -> dict:
+    """Map each registered worktree root (resolved) -> current branch name
+    (None when detached), from ``git worktree list --porcelain``."""
+    proc = _git_may_fail(repo, "worktree", "list", "--porcelain")
+    if proc.returncode != 0:
+        return {}
+    out: dict = {}
+    current: Path | None = None
+    for line in proc.stdout.splitlines():
+        if line.startswith("worktree "):
+            try:
+                current = Path(line[len("worktree "):]).resolve()
+            except (OSError, RuntimeError, ValueError):
+                current = None
+            if current is not None:
+                out.setdefault(current, None)
+        elif line.startswith("branch refs/heads/") and current is not None:
+            out[current] = line[len("branch refs/heads/"):]
+    return out
+
+
+def _is_single_path_component(value: object) -> bool:
+    """True only when ``value`` is a single, safe relative path component.
+
+    ``iteration_id`` and ``plan_id`` are concatenated into the canonical plan
+    path, so a value that itself carries path syntax makes "derived from the
+    worktree root" vacuous: ``iteration_id="../../etc"`` would derive
+    ``docs/plans/../../etc/PLAN-1.status.json`` and ``"."`` would collapse the
+    iteration directory away (INV-3e, rev9).  The constraints are: a non-empty
+    string, no path separators (``/`` or ``\\``), not ``.`` / ``..``, no leading
+    dot, and no NUL.  This is deliberately stricter than "no separator" — an
+    id must be a plain directory/file name an attacker cannot bend."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    if value in (".", ".."):
+        return False
+    if value.startswith("."):
+        return False
+    if "/" in value or "\\" in value or "\x00" in value:
+        return False
+    return True
+
+
+def _canonical_plan_rel(data: dict):
+    """Lexically safe repo-relative canonical path of the plan status file:
+    ``<iterations_dir>/<iteration_id>/<plan_id>.status.json``. None when the
+    configured iterations_dir escapes the repo root, or when either path field
+    is not a single safe component (INV-3e).
+
+    Defensive only: ``validate()`` already fails closed on such fields, so call
+    sites that ran ``_validate_or_raise`` first can never see the ``None``."""
+    try:
+        if not _is_single_path_component(data.get("iteration_id")):
+            return None
+        if not _is_single_path_component(data.get("plan_id")):
+            return None
+        repo = _rp.main_repo()
+        rel = os.path.relpath(_rp.iterations_dir(), repo)
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        return None
+    rel_path = Path(rel)
+    if rel_path.is_absolute() or rel_path.parts[:1] == ("..",):
+        return None
+    return (rel_path / data["iteration_id"] / "{}.status.json".format(data["plan_id"])).as_posix()
+
+
+def _lint_exemption_is_legal(exemption: object) -> bool:
+    """Return True only for the repository's strict four-field approval shape."""
+    if not isinstance(exemption, dict):
+        return False
+    if exemption.get("approved") is not True:
+        return False
+    approver = exemption.get("approver")
+    if not isinstance(approver, str) or not approver.strip():
+        return False
+    justification = exemption.get("justification")
+    if not isinstance(justification, str) or not justification.strip():
+        return False
+    reviewed_at = exemption.get("reviewed_at")
+    if not isinstance(reviewed_at, str) or not reviewed_at.strip():
+        return False
+    return True
+
+
+def _lexical_absolute(path: Path) -> Path:
+    """Absolute + lexical-normalized form of ``path`` (``os.path.normpath``).
+
+    NOT used by the source-trust check: ``normpath`` collapses ``hop/..``
+    lexically, which hides a symlinked component from every later check (the r4
+    bypass).  It survives only as the historical spelling used by the
+    `canonical-symlink` test shape, which asserts that lexical equality alone
+    would NOT reject a symlinked leaf."""
+    return Path(os.path.normpath(os.path.abspath(path)))
+
+
+def _no_symlinked_component(wt_root: Path, rel: str) -> bool:
+    """True only when every relative component of ``rel`` under ``wt_root``
+    exists and is a real (non-symlink) filesystem entry.
+
+    ``rel`` is the DERIVED canonical repo-relative path of the plan status file
+    (``docs/plans/<iteration_id>/<plan_id>.status.json``).  Each accumulated
+    path is inspected with ``Path.is_symlink()``, which is an ``lstat`` and
+    never follows links, so a symlinked parent component (e.g. a relocated
+    ``docs`` tree) is detected instead of silently followed (INV-3b rule 3,
+    R3-b).  Fail-closed: any ``OSError``/``RuntimeError``/``ValueError``
+    (including a missing or dangling component) returns False.  The file's
+    bytes are never read here (INV-3c)."""
+    try:
+        current = Path(wt_root)
+        for part in Path(rel).parts:
+            current = current / part
+            if current.is_symlink():
+                return False
+        return True
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def _plan_arg_shape(plan_arg: str):
+    """R3-c pre-sanitization: classify the caller's RAW spelling, lexically.
+
+    Runs strictly before any ``normpath`` / ``abspath`` / ``resolve``: those
+    would collapse ``hop/..`` (hiding a symlinked component) or fold a ``.`` /
+    doubled separator into a different spelling that then compares equal.  The
+    output is one of:
+
+      * ``("reject", None)``           — carries ``..`` / ``.`` / ``//`` / a
+        trailing separator, or is neither accepted shape;
+      * ``("absolute", None)``         — an absolute spelling to use verbatim;
+      * ``("relative", rel)``          — a canonical relative spelling, mapped
+        later onto whichevery registered worktree root actually carries it.
+
+    A canonical relative spelling must consist of non-empty, non-``.``/``..``
+    components; every component except the last must additionally not start
+    with a dot (no hidden segment traversal), and the last must be
+    ``<plan_id>.status.json``.  The terminal ``.status.json`` and the iteration
+    directory are therefore the only opaque parts, and both are verified
+    byte-for-byte against the file's own fields in stage 2."""
+    if not isinstance(plan_arg, str) or not plan_arg:
+        return ("reject", None)
+    if "\x00" in plan_arg:
+        return ("reject", None)
+    if plan_arg.endswith("/") or plan_arg.endswith("/."):
+        return ("reject", None)
+    if "//" in plan_arg:
+        return ("reject", None)
+    if os.path.isabs(plan_arg):
+        # Absolute: the sole accepted spelling.  Stage 2 requires byte-exact
+        # equality with the derived path, so any oddity (a ``.``/``..``/``//``
+        # component) is rejected there; only a trailing separator is caught
+        # here, because it changes the spelling without changing the path.
+        return ("absolute", None)
+    if plan_arg.endswith("/") or plan_arg.endswith("."):
+        return ("reject", None)
+    parts = plan_arg.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        return ("reject", None)
+    if any(part.startswith(".") for part in parts[:-1]):
+        return ("reject", None)
+    if not parts[-1].endswith(".status.json") or parts[-1] == ".status.json":
+        return ("reject", None)
+    return ("relative", plan_arg)
+
+
+def _stage2_candidate(
+    plan_arg: str,
+    shape: str,
+    rel: str,
+    wt_root: Path,
+    main_common: Path,
+    loaded_raw: bytes | None = None,
+) -> tuple:
+    """INV-3b stage 2: independently re-check one candidate's bytes.
+
+    ``loaded_raw`` is the byte string ``load_plan()`` actually PARSED, or
+    ``None`` when this candidate is not the one stage 1 read.  The ACCEPTED
+    candidate must be handed its parsed bytes: INV-3c forbids re-reading the
+    accepted candidate, so rule 4 compares ``loaded_raw`` against the committed
+    blob and this function does NOT touch the filesystem for it.  A DROPPED
+    candidate that was never read may be read here exactly once (R3-a stage 1
+    authorizes that read for candidate discovery; only a *second* read of the
+    accepted candidate is forbidden).  Returns the raw bytes object on success
+    and ``None`` on any failure, including a failure to parse the candidate at
+    all (a candidate whose bytes cannot be parsed cannot have declared the base
+    branch we need, so it is simply not trusted).
+
+    Invariants checked, each of which alone must be able to fail closed:
+
+    1. the worktree is registered and shares the main repo's resolved
+       ``git-common-dir``;
+    2. its current branch is byte-exactly what the file itself declares as
+       ``git.base_branch`` (this is what excludes a parallel-lane worktree that
+       merely inherits the same relative path, E18(c1));
+    3. the file's ``iteration_id`` / ``plan_id`` match the canonical relative
+       spelling component by component (no field forgery can move trust to a
+       different worktree, E18(d)); the fields must also be safe single
+       components (INV-3e);
+    4. containment: the derived path stays lexically below the worktree root;
+    5. every component of the derived path, leaf and parents, is a real
+       (non-symlink) entry — R3-b;
+    6. raw bytes == ``git show <base_branch>:<derived-rel>``.
+    """
+    base_branch = ""
+    try:
+        if _git_common_dir(wt_root) != main_common:
+            return None
+        if loaded_raw is None:
+            # Not stage 1's candidate: this is a dropped candidate's own first
+            # (and only) read, authorized by R3-a stage 1 as part of candidate
+            # discovery.  The accepted candidate never reaches this branch.
+            raw = (Path(plan_arg) if shape == "absolute" else wt_root / rel).read_bytes()
+        else:
+            # The accepted candidate: consume the bytes ``load_plan()`` parsed.
+            # Re-reading the path here would be INV-3c's violation — a check that
+            # re-reads judges bytes the merge decision never used.
+            raw = loaded_raw
+        data = json.loads(raw.decode("utf-8"))
+        if not isinstance(data, dict):
+            return None
+        iteration_id = data.get("iteration_id")
+        plan_id = data.get("plan_id")
+        git = data.get("git")
+        if not isinstance(git, dict):
+            return None
+        base_branch = git.get("base_branch")
+    except (OSError, RuntimeError, ValueError, UnicodeDecodeError, SystemExit):
+        return None
+    if not isinstance(base_branch, str) or not base_branch.strip():
+        return None
+    # (3) The file's own fields must BE the spelling we were asked for — an
+    # attacker cannot stash a file whose fields point elsewhere under a
+    # legitimate relative spelling.  `rel` is the effective repo-relative path
+    # (``<iterations_dir>/<iteration_id>/<plan_id>.status.json``), and the
+    # iterations_dir prefix is the engine's own constant, so the fields must
+    # equal its last two components byte for byte.
+    if not _is_single_path_component(iteration_id) or not _is_single_path_component(plan_id):
+        return None
+    rel_parts = Path(rel).parts
+    if len(rel_parts) < 2 or rel_parts[-2:] != (iteration_id, "{}.status.json".format(plan_id)):
+        return None
+    # (2) Branch binding: the worktree's CURRENT branch must be the one the
+    # file declares.  A lane worktree cut from the integration branch inherits
+    # this file but is checked out at a different branch, so it is dropped here
+    # rather than by the accident of the file existing (rev11).
+    try:
+        if _registered_worktrees(_rp.main_repo()).get(Path(wt_root).resolve()) != base_branch:
+            return None
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        return None
+    derived = Path(wt_root) / rel
+    # (4) Containment: the derivation itself must not escape the root.
+    if Path(rel).is_absolute() or Path(rel).parts[:1] == ("..",):
+        return None
+    # (5) R3-b: derived path, per-component lstat from the worktree root down.
+    if not _no_symlinked_component(wt_root, rel):
+        return None
+    if not derived.is_file() or derived.is_symlink():
+        return None
+    # (6) INV-3c / rule 4: the DERIVED path names the blob to compare, and the
+    # object compared is the raw bytes bound above — the loaded bytes for the
+    # accepted candidate, never a re-read.
+    blob = _git_bytes_may_fail(_rp.main_repo(), "show", "{}:{}".format(base_branch, rel))
+    if blob.returncode != 0 or blob.stdout != raw:
+        return None
+    return raw
+
+
+def _trusted_candidate_raw(
+    plan_arg: str, path: Path, data: dict, raw: bytes
+):
+    """INV-3b rule 3 (rev8 direction: canonicalize once) — returns
+    ``(ok, witness)``.
+
+    Trust is NOT established by validating whatever spelling the caller typed.
+    The engine derives the canonical path itself and accepts exactly two
+    spellings, byte for byte:
+
+      * canonical absolute: ``<worktree_root>/<iterations_dir>/<iter>/<plan>.status.json``;
+      * canonical relative: ``<iterations_dir>/<iter>/<plan>.status.json``.
+
+    Anything else (case variants, Unicode normalization variants, Windows
+    separators as literals, symlink aliases, paths outside the repository, a
+    copy in the target worktree) can only fail, and no enumeration of known
+    aliases exists to be out-grown.
+
+    The caller's path is used in exactly two places and nowhere else: the
+    single read of `_load_and_validate` / `_stage2_candidate` (explicitly
+    authorized by R3-a), and the byte-exact comparison below.  Rule 4's blob
+    comparison uses the DERIVED path; for the ACCEPTED candidate it compares
+    the caller's parsed bytes — the `raw` that `load_plan()` actually parsed —
+    and never re-reads that path (INV-3c).  Only a DROPPED candidate gets its
+    own single read, on the candidate-discovery path, and only when it was not
+    the one stage 1 loaded.
+    """
+    shape, rel = _plan_arg_shape(plan_arg)
+    if shape == "reject":
+        return (False, "unaccepted spelling")
+
+    try:
+        main_repo = _rp.main_repo()
+        main_common = _git_common_dir(main_repo)
+        worktrees = _registered_worktrees(main_repo)
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        return (False, "cannot resolve the registered worktree set")
+
+    if shape == "absolute":
+        # Exactly one candidate: the caller handed us an absolute spelling.
+        # Which worktree it belongs to is decided by the bytes it holds.
+        # The path is NOT re-resolved here: `path` is the very candidate that
+        # `_stage1_load` already read (R3-a forbids a second open/read/resolve
+        # of the caller spelling), and the lexical form is enough to locate the
+        # registered worktree root that contains it.  `raw` IS that parsed byte
+        # string: the caller's spelling here contains exactly one existing
+        # candidate, so it is the accepted one and rule 4 must judge these bytes.
+        for wt_root in worktrees:
+            wt_root = Path(wt_root).resolve()
+            try:
+                lexical = Path(os.path.normpath(os.path.abspath(path)))
+                if not lexical.is_relative_to(wt_root):
+                    continue
+            except (OSError, RuntimeError, ValueError):
+                continue
+            try:
+                candidate_rel = lexical.relative_to(wt_root).as_posix()
+            except (OSError, RuntimeError, ValueError):
+                continue
+            # R3-c: the raw spelling must be the un-folded canonical absolute
+            # form, so a `..`/`.` component can never hide a symlinked parent.
+            if os.path.normpath(plan_arg) != plan_arg:
+                return (False, "unaccepted spelling")
+            candidate_raw = _stage2_candidate(
+                plan_arg, shape, candidate_rel, wt_root, main_common, raw
+            )
+            if candidate_raw is None:
+                continue
+            # Accepted == the caller's spelling names exactly the derived form.
+            if str((wt_root / candidate_rel)) != plan_arg:
+                return (False, "unaccepted spelling")
+            return (True, "")
+        return (False, "no trusted candidate")
+
+    # Canonical relative shape: candidate discovery across every registered
+    # worktree.  `_resolve_plan_path()` is deliberately NOT used: it anchors
+    # relative paths at `main_repo()`, while the plan file is committed only on
+    # the integration branch (E13's first-introduction case), so that spelling
+    # resolves to a non-existent main-repo path and is undeployable.  The file
+    # used is the canonical relative contract spelling, which maps to the
+    # worktree the candidate discovery selects — never to the CWD.
+    trusted = []
+    for wt_root in worktrees:
+        try:
+            wt_root = Path(wt_root).resolve()
+            # Only stage 1's own candidate gets the parsed `raw`; the others are
+            # dropped candidates and may be read once each while being dropped.
+            is_stage1_candidate = os.path.abspath(wt_root / rel) == os.path.abspath(path)
+            candidate_raw = _stage2_candidate(
+                plan_arg,
+                shape,
+                rel,
+                wt_root,
+                main_common,
+                raw if is_stage1_candidate else None,
+            )
+        except (OSError, RuntimeError, ValueError, SystemExit):
+            continue
+        if candidate_raw is not None:
+            trusted.append((wt_root, candidate_raw))
+
+    if not trusted:
+        return (False, "no trusted candidate")
+    if len(trusted) > 1:
+        return (False, "trusted candidate not unique")
+    # The accepted bytes ARE the trusted candidate's bytes.  R3-c requires the
+    # caller's RAW spelling to equal the canonical relative form byte for byte
+    # — that spelling never depends on a worktree root or on the CWD.
+    wt_root, candidate_raw = trusted[0]
+    if plan_arg != rel:
+        return (False, "unaccepted spelling")
+    return (True, "")
+
+
+def _lint_exemption_source_is_trusted(plan_arg: str, data: dict, raw: bytes):
+    """Bind a merge-only lint exemption to the integration branch's committed
+    blob; returns ``(trusted, witness)`` (the witness is empty when trusted).
+
+    The audit authority is the committed blob on ``git.base_branch`` — not any
+    checkout's index (known trap 4).  Everything is decided on the raw bytes
+    that ``_load_and_validate`` already parsed; nothing is re-read here except
+    a relative form's other candidates, each at most once (INV-3b/3c).
+
+    rev8 direction (unchanged since): the trusted path is DERIVED by the
+    engine.  Checking the caller's spelling harder cannot close this hole —
+    three successive implementations (outside alias, parent-directory symlink,
+    ``..``-cancelled symlink hop) were all the same root cause exposed through a
+    different spelling, because ``_lexical_absolute()`` folds ``hop/..``
+    lexically and the symlinked component never reaches any checked path.  The
+    witness vocabulary is closed and generated from that judgement itself:
+    ``no trusted candidate`` / ``trusted candidate not unique`` /
+    ``unaccepted spelling``; a caller can never supply a witness string.
+    """
+    ok, witness = _trusted_candidate_raw(plan_arg, Path(plan_arg), data, raw)
+    return (ok, witness)
 
 
 def _require_converged(data: dict, repo: Path) -> None:
@@ -575,7 +1113,7 @@ def _lint_report(data: dict, repo: Path) -> tuple:
 # ---------------------------------------------------------------------------
 
 def cmd_check(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
     base = data["git"]["base_branch"]
     target = data["git"]["target_branch"]
@@ -633,7 +1171,7 @@ def cmd_check(plan_arg: str) -> int:
 
 
 def cmd_lint(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
     dirty, lines = _lint_report(data, repo)
     for line in lines:
@@ -653,7 +1191,7 @@ def cmd_lanes(plan_arg: str) -> int:
     Read-only (git `show` only). The ready computation is a pure function
     (`_lanes_ready`) evaluated over WP states read from git — the state is the
     only dynamic input; there is no clock / no network."""
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
     base = data["git"]["base_branch"]
 
@@ -717,7 +1255,7 @@ def cmd_lanes(plan_arg: str) -> int:
 
 
 def cmd_merge(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
 
     base_branch = data["git"]["base_branch"]
@@ -743,19 +1281,59 @@ def cmd_merge(plan_arg: str) -> int:
     # Fail-closed on evidence: every declared WP must actually be MERGED.
     _require_converged(data, repo)
 
-    # Fail-closed on commit discipline: no review/consult/override "sync" commits.
+    # Fail-closed on commit discipline.  A legal exemption waives only this one
+    # finding, and only when the bytes actually parsed are bound to the
+    # integration branch's committed canonical blob (see
+    # _lint_exemption_source_is_trusted).
     dirty, lines = _lint_report(data, repo)
     if dirty:
-        for line in lines:
-            print(line, file=sys.stderr)
+        exemption = data.get("lint_exemption")
+        if not _lint_exemption_is_legal(exemption):
+            for line in lines:
+                print(line, file=sys.stderr)
+            print(
+                "PLAN_FAIL: status-sync commits present; squash to freeze + finalize "
+                "first (see `agentic plan lint`)",
+                file=sys.stderr,
+            )
+            return RC_FAIL
+        trusted, witness = _lint_exemption_source_is_trusted(plan_arg, data, raw)
+        if not trusted:
+            for line in lines:
+                print(line, file=sys.stderr)
+            print(
+                "PLAN_FAIL: lint exemption source is untrusted ({}); the exemption "
+                "must name the plan status file committed on the integration "
+                "branch, either as its canonical absolute path or as the "
+                "contract's canonical relative path".format(witness),
+                file=sys.stderr,
+            )
+            return RC_FAIL
         print(
-            "PLAN_FAIL: status-sync commits present; squash to freeze + finalize "
-            "first (see `agentic plan lint`)",
-            file=sys.stderr,
+            "PLAN_LINT_EXEMPTION approver={} justification={}".format(
+                exemption["approver"], exemption["justification"]
+            )
         )
+
+    # Everything below consults or mutates a checkout.  It MUST run in the
+    # caller's current worktree (INV-3d) — never the physical-primary
+    # checkout, which may be on another branch with unrelated user changes
+    # (E14).  Refs-only queries above already ran against the shared main
+    # repo; the current worktree must share that repo's resolved common dir.
+    try:
+        checkout = _rp.current_worktree()
+        if _git_common_dir(checkout) != _git_common_dir(repo):
+            print(
+                "PLAN_FAIL: current worktree is not linked to the main repo "
+                "(shared git-common-dir mismatch)",
+                file=sys.stderr,
+            )
+            return RC_FAIL
+    except (OSError, RuntimeError, ValueError, SystemExit):
+        print("PLAN_FAIL: cannot resolve the current worktree", file=sys.stderr)
         return RC_FAIL
 
-    current = _git(repo, "branch", "--show-current")
+    current = _git(checkout, "branch", "--show-current")
     if current != target_branch:
         print(
             "PLAN_FAIL: must run on target branch {} (current: {})".format(
@@ -775,16 +1353,16 @@ def cmd_merge(plan_arg: str) -> int:
         )
         return RC_FAIL
 
-    proc = _git_may_fail(repo, "merge", "--no-ff", "--no-edit", base_branch)
+    proc = _git_may_fail(checkout, "merge", "--no-ff", "--no-edit", base_branch)
     if proc.returncode != 0:
-        conflicted = _git_may_fail(repo, "diff", "--name-only", "--diff-filter=U")
+        conflicted = _git_may_fail(checkout, "diff", "--name-only", "--diff-filter=U")
         if conflicted.returncode == 0 and conflicted.stdout.strip():
             print("PLAN_FAIL: merge conflicts in:", file=sys.stderr)
             for line in conflicted.stdout.splitlines():
                 if line.strip():
                     print("    - {}".format(line.strip()), file=sys.stderr)
             print(
-                "  resolve then: git -C {} merge --continue   (or abort: git merge --abort)".format(repo),
+                "  resolve then: git -C {} merge --continue   (or abort: git merge --abort)".format(checkout),
                 file=sys.stderr,
             )
         else:
@@ -792,7 +1370,7 @@ def cmd_merge(plan_arg: str) -> int:
                 base_branch, proc.stderr.strip()), file=sys.stderr)
         return RC_FAIL
 
-    merged_commit = _git(repo, "rev-parse", "HEAD")
+    merged_commit = _git(checkout, "rev-parse", "HEAD")
     print(
         "PLAN_MERGE_OK merged_commit={} base_branch={} into={}".format(
             merged_commit, base_branch, target_branch
@@ -803,7 +1381,7 @@ def cmd_merge(plan_arg: str) -> int:
 
 
 def cmd_finalize(plan_arg: str) -> int:
-    data, path = _load_and_validate(plan_arg)
+    data, path, _raw = _load_and_validate(plan_arg)
     repo = _rp.main_repo()
 
     base_branch = data["git"]["base_branch"]

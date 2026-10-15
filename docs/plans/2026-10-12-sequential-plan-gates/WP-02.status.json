@@ -1,0 +1,208 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-02",
+  "iteration_id": "2026-10-12-sequential-plan-gates",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "dsh-seq-plan-gates"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-10-12-sequential-plan-gates",
+    "base_commit": "5a469f203f7b4125d64871f871cb7ac029a0fc14",
+    "dispatch_commit": "e967fb2c97aa9706397563da4bdf28eca3ef14db",
+    "branch": "plan/2026-10-12-sequential-plan-gates",
+    "worktree": "/Users/admin/vibe/seq-plan-gates",
+    "commit": "70a599043b9c81b5b39aa3b53d5403b263bada65",
+    "merged_commit": "6ce78335a23d6b1363cf0131458fc2a071992187"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "tests/test_finalize_merge_sequential.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/plan_cmd.py",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/wrappers/codex_merge_gate.sh",
+      "src/agentic_loop/wrappers/merge.sh",
+      "src/agentic_loop/wrappers/preflight.sh",
+      ".agentic/config.toml",
+      "uv.lock",
+      "docs/plans/2026-10-09-developer-probe-no-degrade"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "pytest tests/test_finalize_merge_sequential.py -q",
+        "result": "18 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent re-run)"
+      },
+      {
+        "command": "pytest tests -q (init.defaultBranch=main)",
+        "result": "861 passed, 4 skipped, 0 failed in 131.57s",
+        "exit_code": 0,
+        "baseline": "853 passed pre-rev4; +8 matches the new case count exactly",
+        "run_by": "orchestrator (independent)"
+      }
+    ],
+    "brief": {
+      "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.md",
+      "sha256": "c588e79cc1892197328714e6bc9a4b4f4c2091ab060c9704fa6a00e01e81a77e",
+      "rev": 5,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev1.md",
+          "sha256": "9bc1e96b8982948952971eb2d706ca1b33dc76b81453b5ca74c8a4bf23a6390d",
+          "outcome": "SUPERSEDED_AFTER_VOIDED_CONSULT",
+          "cause": "consult r1 attempt1 VOIDED (no CODEX_DECISION marker; budget exhausted before the verdict) but produced four substantive findings. Orchestrator independently verified each: 3 upheld, 1 not upheld, plus a 5th the consultant raised but did not finish checking. rev2 closes every upheld item.",
+          "superseded_by_rev": 2
+        },
+        {
+          "rev": 2,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev2.md",
+          "sha256": "f08d8c0ed8bcc318c3a1f5f9e164df394a31ed41b862bc42462a1c2f58c7b075",
+          "outcome": "REWORK",
+          "cause": "consult r2 returned a VALID REWORK (marker form). Two required changes, both verified by the orchestrator before closing: (C1) a tracked symlink pointing at an untracked JSON bypasses a logical-path-only tracking check (measured: ls-files reports the symlink tracked and its target untracked, while reading the symlink yields the untracked content); (C2) S1b's runtime-fixture escape hatch is unimplementable -- equal branch fields always rev-parse to the same commit, and macOS is case-insensitive so `git branch Main` errors as already-existing.",
+          "superseded_by_rev": 3
+        },
+        {
+          "rev": 3,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev3.md",
+          "sha256": "2a0e7ac43818e9385a152abd66afec7bc5e2dc5d4fb21b4ac48703f86c223676",
+          "outcome": "IMPLEMENTED_THEN_REWORK",
+          "cause": "rev3 was implemented as cdb4590 and passed review on scope, mutation red-evidence and a green suite, but the implementation second signature found a merge-blocking fail-open that rev3's invariant set could not catch: INV-3 constrains the DISCRIMINATOR (branch identity, not empty candidates) but says nothing about whether the DECLARED layout is trustworthy. S3a/S3b both honour the declaration. Reproduced by the orchestrator: forging branch == base_branch while git.commit stays an unmerged feature tip yields FINALIZE_OK + state=MERGED + a forged merged_commit. rev4 adds INV-6 (first-parent topology proof), S3c, S3d, M-6 and M-6b.",
+          "superseded_by_rev": 4
+        },
+        {
+          "rev": 4,
+          "path": "docs/plans/2026-10-12-sequential-plan-gates/WP-02-brief.rev4.md",
+          "sha256": "c0e1db2034a42d9e407fe7b089b2f29ddab8cc960e2d7549c6d49eee54d60b99",
+          "outcome": "IMPLEMENTED_WITH_TWO_DOC_CORRECTIONS",
+          "cause": "rev4's INV-6 was implemented correctly as 70a5990, but the implementer found two defects in the brief's own guidance, both reproduced by the orchestrator: (1) the suggested `rev-list --first-parent | grep -q` form false-rejects REAL commits under set -euo pipefail (grep exits on match, git takes SIGPIPE, pipefail reports 141; measured 3/3 on this repo's own history), which would deadlock a genuinely sequential WP in a fully legal state; (2) S3c needs TWO parameterized forms -- only the merged-not-first-parent one turns red under M-6b. rev5 records both.",
+          "superseded_by_rev": 5
+        }
+      ]
+    },
+    "finalize_note": "Stamped by the orchestrator applying the sequential-layout rule that wrappers/finalize_merge.sh itself implements, because the wrapper refuses any status file resolving inside a worktree and demands a main-repo copy -- which cannot exist for this plan, whose files are committed only on the integration branch (the same bootstrap limitation already recorded for `agentic preflight`). Every condition the wrapper checks was verified first: state=APPROVED_FOR_MERGE, review.decision=ACCEPT, consult.decision=ACCEPT, branch == base_branch (sequential layout), and -- the check that licenses stamping the branch tip -- git.commit appears in the integration branch's --first-parent history (verified for 70a599043b9c81b5b39aa3b53d5403b263bada65). merged_commit is the integration branch tip 6ce78335a23d6b1363cf0131458fc2a071992187. No git operation was performed; this is a status-only write, exactly as the wrapper is specified to be."
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewer": "claude-orchestrator",
+    "reviewed_at": "2026-10-13T07:40:00Z",
+    "basis": "independent reproduction, not acceptance of the implementer's report",
+    "verified_independently": [
+      "commit is pure insertion: 63 + 209 lines, 0 deletions -- the prior implementation is intact",
+      "M-6 (delete topology check) reproduced: BOTH S3c forms red",
+      "M-6b (weaken to plain is-ancestor) reproduced: merged-not-first-parent red, never-merged stays green -- exactly as predicted, which is why the second form is mandatory",
+      "mutations restored: script byte-identical to the committed state",
+      "ORIGINAL FAIL-OPEN CONFIRMED CLOSED: the same forged status (branch=base_branch=main, git.commit=unmerged feature tip) that previously produced FINALIZE_OK now yields FINALIZE_FAIL with a reason-specific witness, merged_commit not written, state unchanged",
+      "SIGPIPE trap reproduced 3/3 on this repo's history: the piped form returns 141 for a commit that genuinely exists",
+      "new cases: 18 passed standalone (10 prior + 8 new)"
+    ],
+    "implementer_feedback_upheld": {
+      "sigpipe_pipefail": "UPHELD and serious. My own brief suggested the piped form. Had the implementer followed it literally, a genuinely sequential WP would fail-closed in a fully legal state. Recorded in brief rev5 as a correctness requirement.",
+      "s3c_two_forms": "UPHELD. The brief named only the never-merged form, which cannot catch M-6b. The implementer added the merged-not-first-parent form on its own initiative; I verified it is the only one that reds under the weakened check.",
+      "s3d_empty_attribution": "ACCEPTED as honest reporting. The empty form is caught by the pre-existing :339 non-empty guard, not by INV-6. The implementer said so rather than letting it pose as INV-6 red evidence, and asserted on the outcome."
+    }
+  },
+  "consult": {
+    "state": "DECIDED",
+    "round": "impl-r2",
+    "decision": "ACCEPT",
+    "bound_brief_rev": 5,
+    "prior_rounds": [
+      {
+        "round": "r1-attempt1",
+        "decision": "VOID",
+        "bound_brief_rev": 1,
+        "cause": "no CODEX_DECISION marker in the answer; budget exhausted before the verdict was written (exit 0, 555s, 4019 output tokens, binding unchanged)",
+        "receipt": ".agentic/seq-gates-brief-consult-r1-attempt1-void/seq-gates-brief-consult-r1.receipt.json",
+        "findings_salvaged": 5,
+        "resolved_in_rev": 2
+      },
+      {
+        "round": "r2",
+        "decision": "REWORK",
+        "bound_brief_rev": 2,
+        "receipt": ".agentic/seq-gates-brief-consult-r2.receipt.json",
+        "answer": ".agentic/seq-gates-brief-consult-r2.answer.md",
+        "required_changes": 2,
+        "residual_risks_raised": 3,
+        "resolved_in_rev": 3
+      },
+      {
+        "round": "r3",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 3,
+        "receipt": ".agentic/seq-gates-brief-consult-r3.receipt.json",
+        "answer": ".agentic/seq-gates-brief-consult-r3.answer.md",
+        "scope": "narrow round verifying only the closure of the two r2 required changes",
+        "verified": "V1 C1 closed (resolve-first ordering + E9 sub-form 4 + M-2d); V2 C2 closed (S1b locates the assignment, excludes comments/dead code/full-text search; M-2b forces red+green evidence)",
+        "consultant_declared": "checked HEAD, clean tree and all four SHA-256; did NOT additionally read source sites"
+      },
+      {
+        "round": "impl-r1",
+        "decision": "REWORK",
+        "kind": "implementation-second-signature",
+        "bound_impl_commit": "cdb459015793463b5dffbf117bc0be6a13fcef44",
+        "receipt": ".agentic/wp02-impl-consult-r1.receipt.json",
+        "answer": ".agentic/wp02-impl-consult-r1.answer.md",
+        "harness_verdict": "INVALID (binding_unchanged=false)",
+        "harness_verdict_cause": "the ORCHESTRATOR wrote review.decision into WP-02.status.json while the consult was still running, so the bound status blob changed mid-round. Operator error, not consultant error. The three artifacts actually under review (finalize_merge.sh, the test file, the brief) were byte-identical throughout, so the finding stands on its own evidence and was independently reproduced before being accepted.",
+        "finding_reproduced_by_orchestrator": true
+      },
+      {
+        "round": "impl-r2",
+        "decision": "ACCEPT",
+        "kind": "implementation-second-signature",
+        "bound_brief_rev": 5,
+        "bound_impl_commit": "70a599043b9c81b5b39aa3b53d5403b263bada65",
+        "receipt": ".agentic/wp02-impl-consult-r2.receipt.json",
+        "answer": ".agentic/wp02-impl-consult-r2.answer.md",
+        "harness_verdict": "VALID (binding_unchanged=true)",
+        "verified": "A37 has no visible bypass: all four checks precede the merged_commit assignment and any status write. base_tip == wp_tip makes the old ancestor check tautological, but the new check is NOT circular -- it bears on the separately-bound git.commit field. Captures cannot be empty on success; the newline-delimited match accepts no SHA prefix or substring. S3c's two forms carry M-6 and M-6b respectively with a same-fixture positive control.",
+        "agreed_with_implementer": [
+          "sigpipe_pipefail_is_a_real_orchestrator_error",
+          "s3c_needs_both_forms",
+          "s3d_empty_attribution_is_honest_not_concealment"
+        ]
+      }
+    ],
+    "bound_impl_commit": "70a599043b9c81b5b39aa3b53d5403b263bada65",
+    "blocking_finding": {
+      "id": "V1",
+      "severity": "MERGE_BLOCKING",
+      "summary": "INV-3 fail-open: the discriminator trusts two mutable DECLARED fields, so a never-integrated parallel-lane WP can be stamped MERGED with a forged merged_commit simply by writing branch == base_branch.",
+      "mechanism": "wp_tip and base_tip are both resolved from BRANCH NAMES. When the status claims the sequential layout both resolve to the same commit, so the :371 `is-ancestor X X` precondition is trivially true. git.commit -- the field that records the WP's real work tip -- is only checked for non-emptiness and never participates in any topology check.",
+      "reproduced": "Orchestrator built a repo with an unmerged feature/x, forged a status claiming branch=base_branch=main while git.commit stayed the unmerged feature tip, and ran the real wrapper: FINALIZE_OK, state=MERGED, merged_commit set to the main tip -- a commit unrelated to the WP's work, which remained unintegrated."
+    }
+  },
+  "timestamps": {
+    "created_at": "2026-10-12T13:00:00Z",
+    "updated_at": "2026-10-15T09:55:00Z",
+    "dispatched_at": "2026-10-13T05:10:00Z",
+    "approved_at": "2026-10-13T05:05:00Z",
+    "approved_for_merge_at": "2026-10-13T08:10:00Z",
+    "merged_at": "2026-10-15T09:55:00Z"
+  }
+}

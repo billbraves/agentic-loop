@@ -4,6 +4,12 @@
   "iteration_id": "<iteration-id>",
   "state": "DRAFT",
   "title": "",
+  "lint_exemption": {
+    "approved": false,
+    "approver": "",
+    "justification": "",
+    "reviewed_at": ""
+  },
   "git": {
     "base_branch": "plan/<iteration-id>",
     "target_branch": "main",
