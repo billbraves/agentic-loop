@@ -2,7 +2,7 @@
   "schema_version": "agentic-plan-status/v1",
   "plan_id": "PLAN-01",
   "iteration_id": "2026-10-12-sequential-plan-gates",
-  "state": "ACTIVE",
+  "state": "READY_TO_MERGE",
   "title": "顺序型计划的收敛闸门：finalize 分流 + 显式豁免记录",
   "git": {
     "base_branch": "plan/2026-10-12-sequential-plan-gates",
@@ -15,7 +15,8 @@
   ],
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-13T09:00:00Z"
+    "updated_at": "2026-10-15T10:15:00Z",
+    "ready_to_merge_at": "2026-10-15T10:15:00Z"
   },
   "lint_exemption": {
     "approved": true,
