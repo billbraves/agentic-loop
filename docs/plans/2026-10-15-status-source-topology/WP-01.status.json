@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": {
     "tool": "unassigned"
@@ -46,7 +46,12 @@
       "uv.lock",
       "docs/plans/**",
       "docs/agentic/templates/**"
-    ]
+    ],
+    "decisions": {
+      "inv1_semantics": "User-selected: the trusted source is the registered worktree that currently has git.target_branch checked out. Whether that checkout is the physical primary repo or a linked worktree does NOT affect the verdict; every other worktree is still refused. The rejected alternative was to additionally require it be an explicitly configured checkout -- narrower, but it needs a new config key and a misconfiguration would deadlock the tooling exactly as today.",
+      "existing_tests": "User-selected: test_preflight_status_source.py, test_finalize_merge_first_call.py and test_finalize_merge_toctou.py may receive MINIMAL adjustment, but every adjustment must be justified line by line in the report and no attack shape may be weakened. tests/test_worktree_detection.py's 17 nodes are read-only guards regardless.",
+      "flow": "User-selected: brief second signature BEFORE dispatching any implementation. The WP-03 experience is that specification defects are cheapest to catch at this gate."
+    }
   },
   "risk": {
     "production_writes": "FORBIDDEN",
@@ -64,9 +69,18 @@
     }
   },
   "review": {},
-  "consult": {},
+  "consult": {
+    "state": "PENDING",
+    "round": "topo-brief-r1",
+    "decision": null,
+    "kind": "wp-brief-second-signature",
+    "bound_brief_rev": 1,
+    "prior_rounds": [],
+    "pending_note": "Brief rev1 second signature. Scope frozen with user approval. No implementation may be dispatched until this round returns ACCEPT."
+  },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T11:00:00Z"
+    "updated_at": "2026-10-15T11:20:00Z",
+    "approved_at": "2026-10-15T11:20:00Z"
   }
 }
