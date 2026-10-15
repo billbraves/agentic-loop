@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -259,9 +259,9 @@
     "decided_at": "2026-10-15T08:40:00Z"
   },
   "consult": {
-    "state": "PENDING",
+    "state": "DECIDED",
     "round": "wp03-impl-r6b",
-    "decision": null,
+    "decision": "ACCEPT",
     "kind": "wp-impl-second-signature",
     "bound_brief_rev": 11,
     "pending_note": "Implementation second signature on 181ce61 (rev11 + the INV-3c fix). The brief is already double-signed at rev11 (brief-r7 ACCEPT). This round is the independent second signature on the implementation itself.",
@@ -438,19 +438,31 @@
         "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
         "finding": "No blocking defect in rev11; the brief is implementable and its criteria load-bearing.",
         "non_blocking": "Deliverables line still says E18 has four branches; five (a/b/c1/c2/d) is authoritative. Not patched, since editing the brief would invalidate the SHA this ACCEPT binds."
+      },
+      {
+        "round": "wp03-impl-r6",
+        "decision": "ACCEPT",
+        "kind": "wp-impl-second-signature",
+        "bound_commit": "181ce61",
+        "harness_verdict": "VALID (marker) but body EMPTY",
+        "receipt": ".agentic/wp03-impl-consult-r6.receipt.bare.json",
+        "answer": ".agentic/wp03-impl-consult-r6.answer.bare.md",
+        "note": "Returned a bare ACCEPT marker with no reasoning. The orchestrator did NOT accept that as usable evidence for a security gate and re-ran the round as r6b with substantiation required. Recorded for completeness; r6b is the operative signature."
       }
     ],
     "bound_impl_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
-    "receipt": ".agentic/wp03-brief-consult-r7.receipt.json",
-    "answer": ".agentic/wp03-brief-consult-r7.answer.md",
+    "receipt": ".agentic/wp03-impl-consult-r6b.receipt.json",
+    "answer": ".agentic/wp03-impl-consult-r6b.answer.md",
     "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
-    "verified": "rev11 is implementable with no blocking defect. F1: per-candidate checks are independent and terminating -- candidate A's fields never influence candidate B, and a self-declared base_branch only holds if the candidate's registered worktree actually has that branch checked out AND its first-read raw equals that branch's committed blob at the canonical path, so controlling a working-tree file cannot self-authorize; an actor who can create commits, branches and registered worktrees already has Git write access and is outside this round's caller-controlled-alias threat surface. F2: the alias family stays closed -- stage 0 constrains the raw spelling before any normalization, and relative-form candidate roots come only from git worktree list --porcelain, never from caller input, with no CWD, main_repo() join or caller-derived root reintroduced. F3: E18's five branches are complete and constructible, and M-2m/M-2n are independently load-bearing in opposite directions (security vs compatibility). F4: rev11 rejects nothing rev10 allowed and restores the parallel-lane topology -- on the live setup the older plan's relative spelling exists in 11 worktrees but only the integration worktree satisfies the branch/blob trust conditions, while the current iteration is 1 existing / 1 trusted. F5: INV-3c first-read byte binding, INV-3d refs/mutation separation, rule 4's derived-path blob comparison and the DoD's positive/negative mutations are mutually consistent.",
+    "verified": "G1 (INV-3c): load_plan()'s parsed raw is passed to _stage2_candidate as loaded_raw and used directly as the comparison bytes for the stage-1 candidate. Other relative-form candidates may be read during discovery, but only the candidate matching the stage-1 identity can be accepted, and no second open/resolve/re-read of the accepted path exists on the acceptance path -- so rule 4 compares exactly the parsed bytes. G2 (E15): the restored test is a genuine double-read attack -- the committed bytes are written back to the same path DURING the source check, creating a real mid-check byte swap, so an implementation that re-reads the accepted path would read the swapped committed bytes and wrongly pass. It is not merely a value-equal copy, so it does catch the _stage2_candidate self-re-read defect that caused the impl-r5 rejection.",
     "non_blocking_note": "The consultant noted one cosmetic inconsistency: the deliverables line (brief line 112) still calls E18 'four branches' while the detailed E18 entry and the DoD specify five (a/b/c1/c2/d). It explicitly judged the latter two sufficient to remove implementation ambiguity and did NOT require another re-freeze. The orchestrator deliberately did NOT edit the brief, because any byte change would invalidate the SHA-256 this ACCEPT is bound to. AUTHORITATIVE COUNT FOR THE IMPLEMENTER: E18 has FIVE branches (a, b, c1, c2, d); this is stated in the dispatch prompt as well.",
-    "bound_commit": "181ce61"
+    "bound_commit": "181ce61",
+    "process_note": "This round took four dispatches. Two attempts returned INVALID with no verdict marker: the consultant spent its budget exploring the repository (one hit a shell quoting error) and never emitted a decision. A third returned a marker whose body said the verification had not been done. The orchestrator stopped retrying the same shape and changed approach: the 903-line diff was pre-extracted to .agentic/wp03-impl-r6.{impl,tests}.diff and bound by SHA, repository-wide searching and suite runs were forbidden, and the six review questions were cut to the two that gate the merge. That produced a valid verdict; r6b then added the substantiation requirement."
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T08:55:00Z",
-    "dispatched_at": "2026-10-15T05:15:00Z"
+    "updated_at": "2026-10-15T09:45:00Z",
+    "dispatched_at": "2026-10-15T05:15:00Z",
+    "approved_for_merge_at": "2026-10-15T09:45:00Z"
   }
 }
