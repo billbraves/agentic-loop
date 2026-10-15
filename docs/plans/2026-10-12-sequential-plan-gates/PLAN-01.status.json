@@ -16,5 +16,11 @@
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
     "updated_at": "2026-10-13T09:00:00Z"
+  },
+  "lint_exemption": {
+    "approved": true,
+    "approver": "user (product owner, approved in session 2026-10-15)",
+    "justification": "PLAN-01's integration branch carries 40 status-sync commits across WP-02 (10) and WP-03 (30). Every one is a product of the mandated dual-signature workflow itself, not undisciplined committing: brief re-freezes, dispatch points, review decisions, second-signature requests and their recorded verdicts. WP-03 alone needed eleven brief revisions and six implementation rounds because three independently reproduced fail-opens and two specification defects had to be closed one at a time, each requiring its decision to be durably recorded before the next round could be dispatched. The commit-discipline lint assumes exactly two status commits per WP (freeze and finalize); that assumption cannot hold for a WP whose convergence legitimately takes many signed rounds. This is precisely the situation WP-03 was specified to handle, and the exemption it implements is deliberately narrow: it waives ONLY the status-sync commit-count criterion, and only when the plan file loaded into memory is byte-identical to the blob committed on the integration branch at the canonical derived path (INV-3b/3c, rule 4). It waives no merge gate: convergence (every WP MERGED), target-branch identity, already-merged detection and the autonomy gate all remain load-bearing, each with its own mutation test. Approved by the product owner after both WPs reached MERGED with orchestrator review ACCEPT and an independent second signature ACCEPT.",
+    "reviewed_at": "2026-10-15T10:05:00Z"
   }
 }
