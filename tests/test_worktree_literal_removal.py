@@ -49,10 +49,12 @@ refusal's exit code.
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
 import sys
+import tokenize
 from pathlib import Path
 
 import pytest
@@ -582,42 +584,57 @@ def test_f5_merge_probe_failure_fails_closed(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # F6: static single-authority assertion
 # ---------------------------------------------------------------------------
-def _code_without_comments(text: str) -> list[str]:
-    """Strip comments line by line, keeping line count aligned.
+def _code_without_comments(text: str, *, python: bool) -> list[str]:
+    """Blank out real COMMENT TOKENS, keeping the line count aligned.
 
-    Distinguishing comments from code by position: a shebang is skipped; a line
-    whose first non-space character is ``#`` is a whole-line comment; otherwise
-    a ``#`` that starts the line or is preceded by whitespace opens a trailing
-    comment. ``#`` NOT preceded by whitespace stays in place -- it is part of a
-    token (a regex, a colour literal, a ``#{...}`` shell expansion), and
-    treating it as a comment would let real code hide behind it.
+    Two earlier versions of this helper were defeated, both found by the
+    second signature and reproduced by the orchestrator, because they judged
+    comments by POSITION rather than by lexing:
 
-    The two legitimate matches this must ignore are exactly the whole-line
-    comments at ``wrappers/finalize_merge.sh:38`` and ``gate/__init__.py:809``.
+    1. cutting at any ``#`` preceded by whitespace also cut inside a string, so
+       ``if " # /.worktrees/"[3:] in str(f):`` became ``if " ``;
+    2. blanking any physical line whose first non-space character is ``#`` also
+       blanked a line INSIDE a triple-quoted string, so
+
+           if \"\"\"
+           # /.worktrees/
+           \"\"\"[3:-1] in str(f):
+
+       scanned clean while reconstructing the literal exactly at runtime.
+
+    For Python the only correct answer is the real lexer: ``tokenize`` reports
+    COMMENT tokens and leaves string contents alone, so neither trick survives.
+    Shell has no stdlib lexer here, so it keeps the conservative whole-line
+    rule -- which is sound for the one legitimate shell match
+    (``wrappers/finalize_merge.sh:38``, a whole-line comment) and can only
+    OVER-report otherwise, failing safe for INV-A.
     """
-    code: list[str] = []
-    for index, line in enumerate(text.splitlines(), start=1):
-        if index == 1 and line.startswith("#!"):
-            code.append("")
+    lines = text.splitlines()
+    if not python:
+        out: list[str] = []
+        for index, line in enumerate(lines, start=1):
+            if index == 1 and line.startswith("#!"):
+                out.append("")
+                continue
+            out.append("" if line.lstrip().startswith("#") else line)
+        return out
+
+    keep = list(lines)
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        # Unlexable: keep every line verbatim. Over-reporting is safe; silently
+        # dropping lines is what let the two bypasses through.
+        return keep
+    for tok in tokens:
+        if tok.type != tokenize.COMMENT:
             continue
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            code.append("")
-            continue
-        # Trailing-comment stripping is DELIBERATELY NOT done. The earlier
-        # version cut the line at any "#" preceded by whitespace, even inside a
-        # string literal, so executable code could hide the literal behind a
-        # quoted "#" and the scan would report zero hits -- e.g.
-        #   if " <hash> /.worktrees/"[3:] in str(status_file):
-        # was truncated to `if " `. Found by the wp02-impl-r3 second signature
-        # and reproduced by the orchestrator. Doing this correctly needs a
-        # per-language, quote-aware tokenizer; it is not needed, because both
-        # legitimate matches (wrappers/finalize_merge.sh:38 and
-        # gate/__init__.py:809) are WHOLE-LINE comments, already handled above.
-        # Keeping the rest of the line intact can only ever over-report, which
-        # fails safe for INV-A.
-        code.append(line)
-    return code
+        row = tok.start[0] - 1
+        if 0 <= row < len(keep):
+            # Remove only the comment's own span, never the whole line, so code
+            # preceding a trailing comment is still scanned.
+            keep[row] = keep[row][: tok.start[1]]
+    return keep
 
 
 def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
@@ -634,14 +651,34 @@ def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
     whatever precedes it on the line. Over-reporting is acceptable (it fails
     safe for INV-A); under-reporting is the defect.
     """
+    # Bypass 1 (found at impl-r3): a quoted "#" must not open a comment.
     smuggled = 'if " # ' + LITERAL + '"[3:] in str(status_file):'
-    assert LITERAL in _code_without_comments(smuggled)[0], (
-        "F6's scanner lost a literal that is inside executable code; a quoted "
-        "'#' must not be treated as opening a comment"
+    assert LITERAL in _code_without_comments(smuggled, python=True)[0], (
+        "scanner lost a literal inside executable code; a quoted '#' must not "
+        "be treated as opening a comment"
     )
-    # A genuine whole-line comment must still be ignored, or F6 would always
-    # fail on the two legitimate matches.
-    assert LITERAL not in _code_without_comments(f"  # {LITERAL} retired")[0]
+
+    # Bypass 2 (found at impl-r4): a physical line that merely STARTS with "#"
+    # may be the inside of a triple-quoted string, and this expression
+    # reconstructs the literal exactly at runtime.
+    multiline = 'if """\n# ' + LITERAL + '\n"""[3:-1] in str(status_file):'
+    assert (
+        "".join(_code_without_comments(multiline, python=True)).find(LITERAL) >= 0
+    ), (
+        "scanner lost a literal held inside a triple-quoted string; judging "
+        "comments by line position cannot survive this -- lex instead"
+    )
+    # Prove the construction is not a strawman: it really does rebuild it.
+    assert eval('"""\n# ' + LITERAL + '\n"""[3:-1]') == LITERAL  # noqa: S307
+
+    # A genuine comment token must still be ignored, in both languages, or F6
+    # would always fail on the two legitimate matches.
+    assert LITERAL not in _code_without_comments(f"  # {LITERAL} retired", python=True)[0]
+    assert LITERAL not in _code_without_comments(f"  # {LITERAL} retired", python=False)[0]
+    # And a trailing comment must not swallow the code before it.
+    assert LITERAL in _code_without_comments(
+        f'x = "{LITERAL}"  # kept', python=True
+    )[0]
 
 
 def test_f6_no_literal_worktree_check_remains() -> None:
@@ -656,7 +693,7 @@ def test_f6_no_literal_worktree_check_remains() -> None:
             continue
         scanned += 1
         text = path.read_text(encoding="utf-8", errors="replace")
-        stripped_lines = _code_without_comments(text)
+        stripped_lines = _code_without_comments(text, python=path.suffix == ".py")
         source_lines = text.splitlines()
         for line_no, code_line in enumerate(stripped_lines, start=1):
             if LITERAL in code_line:
