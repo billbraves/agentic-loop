@@ -45,12 +45,16 @@
       ".agentic/config.toml",
       "uv.lock",
       "docs/plans/**",
-      "docs/agentic/templates/**"
+      "docs/agentic/templates/**",
+      "src/agentic_loop/wrappers/merge.sh",
+      "src/agentic_loop/gate/qoder_security.py"
     ],
     "decisions": {
       "inv1_semantics": "User-selected: the trusted source is the registered worktree that currently has git.target_branch checked out. Whether that checkout is the physical primary repo or a linked worktree does NOT affect the verdict; every other worktree is still refused. The rejected alternative was to additionally require it be an explicitly configured checkout -- narrower, but it needs a new config key and a misconfiguration would deadlock the tooling exactly as today.",
       "existing_tests": "User-selected: test_preflight_status_source.py, test_finalize_merge_first_call.py and test_finalize_merge_toctou.py may receive MINIMAL adjustment, but every adjustment must be justified line by line in the report and no attack shape may be weakened. tests/test_worktree_detection.py's 17 nodes are read-only guards regardless.",
-      "flow": "User-selected: brief second signature BEFORE dispatching any implementation. The WP-03 experience is that specification defects are cheapest to catch at this gate."
+      "flow": "User-selected: brief second signature BEFORE dispatching any implementation. The WP-03 experience is that specification defects are cheapest to catch at this gate.",
+      "anchor": "User-selected after brief-r2: the trusted branch anchor must live OUTSIDE the repository write domain. rev3 uses $XDG_CONFIG_HOME/agentic_loop/policy.toml (default $HOME/.config/...) key [trust] protected_branch, measured to be inside no git worktree. Rejected, each measured: .agentic/config.toml (git TRACKED), refs/remotes/origin/HEAD (movable by one local symbolic-ref call), server ls-remote (remote.origin.url is locally rewritable, plus a network dependency), environment variable (caller-declared fact -- the A22 bypass family).",
+      "literal_defect": "User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here."
     }
   },
   "risk": {
@@ -63,25 +67,31 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.md",
-      "sha256": "4e101dcacdbd0ad1e6829777db66379eb7fa891e720f28cbd87c288471ec8d46",
-      "rev": 2,
+      "sha256": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b",
+      "rev": 3,
       "prior_revs": [
         {
           "rev": 1,
           "sha256": "96a7398f5cfa7b96863c4f68b6d197092fc2d76c45f85de019e03f8ca462b527",
           "snapshot": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.rev1.md",
           "outcome": "REWORK_AT_BRIEF_R1"
+        },
+        {
+          "rev": 2,
+          "sha256": "4e101dcacdbd0ad1e6829777db66379eb7fa891e720f28cbd87c288471ec8d46",
+          "snapshot": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.rev2.md",
+          "outcome": "REWORK_AT_BRIEF_R2"
         }
       ]
     }
   },
   "review": {},
   "consult": {
-    "state": "REWORK_PENDING_DIRECTION",
-    "round": "topo-brief-r2",
-    "decision": "REWORK",
+    "state": "PENDING",
+    "round": "topo-brief-r3",
+    "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 2,
+    "bound_brief_rev": 3,
     "prior_rounds": [
       {
         "round": "topo-brief-r1",
@@ -98,7 +108,7 @@
         "round": "topo-brief-r2",
         "decision": "REWORK",
         "bound_brief_rev": 2,
-        "resolved_in_rev": null,
+        "resolved_in_rev": 3,
         "findings": [
           "Q1 CONFIRMED BY ORCHESTRATOR MEASUREMENT: the dual anchor is not a real trust boundary. Both anchors sit in the same write domain -- a single local `git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/<evil>` moves anchor 1 with no server, push or approval involved (reproduced in /tmp/anchprobe), and anchor 2 is a tracked file in the same tree. An actor who can commit moves both in one step and keeps them byte-identical. rev2's security claim ('two sources in the same trust domain constitute an independent anchor') must be withdrawn.",
           "Q2 BLOCKING DEFECT A (scope self-contradiction): the brief's scope permits adding [project] protected_branch to .agentic/config.toml, but this frozen status still lists that file under forbidden_paths. Any implementation would be out of scope on its first edit.",
@@ -108,11 +118,11 @@
         ]
       }
     ],
-    "pending_note": "rev3 is BLOCKED ON A PRODUCT DECISION and must not be drafted until the user rules. The anchor must come from outside the repository write domain; every in-repo candidate was measured movable by a single actor, so the orchestrator cannot pick one unilaterally. Note on bookkeeping: state stays APPROVED rather than BLOCKED because the validator requires executor.tool, git.base_commit and git.worktree in BLOCKED, and this WP was never dispatched -- forcing BLOCKED would mean inventing implementation-phase facts. Separately escalated: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment instead of the hardened predicate, so INV-5 is already violated in the current tree; the user must decide whether that is folded into this WP or split into its own."
+    "pending_note": "Brief rev3 second signature. rev3 closes D4/D5/D6 from topo-brief-r2."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T12:45:00Z",
+    "updated_at": "2026-10-15T13:10:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
