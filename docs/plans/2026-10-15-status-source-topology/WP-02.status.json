@@ -1,0 +1,82 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-02",
+  "iteration_id": "2026-10-15-status-source-topology",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "APPROVED",
+  "role": "Developer",
+  "executor": {
+    "tool": "unassigned"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-10-15-status-source-topology",
+    "base_commit": "",
+    "dispatch_commit": "",
+    "branch": "plan/2026-10-15-status-source-topology",
+    "worktree": null,
+    "commit": null,
+    "merged_commit": null
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/merge.sh",
+      "src/agentic_loop/gate/qoder_security.py",
+      "tests/test_worktree_literal_removal.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_worktree_detection.py",
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "src/agentic_loop/plan_cmd.py",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/autonomy.py",
+      ".agentic/config.toml",
+      "uv.lock",
+      "docs/plans/**",
+      "docs/agentic/templates/**"
+    ],
+    "decisions": {
+      "origin": "Split from WP-01 by user decision: this is a pre-existing INV-5 violation, independent of WP-01's trust-root question, and the user chose to fix it first. Measured in the current tree with no change of mine: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment, so they ACCEPT a sibling linked-worktree path that preflight.sh:44, finalize_merge.sh:160 and gate/__init__.py:810 REFUSE via the hardened git-fact predicate."
+    }
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [],
+    "brief": {
+      "path": "docs/plans/2026-10-15-status-source-topology/WP-02-brief.md",
+      "sha256": "aabc0366017ec934218015d29e5bf23c1c853d83d4aa87f7ae2b1b5709d43ba6",
+      "rev": 1,
+      "prior_revs": []
+    }
+  },
+  "review": {},
+  "consult": {
+    "state": "PENDING",
+    "round": "wp02-brief-r1",
+    "decision": null,
+    "kind": "wp-brief-second-signature",
+    "bound_brief_rev": 1,
+    "prior_rounds": [],
+    "pending_note": "WP-02 brief rev1 second signature. No implementation may be dispatched until ACCEPT."
+  },
+  "timestamps": {
+    "created_at": "2026-10-15T14:15:00Z",
+    "approved_at": "2026-10-15T14:15:00Z",
+    "updated_at": "2026-10-15T14:15:00Z"
+  }
+}
