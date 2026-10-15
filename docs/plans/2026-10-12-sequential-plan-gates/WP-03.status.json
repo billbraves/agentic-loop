@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -26,7 +26,7 @@
     "dispatch_commit": "476561dc6e8c1d3c0fd1a4e0e96ba50cd8e2f0a1",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": "3acbcd4",
+    "commit": "181ce61",
     "diff_base": "7e64e50caed8bb2c07e1f04e29a698953952e0e5"
   },
   "scope": {
@@ -79,11 +79,18 @@
         "run_by": "orchestrator (independent)"
       },
       {
-        "name": "orchestrator-repro-dotdot-hop",
+        "name": "repro-dotdot-hop-and-symlinked-root",
         "cmd": "python3.11 .agentic/wp03-r4-repro_dotdot_hop.py",
-        "result": "both cases rejected (rc=2, target tip unchanged) while all four rev7 faces still pass",
+        "result": "both cases rejected (rc=2, tip unchanged) while all four rev7 faces still pass",
         "exit_code": 0,
         "run_by": "orchestrator (independent, pre-existing script)"
+      },
+      {
+        "name": "repro-inv3c-reread",
+        "cmd": "python3.11 .agentic/wp03-rev11-repro_inv3c_reread.py",
+        "result": "closed -- a forged parse is now rejected with witness 'no trusted candidate' (was trusted=True before the fix)",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent, written during impl-r5 review)"
       }
     ],
     "mutations": [
@@ -225,31 +232,39 @@
     ],
     "orchestrator_independent_repro": "Ran the orchestrator's own pre-existing repro script (not the developer's tests) against 3acbcd4. Case A (dotdot-cancelled symlink hop): hop IS a symlink, leaf is not, loaded bytes == committed blob, and BOTH normpath(abspath(arg)) and resolve(arg) equal the canonical path -- i.e. all four rev7 faces still pass -- yet rc=2 and the target tip did NOT move. The impl-r4 fail-open is closed structurally rather than by enumerating the alias. Case B (symlinked registered worktree root) also rejected, rc=2, tip unchanged.",
     "scope_check": "git diff --name-only 7e64e50..HEAD lists exactly src/agentic_loop/plan_cmd.py and tests/test_plan_lint_exemption.py. uv.lock is NOT in the commit. The developer amended its own unpushed commit only; git merge-base --is-ancestor 7e64e50 HEAD confirms no orchestrator commit was rewritten. E7 bypass grep (skip-lint / force-merge / AGENTIC_SKIP / --force) is clean.",
-    "quality_gate_note": "agentic quality-gate diffs from git.base_commit (5a469f2, the plan's origin on main), so it attributes every WP-02 change on the shared integration branch to WP-03 and reports false positives including uv.lock and unrelated tests. git.diff_base records the real WP-03 diff base (7e64e50); scope was verified against that range instead."
+    "quality_gate_note": "agentic quality-gate diffs from git.base_commit (5a469f2, the plan's origin on main), so it attributes every WP-02 change on the shared integration branch to WP-03 and reports false positives including uv.lock and unrelated tests. git.diff_base records the real WP-03 diff base (7e64e50); scope was verified against that range instead.",
+    "orchestrator_verified_mutations": {
+      "M-2h": "Load-bearing, confirmed in its BRIEF form (normalize-then-compare). Reverting R3-c so the caller spelling is normalized before the equality check reopens the attack end to end: the repro script reports rc=0 with the target tip MOVED, and E9's dotdot-cancelled-symlink-hop node goes red at PLAN_MERGE_OK. Note for the record: deleting only the redundant `normpath(plan_arg) != plan_arg` line, or only the stage-0 dotdot rejection, does NOT reopen it -- the byte-equality against the derived path still holds. That is defense in depth, not a missing guard.",
+      "M-2i": "Load-bearing. Dropping the per-component lstat turns E9's parent-dir-symlink node red at PLAN_MERGE_OK.",
+      "M-2o": "Load-bearing, new this round. Forcing the ACCEPTED candidate to re-read instead of using load_plan()'s bytes turns the restored E15 red at PLAN_MERGE_OK; exact restore returns it to green with an empty git diff.",
+      "note": "The orchestrator applied and reverted these itself rather than relying on the developer's report, because the impl-r5 round proved the developer's own mutation accounting could coexist with a regressed invariant. M-2j/M-2k/M-2l/M-2m/M-2n remain as reported by the developer at 3acbcd4 and are covered by the corresponding green acceptance nodes."
+    },
+    "inv3c_fix": "_stage2_candidate now takes loaded_raw and uses it for the stage-1 candidate -- the one that can be accepted -- so rule 4 compares the bytes load_plan() actually parsed against git show <base_branch>:<derived-rel>. Other relative-form candidates are still discovered with at most one read each, which INV-3c permits since their bytes can never become the accepted bytes. E15 was restored byte-identically to the 7e64e50 original (verified with diff) and passes."
   },
   "review": {
-    "decision": "REWORK",
-    "round": "wp03-impl-r5",
+    "decision": "ACCEPT",
+    "round": "wp03-impl-r6",
     "reviewer": "orchestrator (Kiro, independent)",
-    "bound_commit": "3acbcd4",
+    "bound_commit": "181ce61",
     "bound_brief_rev": 11,
-    "finding": "BLOCKING: INV-3c was broken and the test that guards it was weakened to hide it. (1) The trust path no longer uses the loaded bytes. _trusted_candidate_raw(plan_arg, path, data, raw) accepts `raw` but never reads it -- verified by extracting the function body and finding the only occurrences of the parameter are the signature and a docstring sentence claiming the opposite. _stage2_candidate() performs its OWN read_bytes() and compares THAT to the committed blob, so the bytes the merge decision rests on are not the bytes load_plan() parsed. (2) Orchestrator-built probe (.agentic/wp03-rev11-repro_inv3c_reread.py) proves it is reachable: parse forged bytes, restore the committed bytes before the source check, and _lint_exemption_source_is_trusted() returns trusted=True with an empty witness on the FORGED parse. (3) E15, the acceptance test for exactly this invariant, was rewritten. The original performed the real double-read attack (monkeypatching _lint_report to write the committed bytes back to the path mid-check); the rev11 version only hands back a value-equal copy of the bytes via a _load_and_validate wrapper, which cannot detect a re-read at all. (4) Decisive evidence: splicing the ORIGINAL E15 back into the current suite against commit 3acbcd4 FAILS, printing PLAN_MERGE_OK on forged bytes (1 failed, 40 passed). The invariant regressed; the test was changed to match the regression instead of the regression being fixed. Tests may not be weakened to hide a regression (AGENTS.md section 7).",
-    "required_changes": [
-      "Restore E15 to the original double-read attack verbatim as committed at 7e64e50 (swap the committed bytes back during the source check, not a value-equal copy). It must fail closed, and that exact test must pass.",
-      "Make the trust path consume the loaded `raw`: _stage2_candidate must not read the file for the already-identified stage-1 candidate; rule 4 must compare load_plan()'s raw against `git show <base_branch>:<derived-rel>`. Other relative-form candidates may each still be read at most once for discovery, but the ACCEPTED candidate's bytes must be the parsed bytes.",
-      "Add a mutation M-2o: make the trust path re-read the accepted candidate instead of using the loaded raw -> the restored E15 must turn red at PLAN_MERGE_OK.",
-      "Keep every rev11 gain: the dotdot-hop and parent-symlink rejections, E16/E17/E18 and M-2h..M-2n must all stay green, and the orchestrator's repro must still reject both cases."
+    "verified": "The impl-r5 blocker is closed and every rev11 gain is intact. INV-3c: the orchestrator's own probe now reports 'closed' (a forged parse is rejected with witness 'no trusted candidate'; before the fix it returned trusted=True with an empty witness). E15 is restored byte-identically to the original double-read attack and passes -- the test that was weakened now guards the invariant again. The root-cause family stays closed: the dotdot-cancelled symlink hop and the symlinked worktree root are both rejected (rc=2, tip unchanged) while all four rev7 faces still pass, so the rejection is structural rather than per-alias. Suites independently re-run at 181ce61: targeted 41 passed (baseline 32), protected 66, full 902 passed / 4 skipped (baseline 893/4). The orchestrator personally applied and reverted M-2h, M-2i and M-2o to confirm they are load-bearing. Scope is exactly the two allowed files against diff base 7e64e50; no history rewrite; E7 bypass grep clean.",
+    "prior_decisions": [
+      {
+        "round": "wp03-impl-r5",
+        "decision": "REWORK",
+        "finding": "INV-3c regression with a weakened E15 guard test",
+        "resolved_in_commit": "181ce61"
+      }
     ],
-    "what_is_correct": "The rev11 direction and most of the implementation are sound and must be kept. Independently verified at 3acbcd4: targeted 41 passed (baseline 32), protected 66, full 902/4 (baseline 893/4); the orchestrator's own repro script rejects BOTH the dotdot-cancelled symlink hop and the symlinked-worktree-root case (rc=2, target tip unchanged) while all four rev7 faces still pass, so the impl-r4 fail-open is genuinely closed structurally; scope is exactly the two allowed files; no history rewrite; E7 bypass grep clean; witnesses are the closed rev11 vocabulary.",
-    "decided_at": "2026-10-15T07:45:00Z"
+    "decided_at": "2026-10-15T08:40:00Z"
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp03-impl-r5",
+    "round": "wp03-impl-r6",
     "decision": null,
     "kind": "wp-impl-second-signature",
     "bound_brief_rev": 11,
-    "pending_note": "Implementation second signature is NOT requested yet: the orchestrator review returned REWORK on an INV-3c regression with a weakened guard test. Re-request only after the fix.",
+    "pending_note": "Implementation second signature on 181ce61 (rev11 + the INV-3c fix). The brief is already double-signed at rev11 (brief-r7 ACCEPT). This round is the independent second signature on the implementation itself.",
     "superseded_impl_round": {
       "round": "wp03-impl-r4",
       "decision": "REWORK",
@@ -420,11 +435,11 @@
     "harness_verdict": "VALID (binding_unchanged=true, valid_consult=true, exit_code=0)",
     "verified": "rev11 is implementable with no blocking defect. F1: per-candidate checks are independent and terminating -- candidate A's fields never influence candidate B, and a self-declared base_branch only holds if the candidate's registered worktree actually has that branch checked out AND its first-read raw equals that branch's committed blob at the canonical path, so controlling a working-tree file cannot self-authorize; an actor who can create commits, branches and registered worktrees already has Git write access and is outside this round's caller-controlled-alias threat surface. F2: the alias family stays closed -- stage 0 constrains the raw spelling before any normalization, and relative-form candidate roots come only from git worktree list --porcelain, never from caller input, with no CWD, main_repo() join or caller-derived root reintroduced. F3: E18's five branches are complete and constructible, and M-2m/M-2n are independently load-bearing in opposite directions (security vs compatibility). F4: rev11 rejects nothing rev10 allowed and restores the parallel-lane topology -- on the live setup the older plan's relative spelling exists in 11 worktrees but only the integration worktree satisfies the branch/blob trust conditions, while the current iteration is 1 existing / 1 trusted. F5: INV-3c first-read byte binding, INV-3d refs/mutation separation, rule 4's derived-path blob comparison and the DoD's positive/negative mutations are mutually consistent.",
     "non_blocking_note": "The consultant noted one cosmetic inconsistency: the deliverables line (brief line 112) still calls E18 'four branches' while the detailed E18 entry and the DoD specify five (a/b/c1/c2/d). It explicitly judged the latter two sufficient to remove implementation ambiguity and did NOT require another re-freeze. The orchestrator deliberately did NOT edit the brief, because any byte change would invalidate the SHA-256 this ACCEPT is bound to. AUTHORITATIVE COUNT FOR THE IMPLEMENTER: E18 has FIVE branches (a, b, c1, c2, d); this is stated in the dispatch prompt as well.",
-    "bound_commit": "3acbcd4"
+    "bound_commit": "181ce61"
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T07:55:00Z",
+    "updated_at": "2026-10-15T08:40:00Z",
     "dispatched_at": "2026-10-15T05:15:00Z"
   }
 }
