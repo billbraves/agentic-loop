@@ -34,7 +34,27 @@ case "$status_arg" in
   *) status_file="$repo_root/$status_arg" ;;
 esac
 
-if [[ "$status_file" == *"/.worktrees/"* ]]; then
+# WP-02 single authority (agentic_loop.gate.path_is_in_worktree), the same
+# WORKTREE refusal semantics as preflight.sh:37-50 and finalize_merge.sh: a
+# status path that resolves inside a linked worktree is refused — the main-repo
+# copy is the single source of truth. The git-fact predicate is referenced,
+# never reimplemented: the retired `[[ "$status_file" == *"/.worktrees/"* ]]`
+# literal missed every sibling worktree (`git worktree add ../wpN-x`), the
+# layout this repo actually uses (A13, WP-19).
+#
+# Fail-closed form (INV-B): a probe crash, missing Python, failed import or any
+# unexpected stdout collapses into PROBE_FAIL via `|| echo PROBE_FAIL`, and the
+# `!= "MAIN"` comparison below refuses it. Only the exact verdict MAIN passes;
+# never append `|| true`/`|| echo false` here, which would turn a crashed probe
+# into "not a worktree" (fail-open).
+wt_verdict=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY' 2>/dev/null || echo PROBE_FAIL
+import sys
+from pathlib import Path
+from agentic_loop.gate import path_is_in_worktree
+print("WORKTREE" if path_is_in_worktree(Path(sys.argv[1])) else "MAIN")
+PY
+)
+if [[ "$wt_verdict" != "MAIN" ]]; then
   echo "MERGE_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy" >&2
   exit 2
 fi
