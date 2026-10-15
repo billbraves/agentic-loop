@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -26,7 +26,8 @@
     "dispatch_commit": "476561dc6e8c1d3c0fd1a4e0e96ba50cd8e2f0a1",
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
-    "commit": "c5fce58ca70d9072aecfeb975544878c7e11647a"
+    "commit": "3acbcd4",
+    "diff_base": "7e64e50caed8bb2c07e1f04e29a698953952e0e5"
   },
   "scope": {
     "allowed_paths": [
@@ -54,34 +55,35 @@
   "evidence": {
     "tests": [
       {
-        "command": "python3.11 -m pytest tests/test_plan_lint_exemption.py -q",
-        "result": "32 passed in 11.52s",
+        "name": "targeted",
+        "cmd": "python3.11 -m pytest tests/test_plan_lint_exemption.py -q",
+        "result": "41 passed",
+        "baseline": "32 passed",
         "exit_code": 0,
-        "at_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
-        "baseline": "31 passed at e7712dd; +1 exact parent-dir-symlink node",
-        "run_by": "orchestrator independent"
+        "run_by": "orchestrator (independent)"
       },
       {
-        "command": "python3.11 -m pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
-        "result": "66 passed in 13.05s",
+        "name": "protected",
+        "cmd": "python3.11 -m pytest tests/test_plan.py tests/test_plan_lanes.py tests/test_finalize_merge_sequential.py -q",
+        "result": "66 passed",
+        "baseline": "66 passed",
         "exit_code": 0,
-        "at_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
-        "run_by": "orchestrator independent"
+        "run_by": "orchestrator (independent)"
       },
       {
-        "command": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
-        "result": "893 passed, 4 skipped in 158.66s",
+        "name": "full",
+        "cmd": "env -u AGENTIC_PYTHON -u PROBE_CMD GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main PYTHONPATH=src python3.11 -m pytest tests -q",
+        "result": "902 passed, 4 skipped",
+        "baseline": "893 passed, 4 skipped",
         "exit_code": 0,
-        "at_commit": "c5fce58ca70d9072aecfeb975544878c7e11647a",
-        "baseline": "892 passed, 4 skipped at e7712dd; +1 exact parent-dir-symlink regression",
-        "run_by": "orchestrator independent"
+        "run_by": "orchestrator (independent)"
       },
       {
-        "command": "python3.11 -m pytest tests/test_plan_lint_exemption.py -q (prior rev7 baseline at e7712dd)",
-        "result": "31 passed in 10.25s",
+        "name": "orchestrator-repro-dotdot-hop",
+        "cmd": "python3.11 .agentic/wp03-r4-repro_dotdot_hop.py",
+        "result": "both cases rejected (rc=2, target tip unchanged) while all four rev7 faces still pass",
         "exit_code": 0,
-        "at_commit": "e7712ddad0ee177e0ee5106abd45f561cf610e78",
-        "run_by": "orchestrator independent"
+        "run_by": "orchestrator (independent, pre-existing script)"
       }
     ],
     "mutations": [
@@ -220,7 +222,10 @@
     },
     "depends_on": [
       "WP-02 implementation commit 70a5990, review ACCEPT, consult ACCEPT, state APPROVED_FOR_MERGE; both WPs finalize only after WP-03 implementation and signatures complete, then PLAN-01 merges after both are MERGED."
-    ]
+    ],
+    "orchestrator_independent_repro": "Ran the orchestrator's own pre-existing repro script (not the developer's tests) against 3acbcd4. Case A (dotdot-cancelled symlink hop): hop IS a symlink, leaf is not, loaded bytes == committed blob, and BOTH normpath(abspath(arg)) and resolve(arg) equal the canonical path -- i.e. all four rev7 faces still pass -- yet rc=2 and the target tip did NOT move. The impl-r4 fail-open is closed structurally rather than by enumerating the alias. Case B (symlinked registered worktree root) also rejected, rc=2, tip unchanged.",
+    "scope_check": "git diff --name-only 7e64e50..HEAD lists exactly src/agentic_loop/plan_cmd.py and tests/test_plan_lint_exemption.py. uv.lock is NOT in the commit. The developer amended its own unpushed commit only; git merge-base --is-ancestor 7e64e50 HEAD confirms no orchestrator commit was rewritten. E7 bypass grep (skip-lint / force-merge / AGENTIC_SKIP / --force) is clean.",
+    "quality_gate_note": "agentic quality-gate diffs from git.base_commit (5a469f2, the plan's origin on main), so it attributes every WP-02 change on the shared integration branch to WP-03 and reports false positives including uv.lock and unrelated tests. git.diff_base records the real WP-03 diff base (7e64e50); scope was verified against that range instead."
   },
   "review": {
     "decision": "REWORK",
@@ -425,7 +430,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T05:15:00Z",
+    "updated_at": "2026-10-15T07:10:00Z",
     "dispatched_at": "2026-10-15T05:15:00Z"
   }
 }
