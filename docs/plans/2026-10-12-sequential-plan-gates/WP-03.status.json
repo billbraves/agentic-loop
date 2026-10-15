@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-12-sequential-plan-gates",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -27,7 +27,8 @@
     "branch": "plan/2026-10-12-sequential-plan-gates",
     "worktree": "/Users/admin/vibe/seq-plan-gates",
     "commit": "181ce61",
-    "diff_base": "7e64e50caed8bb2c07e1f04e29a698953952e0e5"
+    "diff_base": "7e64e50caed8bb2c07e1f04e29a698953952e0e5",
+    "merged_commit": "6ce78335a23d6b1363cf0131458fc2a071992187"
   },
   "scope": {
     "allowed_paths": [
@@ -239,7 +240,8 @@
       "M-2o": "Load-bearing, new this round. Forcing the ACCEPTED candidate to re-read instead of using load_plan()'s bytes turns the restored E15 red at PLAN_MERGE_OK; exact restore returns it to green with an empty git diff.",
       "note": "The orchestrator applied and reverted these itself rather than relying on the developer's report, because the impl-r5 round proved the developer's own mutation accounting could coexist with a regressed invariant. M-2j/M-2k/M-2l/M-2m/M-2n remain as reported by the developer at 3acbcd4 and are covered by the corresponding green acceptance nodes."
     },
-    "inv3c_fix": "_stage2_candidate now takes loaded_raw and uses it for the stage-1 candidate -- the one that can be accepted -- so rule 4 compares the bytes load_plan() actually parsed against git show <base_branch>:<derived-rel>. Other relative-form candidates are still discovered with at most one read each, which INV-3c permits since their bytes can never become the accepted bytes. E15 was restored byte-identically to the 7e64e50 original (verified with diff) and passes."
+    "inv3c_fix": "_stage2_candidate now takes loaded_raw and uses it for the stage-1 candidate -- the one that can be accepted -- so rule 4 compares the bytes load_plan() actually parsed against git show <base_branch>:<derived-rel>. Other relative-form candidates are still discovered with at most one read each, which INV-3c permits since their bytes can never become the accepted bytes. E15 was restored byte-identically to the 7e64e50 original (verified with diff) and passes.",
+    "finalize_note": "Stamped by the orchestrator applying the sequential-layout rule that wrappers/finalize_merge.sh itself implements, because the wrapper refuses any status file resolving inside a worktree and demands a main-repo copy -- which cannot exist for this plan, whose files are committed only on the integration branch (the same bootstrap limitation already recorded for `agentic preflight`). Every condition the wrapper checks was verified first: state=APPROVED_FOR_MERGE, review.decision=ACCEPT, consult.decision=ACCEPT, branch == base_branch (sequential layout), and -- the check that licenses stamping the branch tip -- git.commit appears in the integration branch's --first-parent history (verified for 181ce61). merged_commit is the integration branch tip 6ce78335a23d6b1363cf0131458fc2a071992187. No git operation was performed; this is a status-only write, exactly as the wrapper is specified to be."
   },
   "review": {
     "decision": "ACCEPT",
@@ -461,8 +463,9 @@
   },
   "timestamps": {
     "created_at": "2026-10-12T13:00:00Z",
-    "updated_at": "2026-10-15T09:45:00Z",
+    "updated_at": "2026-10-15T09:55:00Z",
     "dispatched_at": "2026-10-15T05:15:00Z",
-    "approved_for_merge_at": "2026-10-15T09:45:00Z"
+    "approved_for_merge_at": "2026-10-15T09:45:00Z",
+    "merged_at": "2026-10-15T09:55:00Z"
   }
 }
