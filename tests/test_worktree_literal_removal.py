@@ -604,12 +604,44 @@ def _code_without_comments(text: str) -> list[str]:
         if stripped.startswith("#"):
             code.append("")
             continue
-        for pos in range(1, len(line)):
-            if line[pos] == "#" and line[pos - 1] in " \t":
-                line = line[:pos]
-                break
+        # Trailing-comment stripping is DELIBERATELY NOT done. The earlier
+        # version cut the line at any "#" preceded by whitespace, even inside a
+        # string literal, so executable code could hide the literal behind a
+        # quoted "#" and the scan would report zero hits -- e.g.
+        #   if " <hash> /.worktrees/"[3:] in str(status_file):
+        # was truncated to `if " `. Found by the wp02-impl-r3 second signature
+        # and reproduced by the orchestrator. Doing this correctly needs a
+        # per-language, quote-aware tokenizer; it is not needed, because both
+        # legitimate matches (wrappers/finalize_merge.sh:38 and
+        # gate/__init__.py:809) are WHOLE-LINE comments, already handled above.
+        # Keeping the rest of the line intact can only ever over-report, which
+        # fails safe for INV-A.
         code.append(line)
     return code
+
+
+def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
+    """Adversarial guard on F6's own scanner, added at wp02-impl-r3.
+
+    The second signature found that stripping a trailing comment at any ``#``
+    preceded by whitespace also cuts inside STRING LITERALS, so executable code
+    could smuggle the literal past the scan. Reproduced by the orchestrator:
+    ``if " # /.worktrees/"[3:] in str(status_file):`` was truncated to
+    ``if " `` and F6 reported zero hits while the code reconstructs the literal
+    at runtime.
+
+    This pins the fix: the scanner must still SEE a literal that sits in code,
+    whatever precedes it on the line. Over-reporting is acceptable (it fails
+    safe for INV-A); under-reporting is the defect.
+    """
+    smuggled = 'if " # ' + LITERAL + '"[3:] in str(status_file):'
+    assert LITERAL in _code_without_comments(smuggled)[0], (
+        "F6's scanner lost a literal that is inside executable code; a quoted "
+        "'#' must not be treated as opening a comment"
+    )
+    # A genuine whole-line comment must still be ignored, or F6 would always
+    # fail on the two legitimate matches.
+    assert LITERAL not in _code_without_comments(f"  # {LITERAL} retired")[0]
 
 
 def test_f6_no_literal_worktree_check_remains() -> None:
