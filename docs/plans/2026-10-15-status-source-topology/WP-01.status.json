@@ -77,9 +77,9 @@
   },
   "review": {},
   "consult": {
-    "state": "PENDING",
+    "state": "REWORK_PENDING_DIRECTION",
     "round": "topo-brief-r2",
-    "decision": null,
+    "decision": "REWORK",
     "kind": "wp-brief-second-signature",
     "bound_brief_rev": 2,
     "prior_rounds": [
@@ -93,13 +93,26 @@
           "D2: even if the field existed it comes from the file under validation, so an attacker checking out feat/evil in their own worktree and writing that name into the status satisfies all three rev1 conjuncts and becomes the trusted source. rev2 moves the expected branch to an EXTERNAL dual anchor (origin/HEAD with the origin/ prefix stripped, plus a new [project] protected_branch config key) that must agree byte-for-byte; a status field may only cross-check, never override.",
           "D3 (orchestrator-reproduced): rev1's 'all 17 guards stay green read-only' is impossible -- all 17 call path_is_in_worktree(path) with a SINGLE argument and cannot pass a target branch, and their assertions encode the premise 'every linked worktree is refused' that the new contract deliberately changes. rev2 replaces it with 'the attack guarantees are preserved, the assertions may be rewritten premise-preserving' plus a mandatory 17-row old-node-to-new-assertion mapping."
         ]
+      },
+      {
+        "round": "topo-brief-r2",
+        "decision": "REWORK",
+        "bound_brief_rev": 2,
+        "resolved_in_rev": null,
+        "findings": [
+          "Q1 CONFIRMED BY ORCHESTRATOR MEASUREMENT: the dual anchor is not a real trust boundary. Both anchors sit in the same write domain -- a single local `git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/<evil>` moves anchor 1 with no server, push or approval involved (reproduced in /tmp/anchprobe), and anchor 2 is a tracked file in the same tree. An actor who can commit moves both in one step and keeps them byte-identical. rev2's security claim ('two sources in the same trust domain constitute an independent anchor') must be withdrawn.",
+          "Q2 BLOCKING DEFECT A (scope self-contradiction): the brief's scope permits adding [project] protected_branch to .agentic/config.toml, but this frozen status still lists that file under forbidden_paths. Any implementation would be out of scope on its first edit.",
+          "Q2 BLOCKING DEFECT B (wrong call-site inventory): the brief claims five call sites of the predicate, with plan_cmd.py as a PLAN-side one. Measured: plan_cmd.py never calls it (grep count 0). Only THREE files call it -- wrappers/preflight.sh:44, wrappers/finalize_merge.sh:160, gate/__init__.py:810.",
+          "ORCHESTRATOR-DISCOVERED, INDEPENDENT PRE-EXISTING DEFECT (not caused by this WP): wrappers/merge.sh:37 and gate/qoder_security.py:1012 do NOT use the hardened predicate at all -- they test the literal path fragment '/.worktrees/'. That is precisely the abandoned approach documented as wrong by test_verdict_does_not_depend_on_directory_name. Consequence measured today, before any change of mine: the path /Users/admin/vibe/agentic-loop-main-codex-merge/docs/plans/.../WP.status.json does not contain '/.worktrees/', so merge.sh and qoder_security ACCEPT it while preflight/finalize/gate REFUSE it. INV-5 (single authority) is therefore already violated in the current tree.",
+          "Q3: E10 as written would write git.target_branch into a WP fixture, producing a schema-invalid object, so it could fail for the wrong reason; it must use a legal PLAN status or an explicit declared-target input. E9/M-8 cannot catch the coordinated two-anchor move, so a coordinated-move attack test is required."
+        ]
       }
     ],
-    "pending_note": "Brief rev2 second signature. rev2 closes D1/D2/D3 from topo-brief-r1."
+    "pending_note": "rev3 is BLOCKED ON A PRODUCT DECISION and must not be drafted until the user rules. The anchor must come from outside the repository write domain; every in-repo candidate was measured movable by a single actor, so the orchestrator cannot pick one unilaterally. Note on bookkeeping: state stays APPROVED rather than BLOCKED because the validator requires executor.tool, git.base_commit and git.worktree in BLOCKED, and this WP was never dispatched -- forcing BLOCKED would mean inventing implementation-phase facts. Separately escalated: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment instead of the hardened predicate, so INV-5 is already violated in the current tree; the user must decide whether that is folded into this WP or split into its own."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T12:10:00Z",
+    "updated_at": "2026-10-15T12:45:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
