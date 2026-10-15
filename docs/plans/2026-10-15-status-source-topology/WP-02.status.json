@@ -187,6 +187,16 @@
           "Q1/Q2 ACCEPT again (r4 touched no product code). Q3 REWORK: a SECOND, deeper bypass of F6's scanner. Blanking any physical line whose first non-space character is '#' also blanks a line INSIDE a triple-quoted string, so `if \"\"\"\\n# /.worktrees/\\n\"\"\"[3:-1] in str(f):` scanned clean while reconstructing the literal exactly at runtime. Orchestrator-reproduced, including asserting by eval that the expression rebuilds the literal.",
           "Root diagnosis accepted: both defeated versions judged comments by POSITION rather than lexing. FIX: Python now goes through tokenize, which reports COMMENT tokens and leaves string contents alone, removing only the comment's own span so code before a trailing comment is still scanned; shell keeps the conservative whole-line rule (sound for its single legitimate whole-line match, and otherwise can only over-report); unlexable Python keeps every line verbatim. The adversarial node pins both bypasses and two negative directions, verified red under a mutation reinstating each defeated version."
         ]
+      },
+      {
+        "round": "wp02-impl-r5",
+        "decision": "CONSULT",
+        "bound_commit": "e93ba1c7b062f5d49bbdd062be17bb029590b94b",
+        "kind": "wp-impl-second-signature",
+        "outcome": "VOID_SESSION_FAILURE",
+        "findings": [
+          "Not a finding: the consultant session came up without a usable tool interface, so it could not read the pre-extracted diff, verify the bound SHA-256 values, or inspect preflight.sh and the test implementation. It correctly declined to sign on a summary alone rather than rubber-stamping. Its design-level remarks matched the orchestrator's own verification but were explicitly non-independent. Sandbox config was identical to r3/r4 (read-only), so this was a transient session failure; the round is VOID and re-dispatched unchanged as r5b."
+        ]
       }
     ],
     "pending_note": "Implementation second signature r5 on the tokenize-based scanner fix.",
