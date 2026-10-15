@@ -29,10 +29,7 @@
   "scope": {
     "allowed_paths": [
       "src/agentic_loop/gate/__init__.py",
-      "src/agentic_loop/gate/qoder_security.py",
-      "src/agentic_loop/wrappers/finalize_merge.sh",
       "src/agentic_loop/wrappers/preflight.sh",
-      "src/agentic_loop/wrappers/merge.sh",
       "tests/test_worktree_detection.py",
       "tests/test_preflight_status_source.py",
       "tests/test_finalize_merge_first_call.py",
@@ -51,10 +48,12 @@
     ],
     "decisions": {
       "inv1_semantics": "User-selected: the trusted source is the registered worktree that currently has git.target_branch checked out. Whether that checkout is the physical primary repo or a linked worktree does NOT affect the verdict; every other worktree is still refused. The rejected alternative was to additionally require it be an explicitly configured checkout -- narrower, but it needs a new config key and a misconfiguration would deadlock the tooling exactly as today.",
-      "existing_tests": "User-selected: test_preflight_status_source.py, test_finalize_merge_first_call.py and test_finalize_merge_toctou.py may receive MINIMAL adjustment, but every adjustment must be justified line by line in the report and no attack shape may be weakened. tests/test_worktree_detection.py's 17 nodes are read-only guards regardless.",
+      "existing_tests": "User-approved earlier, and corrected after brief-r3 flagged the wording: the 17 guards in tests/test_worktree_detection.py are NOT read-only. They may receive premise-preserving rewrites under INV-4, each justified line by line, with no attack shape weakened. The three other test files (test_preflight_status_source.py, test_finalize_merge_first_call.py, test_finalize_merge_toctou.py) may receive minimal, individually justified adjustment.",
       "flow": "User-selected: brief second signature BEFORE dispatching any implementation. The WP-03 experience is that specification defects are cheapest to catch at this gate.",
       "anchor": "User-selected after brief-r2: the trusted branch anchor must live OUTSIDE the repository write domain. rev3 uses $XDG_CONFIG_HOME/agentic_loop/policy.toml (default $HOME/.config/...) key [trust] protected_branch, measured to be inside no git worktree. Rejected, each measured: .agentic/config.toml (git TRACKED), refs/remotes/origin/HEAD (movable by one local symbolic-ref call), server ls-remote (remote.origin.url is locally rewritable, plus a network dependency), environment variable (caller-declared fact -- the A22 bypass family).",
-      "literal_defect": "User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here."
+      "literal_defect": "User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here.",
+      "direction_c": "User-selected after three REWORKs in one root-cause family: option (c). WP-01 is DOWNGRADED to a pure usability fix. It resolves the finalize/preflight/merge deadlock and explicitly WITHDRAWS any claim of defending against a malicious LOCAL actor. Rationale accepted from the escalation: in this threat model anyone who can write the repository or set the caller's environment can already modify the code itself, so an unmovable local trust root is a false goal, whereas the deadlock is a real daily obstruction. Every anchor attempt is therefore abandoned: rev1 (status field), rev2 (origin/HEAD + tracked config), rev3 (XDG_CONFIG_HOME policy file) are all superseded.",
+      "wp02_split": "User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here."
     }
   },
   "risk": {
@@ -131,11 +130,11 @@
         ]
       }
     ],
-    "pending_note": "SOFT LIMIT REACHED: three consecutive REWORKs in ONE root-cause family -- every anchor location proposed so far is movable either by whoever can write the repository (rev2: tracked config, local symbolic-ref) or by whoever invokes the command (rev3: XDG_CONFIG_HOME). `agentic autonomy signal rework_twice` and `circuit_breaker` both report SOFT_LIMIT_ENABLED. The orchestrator is NOT drafting rev4 unilaterally: picking a trust root that neither the repository writer nor the caller can move is a product/threat-model decision, and the consultant's proposal (resolve a fixed path from OS account information, ignoring HOME and XDG_CONFIG_HOME, plus an explicit operator provisioning step) changes operational requirements for every fresh clone and CI runner. Escalated to the user."
+    "pending_note": "WP-01 is parked pending its rev4 rewrite as a pure usability fix (decision (c)). WP-02 goes first. rev4 must withdraw the security claim, drop the anchor entirely, and delete the now-dangling M-2/M-2b references to the removed E7 (brief-r3 D10)."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T13:45:00Z",
+    "updated_at": "2026-10-15T14:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
