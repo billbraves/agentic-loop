@@ -63,24 +63,43 @@
     "tests": [],
     "brief": {
       "path": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.md",
-      "sha256": "96a7398f5cfa7b96863c4f68b6d197092fc2d76c45f85de019e03f8ca462b527",
-      "rev": 1,
-      "prior_revs": []
+      "sha256": "4e101dcacdbd0ad1e6829777db66379eb7fa891e720f28cbd87c288471ec8d46",
+      "rev": 2,
+      "prior_revs": [
+        {
+          "rev": 1,
+          "sha256": "96a7398f5cfa7b96863c4f68b6d197092fc2d76c45f85de019e03f8ca462b527",
+          "snapshot": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.rev1.md",
+          "outcome": "REWORK_AT_BRIEF_R1"
+        }
+      ]
     }
   },
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-brief-r1",
+    "round": "topo-brief-r2",
     "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 1,
-    "prior_rounds": [],
-    "pending_note": "Brief rev1 second signature. Scope frozen with user approval. No implementation may be dispatched until this round returns ACCEPT."
+    "bound_brief_rev": 2,
+    "prior_rounds": [
+      {
+        "round": "topo-brief-r1",
+        "decision": "REWORK",
+        "bound_brief_rev": 1,
+        "resolved_in_rev": 2,
+        "findings": [
+          "D1 (fatal, orchestrator-reproduced): rev1 had the predicate read git.target_branch from the status file, but that field exists ONLY in the PLAN schema. Measured -- WP template git keys: base_branch, base_commit, branch, commit, dispatch_commit, worktree. Four of the five call sites validate a WP status, so rev1 required reading a field that does not exist on the object being validated: not implementable.",
+          "D2: even if the field existed it comes from the file under validation, so an attacker checking out feat/evil in their own worktree and writing that name into the status satisfies all three rev1 conjuncts and becomes the trusted source. rev2 moves the expected branch to an EXTERNAL dual anchor (origin/HEAD with the origin/ prefix stripped, plus a new [project] protected_branch config key) that must agree byte-for-byte; a status field may only cross-check, never override.",
+          "D3 (orchestrator-reproduced): rev1's 'all 17 guards stay green read-only' is impossible -- all 17 call path_is_in_worktree(path) with a SINGLE argument and cannot pass a target branch, and their assertions encode the premise 'every linked worktree is refused' that the new contract deliberately changes. rev2 replaces it with 'the attack guarantees are preserved, the assertions may be rewritten premise-preserving' plus a mandatory 17-row old-node-to-new-assertion mapping."
+        ]
+      }
+    ],
+    "pending_note": "Brief rev2 second signature. rev2 closes D1/D2/D3 from topo-brief-r1."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T11:20:00Z",
+    "updated_at": "2026-10-15T12:10:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
