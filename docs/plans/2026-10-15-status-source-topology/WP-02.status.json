@@ -131,7 +131,7 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp02-r9",
+    "round": "wp02-r9b",
     "decision": null,
     "kind": "wp-brief-and-impl-second-signature",
     "bound_brief_rev": 3,
@@ -246,9 +246,19 @@
           "Q3 REWORK, the one blocking defect and correctly aimed at my own fix: the executable-template coverage was ONE-WAY. A hard-coded {install.sh.tmpl, pre-push.tmpl} plus an assertion that those two are still installed cannot detect a THIRD entry added to _HOOK_TEMPLATES -- planting the literal in a new .tmpl is skipped by the suffix filter while every assertion and F6 stay green, so the 'cannot drift silently' claim was false.",
           "FIX at this commit: the set is now DERIVED from init_cmd._HOOK_TEMPLATES, selecting every entry whose mode carries an executable bit, so a new executable template is in scope the moment it is added with no test edit. M-K -- the consultant's exact construction, adding ('merge-hook.tmpl', ..., 0o755) and planting the literal -- is verified red."
         ]
+      },
+      {
+        "round": "wp02-r9",
+        "decision": "CONSULT",
+        "bound_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
+        "kind": "wp-brief-and-impl-second-signature",
+        "outcome": "VOID_SESSION_FAILURE",
+        "findings": [
+          "Not a finding; the same transient failure as the voided r5. The session came up with no tool-execution context, so it could not read the bound diff, the target files or the status evidence, and correctly declined to sign rather than rubber-stamp. Re-dispatched unchanged as r9b."
+        ]
       }
     ],
-    "pending_note": "Second signature r9 on the derived executable-template scan set. Q1/Q2/Q4 already ACCEPTed at r8.",
+    "pending_note": "Second signature on the derived executable-template scan set; r9 was void (session had no tool interface).",
     "bound_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
     "soft_limit": {
       "signal": "rework_twice",
