@@ -186,3 +186,34 @@ def test_render_template_stamps_deterministic_checksum():
     a = cr.render_template("AGENTS.md.tmpl", _SAMPLE_CFG, project_name="baofu")
     b = cr.render_template("AGENTS.md.tmpl", _SAMPLE_CFG, project_name="baofu")
     assert a == b
+
+
+# ---- project name must not follow a linked worktree's directory name --------
+
+def test_project_name_for_linked_worktree_resolves_to_main_repo(tmp_path):
+    """A worktree must render the same contract as its main checkout.
+
+    Rendering inside .worktrees/<wp> previously produced
+    "# <wp> Agent Operating Contract", which then failed contract check in the
+    main repo after the merge (WP-41 rev2 blocker).
+    """
+    from agentic_loop.contract_cmd import project_name_for
+
+    main = tmp_path / "my_project"
+    (main / ".git" / "worktrees" / "wp-x").mkdir(parents=True)
+    assert project_name_for(main) == "my_project"
+
+    wt = main / ".worktrees" / "wp-x"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text(
+        "gitdir: %s\n" % (main / ".git" / "worktrees" / "wp-x"), encoding="utf-8"
+    )
+    assert project_name_for(wt) == "my_project"
+
+
+def test_project_name_for_plain_directory_uses_its_own_name(tmp_path):
+    from agentic_loop.contract_cmd import project_name_for
+
+    plain = tmp_path / "standalone"
+    (plain / ".git").mkdir(parents=True)
+    assert project_name_for(plain) == "standalone"

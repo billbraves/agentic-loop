@@ -127,9 +127,35 @@ def test_kimi_temp_config_contains_key_and_is_0600(monkeypatch):
         mode = stat.S_IMODE(os.stat(cfg_path).st_mode)
         assert mode == 0o600
         text = Path(cfg_path).read_text()
-        assert "https://api.deepseek.com/anthropic" in text
+        # kimi 1.50 only resolves these selectors through an openai_legacy
+        # provider; an anthropic-typed block yields "LLM not set" despite a
+        # valid key, so the injected config targets the OpenAI-compatible URL.
+        assert 'type     = "openai_legacy"' in text
+        assert "https://api.deepseek.com/v1" in text
         assert "sk-CANARY" in text                        # key in temp file only
     assert not Path(cfg_path).exists()                    # cleaned up after ctx
+
+
+def test_kimi_temp_mcp_config_declares_no_servers(monkeypatch):
+    """Dispatch must not inherit the operator's ~/.kimi/mcp.json.
+
+    An unreachable server there aborts the whole run with MCPRuntimeError,
+    which is how a WP-41 dispatch died before this isolation existed.
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-CANARY")
+    a = KimiAdapter(binding=mk_binding(selector="deepseek/v4-pro"))
+    with a._temp_mcp_config() as mcp_path:
+        import json
+
+        assert json.loads(Path(mcp_path).read_text()) == {"mcpServers": {}}
+    assert not Path(mcp_path).exists()
+
+
+def test_kimi_implement_isolates_mcp_config(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-CANARY")
+    a = KimiAdapter(binding=mk_binding(selector="deepseek/v4-pro"))
+    res = a.implement(worktree="/tmp", brief="", prompt="hi", dry_run=True)
+    assert "--mcp-config-file" in res.command
 
 
 def test_kimi_implement_cmd_has_no_key_in_argv(monkeypatch):

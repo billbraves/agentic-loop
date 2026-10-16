@@ -38,8 +38,33 @@ DRIFT_RC = 3
 
 
 def project_name_for(target_dir):
-    """Project name is the target directory's own name (stable across CWD)."""
-    return Path(target_dir).resolve().name
+    """Project name is the owning repository's name (stable across CWD).
+
+    A linked worktree must render the same contract as the main checkout. Taking
+    the target directory's own name renders ``# wp-41-skeleton-gates …`` inside
+    ``.worktrees/wp-41-skeleton-gates``, which then fails ``contract check`` in
+    the main repo after the merge. ``.git`` is a file (not a directory) in a
+    linked worktree and points at the main repo's admin dir, so resolve through
+    it to recover the real project name; anything unexpected falls back to the
+    directory name.
+    """
+    resolved = Path(target_dir).resolve()
+    git_path = resolved / ".git"
+    if git_path.is_file():
+        try:
+            text = git_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return resolved.name
+        prefix = "gitdir:"
+        if text.startswith(prefix):
+            gitdir = Path(text[len(prefix):].strip())
+            if not gitdir.is_absolute():
+                gitdir = (resolved / gitdir).resolve()
+            # .../<main>/.git/worktrees/<name> -> main repo root is 3 levels up
+            for parent in gitdir.parents:
+                if parent.name == ".git":
+                    return parent.parent.name
+    return resolved.name
 
 
 def load_config(target_dir):
