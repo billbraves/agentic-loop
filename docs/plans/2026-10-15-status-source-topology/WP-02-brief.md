@@ -1,6 +1,8 @@
 # WP-02 — 两处 status 来源判定改用加固判据，关闭当前已存在的 INV-5 违反
 
-> rev2 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> rev3 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> rev3 仅澄清 INV-C 中 `L` 的判定基准（解析后位置，而非路径拼写），不改变范围、
+> 验收测试或交付物；由 wp02-impl-r7 第二签名迫出，用户批准修订。
 > 状态：**APPROVED（范围已冻结，待二签 ACCEPT 后派发）**。
 > rev1 快照 `WP-02-brief.rev1.md`（`aabc0366…`）被 `wp02-brief-r1` 判 REWORK。
 > 本 WP 与 WP-01 的信任根问题**无关**，可独立完成；用户已决定先做本 WP。
@@ -80,12 +82,31 @@ predicate must not*）。
 
 ```text
 R_new ⊇ (R_old − L)          且   { 所有 linked worktree 路径 } ⊆ R_new
-L = 主仓内仅因命中 "/.worktrees/" 字面量而被误拒的真实路径
+L = 旧字面量的全部误拒：路径字符串命中 "/.worktrees/" 字面量，
+    但**解析后**并不位于任何 linked worktree 内的真实路径
 ```
 
 即：除 `L` 之外，旧拒绝集全部保留；且所有 linked worktree 路径一律进入新拒绝集。
 `L` 的正当性由 `test_verdict_does_not_depend_on_directory_name` 的语义背书 ——
-主仓内名为 `.worktrees` 的真实目录本就是主仓内容。
+判据依据 git 事实而非目录拼写。
+
+**rev3 澄清（由 wp02-impl-r7 第二签名迫出，用户批准修订）**：rev2 把 `L` 窄化为
+「主仓内名为 `.worktrees` 的真实目录」，漏掉了**别名路径**这一同类。顾问给出并经
+orchestrator 复现的真实反例：
+
+```text
+<parent>/.worktrees/../<repo>/docs/plans/<iter>/WP-01.status.json
+```
+
+旧字面量**拒绝**它（未解析的拼写命中字面量），新判据**接受**它。裁定为旧字面量的
+**误报**，而非新判据的放宽缺陷：该路径 `resolve()` 后落在主仓内（`git-dir` 与
+`git-common-dir` 一致），即 gate 真正打开的就是主仓单一真相副本 —— 拒绝它恰恰是
+拒绝本规则要保护的对象。先 `resolve()` 再判定是判据的 A19/A27 加固行为。
+
+因此 `L` 的判定基准是**解析后的位置**，不是路径拼写：凡仅在拼写上命中字面量、而解析后
+不在任何 linked worktree 内的路径，一律属于 `L`。由
+`test_inv_c_alias_resolving_to_main_repo_is_accepted` 钉死，该用例同时验证真实
+sibling worktree 仍被拒绝，确保这不是无边界放宽。
 
 交付时必须在报告中用这个式子逐项对照说明，不得只写「只收紧」。
 

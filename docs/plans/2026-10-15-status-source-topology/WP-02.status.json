@@ -50,7 +50,8 @@
     ],
     "decisions": {
       "origin": "Split from WP-01 by user decision: this is a pre-existing INV-5 violation, independent of WP-01's trust-root question, and the user chose to fix it first. Measured in the current tree with no change of mine: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment, so they ACCEPT a sibling linked-worktree path that preflight.sh:44, finalize_merge.sh:160 and gate/__init__.py:810 REFUSE via the hardened git-fact predicate.",
-      "scope_extension_r6": "USER-APPROVED scope extension. finalize_merge.sh moved from forbidden_paths to allowed_paths for ONE reworded comment (line 38), nothing else. Reason: wp02-impl-r6 showed that any exemption pinned to a line -- by number, by file, or even by verbatim text -- is defeatable by opening a quote on an ADJACENT line, leaving the exempt line byte-identical while turning it into a runtime string. Orchestrator-reproduced against the real file. No line-local predicate can see the enclosing quote, so the exemption was DELETED rather than hardened and the comment now spells the literal out in prose. The product behaviour of finalize_merge.sh is unchanged -- comment text only."
+      "scope_extension_r6": "USER-APPROVED scope extension. finalize_merge.sh moved from forbidden_paths to allowed_paths for ONE reworded comment (line 38), nothing else. Reason: wp02-impl-r6 showed that any exemption pinned to a line -- by number, by file, or even by verbatim text -- is defeatable by opening a quote on an ADJACENT line, leaving the exempt line byte-identical while turning it into a runtime string. Orchestrator-reproduced against the real file. No line-local predicate can see the enclosing quote, so the exemption was DELETED rather than hardened and the comment now spells the literal out in prose. The product behaviour of finalize_merge.sh is unchanged -- comment text only.",
+      "brief_rev3": "USER-APPROVED brief revision. rev2's INV-C narrowed L to 'a real .worktrees directory inside the main repo', which omitted ALIAS paths of the same kind. wp02-impl-r7 produced a real counter-example that the old literal refuses and the predicate accepts: <parent>/.worktrees/../<repo>/docs/.../WP-01.status.json. Orchestrator-reproduced and ruled a FALSE POSITIVE of the old literal, not a loosening defect -- it resolves into the primary repo (git-dir and git-common-dir agree), so the file the gate opens IS the main-repo single source of truth, and refusing it would refuse what the rule protects. rev3 therefore states that L is judged by RESOLVED LOCATION, not by path spelling. Scope, acceptance tests and deliverables are unchanged; the clarification is pinned by test_inv_c_alias_resolving_to_main_repo_is_accepted."
     }
   },
   "risk": {
@@ -138,7 +139,7 @@
     "round": "wp02-impl-r7",
     "decision": null,
     "kind": "wp-impl-second-signature",
-    "bound_brief_rev": 2,
+    "bound_brief_rev": 3,
     "prior_rounds": [
       {
         "round": "wp02-brief-r1",
@@ -240,6 +241,10 @@
       ],
       "note": "Each round narrowed the defect and each was orchestrator-reproduced, so the loop was productive rather than thrashing. The final fix is a root-cause change (raw .sh scan, real lexer for Python) rather than a third heuristic patch. Escalated for a user decision on whether to run another second-signature round.",
       "user_decision": "User approved one further second-signature round (r6) past SOFT_LIMIT_ENABLED, on the reasoning that each round narrowed a real defect and the last fix was root-cause."
+    },
+    "brief_sha256": "b329d32b420bea3a79bb61b34d421d701a673ffbef1554cb16a6bbcd853c77a6",
+    "brief_snapshots": {
+      "rev2": "39a11525952c9b1ad5a2d3374da42d950f89bf242c4bffcc7bdb15c492cc465b"
     }
   },
   "timestamps": {
