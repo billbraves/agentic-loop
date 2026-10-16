@@ -112,7 +112,7 @@
         "round": "topo-brief-r3",
         "decision": "REWORK",
         "bound_brief_rev": 3,
-        "resolved_in_rev": null,
+        "resolved_in_rev": 4,
         "findings": [
           "D7 FATAL, ORCHESTRATOR-REPRODUCED: the rev3 anchor is itself caller-controlled. XDG_CONFIG_HOME comes from the caller's environment, so `XDG_CONFIG_HOME=/tmp/evil agentic ...` with /tmp/evil/agentic_loop/policy.toml declaring feat/evil resolves the anchor to an attacker-chosen file that is outside any git worktree and therefore PASSES E9b. Reproduced: the probe resolved /tmp/evil/agentic_loop/policy.toml, read 'feat/evil', and the worktree check answered False. This is precisely the A22 caller-declared-fact family that the predicate's own docstring rejects -- rev3 believed it had escaped that family and had not.",
           "D8 (orchestrator-reproduced): scope self-contradiction returned in a new form -- merge.sh and qoder_security.py are now in BOTH allowed_paths and forbidden_paths, and the brief body still permits editing them while the recorded literal_defect decision reserves them for a separate WP. Additionally scope.decisions.existing_tests still calls the 17 guards 'read-only', contradicting INV-4's premise-preserving-rewrite rule.",
