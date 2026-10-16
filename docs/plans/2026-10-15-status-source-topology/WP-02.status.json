@@ -26,7 +26,7 @@
     "dispatch_commit": "",
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
-    "commit": "fea2bd8e21efa632ead88a06a60b4769348f09be",
+    "commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
     "merged_commit": null
   },
   "scope": {
@@ -109,7 +109,7 @@
   "review": {
     "decision": "ACCEPT",
     "round": "wp02-impl-r2",
-    "bound_commit": "fea2bd8e21efa632ead88a06a60b4769348f09be",
+    "bound_commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
     "reviewed_by": "orchestrator (independent re-run; every mutation hand-applied and reverted)",
     "findings": [
       "The code change itself is CORRECT: qoder_security.py now calls path_is_in_worktree, and merge.sh copies preflight.sh's inline-probe pattern verbatim including the `|| echo PROBE_FAIL` fail-closed form. Independently re-run by the orchestrator: targeted 7 passed, guards 19 passed with tests/test_worktree_detection.py's git diff EMPTY, protected set 36 passed.",
@@ -136,9 +136,9 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp02-impl-r7",
+    "round": "wp02-r8",
     "decision": null,
-    "kind": "wp-impl-second-signature",
+    "kind": "wp-brief-and-impl-second-signature",
     "bound_brief_rev": 3,
     "prior_rounds": [
       {
@@ -225,10 +225,23 @@
           "FIX at fea2bd8: the exemption is DELETED, not hardened, because no line-local predicate can observe a quote opened on an adjacent line. Under a USER-APPROVED scope extension, finalize_merge.sh:38 was reworded to spell the retired literal out in prose, so no .sh file needs exempting; verified zero contiguous literals remain in shell comments tree-wide. finalize_merge.sh changes by two comment lines only, behaviour untouched. A regression assertion keeps the exemption from returning.",
           "The consultant was right on both evidence-binding complaints: the diff SHA was stale (actual ebdd0069) and consult.bound_commit still pointed at e93ba1c instead of the then-final 88e6c3c. Both are regenerated as the final step this round, and the orchestrator now verifies each SHA literally appears in the prompt before dispatching."
         ]
+      },
+      {
+        "round": "wp02-impl-r7",
+        "decision": "REWORK",
+        "bound_commit": "6d2ca2d",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
+        "findings": [
+          "Q1 ACCEPT for the sixth consecutive round.",
+          "Q2 REWORK, ruled a FALSE POSITIVE after reproduction: the consultant's real path <parent>/.worktrees/../<repo>/docs/.../WP-01.status.json is refused by the old literal and accepted by the predicate, and is not rev2's L. The orchestrator reproduced it (path exists; old_refuses=True; new_refuses=False) but ruled it a false positive of the LITERAL, not a loosening defect: it resolves into the primary repo (git-dir /Users/admin/vibe/agentic_loop/.git, git-common-dir agreeing), so the file the gate opens IS the main-repo single source of truth and refusing it would refuse what the rule protects. Resolve-before-decide is the predicate's hardened A19/A27 behaviour. Resolution: a USER-APPROVED brief revision to rev3 stating that L is judged by RESOLVED LOCATION rather than path spelling, pinned by test_inv_c_alias_resolving_to_main_repo_is_accepted which also checks a genuine sibling worktree still refuses.",
+          "Q3 REWORK, a REAL gap and the first one not line-local: F6's {'.py','.sh'} suffix filter silently skipped src/agentic_loop/templates/install.sh.tmpl and pre-push.tmpl, which init_cmd.py:99-101 installs at mode 0o755 -- they ship as executable shell, so a literal-based check added there would never have been seen. Fixed: both are in scope, asserted to still exist and to still be installed as executables so the set cannot silently drift, and M-J (planting the literal in install.sh.tmpl) is verified red.",
+          "Evidence binding: the consultant confirmed all bound SHA-256 values, HEAD and the single untracked forbidden path matched this round, after the orchestrator began verifying each SHA literally appears in the prompt before dispatch."
+        ]
       }
     ],
-    "pending_note": "Second signature r7 on the exemption removal.",
-    "bound_commit": "fea2bd8e21efa632ead88a06a60b4769348f09be",
+    "pending_note": "Combined round: brief rev3 (the INV-C clarification) AND the implementation at this commit. Brief changed, so per contract it needs its own signature; folded into one round rather than two.",
+    "bound_commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "SOFT_LIMIT_ENABLED",
@@ -237,7 +250,8 @@
         "wp02-impl-r3",
         "wp02-impl-r4",
         "wp02-impl-r5b",
-        "wp02-impl-r6"
+        "wp02-impl-r6",
+        "wp02-impl-r7"
       ],
       "note": "Each round narrowed the defect and each was orchestrator-reproduced, so the loop was productive rather than thrashing. The final fix is a root-cause change (raw .sh scan, real lexer for Python) rather than a third heuristic patch. Escalated for a user decision on whether to run another second-signature round.",
       "user_decision": "User approved one further second-signature round (r6) past SOFT_LIMIT_ENABLED, on the reasoning that each round narrowed a real defect and the last fix was root-cause."
