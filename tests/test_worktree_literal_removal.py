@@ -230,10 +230,39 @@ def _add_sibling_worktree(repo: Path, tmp_path: Path, name: str, branch: str) ->
     return wt
 
 
+def _write_fixture_plan_status(beside: Path, repo: Path, wp: str = "WP-02") -> None:
+    """WP-01: the status-source predicate resolves the authoritative branch from
+    the PLAN status beside the judged file, so every fixture plan dir needs one.
+
+    ``base_branch`` names the branch ``repo`` ACTUALLY holds, so a fixture
+    parked on a feature branch still matches its holder.
+    """
+    # Resolve the branch held by the MAIN repo, not by ``repo``: f1/f2 pass a
+    # SIBLING worktree here, and declaring that worktree's own branch would
+    # make it look like the authoritative holder and wrongly flip those
+    # refusal tests to accept.
+    main_root = _run_git(repo, "rev-parse", "--path-format=absolute",
+                         "--git-common-dir").stdout.strip()
+    main_repo = Path(main_root).parent if main_root else repo
+    held = _run_git(main_repo, "branch", "--show-current").stdout.strip() or "main"
+    (Path(beside).parent / "PLAN-FIXTURE.status.json").write_text(json.dumps({
+        "schema_version": "agentic-plan-status/v1",
+        "plan_id": "PLAN-FIXTURE",
+        "iteration_id": "fixture-iteration",
+        "state": "ACTIVE",
+        "title": "fixture plan",
+        "git": {"base_branch": held, "target_branch": "main"},
+        "work_packages": [wp],
+        "timestamps": {"created_at": "2026-01-01T00:00:00Z",
+                       "updated_at": "2026-01-01T00:00:00Z"},
+    }, indent=2), encoding="utf-8")
+
+
 def _write_status(repo: Path, status: dict, wp: str = "WP-02") -> Path:
     path = repo / PLAN_DIR / f"{wp}.status.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    _write_fixture_plan_status(path, repo, wp)
     return path
 
 
@@ -410,6 +439,7 @@ def test_f3_merge_accepts_literal_dot_worktrees_dir_in_main_repo(
     nested.mkdir(parents=True)
     status_path = nested / "WP-02.status.json"
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    _write_fixture_plan_status(status_path, repo)
 
     # The literal DOES hit this path -- that is the point of F3, so the F1
     # self-proof deliberately does not apply here.
@@ -427,6 +457,10 @@ def test_f3_merge_accepts_literal_dot_worktrees_dir_in_main_repo(
     # Control: identical arguments, invalid content. It must be refused at the
     # validator, proving the acceptance above was decided by the worktree
     # predicate on a valid document and not by anything about the path.
+    # WP-01: the control judges a file at the repo ROOT, so that directory
+    # needs a PLAN status too -- otherwise the control dies at the worktree
+    # gate instead of the validator and stops being a control.
+    _write_fixture_plan_status(repo / "README.md", repo)
     control = _run_merge(repo, repo / "README.md", env)
     assert control.returncode == 2, (control.returncode, control.stdout, control.stderr)
     assert VALIDATION_FAILED in control.stderr, (control.stdout, control.stderr)
@@ -478,6 +512,7 @@ def test_f4_qoder_accepts_literal_dot_worktrees_dir_in_main_repo(
     nested.mkdir(parents=True)
     status_path = nested / "WP-02.status.json"
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    _write_fixture_plan_status(status_path, repo)
 
     assert LITERAL in str(status_path)
     # Must exist: is_file() (:1008) precedes the worktree decision.
@@ -842,7 +877,12 @@ def test_f6_no_literal_worktree_check_remains() -> None:
     # Only Python comments are stripped now, so gate/__init__.py's explanatory
     # comment is the witness; every .sh comment is scanned raw, which is why no
     # shell comment anywhere in the tree may spell the literal contiguously.
-    assert "agentic_loop/gate/__init__.py:809" in comment_only, comment_only
+    # WP-01: assert the witness comment EXISTS, not where it sits. Pinning a
+    # hardcoded line number made this break whenever the file grew (WP-01's
+    # insertions moved the same comment from :809 to :1117), which tested
+    # nothing about the invariant. The invariant is `hits == []` above.
+    assert any(h.startswith("agentic_loop/gate/__init__.py:") for h in comment_only), \
+        comment_only
     assert len(comment_only) >= 1, comment_only
 
 

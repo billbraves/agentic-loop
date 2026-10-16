@@ -24,6 +24,33 @@ from pathlib import Path
 
 import pytest
 
+
+def _write_fixture_plan_status(status_path, repo, wp_id="WP-01",
+                               iteration_id="fixture-iteration"):
+    """WP-01: give the fixture's plan dir a PLAN status.
+
+    The status-source predicate resolves the authoritative branch from the PLAN
+    status sitting beside the judged file, so a plan dir with no plan in it is
+    refused. ``base_branch`` must name the branch this repo ACTUALLY holds --
+    a hardcoded "main" would not match a fixture parked on a feature branch.
+    """
+    import json as _json
+    import subprocess as _sp
+    held = _sp.run(["git", "branch", "--show-current"], cwd=repo,
+                   capture_output=True, text=True).stdout.strip() or "main"
+    (Path(status_path).parent / "PLAN-FIXTURE.status.json").write_text(
+        _json.dumps({
+            "schema_version": "agentic-plan-status/v1",
+            "plan_id": "PLAN-FIXTURE",
+            "iteration_id": iteration_id,
+            "state": "ACTIVE",
+            "title": "fixture plan",
+            "git": {"base_branch": held, "target_branch": "main"},
+            "work_packages": [wp_id],
+            "timestamps": {"created_at": "2026-01-01T00:00:00Z",
+                           "updated_at": "2026-01-01T00:00:00Z"},
+        }, indent=2), encoding="utf-8")
+
 PKG_ROOT = Path(__file__).resolve().parents[1]
 PKG_SRC = PKG_ROOT / "src"
 PREFLIGHT_SH = PKG_SRC / "agentic_loop" / "wrappers" / "preflight.sh"
@@ -117,6 +144,7 @@ def _write_status_and_brief(repo: Path, wp: str, status: dict) -> Path:
     brief.write_text(BRIEF, encoding="utf-8")
     status_path = repo / PLAN_DIR / f"{wp}.status.json"
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    _write_fixture_plan_status(status_path, repo)
     return status_path
 
 

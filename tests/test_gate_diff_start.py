@@ -204,6 +204,22 @@ def _write_status(repo: Path, rel: str, **over) -> None:
     f = repo / rel
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    # WP-01: the predicate reads the authoritative branch from the PLAN status
+    # beside the judged file. base_branch must name the branch this repo
+    # ACTUALLY holds, so a fixture parked on a feature branch still matches.
+    _held = subprocess.run(["git", "branch", "--show-current"], cwd=repo,
+                           capture_output=True, text=True).stdout.strip() or "main"
+    (f.parent / "PLAN-FIXTURE.status.json").write_text(json.dumps({
+        "schema_version": "agentic-plan-status/v1",
+        "plan_id": "PLAN-FIXTURE",
+        "iteration_id": "fixture-iteration",
+        "state": "ACTIVE",
+        "title": "fixture plan",
+        "git": {"base_branch": _held, "target_branch": "main"},
+        "work_packages": ["WP-01"],
+        "timestamps": {"created_at": "2026-01-01T00:00:00Z",
+                       "updated_at": "2026-01-01T00:00:00Z"},
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
