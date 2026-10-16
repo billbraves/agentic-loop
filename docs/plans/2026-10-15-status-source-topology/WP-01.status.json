@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED",
+  "state": "DRAFT",
   "role": "Developer",
   "executor": {
     "tool": "unassigned"
@@ -65,32 +65,20 @@
   "evidence": {
     "tests": [],
     "brief": {
-      "path": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.md",
-      "sha256": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b",
-      "rev": 3,
-      "prior_revs": [
-        {
-          "rev": 1,
-          "sha256": "96a7398f5cfa7b96863c4f68b6d197092fc2d76c45f85de019e03f8ca462b527",
-          "snapshot": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.rev1.md",
-          "outcome": "REWORK_AT_BRIEF_R1"
-        },
-        {
-          "rev": 2,
-          "sha256": "4e101dcacdbd0ad1e6829777db66379eb7fa891e720f28cbd87c288471ec8d46",
-          "snapshot": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.rev2.md",
-          "outcome": "REWORK_AT_BRIEF_R2"
-        }
-      ]
+      "rev": 4,
+      "sha256": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957",
+      "snapshots": {
+        "rev3": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b"
+      }
     }
   },
   "review": {},
   "consult": {
-    "state": "REWORK_PENDING_DIRECTION",
-    "round": "topo-brief-r3",
-    "decision": "REWORK",
+    "state": "PENDING",
+    "round": "topo-brief-r4",
+    "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 3,
+    "bound_brief_rev": 4,
     "prior_rounds": [
       {
         "round": "topo-brief-r1",
@@ -128,13 +116,26 @@
           "D10: M-2 and M-2b both require 'E7 must turn red', but rev3 no longer defines E7 (it was replaced during the E9/E10/E11 rewrite). Two DoD items are therefore unexecutable as written.",
           "D11: tests cannot relocate the anchor via XDG_CONFIG_HOME once that variable is removed from the production path; fixtures need internal dependency injection or a mockable path resolver instead."
         ]
+      },
+      {
+        "round": "topo-brief-r3",
+        "decision": "REWORK",
+        "bound_brief_rev": 3,
+        "kind": "wp-brief-second-signature",
+        "resolved_in_rev": 4,
+        "findings": [
+          "D7: rev3's out-of-repo anchor was pierced. The anchor was $XDG_CONFIG_HOME/agentic_loop/policy.toml, claimed to be 'outside repository write permission', but XDG_CONFIG_HOME is a CALLER-SUPPLIED environment variable -- exactly the category rev3's own exclusion table rejected as 'caller-declared fact, the A22 bypass family'. Orchestrator-reproduced: XDG_CONFIG_HOME=/tmp/evil plus a policy.toml declaring feat/evil retargets the trusted branch, and because that file is in no git worktree it PASSES rev3's own E9b check.",
+          "D9: INV-3 clause 3 was self-contradictory -- it required the comparison baseline to come from 'the anchor's repository' while also requiring the anchor to live outside every git worktree, so no such repository exists.",
+          "USER DECISION (c): under this threat model anyone who can write the repo or set the caller's environment can simply edit the predicate, so an immovable local trust root is a false goal. Three revisions stalled at the same place, indicating the objective was wrong rather than the implementation. All security claims are WITHDRAWN and the WP is downgraded to a pure usability fix.",
+          "rev4 deletes: the anchor architecture (original INV-1b), the candidate-exclusion table, E9/E9b/E11, M-8/M-9/M-10/M-2b. It keeps the correctness requirements that never depended on a security claim: INV-1/2/2b/3/4/5, E1-E6/E8, E10 (recast as structural correctness) and M-1..M-7. It also fixes two dangling references rev3 left behind: M-2/M-2b pointed at E7, which rev3 had deleted."
+        ]
       }
     ],
-    "pending_note": "WP-01 is parked pending its rev4 rewrite as a pure usability fix (decision (c)). WP-02 goes first. rev4 must withdraw the security claim, drop the anchor entirely, and delete the now-dangling M-2/M-2b references to the removed E7 (brief-r3 D10)."
+    "pending_note": "Brief rev4 second signature. rev4 is a DOWNGRADE per user decision (c): all security claims withdrawn."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T14:00:00Z",
+    "updated_at": "2026-10-15T21:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }

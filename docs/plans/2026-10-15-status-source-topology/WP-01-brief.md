@@ -1,10 +1,21 @@
 # WP-01 — status 来源判据改为「受信任目标分支的持有者」而非「物理主仓」
 
-> rev3 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> rev4 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
 > 状态：**APPROVED（范围已由用户批准冻结）**。
 > rev1 快照 `WP-01-brief.rev1.md`（`96a7398f…`）被 `topo-brief-r1` 判 REWORK。
 > rev2 快照 `WP-01-brief.rev2.md`（`4e101dca…`）被 `topo-brief-r2` 判 REWORK。
-> 本 WP 修改一条经过 A13/A19/A22 加固、且曾被真实绕过的安全判据，因此范围冻结必须由用户批准。
+> rev3 快照 `WP-01-brief.rev3.md`（`e94a7670…`）被 `topo-brief-r3` 判 REWORK。
+>
+> **rev4 是一次降级，不是又一次加固尝试（用户决策 (c)，已批准）。**
+> rev1–rev3 都试图建立一个「能写仓库的本地行为者也无法移动的信任根」。rev3 把锚点放到
+> 仓库外策略文件 `$XDG_CONFIG_HOME/agentic_loop/policy.toml`，而 `topo-brief-r3` 的 D7
+> 实测击穿了它：`XDG_CONFIG_HOME` 本身是**调用者提供**的，`XDG_CONFIG_HOME=/tmp/evil`
+> 配一个声明 `feat/evil` 的 policy.toml 即可改向，且该文件不在任何工作树内、**通过** E9b。
+> 编排者已独立复现。
+>
+> 用户据此裁定：在本威胁模型下，能写仓库或能设调用方环境的人本来就能改代码，
+> 「不可移动的本地信任根」是伪目标。**本 WP 因此只主张可用性，不主张任何安全性质。**
+> rev4 删除锚点架构及其全部验收项与变异，保留与安全主张无关的正确性要求。
 
 ## 1. 问题（编排者已实测复现）
 
@@ -103,54 +114,73 @@ git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/evil
 main 签出路径不含该片段，故这两处**接受**、另三处**拒绝**，即 INV-5 在当前树中**已被违反**，
 与本 WP 改动无关。用户已决定由单独 WP 修复。
 
-## 2. 方向（用户已选定；rev3 把锚点移到仓库写权限之外）
+## 1.97 rev4 触发原因（brief-r3 REWORK → 用户决策 (c)：撤回安全主张）
 
-把判据从「**是否位于 linked worktree**」改为「**是否是持有受信任目标分支的那个签出**」。
-允许该签出本身是 linked worktree；其余所有 worktree 一律仍然拒绝。
+`topo-brief-r3` 判 rev3 REWORK，两条缺陷编排者均独立复现：
 
-rev3 的关键修正（针对 D4）：期望分支由一个**位于仓库写权限之外**的策略文件确定。
+**D7（锚点被击穿，rev3 的核心主张不成立）**：rev3 把锚点定为仓库外策略文件
+`$XDG_CONFIG_HOME/agentic_loop/policy.toml`，声称「仓库写权限之外」。但
+`XDG_CONFIG_HOME` 本身是**调用者提供的环境变量** —— 正是 rev3 自己在排除候选表里
+以「调用者声明式事实，A22 绕过家族」为由否决的那一类。实测：
 
 ```text
-锚点（唯一）：  $XDG_CONFIG_HOME/agentic_loop/policy.toml
-                 缺省 $HOME/.config/agentic_loop/policy.toml
-                 键：  [trust] protected_branch = "main"
+XDG_CONFIG_HOME=/tmp/evil  +  /tmp/evil/agentic_loop/policy.toml 声明 feat/evil
+  → 受信任目标分支变为 feat/evil
+  → 该文件不在任何 git 工作树内，因此 rev3 的 E9b 检查通过
 ```
 
-实测该位置**不在任何 git 工作树内**（`git -C ~/.config rev-parse --show-toplevel` 无仓库），
-因此仓库内容 —— 包括被跟踪的 `.agentic/config.toml`、任何 ref、任何提交 —— 都**无法**覆盖它。
-改动它需要操作者在自己的用户目录动手，而这正是「仓库写权限之外」的含义。
+即 rev3 的 E9b（「策略文件不得在工作树内」）无法捕获这条路径，而 rev3 把它当作 D4 的
+解决方案。锚点与 rev2 被否决的候选处在同一类别。
 
-**明确排除的候选及理由（均经实测）**：
+**D9（INV-3 第 3 条自指矛盾）**：rev3 要求比对基准「取自锚点侧（独立确定）」，同时规定
+锚点必须不在任何 git 工作树内 —— 于是「锚点所属仓库」并不存在，该条无法实现。
 
-| 候选 | 为何不行 |
-| --- | --- |
-| `.agentic/config.toml` 的键 | 实测为 git TRACKED 文件，属仓库写权限域内 |
-| `refs/remotes/origin/HEAD` | 单条本地 `git symbolic-ref` 即可改写 |
-| `git ls-remote --symref origin HEAD`（服务端） | 真在服务端，但 `remote.origin.url` 在本地 `.git/config` 内可改写，可把 origin 指向攻击者仓库；且引入网络依赖 |
-| 环境变量（如 `AGENTIC_PROTECTED_BRANCH`） | 调用者声明式事实 —— A22 的绕过家族正是这一类，判据的 docstring 已明确拒绝 |
+**用户裁定（决策 (c)）**：在本威胁模型下，能写仓库或能设调用方环境的人本来就能改判据
+代码，追求「不可移动的本地信任根」是伪目标。rev1→rev2→rev3 三轮都卡在同一处，说明问题
+不在实现细节而在目标设定。**撤回全部安全主张，本 WP 降级为纯可用性修复。**
 
-**INV-1b 随之重写为单锚 + 严格 fail-closed**（见下）。不再有「双锚一致」这一说法。
+rev4 因此删除：锚点架构（INV-1b 原文）、排除候选表、E9/E9b/E11、M-8/M-9/M-10/M-2b。
+保留与安全主张无关的正确性要求：INV-1/2/2b/3/4/5、E1–E6/E8、E10（改为结构正确性）、
+M-1~M-7。
+
+## 2. 方向（rev4：纯可用性修复）
+
+把判据从「**是否位于 linked worktree**」改为「**是否是持有目标分支的那个签出**」。
+允许该签出本身是 linked worktree；其余所有 worktree 一律仍然拒绝。
+
+目标分支名从**同一 plan 目录下的 PLAN status 的 `git.target_branch`** 读取 —— 这是一个
+已有的合法 schema 字段，不新增任何机制。
+
+**本 WP 明确不主张的性质（rev4 撤回）**：
+
+- 不主张抵御能写仓库内容的本地行为者。该行为者可直接改判据代码。
+- 不主张抵御能设置调用方环境的本地行为者。`topo-brief-r3` D7 已实测证明
+  `XDG_CONFIG_HOME` 这类调用者提供的位置无法充当信任根。
+- 因此 `git.target_branch` 的读取**不是信任边界**，只是配置读取。rev1–rev3 反复试图
+  为它找一个不可移动的锚点，rev4 停止这一尝试。
+
+**本 WP 主张的性质**：消除 §1 实测的死锁 —— 在「物理主仓停在别的分支、目标分支签出在
+linked worktree」这一真实布局下，`agentic preflight` / `merge` / `finalize` 从完全不可用
+变为可用，且不把门放开到「任何 worktree 都接受」。
+
+WP-02 合并后该死锁已从 3 个入口扩大到 **5 个**（`merge.sh`、`qoder_security.py` 由路径
+字面量改为引用同一判据），rev4 的收益相应变大。
 
 ## 3. 不变量
 
-**INV-1（角色而非位置）**：status 文件的受信任来源是「当前检出**受信任目标分支**的那个
+**INV-1（角色而非位置）**：status 文件的单一真相源是「当前检出**目标分支**的那个
 registered worktree」。该 worktree 是物理主仓还是 linked worktree **不影响**判定。
 
-**INV-1b（单一仓库外锚点，关闭 D4）**：受信任目标分支**只**取自仓库外策略文件
-`$XDG_CONFIG_HOME/agentic_loop/policy.toml`（缺省 `$HOME/.config/...`）的
-`[trust] protected_branch`。
+**INV-1b（rev4 重写：目标分支来自 PLAN status，且这不是信任边界）**：目标分支名取自
+被校验 status 文件所在 plan 目录下的 PLAN status 的 `git.target_branch`。
 
-1. 文件缺失、不可读、TOML 非法、缺键、值非字符串或未通过 INV-3 第 1 条的名称校验
-   → **一律 fail-closed**，witness 为 `trusted branch policy unavailable`。
-   **不得**在任何情形下回退到仓库内的值、`origin/HEAD`、环境变量或硬编码 `"main"`。
-2. 该文件若位于任何 git 工作树内 → fail-closed，witness 为
-   `trusted branch policy must live outside any git worktree`。此检查使「把策略文件塞进仓库」
-   这条回路也被堵死。
-3. 仓库内任何同名/同义字段（PLAN 的 `git.target_branch`、WP 状态字段等）**只能**做
-   一致性交叉校验：不等则 fail-closed，**永远不**用它覆盖锚点。
-
-实测依据：`~/.config` 不属于任何 git 仓库；而 `.agentic/config.toml` 是被跟踪文件、
-`refs/remotes/origin/HEAD` 可被单条本地命令改写，故二者都不能充当锚点。
+1. 该字段缺失、非字符串、或未通过 INV-3 第 1 条的名称校验 → fail-closed，witness 为
+   `target branch unresolved`。**不得**回退到硬编码 `"main"`。
+2. 读取失败（文件不存在、JSON 非法）→ 同样 fail-closed，同一 witness 族。
+3. **本条不是信任边界。** 能写仓库的行为者可以改写这个字段，也可以直接改判据代码；
+   rev4 不主张抵御该行为者（见 §2 与 §8）。本条的作用是让判据有一个**声明式、单一、
+   可审计**的来源，而不是让它抗攻击。rev1–rev3 曾试图为此寻找不可移动锚点并全部失败，
+   不要在实现中重新引入锚点、环境变量或仓库外策略文件。
 
 **INV-2（仍然唯一，且必须是活的）**：受信任来源必须唯一。若零个或多于一个 registered
 worktree 检出 `target_branch`，一律 fail-closed，两种失败给出**各自特异**的 witness
@@ -164,15 +194,20 @@ worktree 检出 `target_branch`，一律 fail-closed，两种失败给出**各�
 witness 为 `target_branch holder is stale (prunable)`，**不得**退化成 `no checkout holds`
 （二者的修复动作不同：前者需 `git worktree prune`）。
 
-**INV-3（候选必须是本仓库的真实活签出）**：候选 worktree 必须同时满足：
+**INV-3（候选必须是本仓库的真实活签出）**：候选 worktree 必须同时满足
+（rev4 修正 rev3 的 D9 自指矛盾：比对基准改为**被校验路径自身解析出的仓库**，
+rev3 写的是「锚点所在仓库」，而锚点被规定为不在任何仓库内，自相矛盾）：
 
-1. 受信任目标分支名通过单一路径组件校验（非空、不含 `/` 与 `\\`、不等于 `.` `..`、
+1. 目标分支名通过单一路径组件校验（非空、不含 `/` 与 `\\`、不等于 `.` `..`、
    不以 `.` 开头、无 NUL 字节）；
-2. 该候选的**当前分支**严格等于受信任目标分支；
-3. 该候选与**锚点所属仓库**共享同一 resolved `git-common-dir`。此处的对照基准必须取自
-   锚点侧（独立确定），**不得**取自候选路径自己发现的仓库 —— 否则两个事实都来自候选，
-   独立仓库里同名 `main` 会被接受（brief-r1 Q3 指出，编排者已实测两个独立仓库的
-   common-dir 必然不同，故该合取项可承重）。
+2. 该候选的**当前分支**严格等于目标分支；
+3. 该候选与**被校验路径自身解析出的仓库**共享同一 resolved `git-common-dir`。
+   目的是排除「另一个独立仓库里恰好也有一个同名 `main`」—— 编排者已实测两个独立仓库的
+   resolved common-dir 必然不同，故该合取项可承重（brief-r1 Q3 指出需要它）。
+   **rev4 修正**：rev3 要求基准「取自锚点侧（独立确定）」，而 rev3 同时规定锚点不在任何
+   仓库内，「锚点所属仓库」并不存在 —— 这是 `topo-brief-r3` D9 指出的自指矛盾。锚点架构
+   删除后，基准取被校验路径自身解析出的仓库即可：本条要排除的是**跨仓库混淆**，而非
+   「候选自证」，后者由 INV-1b 第 3 条与 E10/M-7 承担。
 
 **INV-4（加固不得退化，rev2 改为「保证不变、断言可改写」，关闭 D3）**：A22 环境剥离、
 A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环的 `RuntimeError`、超长
@@ -188,8 +223,8 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
    **不得**削弱或删除任何攻击形态（环境伪装、symlink 跟随、NUL、超长路径、symlink 环）;
 3. 任何期望值翻转必须在报告中逐条给出理由，说明它是契约刻意改变所致，而非为了变绿。
 
-签名变更必须在交付中显式说明：新判据需要「受信任目标分支」这一入参或由其内部解析锚点，
-二者择一但必须**全仓统一**（INV-5）。
+签名变更必须在交付中显式说明：新判据需要「目标分支」这一入参，或由其内部从 PLAN status
+解析，二者择一但必须**全仓统一**（INV-5）。rev4 不再有「解析锚点」这一选项。
 
 **INV-5（单一权威）**：三个调用点必须继续引用**同一个**判据函数，不得各自实现。新判据与旧
 判据不得并存为两条可选路径。
@@ -223,26 +258,23 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
   含 NUL 共 **8** 种形态 → 各自 fail-closed，原因必须指向**名称校验**，不得是偶然的
   「分支不存在」。（rev1 只列 5 种，brief-r1 指出漏了反斜杠、点号前缀与 NUL。）
 
-- **E9 `[policy-anchor-fail-closed]`**（rev3 重写，承载 INV-1b）：参数化覆盖锚点的每一种
-  退化形态 —— 文件缺失、不可读、TOML 非法、缺 `[trust]` 段、缺 `protected_branch` 键、
-  值非字符串、值未过名称校验 —— **每一种都必须 fail-closed** 且 witness 为
-  `trusted branch policy unavailable`。本节点必须额外断言：**没有**任何形态退化成
-  「回退到 `main`」或「回退到仓库内值」而放行。
+- **E9 `[target-branch-unresolved-fails-closed]`**（rev4 重写，承载 INV-1b 第 1/2 条）：
+  参数化覆盖 PLAN status 的每一种退化形态 —— 文件不存在、JSON 非法、缺 `git` 段、
+  缺 `target_branch` 键、值非字符串、值未过名称校验 —— **每一种都必须 fail-closed**，
+  witness 为 `target branch unresolved`。本节点必须额外断言：**没有**任何形态退化成
+  「回退到 `main`」而放行。
+  （rev3 的 E9/E9b 绑定仓库外策略文件锚点，随锚点架构一并删除；rev3 的 E11
+  `[coordinated-in-repo-move-cannot-retarget]` 断言「协同改写仓库内一切后受信任来源不变」，
+  这正是 rev4 撤回的安全主张，故删除。）
 
-- **E9b `[policy-inside-worktree-is-refused]`**（rev3 新增）：把策略文件放在一个 git 工作树
-  内 → fail-closed，witness 为 `trusted branch policy must live outside any git worktree`。
-
-- **E10 `[in-repo-value-cannot-override-anchor]`**（rev3 重写，关闭 D2/D4，并修掉 brief-r2
-  对旧 E10 的质疑）：仓库内声明值与锚点不一致时必须 fail-closed，且**不得**改用仓库内的值。
-  构造必须使用**合法 schema 对象**（PLAN status 的 `git.target_branch`，或冻结接口的显式
-  declared-target 入参），**不得**往 WP fixture 里塞未知字段 —— 否则用例可能因 validator
-  拒绝未知字段而变绿，而不是因为锚点不可覆盖（brief-r2 Q3 指出此点）。
-  断言必须命中**特异的 mismatch 原因**。
-
-- **E11 `[coordinated-in-repo-move-cannot-retarget]`**（rev3 新增，直接钉死 D4）：同时
-  改写 `refs/remotes/origin/HEAD` **并**修改仓库内所有声明值（含 `.agentic/config.toml`），
-  模拟「单一行为者协同移动仓库内一切」→ 受信任来源**必须不变**。该节点是 rev2 被判 REWORK
-  的那次攻击的回归测试；brief-r2 明确指出 rev2 的 E9/M-8 无法捕获它。
+- **E10 `[judged-object-cannot-declare-its-own-basis]`**（rev4 重写，承载 M-7）：
+  目标分支**必须**取自 PLAN status，**不得**取自被校验的 WP status 文件自身。构造一个
+  WP status，其所在 plan 的 PLAN status 声明 `main`，而该 WP 自身（通过任何合法字段或
+  实现可能误读的位置）暗示另一个分支 → 判定必须以 PLAN 的值为准。
+  构造必须使用**合法 schema 对象**，**不得**往 fixture 里塞未知字段 —— 否则用例可能因
+  validator 拒绝未知字段而变绿，而不是因为来源正确（brief-r2 Q3 指出此点）。
+  **这是结构正确性要求（判定依据不能由被判定对象提供），不是安全主张** —— 能写仓库者
+  同样可以改 PLAN status，rev4 不主张抵御他。
 
 - **E8 `[hardening-preserved]`**：A22/A27/A28 的既有断言在新判据下复跑全绿 —— 不新增
   用例，直接复用 `tests/test_worktree_detection.py` 的 17 个节点作为护栏。
@@ -250,20 +282,16 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
 ## 5. 承重变异（DoD 必做，逐条分别施加、分别验证、精确还原）
 
 - **M-1**：把 INV-2b 的存活性检查去掉（接受 prunable 幽灵条目）→ **E5 必须转红**。
-- **M-2**：去掉 INV-3 第 3 条（不比对 git-common-dir）→ **E7 必须转红**。
-- **M-2b（rev2 新增）**：把 INV-3 第 3 条的对照基准从**锚点侧**改成**候选自己发现的仓库**
-  → **E7 必须转红**。该变异证明「基准必须独立」这半是承重的，而不只是「比了就行」。
+- **M-2（rev4 修正：rev3 把它指向已被删除的 E7，为悬空引用）**：去掉 INV-3 第 3 条
+  （不比对 `git-common-dir`）→ **E3 必须转红**，且红的形态必须是「另一个仓库的 worktree
+  被当作本仓库的持有者接受」。
+  （rev3 的 M-2b 要求把比对基准从「锚点侧」改为「候选自己发现的仓库」才算承重；锚点已删除，
+  且 rev4 的 INV-3 本就以被校验路径自身解析出的仓库为基准，该变异失去意义，删除。）
 - **M-3**：去掉 INV-3 第 1 条（名称校验）→ **E6 必须转红**（8 种形态中至少 1 种）。
-- **M-7（rev2 新增，关键）**：把受信任目标分支的来源从**锚点**改回**被校验的 status 文件**
-  → **E10 必须转红**，且红的形态必须是攻击者的 worktree 被判为受信任来源。该变异锁死
-  brief-r1 Q1 指出的自证循环。
-- **M-8（rev3 重写）**：给锚点加一条「缺失时回退到 `"main"`」的兜底 →
-  **E9 必须转红**。该变异证明严格 fail-closed 承重。
-- **M-9（rev3 新增，关键）**：把锚点来源从仓库外策略文件改回仓库内任一位置
-  （`.agentic/config.toml` 或 `origin/HEAD`）→ **E11 必须转红**，且红的形态必须是
-  协同移动后受信任来源被改写。该变异锁死 D4。
-- **M-10（rev3 新增）**：去掉 INV-1b 第 2 条（不检查策略文件是否在工作树内）→
-  **E9b 必须转红**。
+- **M-7（rev4 重写）**：把目标分支的来源从 PLAN status 改为**被校验的 WP status 文件自身**
+  → **E10 必须转红**，且红的形态必须是「被校验对象自己声明了自己的判定依据」。
+  该变异保留 brief-r1 Q1 指出的自证循环防护 —— 这是**结构正确性**要求（判定依据不能由
+  被判定对象提供），不是安全主张。
 - **M-4**：把判据退回旧形态（纯 `--git-dir != --git-common-dir`）→ **E1 必须转红**，
   且红的原因必须是「被判为 worktree 而拒绝」。该变异锁死本 WP 要消除的死锁。
 - **M-5**：把判据放宽成「任何 registered worktree 都接受」→ **E3 必须转红**。
@@ -281,9 +309,10 @@ M-4 与 M-5 必须**分别**验证：两者同时承重才说明判据既解了�
 - `src/agentic_loop/gate/qoder_security.py`（调用点对齐）
 - `src/agentic_loop/wrappers/finalize_merge.sh`、`preflight.sh`、`merge.sh`（调用点对齐）
 - `tests/test_worktree_detection.py`（新增 E1–E10，并按 INV-4 做保前提改写）
-（rev3 取消 rev2 对 `.agentic/config.toml` 的写许可 —— 它是被跟踪文件，不能充当锚点，
-故本 WP **不需要也不允许**修改它，D5 的自相矛盾随之消失。锚点文件位于仓库之外，不属于
-本仓库任何路径范围；实现须在报告中给出它读取该文件的代码位置与 fail-closed 分支。）
+
+（rev4：锚点架构已删除，故本 WP 既不修改 `.agentic/config.toml`，也不读取任何仓库外
+策略文件。实现须在报告中给出它读取 PLAN status `git.target_branch` 的代码位置与全部
+fail-closed 分支，并确认**没有**引入环境变量或仓库外文件作为来源。）
 - `tests/test_preflight_status_source.py`、`tests/test_finalize_merge_first_call.py`、
   `tests/test_finalize_merge_toctou.py`（仅在新判据使其断言失真时**最小**调整；
   调整必须在报告中逐条说明理由，**不得**为了变绿而削弱攻击形态）
@@ -293,28 +322,36 @@ M-4 与 M-5 必须**分别**验证：两者同时承重才说明判据既解了�
 
 ## 7. 完成定义（DoD）
 
-- [ ] E1–E11（含 E9b）全绿（E6 的 **8** 种名称形态、E9 的 **7** 种退化形态逐一参数化）。
+- [ ] E1–E6、E8、E9、E10 全绿（E6 的 **8** 种名称形态、E9 的 **6** 种退化形态逐一参数化）。
 - [ ] INV-2 的「多于一个持有者」分支虽无验收用例（真实 git 不可构造），代码仍必须显式
       fail-closed 并给出该 witness；报告须指出该分支在代码中的位置。
 - [ ] INV-4 映射表：**旧 17 节点 → 新断言**逐条映射齐备（17 行），每个期望值翻转附理由；
       A22/A27/A28 的攻击形态一个都没少（环境伪装、symlink 跟随与环、NUL、超长路径）。
-- [ ] M-1 ~ M-10（含 M-2b）逐条红证齐备（含还原回绿，还原后 `git diff` 为空），
-      报告附逐条实际输出。M-4/M-5 与 M-7/M-9 必须分别施加、分别验证。
-- [ ] **锚点不可回退自检**：报告须证明不存在任何到 `"main"`、仓库内值或环境变量的回退路径
-      （grep 出锚点读取处的全部分支，逐条说明每个分支的归宿）。
+- [ ] M-1、M-2、M-3、M-4、M-5、M-6、M-7 逐条红证齐备（含还原回绿，还原后 `git diff`
+      为空），报告附逐条实际输出。M-4 与 M-5 必须分别施加、分别验证。
+- [ ] **不可回退自检**：报告须证明不存在任何到硬编码 `"main"` 或环境变量的回退路径
+      （grep 出目标分支读取处的全部分支，逐条说明每个分支的归宿）。
 - [ ] 保护集全绿：`tests/test_preflight_status_source.py`、
       `tests/test_finalize_merge_first_call.py`、`tests/test_finalize_merge_toctou.py`、
       `tests/test_finalize_merge_sequential.py`。
-- [ ] 全量不低于基线 **902 passed / 4 skipped**（新增用例会使总数上升）。
+- [ ] 全量不低于基线 **912 passed / 4 skipped**（WP-02 已把基线从 902 提升到 912；新增用例会使总数继续上升）。
 - [ ] **单一权威自检**：报告须列出**三个**真实调用点，并证明它们引用的是同一个判据函数；
       新旧判据不得并存为两条可选路径（INV-5）。
-- [ ] **端到端自检**：在「物理主仓停在别的分支、`main` 在 linked worktree」的真实布局下，
-      `agentic finalize` 对一个双签完毕的 WP 能够正常盖章（这是本 WP 的存在理由）。
-      报告须附实际命令与输出，并说明策略文件当时的内容与位置。
+- [ ] **端到端自检（本 WP 的存在理由）**：在「物理主仓停在别的分支、目标分支在 linked
+      worktree」的真实布局下，`agentic preflight`、`agentic merge`、`agentic finalize`
+      三者对一个双签完毕的 WP 都必须可用。报告须附实际命令与输出。WP-02 合并后该死锁
+      覆盖 **5** 个入口，实现须确认五者一致。
 - [ ] 不得出现任何旁路开关（`--allow-worktree-status` / 环境变量等）。
 
 ## 8. 残余风险
 
+- **本 WP 不防御能写仓库内容的本地行为者**，也不防御能设置调用方环境的本地行为者。
+  该行为者可改写 PLAN status 的 `git.target_branch`，也可直接改判据代码。依据：
+  `topo-brief-r3` D7 实测 —— rev3 把锚点放到仓库外策略文件后，
+  `XDG_CONFIG_HOME=/tmp/evil` 配一个声明 `feat/evil` 的 policy.toml 即可改向，且该文件
+  不在任何工作树内、通过了 rev3 的 E9b；编排者已独立复现。用户据此裁定此类本地信任根
+  为伪目标（决策 (c)）。**凡在评审中要求本 WP 抵御该行为者的意见，都超出已批准范围。**
 - 判定与使用之间仍存在 ref/worktree 竞态：某 worktree 可在判定通过后切换分支。与既有
   `base_branch` 判定同类，不在本 WP 范围内，记录在此。
 - 本 WP 不改变「status 文件是单一真相源」这一产品语义，只改变「哪个签出持有它」的判定方式。
+- 判据仍对无法 resolve 的路径 fail-closed（A19/A27 行为），rev4 不改变这一点。
