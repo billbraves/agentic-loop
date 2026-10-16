@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DISPATCHED",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -28,7 +28,7 @@
     "dispatch_commit": "",
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
-    "commit": "fa8632b3b182a56e0df0a1c2b810c8e217c9e4be",
+    "commit": "759df4bd321aec202d5e3cb797ce9e89fe479787",
     "merged_commit": null,
     "worktree_note": "Sequential WP per contract 4.3: it works directly on the plan's integration branch, so there is no separate per-WP worktree. The recorded path is the checkout that HOLDS the integration branch -- which is exactly the 'authoritative branch holder' this WP teaches the predicate to recognise. Note this checkout is itself a linked worktree, which is why every gate currently refuses it."
   },
@@ -73,7 +73,32 @@
     "data_access": "READ_ONLY"
   },
   "evidence": {
-    "tests": [],
+    "tests": [
+      {
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "result": "53 failed, 894 passed, 4 skipped",
+        "note": "Against the verified 912 passed / 4 skipped baseline. All 53 failures are in seven files OUTSIDE allowed_paths and share one cause: the new predicate refuses a plain primary repo whose plan dir has no PLAN status, which the old predicate accepted. Orchestrator-reproduced."
+      },
+      {
+        "command": "python3.11 -m pytest tests/test_worktree_detection.py tests/test_preflight_status_source.py tests/test_finalize_merge_first_call.py tests/test_finalize_merge_toctou.py tests/test_finalize_merge_triple_sign.py -q",
+        "exit_code": 0,
+        "result": "77 passed",
+        "note": "The in-scope suites, including the new E1-E6/E8/E9/E10/E12 nodes."
+      },
+      {
+        "command": "pre-WP-01 control in a throwaway worktree at 3955529, then at HEAD",
+        "exit_code": 0,
+        "result": "old predicate refuse=True, new predicate refuse=False for the authoritative status in this linked-worktree holder",
+        "note": "Proves the predicate change is load-bearing for the target layout."
+      },
+      {
+        "command": "wrapper end-to-end with a RELATIVE vs an ABSOLUTE path, at HEAD and at the pre-WP-01 commit",
+        "exit_code": 1,
+        "result": "relative still PREFLIGHT_FAIL; absolute passes preflight and carries merge/finalize_merge into their ordinary business gates, BOTH before and after this WP",
+        "note": "This is spec gap 2: the wrappers anchor relative paths to the physical primary repo before the predicate runs, so the end-to-end DoD item cannot be met by a predicate change alone."
+      }
+    ],
     "brief": {
       "rev": 6,
       "sha256": "df3916fe19cb04701baa8be852002c251f8b086261db6ef6a1c53ca90f517c9e",
@@ -120,6 +145,22 @@
     "baseline": {
       "frozen_dod_figure": "912 passed / 4 skipped",
       "resolution": "The figure is now TRUE on this machine with the user's real HOME and git config: 912 passed / 4 skipped, measured after the fixture fix. Before the fix it was 908 passed / 4 failed / 4 skipped. The original 912 had been measured through the developer dispatch script's isolated temporary HOME, which did not carry the global init.defaultBranch=master, so the discrepancy was an artefact of the measurement environment rather than of the code. 916 tests are collected in both cases, which is what made the two numbers reconcilable."
+    },
+    "impl_r2": {
+      "result": "IMPLEMENTED_WITH_A_SPEC_GAP",
+      "executor": "kimi/deepseekflash",
+      "commit": "759df4b",
+      "files_changed": 10,
+      "scope": "all 10 changed paths are inside allowed_paths; no forbidden path touched",
+      "orchestrator_verified": [
+        "The predicate change is REAL and load-bearing. Controlled with a throwaway worktree at the pre-WP-01 commit 3955529: the OLD predicate returns refuse=True for the authoritative status in this linked-worktree holder, the NEW one returns refuse=False. (An earlier attempt to control via git stash gave a polluted answer and is discarded; see the incident note.)",
+        "INV-5 holds: all five call sites still reference the one path_is_in_worktree function; the name is kept, the semantics retargeted.",
+        "The developer's regression mechanism claim is INDEPENDENTLY REPRODUCED: in a plain primary repo whose plan dir has no PLAN status, the new predicate returns refuse=True reason='authoritative branch unresolved'; adding a PLAN status declaring that repo's current branch flips the same path to refuse=False. That is INV-1b clauses 1-2 working as specified.",
+        "Full suite: 53 failed, 894 passed, 4 skipped, against the verified 912/4 baseline. All 53 are in SEVEN files outside allowed_paths: test_qoder_security.py (22), test_finalize_merge_sequential.py (11), test_preflight_branch_binding.py (6), test_gate_diff_start.py (5), test_worktree_literal_removal.py (4), test_merge_wrapper.py (3), test_cli.py (2). The developer stopped at the scope boundary rather than editing them, which is the correct behaviour.",
+        "The in-scope suites are green: 77 passed, 0 failed."
+      ],
+      "spec_gap_1_orchestrator_found": "THE BRIEF HAS A GAP I OWN, and six review rounds missed it. INV-1b mandates fail-closed when the PLAN status is unreadable, but nobody checked what the OLD predicate ACCEPTED. The old rule accepted any path in a plain primary repo with no PLAN status at all; the new rule refuses it. INV-4 only required that the hardening not degrade and said nothing about not breaking previously-accepted inputs, so the implementation is faithful to the brief while the brief is wrong. The 53 failures are the measured cost of that gap, not developer error.",
+      "spec_gap_2_orchestrator_found": "MORE SERIOUS, and it invalidates part of my own section 1 diagnosis. The predicate is not the only thing standing between these gates and the authoritative file: the wrappers themselves anchor RELATIVE paths to the physical primary repo (preflight.sh lines 31-34 via resolve_paths --root main_repo, same device in dispatch_lint.sh), then hand the predicate a path inside /Users/admin/vibe/agentic_loop where this iteration does not exist. Measured after this implementation: a relative path still yields PREFLIGHT_FAIL, while the ABSOLUTE path to the same file yields STATUS_VALID for preflight and carries merge and finalize_merge past the worktree verdict into their ordinary business gates (wrong-branch, lock warning). Controlled at the pre-WP-01 commit: the absolute path ALREADY worked before this WP. So the deadlock I recorded was caused at least as much by my passing RELATIVE paths as by the predicate, and WP-01's end-to-end DoD item cannot be satisfied by a predicate change alone."
     }
   },
   "review": {},
@@ -227,7 +268,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T01:30:00Z",
+    "updated_at": "2026-10-16T03:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
