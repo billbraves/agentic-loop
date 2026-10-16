@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "IMPLEMENTING",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -43,7 +43,14 @@
       "src/agentic_loop/wrappers/merge.sh",
       "src/agentic_loop/gate/qoder_security.py",
       "src/agentic_loop/wrappers/finalize_merge.sh",
-      "tests/test_finalize_merge_triple_sign.py"
+      "tests/test_finalize_merge_triple_sign.py",
+      "tests/test_qoder_security.py",
+      "tests/test_finalize_merge_sequential.py",
+      "tests/test_preflight_branch_binding.py",
+      "tests/test_gate_diff_start.py",
+      "tests/test_merge_wrapper.py",
+      "tests/test_cli.py",
+      "tests/test_worktree_literal_removal.py"
     ],
     "forbidden_paths": [
       "src/agentic_loop/plan_cmd.py",
@@ -63,7 +70,8 @@
       "direction_c": "User-selected after three REWORKs in one root-cause family: option (c). WP-01 is DOWNGRADED to a pure usability fix. It resolves the finalize/preflight/merge deadlock and explicitly WITHDRAWS any claim of defending against a malicious LOCAL actor. Rationale accepted from the escalation: in this threat model anyone who can write the repository or set the caller's environment can already modify the code itself, so an unmovable local trust root is a false goal, whereas the deadlock is a real daily obstruction. Every anchor attempt is therefore abandoned: rev1 (status field), rev2 (origin/HEAD + tracked config), rev3 (XDG_CONFIG_HOME policy file) are all superseded.",
       "wp02_split": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here.",
       "scope_rev5": "D13 closed. brief section 6 and status forbidden_paths previously contradicted each other on merge.sh and gate/qoder_security.py: the brief allowed them, the status forbade them. WP-02 merged both into the single predicate, so WP-01 must be able to edit them -- there are FIVE call sites, not three. finalize_merge.sh was missing from allowed_paths entirely despite being one of the original three. Flagged by topo-brief-r4 Q2.",
-      "fixture_fix_user_approved": "USER-APPROVED SCOPE EXTENSION. tests/test_finalize_merge_triple_sign.py is added to allowed_paths so the environment-dependent baseline can be fixed at the root instead of re-freezing the DoD number. The file hardcoded `git checkout -q main` and a base_branch default of 'main', while git init honours init.defaultBranch, which is 'master' in this machine's global config -- so four tests failed for a reason unrelated to the behaviour under test, and they already failed at the pushed main (9ec3c38). The fix adopts the sibling fixtures' existing _default_branch() idiom: _merge_wp_branch now returns the repo's real default branch and each caller passes it as base_branch. No assertion was weakened and no behaviour under test was changed. Verified green under three different init.defaultBranch values (master, main, trunk), which proves the branch is probed rather than re-hardcoded. The user's git config was NOT modified, per contract section 5."
+      "fixture_fix_user_approved": "USER-APPROVED SCOPE EXTENSION. tests/test_finalize_merge_triple_sign.py is added to allowed_paths so the environment-dependent baseline can be fixed at the root instead of re-freezing the DoD number. The file hardcoded `git checkout -q main` and a base_branch default of 'main', while git init honours init.defaultBranch, which is 'master' in this machine's global config -- so four tests failed for a reason unrelated to the behaviour under test, and they already failed at the pushed main (9ec3c38). The fix adopts the sibling fixtures' existing _default_branch() idiom: _merge_wp_branch now returns the repo's real default branch and each caller passes it as base_branch. No assertion was weakened and no behaviour under test was changed. Verified green under three different init.defaultBranch values (master, main, trunk), which proves the branch is probed rather than re-hardcoded. The user's git config was NOT modified, per contract section 5.",
+      "fixture_scope_extension_user_approved": "USER-APPROVED option (a), asked as an explicit choice. Adds the seven test files that spec gap 1 breaks. freeze_scope is AUTONOMY_STOP so this could not be self-approved. Justification measured, not estimated: every live iteration carries a PLAN status, and all seven files build plan dirs containing no PLAN status at all, so this is a fixture-contract change rather than a product regression. Two kinds of edit are permitted and nothing else: (1) write one agentic-plan-status/v1 object beside the judged WP status, declaring base_branch = the branch that fixture's repo actually holds; (2) in test_worktree_literal_removal.py ONLY, unpin test_f6's hardcoded line number so it asserts the comment EXISTS rather than where it sits -- its real invariant (hits == []) already passes. NO assertion may be weakened, NO attack form dropped, NO product code touched. Prototyped on test_merge_wrapper.py before asking: 3 failed -> 3 passed, then reverted with git diff HEAD empty."
     }
   },
   "risk": {
@@ -296,7 +304,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T03:00:00Z",
+    "updated_at": "2026-10-16T05:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
