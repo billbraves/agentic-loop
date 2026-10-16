@@ -33,13 +33,13 @@
     "allowed_paths": [
       "src/agentic_loop/wrappers/merge.sh",
       "src/agentic_loop/gate/qoder_security.py",
-      "tests/test_worktree_literal_removal.py"
+      "tests/test_worktree_literal_removal.py",
+      "src/agentic_loop/wrappers/finalize_merge.sh"
     ],
     "forbidden_paths": [
       "src/agentic_loop/gate/__init__.py",
       "tests/test_worktree_detection.py",
       "src/agentic_loop/wrappers/preflight.sh",
-      "src/agentic_loop/wrappers/finalize_merge.sh",
       "src/agentic_loop/plan_cmd.py",
       "src/agentic_loop/validate_wp_status.py",
       "src/agentic_loop/autonomy.py",
@@ -49,7 +49,8 @@
       "docs/agentic/templates/**"
     ],
     "decisions": {
-      "origin": "Split from WP-01 by user decision: this is a pre-existing INV-5 violation, independent of WP-01's trust-root question, and the user chose to fix it first. Measured in the current tree with no change of mine: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment, so they ACCEPT a sibling linked-worktree path that preflight.sh:44, finalize_merge.sh:160 and gate/__init__.py:810 REFUSE via the hardened git-fact predicate."
+      "origin": "Split from WP-01 by user decision: this is a pre-existing INV-5 violation, independent of WP-01's trust-root question, and the user chose to fix it first. Measured in the current tree with no change of mine: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment, so they ACCEPT a sibling linked-worktree path that preflight.sh:44, finalize_merge.sh:160 and gate/__init__.py:810 REFUSE via the hardened git-fact predicate.",
+      "scope_extension_r6": "USER-APPROVED scope extension. finalize_merge.sh moved from forbidden_paths to allowed_paths for ONE reworded comment (line 38), nothing else. Reason: wp02-impl-r6 showed that any exemption pinned to a line -- by number, by file, or even by verbatim text -- is defeatable by opening a quote on an ADJACENT line, leaving the exempt line byte-identical while turning it into a runtime string. Orchestrator-reproduced against the real file. No line-local predicate can see the enclosing quote, so the exemption was DELETED rather than hardened and the comment now spells the literal out in prose. The product behaviour of finalize_merge.sh is unchanged -- comment text only."
     }
   },
   "risk": {

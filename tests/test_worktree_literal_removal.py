@@ -648,23 +648,6 @@ def _code_without_comments(text: str, *, python: bool) -> list[str]:
     return keep
 
 
-# The single exemption the raw .sh scan needs. finalize_merge.sh is OUTSIDE
-# WP-02's allowed paths, so its explanatory comment cannot be reworded the way
-# merge.sh's was. This is pinned by VERBATIM TEXT, not by file name or line
-# number: the line must still be a whole-line comment and must still read
-# exactly like this, so editing it into live code -- or adding any other
-# shell line containing the literal -- fails F6 immediately.
-_EXEMPT_SHELL_COMMENTS = {
-    "agentic_loop/wrappers/finalize_merge.sh:38":
-        '# A13: git-fact judgment instead of a "/.worktrees/" path literal (sibling',
-}
-
-
-def _is_exempt_shell_comment(where: str, line: str) -> bool:
-    expected = _EXEMPT_SHELL_COMMENTS.get(where)
-    return expected is not None and line.strip() == expected and line.lstrip().startswith("#")
-
-
 def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
     """Adversarial guard on F6's own scanner, added at wp02-impl-r3.
 
@@ -718,6 +701,25 @@ def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
     # in prose instead of as a contiguous string -- asserted by F6 itself
     # finding zero hits across the real tree.
     assert LITERAL in _code_without_comments(f"  # {LITERAL} retired", python=False)[0]
+    # Bypass 4 (found at impl-r6): why there is NO exemption list. Any
+    # exemption pinned to a line -- by number, by file, even by verbatim text --
+    # can be defeated by opening a quote on an ADJACENT line, leaving the
+    # exempt line byte-identical while turning it into a runtime string:
+    #
+    #     needle='                 <- line n-1, rewritten
+    #     # <literal> ...          <- line n, UNCHANGED, now string content
+    #     '                        <- line n+1, rewritten
+    #
+    # Reproduced by the orchestrator against the real finalize_merge.sh. No
+    # line-local predicate can see the enclosing quote, so the exemption was
+    # deleted instead of hardened, and the product comment was reworded under a
+    # user-approved scope extension. This asserts the exemption stays gone.
+    import test_worktree_literal_removal as _self
+    assert not hasattr(_self, "_is_exempt_shell_comment"), (
+        "a line-local shell exemption was reintroduced; it is defeatable by "
+        "opening a quote on an adjacent line"
+    )
+
     # And a trailing comment must not swallow the code before it.
     assert LITERAL in _code_without_comments(
         f'x = "{LITERAL}"  # kept', python=True
@@ -741,22 +743,19 @@ def test_f6_no_literal_worktree_check_remains() -> None:
         for line_no, code_line in enumerate(stripped_lines, start=1):
             if LITERAL not in code_line:
                 continue
-            where = f"{path.relative_to(PKG_SRC)}:{line_no}"
-            if _is_exempt_shell_comment(where, code_line):
-                comment_only.append(where)
-                continue
-            hits.append(where)
+            hits.append(f"{path.relative_to(PKG_SRC)}:{line_no}")
         for line_no, src_line in enumerate(source_lines, start=1):
             if LITERAL in src_line and LITERAL not in stripped_lines[line_no - 1]:
                 comment_only.append(f"{path.relative_to(PKG_SRC)}:{line_no}")
 
     assert scanned > 10, f"static scan touched only {scanned} files"
     assert hits == [], f"literal-based worktree check still in product code: {hits}"
-    # The scan must be looking at the real tree, not silently skipping files:
-    # both long-standing comment-only matches have to show up.
-    assert "agentic_loop/wrappers/finalize_merge.sh:38" in comment_only, comment_only
+    # The scan must be looking at the real tree, not silently skipping files.
+    # Only Python comments are stripped now, so gate/__init__.py's explanatory
+    # comment is the witness; every .sh comment is scanned raw, which is why no
+    # shell comment anywhere in the tree may spell the literal contiguously.
     assert "agentic_loop/gate/__init__.py:809" in comment_only, comment_only
-    assert len(comment_only) >= 2, comment_only
+    assert len(comment_only) >= 1, comment_only
 
 
 def test_f6_all_five_call_sites_reference_one_predicate() -> None:

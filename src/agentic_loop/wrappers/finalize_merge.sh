@@ -35,8 +35,8 @@ esac
 
 # Refuse worktree-local copies: they are branch-local working-tree state, not
 # the shared source of truth. Mirrors codex_merge_gate.sh:42-45.
-# A13: git-fact judgment instead of a "/.worktrees/" path literal (sibling
-# worktrees like ../wpN-x never contain that segment). The single
+# A13: git-fact judgment instead of a path literal matching a dot-worktrees
+# segment (sibling worktrees like ../wpN-x never contain it). The single
 # authoritative predicate is agentic_loop.gate.path_is_in_worktree (§5.3);
 # this wrapper only references it. Unresolvable paths fail closed (refused).
 # A29 (WP-21, retargeted at merge): whatever shape this call takes, a
