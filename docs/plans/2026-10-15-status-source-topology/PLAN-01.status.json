@@ -4,12 +4,6 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "state": "DRAFT",
   "title": "",
-  "lint_exemption": {
-    "approved": false,
-    "approver": "",
-    "justification": "",
-    "reviewed_at": ""
-  },
   "git": {
     "base_branch": "plan/2026-10-15-status-source-topology",
     "target_branch": "main",

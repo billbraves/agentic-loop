@@ -42,7 +42,8 @@
       "tests/test_finalize_merge_toctou.py",
       "src/agentic_loop/wrappers/merge.sh",
       "src/agentic_loop/gate/qoder_security.py",
-      "src/agentic_loop/wrappers/finalize_merge.sh"
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "tests/test_finalize_merge_triple_sign.py"
     ],
     "forbidden_paths": [
       "src/agentic_loop/plan_cmd.py",
@@ -61,7 +62,8 @@
       "literal_defect": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here.",
       "direction_c": "User-selected after three REWORKs in one root-cause family: option (c). WP-01 is DOWNGRADED to a pure usability fix. It resolves the finalize/preflight/merge deadlock and explicitly WITHDRAWS any claim of defending against a malicious LOCAL actor. Rationale accepted from the escalation: in this threat model anyone who can write the repository or set the caller's environment can already modify the code itself, so an unmovable local trust root is a false goal, whereas the deadlock is a real daily obstruction. Every anchor attempt is therefore abandoned: rev1 (status field), rev2 (origin/HEAD + tracked config), rev3 (XDG_CONFIG_HOME policy file) are all superseded.",
       "wp02_split": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here.",
-      "scope_rev5": "D13 closed. brief section 6 and status forbidden_paths previously contradicted each other on merge.sh and gate/qoder_security.py: the brief allowed them, the status forbade them. WP-02 merged both into the single predicate, so WP-01 must be able to edit them -- there are FIVE call sites, not three. finalize_merge.sh was missing from allowed_paths entirely despite being one of the original three. Flagged by topo-brief-r4 Q2."
+      "scope_rev5": "D13 closed. brief section 6 and status forbidden_paths previously contradicted each other on merge.sh and gate/qoder_security.py: the brief allowed them, the status forbade them. WP-02 merged both into the single predicate, so WP-01 must be able to edit them -- there are FIVE call sites, not three. finalize_merge.sh was missing from allowed_paths entirely despite being one of the original three. Flagged by topo-brief-r4 Q2.",
+      "fixture_fix_user_approved": "USER-APPROVED SCOPE EXTENSION. tests/test_finalize_merge_triple_sign.py is added to allowed_paths so the environment-dependent baseline can be fixed at the root instead of re-freezing the DoD number. The file hardcoded `git checkout -q main` and a base_branch default of 'main', while git init honours init.defaultBranch, which is 'master' in this machine's global config -- so four tests failed for a reason unrelated to the behaviour under test, and they already failed at the pushed main (9ec3c38). The fix adopts the sibling fixtures' existing _default_branch() idiom: _merge_wp_branch now returns the repo's real default branch and each caller passes it as base_branch. No assertion was weakened and no behaviour under test was changed. Verified green under three different init.defaultBranch values (master, main, trunk), which proves the branch is probed rather than re-hardcoded. The user's git config was NOT modified, per contract section 5."
     }
   },
   "risk": {
@@ -100,6 +102,24 @@
       "workaround": "Same workaround the 2026-10-12 iteration recorded: verify by hand that branch == base_branch (sequential WP per contract 4.3, so it works on the integration branch and needs no separate worktree), that the WP lock is free, and that dispatch-lint's five checks pass against the authoritative copy. Recorded rather than bypassed with a flag; WP-01 is the fix for this.",
       "branch_equals_base": true,
       "wp_lock": "free then acquired by kiro-dsh-wp01-impl"
+    },
+    "impl_r1": {
+      "result": "BLOCKED_BY_ENVIRONMENT_BASELINE",
+      "executor": "kimi/deepseekflash",
+      "files_changed": "none",
+      "developer_claim": "Baseline is 908 passed, not the frozen 912; 4 tests in tests/test_finalize_merge_triple_sign.py fail before any edit, and that file is not in allowed_paths.",
+      "orchestrator_verification": [
+        "CONFIRMED and the developer is right; my frozen DoD figure of 912 was wrong. Measured now: 4 failed, 908 passed, 4 skipped.",
+        "Pre-existing, NOT caused by this plan: the same 4 fail at the merge-base with main (9ec3c38, the commit already pushed to origin/main), verified in a throwaway worktree.",
+        "Root cause proven by injection, not inference: git config --global init.defaultBranch = master on this machine, while tests/test_finalize_merge_triple_sign.py hardcodes `git checkout -q main`. Running that file with GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main makes all 5 pass; with the global master value, 4 fail. Sibling fixtures (test_finalize_merge_sequential.py, test_finalize_merge_first_call.py) probe the default branch via a _default_branch() helper; this one does not.",
+        "Arithmetic reconciliation: 916 tests collected both then and now. 912 passed + 4 skipped = 916, and 908 passed + 4 failed + 4 skipped = 916. So those 4 were PASSING when I measured 912 -- the WP-02 developer dispatch runs under an isolated temporary HOME, which did not carry the global master setting, whereas I now run with the user's real HOME. The 912 figure was an artefact of the isolated HOME, not a property of the code.",
+        "The developer also self-reported running `git checkout -- tests/` as hygiene and correcting it. Verified harmless: git diff -- tests/ is empty and the only working-tree modification is my own PLAN-01 edit plus the pre-existing untracked uv.lock. Its warning is sound -- that command is unsafe here because this checkout is the sole maintainer of those files."
+      ],
+      "developer_brief_observations": "It also flagged that the historical trigger sections (1.95/1.98/1.99) still narrate rev5's restore of E7/M-2 and rev5's 8-form E6, while the normative sections and the DoD carry rev6's deletions and 12 negative forms. It correctly read the historical prose as superseded and did not stop on it. Worth tightening if the brief is revised again, but it is a modification history, not a second contract."
+    },
+    "baseline": {
+      "frozen_dod_figure": "912 passed / 4 skipped",
+      "resolution": "The figure is now TRUE on this machine with the user's real HOME and git config: 912 passed / 4 skipped, measured after the fixture fix. Before the fix it was 908 passed / 4 failed / 4 skipped. The original 912 had been measured through the developer dispatch script's isolated temporary HOME, which did not carry the global init.defaultBranch=master, so the discrepancy was an artefact of the measurement environment rather than of the code. 916 tests are collected in both cases, which is what made the two numbers reconcilable."
     }
   },
   "review": {},
@@ -207,7 +227,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T00:10:00Z",
+    "updated_at": "2026-10-16T01:30:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
