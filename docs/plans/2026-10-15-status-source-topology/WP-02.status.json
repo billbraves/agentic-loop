@@ -26,7 +26,7 @@
     "dispatch_commit": "",
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
-    "commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
+    "commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
     "merged_commit": null
   },
   "scope": {
@@ -104,7 +104,7 @@
   "review": {
     "decision": "ACCEPT",
     "round": "wp02-impl-r2",
-    "bound_commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
+    "bound_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
     "reviewed_by": "orchestrator (independent re-run; every mutation hand-applied and reverted)",
     "findings": [
       "The code change itself is CORRECT: qoder_security.py now calls path_is_in_worktree, and merge.sh copies preflight.sh's inline-probe pattern verbatim including the `|| echo PROBE_FAIL` fail-closed form. Independently re-run by the orchestrator: targeted 7 passed, guards 19 passed with tests/test_worktree_detection.py's git diff EMPTY, protected set 36 passed.",
@@ -131,7 +131,7 @@
   },
   "consult": {
     "state": "PENDING",
-    "round": "wp02-r8",
+    "round": "wp02-r9",
     "decision": null,
     "kind": "wp-brief-and-impl-second-signature",
     "bound_brief_rev": 3,
@@ -233,10 +233,23 @@
           "Q3 REWORK, a REAL gap and the first one not line-local: F6's {'.py','.sh'} suffix filter silently skipped src/agentic_loop/templates/install.sh.tmpl and pre-push.tmpl, which init_cmd.py:99-101 installs at mode 0o755 -- they ship as executable shell, so a literal-based check added there would never have been seen. Fixed: both are in scope, asserted to still exist and to still be installed as executables so the set cannot silently drift, and M-J (planting the literal in install.sh.tmpl) is verified red.",
           "Evidence binding: the consultant confirmed all bound SHA-256 values, HEAD and the single untracked forbidden path matched this round, after the orchestrator began verifying each SHA literally appears in the prompt before dispatch."
         ]
+      },
+      {
+        "round": "wp02-r8",
+        "decision": "REWORK",
+        "bound_commit": "50dd044",
+        "kind": "wp-brief-and-impl-second-signature",
+        "resolved_in_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
+        "findings": [
+          "Q1 ACCEPT (seventh consecutive). Q2 ACCEPT: the consultant independently walked path_is_in_worktree -- resolve() first, then compare --absolute-git-dir against --git-common-dir, returning True on resolution/git/output failure -- and confirmed every linked-worktree path and every unresolvable path the old rule refused is still refused, with the newly-accepted inputs all resolving into a plain primary checkout, i.e. rev3's L. INV-D holds.",
+          "Q4 ACCEPT: rev3's clarification judged correct and minimal. The consultant's reasoning: the validator and later gates read the file the path RESOLVES to, so two spellings resolving to the same main-repo file must not get opposite verdicts; the revision only generalises an already-permitted false-positive class from one directory example to the same class of aliases, without touching product behaviour, scope, acceptance items or deliverables. Even an alias into another plain primary checkout would already be accepted by its canonical path, so object-identity consistency is not an extra worktree loosening.",
+          "Q3 REWORK, the one blocking defect and correctly aimed at my own fix: the executable-template coverage was ONE-WAY. A hard-coded {install.sh.tmpl, pre-push.tmpl} plus an assertion that those two are still installed cannot detect a THIRD entry added to _HOOK_TEMPLATES -- planting the literal in a new .tmpl is skipped by the suffix filter while every assertion and F6 stay green, so the 'cannot drift silently' claim was false.",
+          "FIX at this commit: the set is now DERIVED from init_cmd._HOOK_TEMPLATES, selecting every entry whose mode carries an executable bit, so a new executable template is in scope the moment it is added with no test edit. M-K -- the consultant's exact construction, adding ('merge-hook.tmpl', ..., 0o755) and planting the literal -- is verified red."
+        ]
       }
     ],
-    "pending_note": "Combined round: brief rev3 (the INV-C clarification) AND the implementation at this commit. Brief changed, so per contract it needs its own signature; folded into one round rather than two.",
-    "bound_commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
+    "pending_note": "Second signature r9 on the derived executable-template scan set. Q1/Q2/Q4 already ACCEPTed at r8.",
+    "bound_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "SOFT_LIMIT_ENABLED",
@@ -246,7 +259,8 @@
         "wp02-impl-r4",
         "wp02-impl-r5b",
         "wp02-impl-r6",
-        "wp02-impl-r7"
+        "wp02-impl-r7",
+        "wp02-r8"
       ],
       "note": "Each round narrowed the defect and each was orchestrator-reproduced, so the loop was productive rather than thrashing. The final fix is a root-cause change (raw .sh scan, real lexer for Python) rather than a third heuristic patch. Escalated for a user decision on whether to run another second-signature round.",
       "user_decision": "User approved one further second-signature round (r6) past SOFT_LIMIT_ENABLED, on the reasoning that each round narrowed a real defect and the last fix was root-cause."
