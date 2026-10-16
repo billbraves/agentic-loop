@@ -226,6 +226,24 @@ def _write_status(repo: Path, data: dict) -> Path:
     status_path = repo / PLAN_DIR / STATUS_NAME
     status_path.parent.mkdir(parents=True, exist_ok=True)
     status_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # WP-01: the status-source predicate resolves the authoritative branch from
+    # the PLAN status in this same plan dir. Declare the repo's REAL default
+    # branch (probed, never hardcoded) — the checkout holding it is the
+    # authoritative source these fixtures exercise.
+    (status_path.parent / "PLAN-01.status.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agentic-plan-status/v1",
+                "plan_id": "PLAN-01",
+                "git": {
+                    "base_branch": _default_branch(repo),
+                    "target_branch": "main",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     return status_path
 
 

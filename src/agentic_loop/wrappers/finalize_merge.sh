@@ -33,12 +33,16 @@ case "$status_arg" in
   *) status_file="$repo_root/$status_arg" ;;
 esac
 
-# Refuse worktree-local copies: they are branch-local working-tree state, not
-# the shared source of truth. Mirrors codex_merge_gate.sh:42-45.
+# Refuse non-authoritative copies: only the checkout holding the plan's
+# authoritative branch (PLAN status git.base_branch, the integration branch) is
+# the shared source of truth. Every other worktree is branch-local state.
 # A13: git-fact judgment instead of a path literal matching a dot-worktrees
 # segment (sibling worktrees like ../wpN-x never contain it). The single
 # authoritative predicate is agentic_loop.gate.path_is_in_worktree (§5.3);
-# this wrapper only references it. Unresolvable paths fail closed (refused).
+# WP-01 (2026-10-15-status-source-topology) retargeted it from "inside a linked
+# worktree?" to "not the authoritative-branch holder?" — so this wrapper now
+# ACCEPTS an authoritative status that lives in a linked worktree, which is
+# exactly the layout on this machine. Unresolvable paths still fail closed.
 # A29 (WP-21, retargeted at merge): whatever shape this call takes, a
 # non-zero exit from the worktree predicate MUST reach a refusal. WP-21 wrote
 # this as `in_worktree=$(...)`, a plain assignment: under `set -euo pipefail` a

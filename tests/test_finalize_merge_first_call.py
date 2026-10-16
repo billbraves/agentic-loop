@@ -121,6 +121,29 @@ def _status_without_merged_commit(base: str, wp_tip: str) -> dict:
     }
 
 
+def _write_plan_status(repo: Path, base_branch: str) -> None:
+    """WP-01: declare the authoritative branch beside the fixture status.
+
+    The status-source predicate resolves the authoritative branch from the PLAN
+    status in the judged file's own plan dir; without it the run fails closed as
+    unresolved. The declaration is the repo's real default branch, held by the
+    primary checkout these fixtures use.
+    """
+    plan_path = repo / PLAN_DIR / "PLAN-01.status.json"
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "agentic-plan-status/v1",
+                "plan_id": "PLAN-01",
+                "git": {"base_branch": base_branch, "target_branch": "main"},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_first_call_without_merged_commit_finalizes_then_idempotent(
     tmp_path: Path, session_env
 ) -> None:
@@ -131,6 +154,7 @@ def test_first_call_without_merged_commit_finalizes_then_idempotent(
         json.dumps(_status_without_merged_commit(base, wp_tip), indent=2),
         encoding="utf-8",
     )
+    _write_plan_status(repo, base)
     assert "merged_commit" not in json.loads(status_path.read_text())["git"]
 
     def run_finalize() -> subprocess.CompletedProcess:
@@ -210,9 +234,10 @@ def test_finalize_fails_closed_when_predicate_raises(
         json.dumps(_status_without_merged_commit(base, wp_tip), indent=2),
         encoding="utf-8",
     )
+    _write_plan_status(repo, base)
     # finalize requires the status to be tracked in the main repo index;
     # write alone would make the run fail before the verdict read.
-    _run_git(repo, "add", str(PLAN_DIR / STATUS_NAME))
+    _run_git(repo, "add", str(PLAN_DIR / STATUS_NAME), str(PLAN_DIR / "PLAN-01.status.json"))
     _run_git(repo, "commit", "-q", "-m", "add WP-FC status")
 
     inject = tmp_path / "inject"

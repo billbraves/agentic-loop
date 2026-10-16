@@ -34,10 +34,13 @@ case "$status_arg" in
   *) status_file="$repo_root/$status_arg" ;;
 esac
 
-# WP-02 single authority (agentic_loop.gate.path_is_in_worktree), the same
-# WORKTREE refusal semantics as preflight.sh:37-50 and finalize_merge.sh: a
-# status path that resolves inside a linked worktree is refused — the main-repo
-# copy is the single source of truth. The git-fact predicate is referenced,
+# WP-02/WP-01 single authority (agentic_loop.gate.path_is_in_worktree), the same
+# refusal semantics as preflight.sh, finalize_merge.sh, gate/__init__.py and
+# gate/qoder_security.py. WP-01 (2026-10-15-status-source-topology) retargeted the
+# predicate from "is this path inside a linked worktree?" to "is this path NOT in
+# the checkout holding PLAN status's git.base_branch (the integration branch)?":
+# the authoritative holder is trusted even when it is itself a linked worktree,
+# and every other worktree is still refused. The git-fact predicate is referenced,
 # never reimplemented: the retired path-literal test (a glob match on a
 # dot-worktrees path segment) missed every sibling worktree
 # (`git worktree add ../wpN-x`), the layout this repo actually uses

@@ -197,59 +197,365 @@ _GIT_SELECTION_VARS = frozenset(
 )
 
 
-def path_is_in_worktree(path: Path) -> bool:
-    """Single authoritative predicate: does ``path`` resolve inside a linked
-    git worktree? (A13, WP-19)
+# WP-01 (2026-10-15-status-source-topology). The specific refusal reasons the
+# predicate emits, in the exact wording the acceptance tests and the call-site
+# wrappers key on. ``None`` means "path accepted".
+REFUSAL_UNRESOLVED = "authoritative branch unresolved"
+REFUSAL_NO_HOLDER = "no checkout holds authoritative branch"
+REFUSAL_MULTIPLE_HOLDERS = "authoritative branch checkout not unique"
+REFUSAL_STALE_HOLDER = "authoritative branch holder is stale (prunable)"
+REFUSAL_NOT_HOLDER = "checkout does not hold authoritative branch"
+REFUSAL_LEGACY_WORKTREE = "path resolves inside a non-authoritative worktree"
 
-    Git-fact based, never a path literal: the repository owning ``path`` is a
-    linked worktree exactly when its ``--git-dir`` differs from
-    ``--git-common-dir``. Both call sites that refuse worktree-local status
-    copies (this gate and ``wrappers/finalize_merge.sh``) reference this one
-    definition (global rule §5.3, single authority).
+# The refusal reason of the most recent ``path_is_in_worktree`` call in THIS
+# process (None when the last call accepted). A module-global rather than a
+# second return value so the single positional signature — and therefore all
+# five call sites and the 17 INV-4 guard nodes — stay unchanged. It carries no
+# trust: it is diagnostic wording, not a decision input.
+_last_refusal_reason: "str | None" = None
 
-    Fail-closed and never raises: an unresolvable path (not inside any git
-    repository, git missing, unexpected output) is treated as inside a
-    worktree, i.e. refused.
 
-    A22 (WP-19 rev2/rev3): the probe never inherits the caller's repository
-    selection. ``GIT_DIR`` and its family (``_GIT_SELECTION_VARS``) let the
-    caller *declare* which repository a path belongs to, overriding
-    filesystem topology — a single ``GIT_DIR`` pointing at the main repo
-    made a linked-worktree path answer False and bypassed both call sites.
-    Those variables are stripped so the verdict reads the filesystem; the
-    rest of the environment (``PATH``, ``HOME``) is kept intact so git
-    itself still runs — a bare ``env={}`` would lose ``PATH``, fail to
-    find git, and fail closed on legitimate main-repo paths (a regression).
+# Characters git forbids anywhere in a ref name (``git check-ref-format``):
+# ASCII space, tilde, caret, colon, question mark, asterisk, open bracket and
+# backslash. Kept as an explicit set so the rule is auditable in one place.
+_REF_FORBIDDEN_CHARS = frozenset(" ~^:?*[\\")
 
-    A27 (WP-19 rev4): the verdict must classify the file that will actually
-    be read/written, not the path NAME. The path is therefore resolved
-    BEFORE its parent directory is probed: a main-repo symlink pointing at
-    a worktree-local status file is followed by every later consumer
-    (``is_file()``, the validator, the finalize write-back), so the probe
-    must follow it too and answer the worktree's verdict.
 
-    A28 (WP-19 rev4): fail-closed holds on every degenerate path. Both
-    output lines must be non-empty after ``strip()`` — a blank
-    ``--git-common-dir`` line used to degenerate into
-    ``directory / Path("") == directory`` and answer False. And every
-    ``Path.resolve()`` sits inside a ``try`` that catches ``OSError`` AND
-    ``RuntimeError`` (a symlink loop raises ``RuntimeError``, which is not
-    an ``OSError`` subclass); any resolution failure returns True. The
-    A27 path resolution and the A28 git-dir/common-dir resolution share
-    this one guard form (§5.3, single handling).
+def _is_valid_branch_name(name: object) -> bool:
+    """True when ``name`` is a legal git branch name (git's own ref syntax).
 
-    A29 (WP-19 rev5): "never raises" now actually holds for ANY input.
-    The ``is_dir()`` probe stats the path — a ~300-character filename
-    raises ``OSError: [Errno 63] File name too long`` — so it sits inside
-    the path-resolution guard, not between guards (A29-1). And every
-    guard catches ``ValueError`` too: ``resolve()`` raises
-    ``ValueError: embedded null byte`` for NUL-containing paths, which is
-    not an ``OSError`` subclass (A29-2). All three guards share the one
-    except form ``(OSError, RuntimeError, ValueError)`` (§5.3). This
-    matters because the ``finalize_merge.sh`` call site reads the verdict
-    via command substitution: a raised predicate empties stdout and the
-    fail-open comparison skips the worktree refusal entirely.
+    WP-01 rev6 (D14). rev1-rev5 validated the authoritative branch with a
+    "single path component" rule that FORBIDS ``/``; the real integration
+    branch is ``plan/2026-10-15-status-source-topology`` and contains ``/``, so
+    the spec would have rejected its own authoritative branch and stayed fail
+    closed. The rule is therefore git's, equivalent to
+    ``git check-ref-format --branch``:
+
+    * reject non-strings and the empty string;
+    * reject NUL, every ASCII control character (< 0x20) and DEL (0x7F);
+    * reject the characters ``~^:?*[`` and backslash anywhere;
+    * reject ``..`` and the ``@{`` sequence anywhere;
+    * reject the lone ``@``;
+    * reject a leading ``-`` (a name that would read as a flag) and ``HEAD``;
+      note the lone ``@`` IS legal for ``--branch`` (git maps it to
+      ``refs/heads/@``), so it is accepted here too — the plain-refname ban on a
+      single ``@`` does not apply to the ``--branch`` form we mirror.
+    * split on ``/``; reject if any component is empty (leading/trailing/
+      doubled slashes), begins with ``.``, or ends with ``.`` or ``.lock``.
+
+    Path safety (the ORIGINAL purpose of the old component check) is carried by
+    an implementation constraint, not by this rule: the branch name is only ever
+    STRING-COMPARED against ``git worktree list --porcelain`` output and is never
+    concatenated into a path (see ``path_is_in_worktree``).
     """
+    if not isinstance(name, str) or not name:
+        return False
+    if name == "HEAD" or name.startswith("-"):
+        return False
+    if ".." in name or "@{" in name:
+        return False
+    for char in name:
+        if char in _REF_FORBIDDEN_CHARS or ord(char) < 0x20 or ord(char) == 0x7F:
+            return False
+    for component in name.split("/"):
+        if not component:
+            return False
+        if component.startswith("."):
+            return False
+        if component.endswith(".") or component.endswith(".lock"):
+            return False
+    return True
+
+
+def refusal_reason() -> "str | None":
+    """The refusal reason of the most recent ``path_is_in_worktree`` call.
+
+    ``None`` means the last call accepted the path. Every fail-closed branch in
+    the predicate sets this to a SPECIFIC witness (INV-2 requires the zero-holder
+    and multiple-holder families to stay distinguishable; INV-2b requires the
+    stale-holder family to stay distinct from the zero-holder family).
+    """
+    return _last_refusal_reason
+
+
+def _run_git_probe(
+    env: dict, args: list[str]
+) -> "subprocess.CompletedProcess | None":
+    """Run a git probe with the sanitized environment; ``None`` on any failure.
+
+    One shared runner for every git subprocess the predicate issues, so the A22
+    environment stripping (``_GIT_SELECTION_VARS``) can never be forgotten on
+    one call path and applied on another. Returns ``None`` for a raised call or a
+    non-zero exit; the caller fails closed. Output never raises: a missing git
+    binary is ``OSError``, a broken pipe is ``ValueError``/``OSError``.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", *args], capture_output=True, text=True, env=env
+        )
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc
+
+
+def _read_authoritative_branch(plan_dir: Path, env: dict) -> "str | None":
+    """Resolve the authoritative branch from the PLAN status in ``plan_dir``.
+
+    WP-01 INV-1b: the authoritative branch is PLAN status's ``git.base_branch``
+    (the plan's INTEGRATION branch). ``git.target_branch`` is deliberately NOT
+    used: it is ``main``, which zero worktrees on this machine hold and which
+    does not even contain the authoritative status — keying on it fails closed
+    immediately (brief section 1.98 / D10).
+
+    Returns the branch name, or ``None`` on EVERY degradation (ENUMERATED so the
+    report can point at each fail-closed branch): plan dir unreadable; zero or
+    more than one PLAN status candidate; unreadable file; invalid JSON; the JSON
+    is not an object; missing ``git`` segment or it is not an object; missing
+    ``base_branch`` key; non-string or empty value; illegal ref name.
+
+    This is NOT a trust boundary (brief section 2 / INV-1b clause 3): a local
+    actor who can write the repository can rewrite this field or the predicate
+    itself. It exists so the predicate has ONE declared, auditable source. No
+    environment variable, out-of-repo policy file, or anchor is consulted.
+    """
+    candidates = _find_plan_status_files(plan_dir)
+    if candidates is None or len(candidates) != 1:
+        return None
+    try:
+        raw = candidates[0].read_text(encoding="utf-8")
+    except (OSError, RuntimeError, ValueError, UnicodeError):
+        return None
+    try:
+        data = json.loads(raw)
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    git_section = data.get("git")
+    if not isinstance(git_section, dict):
+        return None
+    if "base_branch" not in git_section:
+        return None
+    branch = git_section["base_branch"]
+    if not _is_valid_branch_name(branch):
+        return None
+    return branch
+
+
+def _find_plan_status_files(plan_dir: Path) -> "list[Path] | None":
+    """Return the ``*.status.json`` files in ``plan_dir`` with a PLAN schema.
+
+    The judged status file (``<iteration_dir>/<WP>.status.json``) sits directly
+    in its plan directory, next to the plan's own status file. A PLAN status is
+    identified by its parsed ``schema_version`` of ``agentic-plan-status/v1`` —
+    NOT by file name, so a renamed plan file is still found. ``None`` (a
+    fail-closed signal, distinct from the empty list) is returned when the
+    directory cannot be listed or a candidate cannot be parsed; an unparseable
+    sibling therefore refuses rather than being silently skipped.
+    """
+    try:
+        entries = list(plan_dir.glob("*.status.json"))
+    except (OSError, RuntimeError, ValueError):
+        return None
+    found: list[Path] = []
+    for entry in sorted(entries):
+        try:
+            raw = entry.read_text(encoding="utf-8")
+        except (OSError, RuntimeError, ValueError, UnicodeError):
+            return None
+        try:
+            data = json.loads(raw)
+        except (ValueError, RecursionError):
+            return None
+        if isinstance(data, dict) and (
+            data.get("schema_version") == "agentic-plan-status/v1"
+        ):
+            found.append(entry)
+    return found
+
+
+def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
+    """Parse ``git worktree list --porcelain`` into one dict per worktree.
+
+    Each returned record carries ``worktree`` (the checkout's path),
+    ``branch`` (the full ref, e.g. ``refs/heads/x``, or ``None`` for a detached
+    HEAD) and ``prunable`` (True when git marked the entry prunable — its
+    directory is gone). ``None`` signals malformed output (fail closed).
+    """
+    records: list[dict[str, object]] = []
+    current: "dict[str, object] | None" = None
+    for line in text.splitlines():
+        if line.startswith("worktree "):
+            current = {
+                "worktree": line[len("worktree ") :],
+                "branch": None,
+                "prunable": False,
+            }
+            records.append(current)
+        elif current is None:
+            # Any content before the first ``worktree`` line is malformed.
+            if line.strip():
+                return None
+        elif line.startswith("branch "):
+            current["branch"] = line[len("branch ") :].strip()
+        elif line.startswith("prunable"):
+            current["prunable"] = True
+    if not records:
+        return None
+    return records
+
+
+def _holder_dirs_for_branch(
+    repo_dir: Path, branch: str, env: dict
+) -> "tuple[list[Path], bool] | None":
+    """Return (live holder directories, saw_stale_holder) or ``None``.
+
+    The candidate set comes from ``git -C <repo_dir> worktree list --porcelain``
+    — the registry of the repository resolved FROM THE JUDGED PATH. A foreign
+    repository's worktree therefore can never appear here, which is why the
+    rev6 spec dropped the old ``git-common-dir`` comparison (brief section 1.99
+    / D15) and why no cross-repository node is needed.
+
+    ``branch`` is used ONLY in an equality comparison against the parsed
+    ``branch refs/heads/<name>`` field; it is never concatenated into a path and
+    never passed to git as an argument, so no ref-syntax value can become a path
+    traversal.
+    """
+    proc = _run_git_probe(
+        env, ["-C", str(repo_dir), "worktree", "list", "--porcelain"]
+    )
+    if proc is None:
+        return None
+    records = _parse_worktree_listing(proc.stdout)
+    if records is None:
+        return None
+    target_ref = "refs/heads/" + branch
+    live: list[Path] = []
+    saw_stale = False
+    for record in records:
+        if record["branch"] != target_ref:
+            continue
+        holder_text = record["worktree"]
+        if not isinstance(holder_text, str) or not holder_text:
+            continue
+        holder = Path(holder_text)
+        exists = False
+        try:
+            exists = holder.is_dir()
+        except (OSError, RuntimeError, ValueError):
+            exists = False
+        if record["prunable"] or not exists:
+            # INV-2b: a ghost entry (directory deleted, still registered) must
+            # NOT count as a holder — git will refuse to re-checkout the branch
+            # until `git worktree prune`, so it is an unusable trusted source.
+            saw_stale = True
+            continue
+        try:
+            live.append(holder.resolve())
+        except (OSError, RuntimeError, ValueError):
+            saw_stale = True
+    return live, saw_stale
+
+
+def _repo_dir_for_path(directory: Path, env: dict) -> "Path | None":
+    """The repository directory owning ``directory``, or ``None`` (fail closed).
+
+    Uses ``--git-common-dir`` so a linked worktree resolves to the shared
+    repository's git dir (the registry both the primary checkout and every
+    linked worktree share). """
+    proc = _run_git_probe(
+        env, ["-C", str(directory), "rev-parse", "--git-common-dir"]
+    )
+    if proc is None:
+        return None
+    text = proc.stdout.strip()
+    if not text:
+        return None
+    common = Path(text)
+    if not common.is_absolute():
+        common = directory / common
+    try:
+        return common.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def _is_inside(child: Path, parent: Path) -> bool:
+    """True when ``child`` is ``parent`` itself or lies beneath it."""
+    try:
+        child.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def path_is_in_worktree(path: Path) -> bool:
+    """Single authoritative predicate: must ``path`` be REFUSED because it is
+    not the authoritative status source? (A13/WP-19, retargeted by WP-01.)
+
+    Returns ``True`` to refuse, ``False`` to accept — the same boolean sense the
+    five call sites already use, so no call site changes shape. The SPECIFIC
+    reason for a refusal is left in ``refusal_reason()`` for diagnostics.
+
+    WP-01 semantic change: the old predicate asked "does ``path`` resolve inside
+    a LINKED worktree?" and assumed the authoritative ``main`` checkout is the
+    PHYSICAL primary repo. On this machine that assumption is false: the primary
+    repo sits on an unrelated branch while the integration branch — holding the
+    authoritative status files — is held by a LINKED worktree, so every gate
+    refused the one checkout that held the truth. The predicate now asks "is
+    ``path`` in the checkout that HOLDS THE AUTHORITATIVE BRANCH?", where the
+    authoritative branch is PLAN status's ``git.base_branch`` (the plan's
+    integration branch, a legitimate existing schema field — see INV-1b).
+    Whether that holder is the primary repo or a linked worktree does NOT
+    affect the verdict; every other worktree is still refused.
+
+    What this does NOT claim (brief section 2, the rev4 downgrade): it does not
+    defend against a local actor who can write the repository or set the
+    caller's environment — such an actor can edit this predicate directly. The
+    ``git.base_branch`` read is therefore configuration, NOT a trust boundary.
+    No anchor, policy file, environment variable, or bypass flag exists.
+
+    Fail-closed and never raises. EVERY error path returns True with its own
+    witness, and none of them falls back to a hard-coded ``main``, to
+    ``target_branch``, or to an environment variable:
+
+    * unresolvable path (A27/A28/A29) -> refuse;
+    * PLAN status unreadable / invalid / missing ``git.base_branch`` / non-string
+      / illegal ref name, or zero or multiple PLAN status files in the plan
+      directory -> ``REFUSAL_UNRESOLVED``;
+    * git probe failure or malformed ``worktree list --porcelain`` -> refuse;
+    * zero live holders -> ``REFUSAL_NO_HOLDER``;
+    * more than one live holder -> ``REFUSAL_MULTIPLE_HOLDERS`` (defensive: real
+      git refuses to check a branch out twice; see the DoD);
+    * only prunable/ghost holders -> ``REFUSAL_STALE_HOLDER`` (INV-2b; kept
+      distinct from the zero-holder family because the fix differs:
+      ``git worktree prune``);
+    * exactly one live holder that is not this checkout -> ``REFUSAL_NOT_HOLDER``.
+
+    A22 (WP-19 rev2/rev3): no git probe inherits the caller's repository
+    selection. ``GIT_DIR`` and its family (``_GIT_SELECTION_VARS``) let the
+    caller *declare* which repository a path belongs to, overriding filesystem
+    topology. They are stripped (in one shared runner, ``_run_git_probe``) so
+    every probe reads the filesystem; the rest of the environment (``PATH``,
+    ``HOME``) is kept so git still runs — a bare ``env={}`` would lose ``PATH``,
+    fail to find git, and fail closed on legitimate paths (a regression).
+
+    A27 (WP-19 rev4): the verdict classifies the file that will actually be
+    read/written, not the path NAME, so the path is resolved BEFORE probing. A
+    symlink pointing at a non-authoritative status file is followed by every
+    later consumer and must be judged as that target.
+
+    A28/A29 (WP-19 rev4/rev5): fail-closed holds on every degenerate path, and
+    "never raises" holds for ANY input — overlong names (``is_dir()`` raises
+    ``OSError``), NUL (``resolve()`` raises ``ValueError``) and symlink loops
+    (``RuntimeError``). Every guard shares the one except form
+    ``(OSError, RuntimeError, ValueError)`` (§5.3).
+    """
+    global _last_refusal_reason
+    _last_refusal_reason = None
+
     sanitized_env = {
         key: value
         for key, value in os.environ.items()
@@ -265,48 +571,50 @@ def path_is_in_worktree(path: Path) -> bool:
         resolved = path.resolve()
         directory = resolved if resolved.is_dir() else resolved.parent
     except (OSError, RuntimeError, ValueError):
+        _last_refusal_reason = REFUSAL_LEGACY_WORKTREE
         return True
-    try:
-        proc = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(directory),
-                "rev-parse",
-                "--absolute-git-dir",
-                "--git-common-dir",
-            ],
-            capture_output=True,
-            text=True,
-            env=sanitized_env,
-        )
-    except (OSError, RuntimeError, ValueError):
-        # Same single guard form as the path resolution above (A29-2, §5.3).
+
+    # INV-1b: the authoritative branch comes from the PLAN status in the plan
+    # directory the judged status file itself lives in.
+    plan_dir = resolved.parent
+    authoritative = _read_authoritative_branch(plan_dir, sanitized_env)
+    if authoritative is None:
+        _last_refusal_reason = REFUSAL_UNRESOLVED
         return True
-    if proc.returncode != 0:
+
+    # INV-3: candidates come from the registry of the repository resolved FROM
+    # THE JUDGED PATH, so a foreign repository's worktree can never enter the
+    # set (rev6 deleted the old common-dir comparison for exactly this reason).
+    repo_dir = _repo_dir_for_path(directory, sanitized_env)
+    if repo_dir is None:
+        _last_refusal_reason = REFUSAL_UNRESOLVED
         return True
-    lines = proc.stdout.splitlines()
-    if len(lines) != 2:
+    holders = _holder_dirs_for_branch(repo_dir, authoritative, sanitized_env)
+    if holders is None:
+        _last_refusal_reason = REFUSAL_LEGACY_WORKTREE
         return True
-    git_dir_text = lines[0].strip()
-    common_dir_text = lines[1].strip()
-    # A28-1: degenerate (blank) output fails closed; Path("") would
-    # otherwise be treated as relative and collapse the comparison.
-    if not git_dir_text or not common_dir_text:
+    live_holders, saw_stale = holders
+
+    if len(live_holders) == 0:
+        # INV-2b: a ghost holder is its own witness, never degraded to the
+        # zero-holder wording (the remedies differ).
+        if saw_stale:
+            _last_refusal_reason = REFUSAL_STALE_HOLDER
+        else:
+            _last_refusal_reason = REFUSAL_NO_HOLDER
         return True
-    git_dir = Path(git_dir_text)
-    common_dir = Path(common_dir_text)
-    if not git_dir.is_absolute():
+    if len(live_holders) > 1:
+        # INV-2 uniqueness. Not reachable with a healthy git (it refuses a
+        # double checkout), but a corrupted registry or a future git change
+        # must fail closed rather than pick a winner.
+        _last_refusal_reason = REFUSAL_MULTIPLE_HOLDERS
         return True
-    # --git-common-dir may be relative; it is then relative to the cwd git
-    # ran in (``directory``), mirroring --git-dir semantics.
-    if not common_dir.is_absolute():
-        common_dir = directory / common_dir
-    try:
-        return git_dir.resolve() != common_dir.resolve()
-    except (OSError, RuntimeError, ValueError):
-        # A28-2/A29-2: same single guard form as the path resolution above.
-        return True
+
+    holder = live_holders[0]
+    if _is_inside(resolved, holder):
+        return False
+    _last_refusal_reason = REFUSAL_NOT_HOLDER
+    return True
 
 
 def scope_prefix(pattern: str) -> str:
@@ -805,8 +1113,11 @@ def main(argv: list[str]) -> int:
             f"(resolved against main repo root {repo_root})"
         )
 
-    # A13: git-fact worktree refusal via the single authoritative predicate
-    # (no "/.worktrees/" path literal — sibling worktrees never contain it).
+    # A13: git-fact refusal via the single authoritative predicate (no
+    # "/.worktrees/" path literal — sibling worktrees never contain it).
+    # WP-01: the predicate now trusts the checkout holding the plan's
+    # authoritative branch (PLAN git.base_branch) instead of assuming the
+    # physical primary repo is the truth — see gate.path_is_in_worktree.
     if path_is_in_worktree(status_file):
         raise GateError(
             f"status file resolves inside a worktree ({status_file}); "
