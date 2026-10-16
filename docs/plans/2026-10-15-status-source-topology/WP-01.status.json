@@ -52,9 +52,9 @@
       "existing_tests": "User-approved earlier, and corrected after brief-r3 flagged the wording: the 17 guards in tests/test_worktree_detection.py are NOT read-only. They may receive premise-preserving rewrites under INV-4, each justified line by line, with no attack shape weakened. The three other test files (test_preflight_status_source.py, test_finalize_merge_first_call.py, test_finalize_merge_toctou.py) may receive minimal, individually justified adjustment.",
       "flow": "User-selected: brief second signature BEFORE dispatching any implementation. The WP-03 experience is that specification defects are cheapest to catch at this gate.",
       "anchor": "User-selected after brief-r2: the trusted branch anchor must live OUTSIDE the repository write domain. rev3 uses $XDG_CONFIG_HOME/agentic_loop/policy.toml (default $HOME/.config/...) key [trust] protected_branch, measured to be inside no git worktree. Rejected, each measured: .agentic/config.toml (git TRACKED), refs/remotes/origin/HEAD (movable by one local symbolic-ref call), server ls-remote (remote.origin.url is locally rewritable, plus a network dependency), environment variable (caller-declared fact -- the A22 bypass family).",
-      "literal_defect": "User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here.",
+      "literal_defect": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here.",
       "direction_c": "User-selected after three REWORKs in one root-cause family: option (c). WP-01 is DOWNGRADED to a pure usability fix. It resolves the finalize/preflight/merge deadlock and explicitly WITHDRAWS any claim of defending against a malicious LOCAL actor. Rationale accepted from the escalation: in this threat model anyone who can write the repository or set the caller's environment can already modify the code itself, so an unmovable local trust root is a false goal, whereas the deadlock is a real daily obstruction. Every anchor attempt is therefore abandoned: rev1 (status field), rev2 (origin/HEAD + tracked config), rev3 (XDG_CONFIG_HOME policy file) are all superseded.",
-      "wp02_split": "User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here.",
+      "wp02_split": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here.",
       "scope_rev5": "D13 closed. brief section 6 and status forbidden_paths previously contradicted each other on merge.sh and gate/qoder_security.py: the brief allowed them, the status forbade them. WP-02 merged both into the single predicate, so WP-01 must be able to edit them -- there are FIVE call sites, not three. finalize_merge.sh was missing from allowed_paths entirely despite being one of the original three. Flagged by topo-brief-r4 Q2."
     }
   },
@@ -67,21 +67,22 @@
   "evidence": {
     "tests": [],
     "brief": {
-      "rev": 5,
-      "sha256": "34dd681bb0d1e6f3b3b586b0f5aa9d10742029a21c747b1cdc798d328078d126",
+      "rev": 6,
+      "sha256": "a0a3dfdfc54b092708f489026f3042b0cc9415fe1dfa415ad9fc059e04eb4983",
       "snapshots": {
         "rev3": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b",
-        "rev4": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957"
+        "rev4": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957",
+        "rev5": "34dd681bb0d1e6f3b3b586b0f5aa9d10742029a21c747b1cdc798d328078d126"
       }
     }
   },
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-brief-r5",
+    "round": "topo-brief-r6",
     "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 5,
+    "bound_brief_rev": 6,
     "prior_rounds": [
       {
         "round": "topo-brief-r1",
@@ -132,13 +133,28 @@
           "Q2/Q4: M-2 was repointed from the deleted E7 to E3, but E3 is 'same repo, wrong branch' and would still be refused by INV-3 clause 2 after removing the common-dir comparison, so M-2 could not turn it red -- not load-bearing (D12). INV-5 had no acceptance test, only a DoD self-check. The brief said three call sites in section 1 and five in section 7. status forbidden_paths banned merge.sh and qoder_security.py while brief section 6 allowed them (D13). M-7 did not pin WHICH field is misread. INV-1b's no-fallback half and INV-5 had no guarding mutation.",
           "rev5 fixes all of it: basis switched to base_branch with the measurement recorded; E1 uses a legal PLAN fixture; E7 restored as a dedicated cross-repository node with M-2 repointed at it; E12 added for INV-5 with M-12 guarding it; M-11 added to guard the no-fallback rule; M-7 now names WP status's own git.base_branch as the misread field; scope unified on five call sites in both the brief and this status; the duplicated topo-brief-r3 record merged."
         ]
+      },
+      {
+        "round": "topo-brief-r5",
+        "decision": "REWORK",
+        "bound_brief_rev": 5,
+        "kind": "wp-brief-second-signature",
+        "resolved_in_rev": 6,
+        "findings": [
+          "Q1/Q3 directionally ACCEPT: the withdrawal is honest and keying on the integration branch is the right basis -- the consultant independently confirmed the integration branch is held by this linked worktree and carries the status while main has no holder and lacks the file.",
+          "D14 FATAL, orchestrator-reproduced: INV-3 clause 1 still used rev1's single-path-component check forbidding '/', but the real base_branch is plan/2026-10-15-status-source-topology, which contains '/'. The spec would reject its own authoritative branch and still fail closed, so rev5 did NOT lift the deadlock. The fixture names in E1/E3/E10 (plan/x, plan/y, plan/authoritative) were all illegal too. git check-ref-format --branch accepts the real name. Fix: validate by git's own ref syntax, and carry path safety as an implementation constraint -- the branch name is only ever string-compared against git worktree list --porcelain output, never concatenated into a path.",
+          "D15: M-2 still was not load-bearing. Candidates are enumerated by running git worktree list in the repository resolved FROM THE JUDGED PATH, so a foreign repository's worktree can never enter the candidate set; INV-3 clause 3 was therefore redundant and E7 could not go red. The consultant offered the smaller fix and the orchestrator took it: delete clause 3, E7 and M-2, and record that cross-repository confusion is excluded by the enumeration source itself.",
+          "D16: M-11 needed E9's fixture to contain a LIVE main holder, or adding a 'main' fallback merely turns 'unresolved' into 'no holder' -- still fail-closed, so E9 would not go red for wrongful acceptance. Premise added to E9.",
+          "D17: wording and stale values -- section 2 still said git.target_branch is not a trust boundary; section 1 still claimed three call sites; status scope notes literal_defect/wp02_split still said those two files were forbidden, contradicting allowed_paths and scope_rev5. All corrected; the stale notes are explicitly marked SUPERSEDED.",
+          "Also adopted from r5: section 8 no longer claims the integration branch 'disappears' after the plan merges (git merge does not necessarily delete it); it now says a merged plan's status no longer enters these gates whether or not the branch is kept."
+        ]
       }
     ],
-    "pending_note": "Brief rev5 second signature. rev5 switches the basis to the integration branch (base_branch) and closes D10-D13."
+    "pending_note": "Brief rev6 second signature. rev6 fixes D14 (branch-name validation rejected the real integration branch) and closes D15-D17."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T22:00:00Z",
+    "updated_at": "2026-10-15T23:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }

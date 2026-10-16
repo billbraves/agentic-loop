@@ -1,6 +1,6 @@
 # WP-01 — status 来源判据改为「权威分支（集成分支）持有者」而非「物理主仓」
 
-> rev5 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
+> rev6 冻结日期 2026-10-15 | 编排者 Kiro（DSH 会话）| 执行者 kimi。
 > 状态：**APPROVED（范围已由用户批准冻结）**。
 > rev1 快照 `WP-01-brief.rev1.md`（`96a7398f…`）被 `topo-brief-r1` 判 REWORK。
 > rev2 快照 `WP-01-brief.rev2.md`（`4e101dca…`）被 `topo-brief-r2` 判 REWORK。
@@ -18,19 +18,23 @@
 > rev4 删除锚点架构及其全部验收项与变异，保留与安全主张无关的正确性要求。
 > rev4 快照 `WP-01-brief.rev4.md`（`bbe4be96…`）被 `topo-brief-r4` 判 REWORK：
 > 判据对象选错（见 §1.98）。**rev5 只改判据对象与三处一致性缺陷，降级决策不变。**
+> rev5 快照 `WP-01-brief.rev5.md`（`34dd681b…`）被 `topo-brief-r5` 判 REWORK：
+> 名称校验会拒绝真实集成分支（见 §1.99）。**rev6 只修校验规则与冗余条款。**
 
 ## 1. 问题（编排者已实测复现）
 
 三个调用点共用同一条「status 文件不得位于 worktree 内」的判据：
 
-真实调用那条判据的只有**三处**（rev3 按实测更正，见 D6）：
+调用那条判据的共 **五处**（rev6 按 WP-02 合并后的实际状态更正，关闭 D17）：
 
 - `src/agentic_loop/wrappers/preflight.sh:44`
 - `src/agentic_loop/wrappers/finalize_merge.sh:160`
 - `src/agentic_loop/gate/__init__.py:810`
+- `src/agentic_loop/wrappers/merge.sh`（WP-02 前为路径字面量，已改为引用同一判据）
+- `src/agentic_loop/gate/qoder_security.py`（同上）
 
-另有两处只是打印同样的错误文案、但用的是路径字面量而非该判据
-（`wrappers/merge.sh:37`、`gate/qoder_security.py:1012`）—— 已拆为独立 WP。
+**历史说明**：rev1–rev5 写「三处」，因为当时后两处尚是路径字面量、已拆为 WP-02。
+WP-02 已在本集成分支合并（双签 ACCEPT），故本 WP 面对的是五处。
 
 判据本体是单一权威 `gate.path_is_in_worktree()`（`gate/__init__.py:200`）：当某路径所属仓库的
 `--git-dir` 不等于 `--git-common-dir` 时，判定为 linked worktree 并拒绝。
@@ -178,7 +182,41 @@ fixture 声明。
 rev5 统一为**五个入口**（WP-02 已把 `merge.sh`、`qoder_security.py` 并入同一判据），
 并相应修正 status 白名单；同时为 INV-5 补一个验收节点 E12。
 
-## 2. 方向（rev5：纯可用性修复，判据对象为集成分支）
+## 1.99 rev6 触发原因（brief-r5 REWORK，编排者独立实测确认，含一处致命缺陷）
+
+**D14（致命：名称校验会拒绝真实的权威分支）**：rev5 的 INV-3 第 1 条沿用 rev1 的
+「单一路径组件」校验（不含 `/`），但权威分支改为集成分支后，真实值就是
+`plan/2026-10-15-status-source-topology` —— **含 `/`**。实测：
+
+```text
+PLAN git.base_branch = plan/2026-10-15-status-source-topology   （含 '/'）
+INV-3 第 1 条 → 拒绝 → authoritative branch unresolved
+git check-ref-format --branch "plan/2026-10-15-status-source-topology" → OK
+```
+
+即规格会拒绝它自己指定的权威分支，rev5 仍然 fail-closed，死锁未解。E1/E3/E10 的
+fixture 分支名（`plan/x`、`plan/y`、`plan/authoritative`）同样全部不合法。
+
+该校验的**原始目的**是防路径穿越（分支名曾被用于拼接路径）。rev6 改为：
+**分支名合法性由 `git check-ref-format --branch` 等价规则判定**（git 自己的 ref 语法），
+路径安全由「不把分支名拼进任何路径」这一实现约束保证 —— 候选来自
+`git worktree list --porcelain` 的结构化输出，分支名只用于**字符串相等比较**，不参与路径构造。
+
+**D15（M-2 不承重，INV-3 第 3 条冗余）**：brief-r5 指出：候选集由**被校验路径所解析出的
+仓库**执行 `git worktree list` 枚举得到，外部仓库 B 的 worktree **根本不可能进入**仓库 A 的
+候选集。因此 INV-3 第 3 条（比对 `git-common-dir`）是冗余的，E7 不可能因 M-2 转红。
+编排者确认该推理成立。rev6 采用 brief-r5 给的**更小修复**：删除 INV-3 第 3 条、E7 与 M-2，
+并把「跨仓库混淆已被候选枚举方式排除」写成显式理由。
+
+**D16（M-11 前提不足）**：rev5 的 M-11（加 `"main"` 回退）需要 E9 的 fixture 中**确有一个活的
+`main` 持有者**，否则加回退只会从 `unresolved` 变成 `no holder`，仍是 fail-closed，E9 不会
+因错误放行而转红。rev6 在 E9 中补上该前提。
+
+**D17（措辞与旧值残留）**：§2 仍写「`git.target_branch` 的读取不是信任边界」；§1 仍称
+「三个调用点」；status 的 `literal_defect` / `wp02_split` 旧值仍说那两个文件禁止修改，与
+`allowed_paths` 和 `scope_rev5` 相反。rev6 全部订正，并把旧值显式标记为 superseded。
+
+## 2. 方向（rev6：纯可用性修复，判据对象为集成分支）
 
 把判据从「**是否位于 linked worktree**」改为「**是否是持有权威分支的那个签出**」。
 允许该签出本身是 linked worktree；其余所有 worktree 一律仍然拒绝。
@@ -199,7 +237,7 @@ PLAN 并入 `main` 之后，集成分支随之消失，届时该 plan 目录下�
 - 不主张抵御能写仓库内容的本地行为者。该行为者可直接改判据代码。
 - 不主张抵御能设置调用方环境的本地行为者。`topo-brief-r3` D7 已实测证明
   `XDG_CONFIG_HOME` 这类调用者提供的位置无法充当信任根。
-- 因此 `git.target_branch` 的读取**不是信任边界**，只是配置读取。rev1–rev3 反复试图
+- 因此 `git.base_branch` 的读取**不是信任边界**，只是配置读取。rev1–rev3 反复试图
   为它找一个不可移动的锚点，rev4 停止这一尝试。
 
 **本 WP 主张的性质**：消除 §1 实测的死锁 —— 在「物理主仓停在别的分支、目标分支签出在
@@ -243,16 +281,19 @@ witness 为 `authoritative branch holder is stale (prunable)`，**不得**退化
 （rev4 修正 rev3 的 D9 自指矛盾：比对基准改为**被校验路径自身解析出的仓库**，
 rev3 写的是「锚点所在仓库」，而锚点被规定为不在任何仓库内，自相矛盾）：
 
-1. 权威分支名通过单一路径组件校验（非空、不含 `/` 与 `\\`、不等于 `.` `..`、
-   不以 `.` 开头、无 NUL 字节）；
+1. 权威分支名通过 **git 自身的 ref 语法校验**（等价于 `git check-ref-format --branch`）。
+   **rev6 修正 D14**：rev1–rev5 沿用「单一路径组件（不含 `/`）」校验，而真实集成分支名
+   `plan/2026-10-15-status-source-topology` 含 `/`，规格会拒绝它自己的权威分支。
+   原校验的目的是防路径穿越；rev6 改由**实现约束**承担：分支名**只**用于与
+   `git worktree list --porcelain` 结构化输出中的 `branch refs/heads/<name>` 做字符串
+   相等比较，**不得**拼接进任何路径。空值、非字符串、含 NUL、以及 git 判定非法的 ref
+   一律 fail-closed。
 2. 该候选的**当前分支**严格等于权威分支；
-3. 该候选与**被校验路径自身解析出的仓库**共享同一 resolved `git-common-dir`。
-   目的是排除「另一个独立仓库里恰好也有一个同名 `main`」—— 编排者已实测两个独立仓库的
-   resolved common-dir 必然不同，故该合取项可承重（brief-r1 Q3 指出需要它）。
-   **rev4 修正**：rev3 要求基准「取自锚点侧（独立确定）」，而 rev3 同时规定锚点不在任何
-   仓库内，「锚点所属仓库」并不存在 —— 这是 `topo-brief-r3` D9 指出的自指矛盾。锚点架构
-   删除后，基准取被校验路径自身解析出的仓库即可：本条要排除的是**跨仓库混淆**，而非
-   「候选自证」，后者由 INV-1b 第 3 条与 E10/M-7 承担。
+（**rev6 删除原第 3 条**，关闭 D15：原条款要求比对 `git-common-dir` 以排除「另一个独立
+仓库里同名分支」。但候选集本就由**被校验路径所解析出的仓库**执行 `git worktree list`
+枚举得到 —— 外部仓库的 worktree 根本不可能进入候选集，该条款冗余，其配套的 E7 与 M-2
+也不可能承重。`topo-brief-r5` 指出此点，编排者确认成立。跨仓库混淆的排除理由因此改为
+**显式记录在枚举方式上**：候选只来自被校验仓库自己的注册表。）
 
 **INV-4（加固不得退化，rev2 改为「保证不变、断言可改写」，关闭 D3）**：A22 环境剥离、
 A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环的 `RuntimeError`、超长
@@ -300,16 +341,26 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
   worktree 同时检出权威分支」在真实 git 下**无法构造**。INV-2 的「多于一个」分支因此
   是**防御性**的（防注册表损坏或未来 git 行为变化），由代码 fail-closed 承担，不要求验收用例；
   承重由 E5 的幽灵形态提供。
-- **E6 `[authoritative-branch-name-is-validated]`**：权威分支名取
-  `"../../etc"` / `"a/b"` / `"a\\b"` / `"."` / `".."` / `".hidden"` / `""` /
-  含 NUL 共 **8** 种形态 → 各自 fail-closed，原因必须指向**名称校验**，不得是偶然的
-  「分支不存在」。（rev1 只列 5 种，brief-r1 指出漏了反斜杠、点号前缀与 NUL。）
+- **E6 `[authoritative-branch-name-is-validated]`**（rev6 重写，关闭 D14）：
+  **正向（必须通过）**：合法的带 `/` 集成分支名，至少含真实形态
+  `plan/2026-10-15-status-source-topology` 与 `feature/x-y` —— rev1–rev5 的校验会错误地
+  拒绝它们，本断言钉死该缺陷不再出现。
+  **负向（必须 fail-closed，原因须指向名称校验，不得是偶然的「分支不存在」）**：
+  空字符串、含 NUL、`..`、`.`、以 `.` 开头、以 `/` 开头或结尾、含 `//`、含空格、
+  含 `~` `^` `:` `?` `*` `[`、以 `.lock` 结尾 —— 即 `git check-ref-format --branch`
+  判定非法的形态，至少覆盖上述 **12** 种。
+  （rev1 只列 5 种；brief-r1 补入反斜杠/点号前缀/NUL；rev6 改为 git ref 语法后，形态集
+  相应重排，并新增正向用例。）
 
 - **E9 `[authoritative-branch-unresolved-fails-closed]`**（rev5 重写，承载 INV-1b 第 1/2 条）：
   参数化覆盖 PLAN status 的每一种退化形态 —— 文件不存在、JSON 非法、缺 `git` 段、
   缺 `base_branch` 键、值非字符串、值未过名称校验 —— **每一种都必须 fail-closed**，
   witness 为 `authoritative branch unresolved`。本节点必须额外断言：**没有**任何形态退化成
   「回退到 `main`」而放行。
+  **fixture 前提（rev6 补入，关闭 D16）**：本节点的 fixture 中必须**确有一个活的 `main`
+  持有者**。否则 M-11（加 `"main"` 回退）只会把 `unresolved` 变成 `no holder`，仍是
+  fail-closed，E9 不会因错误放行而转红 —— `topo-brief-r5` 指出此点。有该持有者时，加入
+  回退会使一个本应 unresolved 的输入**被错误接受**，E9 才真正承重。
   （rev3 的 E9/E9b 绑定仓库外策略文件锚点，随锚点架构一并删除；rev3 的 E11
   `[coordinated-in-repo-move-cannot-retarget]` 断言「协同改写仓库内一切后受信任来源不变」，
   这正是 rev4 撤回的安全主张，故删除。）
@@ -325,14 +376,6 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
   **这是结构正确性要求（判定依据不能由被判定对象提供），不是安全主张** —— 能写仓库者
   同样可以改 PLAN status，rev4 不主张抵御他。
 
-- **E7 `[cross-repository-same-name-branch-refused]`**（rev5 恢复，承载 M-2，关闭 D12）：
-  构造**两个完全独立的仓库**，各自都有一个检出**同名**权威分支的 worktree；在仓库 A 里
-  校验一个 status 路径时，仓库 B 的那个 worktree **不得**被当作持有者接受。
-  本节点必须自证前提：断言两仓库的 resolved `git-common-dir` 确实不同，否则节点可能因
-  无关原因变绿。
-  （rev4 把 M-2 指向 E3 是无效的 —— E3 是「同仓库、错误分支」，去掉 common-dir 比对后
-  仍被 INV-3 第 2 条拒绝，不可能转红。brief-r4 Q2/Q4 指出此点。）
-
 - **E12 `[one-predicate-across-all-five-call-sites]`**（rev5 新增，承载 INV-5，关闭 D13）：
   静态断言五个入口（`preflight.sh`、`merge.sh`、`finalize_merge.sh`、`gate/__init__.py`、
   `gate/qoder_security.py`）全部引用**同一个**判据函数，且不存在第二条可选路径。
@@ -344,13 +387,6 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
 ## 5. 承重变异（DoD 必做，逐条分别施加、分别验证、精确还原）
 
 - **M-1**：把 INV-2b 的存活性检查去掉（接受 prunable 幽灵条目）→ **E5 必须转红**。
-- **M-2（rev5 修正，关闭 D12）**：去掉 INV-3 第 3 条（不比对 `git-common-dir`）→
-  **E7 必须转红**，且红的形态必须是「另一个独立仓库里同名权威分支的 worktree 被当作
-  本仓库的持有者接受」。
-  （rev3 指向已删除的 E7；rev4 改指 E3 仍不承重 —— E3 是「同仓库、错误分支」，去掉
-  common-dir 比对后仍被 INV-3 第 2 条拒绝。rev5 恢复 E7 专用节点。）
-  （rev3 的 M-2b 要求把比对基准从「锚点侧」改为「候选自己发现的仓库」才算承重；锚点已删除，
-  且 rev4 的 INV-3 本就以被校验路径自身解析出的仓库为基准，该变异失去意义，删除。）
 - **M-3**：去掉 INV-3 第 1 条（名称校验）→ **E6 必须转红**（8 种形态中至少 1 种）。
 - **M-7（rev5 重写，消除 brief-r4 Q4 指出的歧义）**：把权威分支的来源从 PLAN status 的
   `git.base_branch` 改为**被校验 WP status 自身的 `git.base_branch`** →
@@ -396,13 +432,17 @@ fail-closed 分支，并确认**没有**引入环境变量或仓库外文件作�
 
 ## 7. 完成定义（DoD）
 
-- [ ] E1–E10、E12 全绿（E6 的 **8** 种名称形态、E9 的 **6** 种退化形态逐一参数化）。
+- [ ] E1–E6、E8、E9、E10、E12 全绿（E6 的 **1 组正向 + 12 种负向**形态、E9 的 **6** 种退化形态逐一参数化）。
 - [ ] INV-2 的「多于一个持有者」分支虽无验收用例（真实 git 不可构造），代码仍必须显式
       fail-closed 并给出该 witness；报告须指出该分支在代码中的位置。
 - [ ] INV-4 映射表：**旧 17 节点 → 新断言**逐条映射齐备（17 行），每个期望值翻转附理由；
       A22/A27/A28 的攻击形态一个都没少（环境伪装、symlink 跟随与环、NUL、超长路径）。
-- [ ] M-1 ~ M-7、M-11、M-12 逐条红证齐备（含还原回绿，还原后 `git diff` 为空），
-      报告附逐条实际输出。M-4 与 M-5 必须分别施加、分别验证。
+- [ ] M-1、M-3、M-4、M-5、M-6、M-7、M-11、M-12 逐条红证齐备（含还原回绿，还原后
+      `git diff` 为空），报告附逐条实际输出。M-4 与 M-5 必须分别施加、分别验证。
+      （rev6 删除 M-2 与 E7：候选枚举方式已排除跨仓库混淆，该变异不可能承重 —— D15。）
+- [ ] **分支名校验自检**：报告须证明合法的带 `/` 集成分支名被接受（含真实值
+      `plan/2026-10-15-status-source-topology`），且分支名**没有**被拼接进任何路径
+      （给出代码位置）。
 - [ ] **不可回退自检**：报告须证明不存在任何到硬编码 `"main"`、`target_branch` 或环境变量的回退路径
       （grep 出目标分支读取处的全部分支，逐条说明每个分支的归宿）。
 - [ ] 保护集全绿：`tests/test_preflight_status_source.py`、
@@ -431,7 +471,8 @@ fail-closed 分支，并确认**没有**引入环境变量或仓库外文件作�
 - 判定与使用之间仍存在 ref/worktree 竞态：某 worktree 可在判定通过后切换分支。与既有
   `base_branch` 判定同类，不在本 WP 范围内，记录在此。
 - 本 WP 不改变「status 文件是单一真相源」这一产品语义，只改变「哪个签出持有它」的判定方式。
-- 权威分支取 `base_branch`（集成分支）而非 `target_branch`：PLAN 并入 `main` 后集成分支
-  消失，但届时该 plan 的 status 已不再被这些 gate 校验（PLAN 已 MERGED），故不需要阶段
+- 权威分支取 `base_branch`（集成分支）而非 `target_branch`。**rev6 按 brief-r5 更正措辞**：
+  不声称「集成分支随之消失」（git merge 并不必然删除分支），而是：**无论集成分支在 PLAN
+  合并后被保留还是删除，已 MERGED 的 plan 的 status 都不再进入这些 gate**，故不需要阶段
   感知切换。若未来出现「PLAN 已 MERGED 但仍需校验其 status」的流程，需另开 WP。
 - 判据仍对无法 resolve 的路径 fail-closed（A19/A27 行为），rev4 不改变这一点。
