@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "DRAFT",
+  "state": "APPROVED",
   "role": "Developer",
   "executor": {
     "tool": "unassigned"
@@ -68,7 +68,7 @@
     "tests": [],
     "brief": {
       "rev": 6,
-      "sha256": "a0a3dfdfc54b092708f489026f3042b0cc9415fe1dfa415ad9fc059e04eb4983",
+      "sha256": "044c002848ba7a29e3b27cc72ed1a4acd1c546e3f5139dac3898ba5395881879",
       "snapshots": {
         "rev3": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b",
         "rev4": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957",
@@ -78,9 +78,9 @@
   },
   "review": {},
   "consult": {
-    "state": "PENDING",
+    "state": "DECIDED",
     "round": "topo-brief-r6",
-    "decision": null,
+    "decision": "ACCEPT",
     "kind": "wp-brief-second-signature",
     "bound_brief_rev": 6,
     "prior_rounds": [
@@ -148,13 +148,40 @@
           "D17: wording and stale values -- section 2 still said git.target_branch is not a trust boundary; section 1 still claimed three call sites; status scope notes literal_defect/wp02_split still said those two files were forbidden, contradicting allowed_paths and scope_rev5. All corrected; the stale notes are explicitly marked SUPERSEDED.",
           "Also adopted from r5: section 8 no longer claims the integration branch 'disappears' after the plan merges (git merge does not necessarily delete it); it now says a merged plan's status no longer enters these gates whether or not the branch is kept."
         ]
+      },
+      {
+        "round": "topo-brief-r6",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 6,
+        "kind": "wp-brief-second-signature",
+        "substantiation": [
+          "Q1: the withdrawal is complete and honest. INV-1b clause 3 denies that git.base_branch is a trust boundary, section 8 names the undefended actors and cites D7, and E10/M-7's structural-correctness recasting only prevents an implementation from reading the WP's own same-named field into a self-reference. No surviving requirement depends on an immovable trust root, and no environment variable, out-of-repo policy file or anchor was reintroduced.",
+          "Q2: E7 and M-2 are fully deleted from the normative text with no dangling reference. Surviving sets are E1-E6/E8/E9/E10/E12 and M-1/M-3/M-4/M-5/M-6/M-7/M-11/M-12, matching the DoD exactly. Every invariant has coverage: INV-1 by E1-E3, INV-1b by E9/E10, INV-2 by E2/E4, INV-2b by E5, INV-3 by E3/E6, INV-4 by E8, INV-5 by E12. The enumeration baseline is implementable -- resolve the repository from the judged path, run git worktree list --porcelain there -- so a foreign repository's worktree cannot be a candidate and dropping the common-dir comparison is the correct reduction.",
+          "Q3: independently measured -- the only holder is the linked worktree at /Users/admin/vibe/agentic-loop-main-codex-merge on plan/2026-10-15-status-source-topology, the PLAN/WP status exists on that integration branch and not on main, and git accepts the slashed name. Keying on PLAN git.base_branch with git check-ref-format validation and a unique live holder chosen from the judged repository's registered worktrees leaves no remaining conjunct that would reject the real layout. No phase-aware switching is needed because a MERGED plan's status no longer enters these gates.",
+          "Q4: each mutation turns its named test red through a specific witness -- M-1 stale-specific, M-3 name-validation, M-4 E1's self-proving linked layout, M-5 E3's wrong-branch witness, M-6 the existing caller-env tests, M-7 the legal WP git.base_branch set against the PLAN basis, M-11 the live main holder in E9 producing a wrongful acceptance, M-12 the five-call-site static assertion. All independently applicable, with no mutation needing another to go red, and the specific witnesses plus fixture premises prevent incidental greening via no-holder, schema-invalid or missing-branch.",
+          "Three non-blocking wording slips were named and the orchestrator fixed them without another round: the opening line still said three call sites, section 2 still said the integration branch 'disappears', and M-3 still said 8 name forms (now 12 negative)."
+        ]
       }
     ],
-    "pending_note": "Brief rev6 second signature. rev6 fixes D14 (branch-name validation rejected the real integration branch) and closes D15-D17."
+    "pending_note": "Brief rev6 is double-signed. Ready to dispatch implementation.",
+    "soft_limit": {
+      "signal": "rework_twice",
+      "state": "RESOLVED",
+      "family": "WP-01 brief specification",
+      "rounds": [
+        "topo-brief-r1",
+        "topo-brief-r2",
+        "topo-brief-r3",
+        "topo-brief-r4",
+        "topo-brief-r5",
+        "topo-brief-r6"
+      ],
+      "note": "Six brief rounds, five REWORK then ACCEPT. Two were fatal and both orchestrator-reproduced: r4 showed the basis object (target_branch=main) had zero holders and no authoritative copy, and r5 showed the name validation forbade '/' while the real integration branch contains it -- each would have left the predicate failing closed. r3 produced the user's decision (c) to withdraw all security claims after the out-of-repo anchor was pierced via XDG_CONFIG_HOME. The user authorised continuing past the soft limit at rev6."
+    }
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T23:00:00Z",
+    "updated_at": "2026-10-15T23:40:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }

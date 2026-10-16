@@ -23,7 +23,7 @@
 
 ## 1. 问题（编排者已实测复现）
 
-三个调用点共用同一条「status 文件不得位于 worktree 内」的判据：
+五个调用点共用同一条「status 文件不得位于 worktree 内」的判据（rev6 更正；WP-02 合并前为三处，见下）：
 
 调用那条判据的共 **五处**（rev6 按 WP-02 合并后的实际状态更正，关闭 D17）：
 
@@ -229,8 +229,8 @@ fixture 分支名（`plan/x`、`plan/y`、`plan/authoritative`）同样全部不
 按 `target_branch` 判会立即 fail-closed，把物理死锁换成生命周期死锁。按 `base_branch` 判
 才与「哪个签出实际持有权威副本」这一产品语义吻合。
 
-PLAN 并入 `main` 之后，集成分支随之消失，届时该 plan 目录下的 status 也不再被这些 gate
-校验（PLAN 已 MERGED），因此不需要阶段感知的来源切换。
+PLAN 并入 `main` 之后，**无论集成分支被保留还是删除**，该 plan 目录下的 status 都不再
+进入这些 gate（PLAN 已 MERGED），因此不需要阶段感知的来源切换。
 
 **本 WP 明确不主张的性质（rev4 撤回）**：
 
@@ -387,7 +387,7 @@ A27 先 resolve 再探测、A28 全路径 fail-closed（含空行、symlink 环�
 ## 5. 承重变异（DoD 必做，逐条分别施加、分别验证、精确还原）
 
 - **M-1**：把 INV-2b 的存活性检查去掉（接受 prunable 幽灵条目）→ **E5 必须转红**。
-- **M-3**：去掉 INV-3 第 1 条（名称校验）→ **E6 必须转红**（8 种形态中至少 1 种）。
+- **M-3**：去掉 INV-3 第 1 条（名称校验）→ **E6 必须转红**（12 种负向形态中至少 1 种）。
 - **M-7（rev5 重写，消除 brief-r4 Q4 指出的歧义）**：把权威分支的来源从 PLAN status 的
   `git.base_branch` 改为**被校验 WP status 自身的 `git.base_branch`** →
   **E10 必须转红**，且红的形态必须是「被校验对象自己声明了自己的判定依据」。
