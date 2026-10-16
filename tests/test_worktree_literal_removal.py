@@ -648,6 +648,23 @@ def _code_without_comments(text: str, *, python: bool) -> list[str]:
     return keep
 
 
+# Which files count as product code for INV-A. Found at wp02-impl-r7: a suffix
+# filter of {".py", ".sh"} silently SKIPPED src/agentic_loop/templates/
+# install.sh.tmpl and pre-push.tmpl, both of which init_cmd.py:99-101 installs
+# at mode 0o755 -- i.e. they ship as executable shell. A literal-based worktree
+# check added there would never have been seen.
+_EXECUTABLE_TEMPLATES = {"install.sh.tmpl", "pre-push.tmpl"}
+
+
+def _is_scannable(path: Path) -> bool:
+    return path.suffix in {".py", ".sh"} or path.name in _EXECUTABLE_TEMPLATES
+
+
+def _scans_as_python(path: Path) -> bool:
+    # Only real .py goes through tokenize; shell and shell templates are raw.
+    return path.suffix == ".py"
+
+
 def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
     """Adversarial guard on F6's own scanner, added at wp02-impl-r3.
 
@@ -726,6 +743,47 @@ def test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash() -> None:
     )[0]
 
 
+def test_inv_c_alias_resolving_to_main_repo_is_accepted(tmp_path: Path) -> None:
+    """INV-C clarification forced by wp02-impl-r7.
+
+    The consultant produced a real path that the OLD literal refused and the new
+    predicate ACCEPTS, and which is not the main-repo ``.worktrees`` directory:
+
+        <parent>/.worktrees/../<repo>/docs/.../WP-01.status.json
+
+    The orchestrator reproduced it and ruled it a FALSE POSITIVE of the old
+    literal, not a loosening defect. The path resolves into the primary repo
+    (``git-dir`` and ``git-common-dir`` agree), so the file the gate actually
+    opens IS the main-repo single source of truth. The literal refused it only
+    because the unresolved SPELLING contains the segment; refusing the real main
+    copy would be the wrong answer.
+
+    So L, the one permitted relaxation, covers every path that merely SPELLS the
+    segment but resolves outside any linked worktree -- including ``..`` aliases.
+    Resolving before deciding is the predicate's hardened A19/A27 behaviour, and
+    this pins that it stays that way.
+    """
+    repo = _make_repo(tmp_path)
+    alias_root = repo.parent / ".worktrees"
+    alias_root.mkdir()
+    status = _write_status(repo, _status(repo))
+    rel = status.relative_to(repo)
+    alias = repo.parent / ".worktrees" / ".." / repo.name / rel
+
+    assert LITERAL in str(alias), "the alias must still SPELL the segment"
+    assert alias.resolve() == status.resolve(), "alias must resolve to the main copy"
+
+    from agentic_loop.gate import path_is_in_worktree
+
+    assert path_is_in_worktree(alias) is False, (
+        "a path that only spells the segment but resolves into the main repo "
+        "must be ACCEPTED; refusing it would refuse the single source of truth"
+    )
+    # And the genuine case still refuses, so this is not a blanket loosening.
+    wt = _add_sibling_worktree(repo, tmp_path, "wp02-alias", "feat/wp02-alias")
+    assert path_is_in_worktree(_write_status(wt, _status(repo))) is True
+
+
 def test_f6_no_literal_worktree_check_remains() -> None:
     """F6 [no-literal-worktree-check-remains]: ZERO non-comment product-code
     matches of the literal under ``src/agentic_loop/`` — i.e. the literal no
@@ -734,11 +792,11 @@ def test_f6_no_literal_worktree_check_remains() -> None:
     comment_only: list[str] = []
     scanned = 0
     for path in sorted((PKG_SRC / "agentic_loop").rglob("*")):
-        if not path.is_file() or path.suffix not in {".py", ".sh"}:
+        if not path.is_file() or not _is_scannable(path):
             continue
         scanned += 1
         text = path.read_text(encoding="utf-8", errors="replace")
-        stripped_lines = _code_without_comments(text, python=path.suffix == ".py")
+        stripped_lines = _code_without_comments(text, python=_scans_as_python(path))
         source_lines = text.splitlines()
         for line_no, code_line in enumerate(stripped_lines, start=1):
             if LITERAL not in code_line:
@@ -749,6 +807,17 @@ def test_f6_no_literal_worktree_check_remains() -> None:
                 comment_only.append(f"{path.relative_to(PKG_SRC)}:{line_no}")
 
     assert scanned > 10, f"static scan touched only {scanned} files"
+    # Found at wp02-impl-r7: a {".py", ".sh"} suffix filter skipped the
+    # templates that init_cmd.py installs at mode 0o755, i.e. files that ship
+    # as executable shell. Pin that they are in scope, and that they really are
+    # installed as executables, so this stays true if the template set changes.
+    for name in sorted(_EXECUTABLE_TEMPLATES):
+        tmpl = PKG_SRC / "agentic_loop" / "templates" / name
+        assert tmpl.is_file(), f"{name} vanished; update _EXECUTABLE_TEMPLATES"
+        assert _is_scannable(tmpl), f"{name} is executable product code but unscanned"
+        assert f'("{name}", ' in (PKG_SRC / "agentic_loop" / "init_cmd.py").read_text(
+            encoding="utf-8"
+        ), f"{name} is no longer installed by init_cmd.py; re-check the scan set"
     assert hits == [], f"literal-based worktree check still in product code: {hits}"
     # The scan must be looking at the real tree, not silently skipping files.
     # Only Python comments are stripped now, so gate/__init__.py's explanatory
