@@ -33,7 +33,10 @@
       "tests/test_worktree_detection.py",
       "tests/test_preflight_status_source.py",
       "tests/test_finalize_merge_first_call.py",
-      "tests/test_finalize_merge_toctou.py"
+      "tests/test_finalize_merge_toctou.py",
+      "src/agentic_loop/wrappers/merge.sh",
+      "src/agentic_loop/gate/qoder_security.py",
+      "src/agentic_loop/wrappers/finalize_merge.sh"
     ],
     "forbidden_paths": [
       "src/agentic_loop/plan_cmd.py",
@@ -42,9 +45,7 @@
       ".agentic/config.toml",
       "uv.lock",
       "docs/plans/**",
-      "docs/agentic/templates/**",
-      "src/agentic_loop/wrappers/merge.sh",
-      "src/agentic_loop/gate/qoder_security.py"
+      "docs/agentic/templates/**"
     ],
     "decisions": {
       "inv1_semantics": "User-selected: the trusted source is the registered worktree that currently has git.target_branch checked out. Whether that checkout is the physical primary repo or a linked worktree does NOT affect the verdict; every other worktree is still refused. The rejected alternative was to additionally require it be an explicitly configured checkout -- narrower, but it needs a new config key and a misconfiguration would deadlock the tooling exactly as today.",
@@ -53,7 +54,8 @@
       "anchor": "User-selected after brief-r2: the trusted branch anchor must live OUTSIDE the repository write domain. rev3 uses $XDG_CONFIG_HOME/agentic_loop/policy.toml (default $HOME/.config/...) key [trust] protected_branch, measured to be inside no git worktree. Rejected, each measured: .agentic/config.toml (git TRACKED), refs/remotes/origin/HEAD (movable by one local symbolic-ref call), server ls-remote (remote.origin.url is locally rewritable, plus a network dependency), environment variable (caller-declared fact -- the A22 bypass family).",
       "literal_defect": "User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here.",
       "direction_c": "User-selected after three REWORKs in one root-cause family: option (c). WP-01 is DOWNGRADED to a pure usability fix. It resolves the finalize/preflight/merge deadlock and explicitly WITHDRAWS any claim of defending against a malicious LOCAL actor. Rationale accepted from the escalation: in this threat model anyone who can write the repository or set the caller's environment can already modify the code itself, so an unmovable local trust root is a false goal, whereas the deadlock is a real daily obstruction. Every anchor attempt is therefore abandoned: rev1 (status field), rev2 (origin/HEAD + tracked config), rev3 (XDG_CONFIG_HOME policy file) are all superseded.",
-      "wp02_split": "User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here."
+      "wp02_split": "User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here.",
+      "scope_rev5": "D13 closed. brief section 6 and status forbidden_paths previously contradicted each other on merge.sh and gate/qoder_security.py: the brief allowed them, the status forbade them. WP-02 merged both into the single predicate, so WP-01 must be able to edit them -- there are FIVE call sites, not three. finalize_merge.sh was missing from allowed_paths entirely despite being one of the original three. Flagged by topo-brief-r4 Q2."
     }
   },
   "risk": {
@@ -65,20 +67,21 @@
   "evidence": {
     "tests": [],
     "brief": {
-      "rev": 4,
-      "sha256": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957",
+      "rev": 5,
+      "sha256": "34dd681bb0d1e6f3b3b586b0f5aa9d10742029a21c747b1cdc798d328078d126",
       "snapshots": {
-        "rev3": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b"
+        "rev3": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b",
+        "rev4": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957"
       }
     }
   },
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-brief-r4",
+    "round": "topo-brief-r5",
     "decision": null,
     "kind": "wp-brief-second-signature",
-    "bound_brief_rev": 4,
+    "bound_brief_rev": 5,
     "prior_rounds": [
       {
         "round": "topo-brief-r1",
@@ -118,24 +121,24 @@
         ]
       },
       {
-        "round": "topo-brief-r3",
+        "round": "topo-brief-r4",
         "decision": "REWORK",
-        "bound_brief_rev": 3,
+        "bound_brief_rev": 4,
         "kind": "wp-brief-second-signature",
-        "resolved_in_rev": 4,
+        "resolved_in_rev": 5,
         "findings": [
-          "D7: rev3's out-of-repo anchor was pierced. The anchor was $XDG_CONFIG_HOME/agentic_loop/policy.toml, claimed to be 'outside repository write permission', but XDG_CONFIG_HOME is a CALLER-SUPPLIED environment variable -- exactly the category rev3's own exclusion table rejected as 'caller-declared fact, the A22 bypass family'. Orchestrator-reproduced: XDG_CONFIG_HOME=/tmp/evil plus a policy.toml declaring feat/evil retargets the trusted branch, and because that file is in no git worktree it PASSES rev3's own E9b check.",
-          "D9: INV-3 clause 3 was self-contradictory -- it required the comparison baseline to come from 'the anchor's repository' while also requiring the anchor to live outside every git worktree, so no such repository exists.",
-          "USER DECISION (c): under this threat model anyone who can write the repo or set the caller's environment can simply edit the predicate, so an immovable local trust root is a false goal. Three revisions stalled at the same place, indicating the objective was wrong rather than the implementation. All security claims are WITHDRAWN and the WP is downgraded to a pure usability fix.",
-          "rev4 deletes: the anchor architecture (original INV-1b), the candidate-exclusion table, E9/E9b/E11, M-8/M-9/M-10/M-2b. It keeps the correctness requirements that never depended on a security claim: INV-1/2/2b/3/4/5, E1-E6/E8, E10 (recast as structural correctness) and M-1..M-7. It also fixes two dangling references rev3 left behind: M-2/M-2b pointed at E7, which rev3 had deleted."
+          "Q1 mostly ACCEPT: the withdrawal was judged honest -- INV-1b clause 3 denies the trust boundary explicitly, E10/M-7's recasting as structural correctness is legitimate, and section 8 is specific enough to stop re-litigation. One incomplete spot: E1 still required an out-of-repo policy file, contradicting section 6's ban (D11).",
+          "Q3 FATAL, orchestrator-reproduced: rev4 keyed the predicate on PLAN git.target_branch, which is main. Measured here: ZERO worktrees hold main (git worktree list --porcelain | grep -c 'branch refs/heads/main$' = 0), and the authoritative status does not exist on main at all (git cat-file -e main:.../WP-01.status.json fails) while it does exist on the integration branch, held by this very checkout. rev4 would therefore fail-closed immediately with 'no checkout holds target_branch' -- trading the physical-location deadlock for a branch-lifecycle deadlock. USER DECISION: switch the basis to the integration branch, PLAN git.base_branch (D10).",
+          "Q2/Q4: M-2 was repointed from the deleted E7 to E3, but E3 is 'same repo, wrong branch' and would still be refused by INV-3 clause 2 after removing the common-dir comparison, so M-2 could not turn it red -- not load-bearing (D12). INV-5 had no acceptance test, only a DoD self-check. The brief said three call sites in section 1 and five in section 7. status forbidden_paths banned merge.sh and qoder_security.py while brief section 6 allowed them (D13). M-7 did not pin WHICH field is misread. INV-1b's no-fallback half and INV-5 had no guarding mutation.",
+          "rev5 fixes all of it: basis switched to base_branch with the measurement recorded; E1 uses a legal PLAN fixture; E7 restored as a dedicated cross-repository node with M-2 repointed at it; E12 added for INV-5 with M-12 guarding it; M-11 added to guard the no-fallback rule; M-7 now names WP status's own git.base_branch as the misread field; scope unified on five call sites in both the brief and this status; the duplicated topo-brief-r3 record merged."
         ]
       }
     ],
-    "pending_note": "Brief rev4 second signature. rev4 is a DOWNGRADE per user decision (c): all security claims withdrawn."
+    "pending_note": "Brief rev5 second signature. rev5 switches the basis to the integration branch (base_branch) and closes D10-D13."
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-15T21:00:00Z",
+    "updated_at": "2026-10-15T22:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
