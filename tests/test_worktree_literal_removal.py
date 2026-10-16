@@ -653,11 +653,28 @@ def _code_without_comments(text: str, *, python: bool) -> list[str]:
 # install.sh.tmpl and pre-push.tmpl, both of which init_cmd.py:99-101 installs
 # at mode 0o755 -- i.e. they ship as executable shell. A literal-based worktree
 # check added there would never have been seen.
-_EXECUTABLE_TEMPLATES = {"install.sh.tmpl", "pre-push.tmpl"}
+def _executable_templates() -> frozenset[str]:
+    """Every template init_cmd installs with an executable bit, DERIVED.
+
+    wp02-r8 showed why this must not be a hand-written set: a hard-coded
+    {"install.sh.tmpl", "pre-push.tmpl"} plus an assertion that those two are
+    still installed is ONE-WAY. Adding a third entry to ``_HOOK_TEMPLATES``
+    (e.g. ``("merge-hook.tmpl", ..., 0o755)``) and planting the literal in it
+    would be skipped by the suffix filter while every assertion and F6 stayed
+    green -- so the claim "the install set cannot drift silently" was false.
+
+    Reading ``init_cmd._HOOK_TEMPLATES`` directly means a new executable
+    template is in scope the moment it is added, with no test edit.
+    """
+    from agentic_loop import init_cmd
+
+    return frozenset(
+        name for name, _target, mode in init_cmd._HOOK_TEMPLATES if mode & 0o111
+    )
 
 
 def _is_scannable(path: Path) -> bool:
-    return path.suffix in {".py", ".sh"} or path.name in _EXECUTABLE_TEMPLATES
+    return path.suffix in {".py", ".sh"} or path.name in _executable_templates()
 
 
 def _scans_as_python(path: Path) -> bool:
@@ -811,13 +828,15 @@ def test_f6_no_literal_worktree_check_remains() -> None:
     # templates that init_cmd.py installs at mode 0o755, i.e. files that ship
     # as executable shell. Pin that they are in scope, and that they really are
     # installed as executables, so this stays true if the template set changes.
-    for name in sorted(_EXECUTABLE_TEMPLATES):
+    executables = _executable_templates()
+    assert executables, "no executable templates derived; the scan set is empty"
+    for name in sorted(executables):
         tmpl = PKG_SRC / "agentic_loop" / "templates" / name
-        assert tmpl.is_file(), f"{name} vanished; update _EXECUTABLE_TEMPLATES"
+        assert tmpl.is_file(), f"init_cmd installs {name} but the template is missing"
         assert _is_scannable(tmpl), f"{name} is executable product code but unscanned"
-        assert f'("{name}", ' in (PKG_SRC / "agentic_loop" / "init_cmd.py").read_text(
-            encoding="utf-8"
-        ), f"{name} is no longer installed by init_cmd.py; re-check the scan set"
+        assert str(tmpl) in [
+            str(q) for q in sorted((PKG_SRC / "agentic_loop").rglob("*")) if q.is_file()
+        ], f"{name} is outside the scanned tree"
     assert hits == [], f"literal-based worktree check still in product code: {hits}"
     # The scan must be looking at the real tree, not silently skipping files.
     # Only Python comments are stripped now, so gate/__init__.py's explanatory
