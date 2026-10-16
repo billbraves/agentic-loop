@@ -476,3 +476,34 @@ fail-closed 分支，并确认**没有**引入环境变量或仓库外文件作�
   合并后被保留还是删除，已 MERGED 的 plan 的 status 都不再进入这些 gate**，故不需要阶段
   感知切换。若未来出现「PLAN 已 MERGED 但仍需校验其 status」的流程，需另开 WP。
 - 判据仍对无法 resolve 的路径 fail-closed（A19/A27 行为），rev4 不改变这一点。
+
+---
+
+> 以下三节为 `dispatch-lint` 要求的英文锚点（`## ` 精确匹配），
+> 内容与上文中文章节同义，**非另一份口径**。与 WP-03 的做法一致。
+
+## Acceptance tests
+
+本段与上文「§4 验收测试」同义，非另一份口径：验收节点为
+**E1、E2、E3、E4、E5、E6、E8、E9、E10、E12** 共 10 个，其中 E6 含
+1 组正向（合法带 `/` 的集成分支名，含真实值 `plan/2026-10-15-status-source-topology`）
+与 12 种负向形态，E9 含 6 种退化形态且 fixture 中必须有一个活的 `main` 持有者。
+E8 复用 `tests/test_worktree_detection.py` 既有 17 节点作为加固护栏。
+rev6 已删除 E7（跨仓库混淆已由候选枚举方式排除，见 §1.99 D15）。
+
+## Allowed and forbidden paths
+
+本段与上文「§6 范围」同义，非另一份口径：只能改 allowed_paths 白名单内的路径
+（判据本体 `gate/__init__.py`、五个调用点、以及 §6 列出的测试文件），绝不能碰
+forbidden_paths 黑名单（`plan_cmd.py`、`validate_wp_status.py`、`autonomy.py`、
+`.agentic/config.toml`、`uv.lock`、`docs/plans/**`、`docs/agentic/templates/**`）。
+不得新增任何旁路开关（`--allow-worktree-status`、环境变量等）。
+
+## Completion definition
+
+本段与上文「§7 完成定义（DoD）」同义，非另一份口径：10 个验收节点全绿；
+承重变异 M-1、M-3、M-4、M-5、M-6、M-7、M-11、M-12 逐条红证齐备并精确还原
+（还原后 `git diff` 为空）；INV-4 的 17 行旧节点→新断言映射表齐备；
+五入口单一权威自检（由 E12 承载、M-12 守护）；分支名校验自检（合法带 `/`
+名称被接受、分支名未拼进任何路径）；不可回退自检；端到端自检三入口可用；
+全量不低于基线 **912 passed / 4 skipped**；无生产写入/网络/通知/推送。
