@@ -217,3 +217,55 @@ def test_project_name_for_plain_directory_uses_its_own_name(tmp_path):
     plain = tmp_path / "standalone"
     (plain / ".git").mkdir(parents=True)
     assert project_name_for(plain) == "standalone"
+
+
+# ---- a table-form role must render as a bare tool name, never a repr --------
+#
+# `build_values` used to compute the dispatch hint by list-wrapping the role and
+# taking [0]. A dict is not a list/tuple, so a table-form binding came back as
+# the dict itself and str() wrote a Python repr into AGENTS.md / CLAUDE.md:
+#
+#   dispatch the developer role (configured tool: {'adapter': 'kimi',
+#   'fallback_provider': 'deepseekflash'}) into an isolated worktree; ...
+#
+# This is load-bearing, not cosmetic: .agentic/config.toml in this repo uses the
+# table form, so `agentic contract check` reported CONFIG_DRIFT on three files.
+
+@pytest.mark.parametrize(
+    "role,expected",
+    [
+        ({"adapter": "kimi", "provider": "deepseekflash"}, "kimi"),
+        ({"adapter": "kimi", "fallback_provider": "deepseekflash"}, "kimi"),
+        ({"adapter": "kimi"}, "kimi"),
+        ("kimi", "kimi"),
+        (["kimi", "claude"], "kimi"),
+        ([], "the developer tool"),
+        ({}, "the developer tool"),
+    ],
+)
+def test_dispatch_hint_uses_bare_tool_name_for_every_binding_form(role, expected):
+    v = cr.build_values({"roles": {"developer": role}}, project_name="proj")
+    hint = v["developer_dispatch_hint"]
+    assert "configured tool: {})".format(expected) in hint, hint
+    # no structured value ever leaks into contract prose
+    assert "{'" not in hint and "adapter" not in hint and "provider" not in hint
+
+
+def test_rendered_contracts_carry_no_python_repr_for_table_form_developer():
+    """Render-level: the emitted files themselves must be free of the struct."""
+    cfg = dict(_SAMPLE_CFG)
+    cfg["roles"] = dict(
+        _SAMPLE_CFG["roles"],
+        developer={"adapter": "kimi", "fallback_provider": "deepseekflash"},
+    )
+    for name in ("AGENTS.md.tmpl", "CLAUDE.md.tmpl", "OPERATING_MODEL.md.tmpl"):
+        out = cr.render_template(name, cfg, project_name="proj")
+        assert "{'adapter'" not in out, name
+        assert "'fallback_provider':" not in out, name
+    # positive control: the provider detail is still rendered where it belongs,
+    # so a "fix" that scrubs the struct by dropping information fails too
+    v = cr.build_values(
+        {"roles": {"developer": {"adapter": "kimi", "provider": "deepseekflash"}}},
+        project_name="proj",
+    )
+    assert v["developer"] == "kimi (provider: deepseekflash)"
