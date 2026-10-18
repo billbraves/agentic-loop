@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "READY_FOR_REVIEW",
+  "state": "APPROVED_FOR_MERGE",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -28,7 +28,7 @@
     "dispatch_commit": "",
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
-    "commit": "759df4bd321aec202d5e3cb797ce9e89fe479787",
+    "commit": "b91388c1bc709159e53ed720fd0503c32c162718",
     "merged_commit": null,
     "worktree_note": "Sequential WP per contract 4.3: it works directly on the plan's integration branch, so there is no separate per-WP worktree. The recorded path is the checkout that HOLDS the integration branch -- which is exactly the 'authoritative branch holder' this WP teaches the predicate to recognise. Note this checkout is itself a linked worktree, which is why every gate currently refuses it."
   },
@@ -199,11 +199,17 @@
       "inv4_mapping": "Verified against the pre-WP-01 tree: 17 old nodes -> 17 new guard_* nodes, one-to-one. Seven were RENAMED (worktree -> non_holder / authoritative) to match the retargeted semantics, not deleted. Attack-form counts are preserved or higher: caller-env disguise 2->2, overlong 4->4, NUL 4->7, symlink loop 18->25. No attack form was weakened or dropped."
     }
   },
-  "review": {},
+  "review": {
+    "decision": "ACCEPT",
+    "bound_commit": "b91388c1bc709159e53ed720fd0503c32c162718",
+    "reviewer": "claude (orchestrator), independent",
+    "evidence": "Reviewed the diff independently of the developer's report. Scope: 10 changed paths, all inside allowed_paths, none forbidden, no product code touched by the fixture extension. Product change verified load-bearing by controlled comparison in a throwaway worktree at the pre-WP-01 commit: the OLD predicate refuses the authoritative status in this linked-worktree holder, the NEW one accepts it. Eight mutations applied one at a time with exact reverts (M-1/M-3/M-4/M-5/M-6/M-7/M-11/M-12), each turning its named node red for the stated reason, with M-4 and M-5 failing in opposite directions. INV-4 mapping 17 old nodes -> 17 new guard_* nodes, seven renamed not deleted, attack coverage preserved or higher. E12 verified in six directions and E13 now covers 18 malformed plus 7 well-formed porcelain cases. Full suite 972 passed / 4 skipped against a 912/4 baseline. Two API-visible behaviours deliberately unchanged: refusal wording and exit codes.",
+    "lock_note": "The status write for this review happened while the WP lock was NOT held: agentic lock heartbeat returned HEARTBEAT_LOST no_lock. Recorded here rather than hidden; the lock was re-acquired before this commit."
+  },
   "consult": {
-    "state": "PENDING",
+    "state": "DECIDED",
     "round": "topo-impl-r11",
-    "decision": null,
+    "decision": "ACCEPT",
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
     "prior_rounds": [
@@ -416,9 +422,27 @@
         "resolved_in_round": "topo-impl-r11",
         "coverage_note": "Marker ACCEPT, but the entire body was one line asking whether it should write the conclusion into the WP status -- no reasoning, no construction named, nothing to check. The dispatch prompt states that a bare ACCEPT is treated as unsubstantiated, so it is recorded here as ACCEPT_BARE rather than as a signature. Zero HTTP 529s, so this was not truncation; the round simply did not do the work.",
         "action": "One further round (r11) asks only for the list of constructions tested and which way each went."
+      },
+      {
+        "round": "topo-impl-r11",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "bound_commit": "b91388c",
+        "substantiation": [
+          "Substantiated, construction by construction, and it matches the orchestrator's own independent checks exactly. It states it RAN them, and each verdict is the one the code produces:",
+          "1 REJECT -- renaming the real import and call while comments still spell the name: ast ignores comments.",
+          "2 REJECT -- a bare decoy call does not decide the printed verdict.",
+          "3 REJECT -- `if <pred>: pass` never emits a verdict.",
+          "4 ACCEPT -- a legitimate `as _pw` alias resolves and `_pw(...)` decides the ternary.",
+          "5 ACCEPT -- the real merge.sh / preflight.sh form: the predicate directly decides the printed ternary.",
+          "6 ACCEPT -- the real finalize_merge.sh form: the predicate branch calls emit_verdict and exits.",
+          "7 ACCEPT -- the real qoder_security.py form: the predicate branch raises GateError.",
+          "Together with r7's ACCEPT of the malformed-porcelain parser, the implementation ID at this commit is signed twice: parser by r7, E12 by r11. Q2 and Q4 were ACCEPTed at r2 and again at r4 and did not change afterwards."
+        ]
       }
     ],
-    "pending_note": "Parser ACCEPTed with concrete verification at r7. r10 returned a bare ACCEPT with no reasoning, so substantiation is being requested explicitly.",
+    "pending_note": "Implementation second-signed: parser at r7, E12 at r11, Q2/Q4 at r2 and r4.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -430,18 +454,21 @@
         "topo-impl-r4"
       ],
       "note": "Four rounds, no clean ACCEPT yet: r1 and r3 returned no verdict marker (void), r2 and r4 REWORKed on two real defects each. Every finding was reproducible and every one was in the ORCHESTRATOR's own fixes rather than the developer's code. The product behaviour (E1-E10) has been ACCEPTed in every round that produced a verdict; the churn is concentrated in the malformed-porcelain parser and in E12's static-analysis strength, both of which are acceptance-test infrastructure.",
-      "provider_note": "Of five implementation-signature rounds, three were void from provider overload (HTTP 529) rather than disagreement. Only r2 and r4 returned usable verdicts, and both REWORKed on genuine defects in the orchestrator's own fixes. The soft-limit signal therefore overstates the amount of real disagreement."
+      "provider_note": "Of five implementation-signature rounds, three were void from provider overload (HTTP 529) rather than disagreement. Only r2 and r4 returned usable verdicts, and both REWORKed on genuine defects in the orchestrator's own fixes. The soft-limit signal therefore overstates the amount of real disagreement.",
+      "resolution": "Eleven rounds. Of these, FOUR were void from provider overload (r1, r3, r5, r6) and ONE was a bare marker with no reasoning (r10). Only six produced usable verdicts, and five of those found real defects -- every single one in the ORCHESTRATOR's own fixes, never in the developer's product code, which was ACCEPTed whenever it was examined. The defects clustered in two places: the malformed-porcelain parser and E12's static strength. Convergence was monotonic; each round narrowed the hole rather than finding a new area.",
+      "final_state": "RESOLVED: parser ACCEPT r7, E12 ACCEPT r11"
     },
     "checks_r2": {
       "parser_cases": "7 must-refuse + 6 must-parse all correct",
       "real_git_output": "19 records parse",
       "e12_bypass": "now turns RED",
       "full_suite": "961 passed / 4 skipped"
-    }
+    },
+    "bound_commit": "b91388c1bc709159e53ed720fd0503c32c162718"
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T17:00:00Z",
+    "updated_at": "2026-10-16T18:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
