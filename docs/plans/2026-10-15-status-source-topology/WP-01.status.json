@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r5",
+    "round": "topo-impl-r6",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -343,9 +343,23 @@
           "FIXED 2: E12 now also requires the predicate call to BE the verdict condition -- `if <pred>(...)` or the ternary `... if <pred>(...) else ...`, resolved through the import alias with ast for .py. Verified in three directions: the r4 decoy mutation is now RED, the alias refactor stays GREEN, and the earlier comment-only rename is still RED.",
           "E13 is now 18 malformed + 7 well-formed cases. Real git worktree list output still parses (19 records); the live predicate still accepts this plan's authoritative status. Full suite 972 passed / 4 skipped."
         ]
+      },
+      {
+        "round": "topo-impl-r5",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_PROVIDER_OVERLOAD",
+        "resolved_in_round": "topo-impl-r6",
+        "findings": [
+          "PROVIDER FAILURE, NOT A REVIEW RESULT. The answer body is 19 bytes, literally '(empty placeholder)'. No finding was made in either direction.",
+          "Root cause visible in the session event log: 8 occurrences of HTTP 529 (provider overloaded); the turn ended with an empty agent message after 1271 output tokens.",
+          "This is chronic rather than a one-off. Counting 529s per round: r1=19, r2=29, r3=7, r4=17, r5=4. The rounds that DID produce a verdict (r2, r4) hit them too and survived; the ones that produced empty or truncated bodies (r1, r3, r5) did not. So of five rounds, only two yielded a usable verdict, and every finding those two made was real and has been fixed.",
+          "Retried as r6 with a much shorter prompt, on the theory that a smaller review has less chance of being cut off mid-answer."
+        ]
       }
     ],
-    "pending_note": "Fifth implementation signature round. Four rounds so far: r1/r3 void (no marker), r2/r4 REWORK on four real defects, all in the orchestrator's own fixes and all now fixed.",
+    "pending_note": "Sixth implementation signature attempt. Three prior rounds produced no usable verdict due to provider 529 overload (r1, r3, r5); the two that did (r2, r4) each found two real defects, all fixed.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -356,7 +370,8 @@
         "topo-impl-r3",
         "topo-impl-r4"
       ],
-      "note": "Four rounds, no clean ACCEPT yet: r1 and r3 returned no verdict marker (void), r2 and r4 REWORKed on two real defects each. Every finding was reproducible and every one was in the ORCHESTRATOR's own fixes rather than the developer's code. The product behaviour (E1-E10) has been ACCEPTed in every round that produced a verdict; the churn is concentrated in the malformed-porcelain parser and in E12's static-analysis strength, both of which are acceptance-test infrastructure."
+      "note": "Four rounds, no clean ACCEPT yet: r1 and r3 returned no verdict marker (void), r2 and r4 REWORKed on two real defects each. Every finding was reproducible and every one was in the ORCHESTRATOR's own fixes rather than the developer's code. The product behaviour (E1-E10) has been ACCEPTed in every round that produced a verdict; the churn is concentrated in the malformed-porcelain parser and in E12's static-analysis strength, both of which are acceptance-test infrastructure.",
+      "provider_note": "Of five implementation-signature rounds, three were void from provider overload (HTTP 529) rather than disagreement. Only r2 and r4 returned usable verdicts, and both REWORKed on genuine defects in the orchestrator's own fixes. The soft-limit signal therefore overstates the amount of real disagreement."
     },
     "checks_r2": {
       "parser_cases": "7 must-refuse + 6 must-parse all correct",
@@ -367,7 +382,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T11:00:00Z",
+    "updated_at": "2026-10-16T12:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
