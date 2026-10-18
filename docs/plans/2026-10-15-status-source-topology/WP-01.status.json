@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r7",
+    "round": "topo-impl-r8",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -371,9 +371,20 @@
           "This is the fourth void round out of six (r1, r3, r5, r6); only r2 and r4 produced usable verdicts. The blocker is provider availability, not a disagreement about the code.",
           "Retried as r7 with a deliberately minimal single-question ask -- just the parser, four commands maximum -- to maximise the chance of a complete answer."
         ]
+      },
+      {
+        "round": "topo-impl-r7",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "substantiation": [
+          "Scoped deliberately to the parser, which is where r4's Q1 defect lived. The consultant ran the commands rather than reasoning from the text: it reported that _parse_worktree_listing returns None for all four malformed inputs, parses all three well-formed ones, that the two-space case prints None on the real command, and that real git worktree list --porcelain output still parses -- so the strictness did not go too far.",
+          "This round had ZERO HTTP 529s, which confirms the previous four void rounds were provider availability rather than anything about the code or the prompt."
+        ],
+        "coverage_note": "This ACCEPT covers the malformed-porcelain parser only. Q2 and Q4 were ACCEPTed at r2 and again at r4, but E12 was changed AFTER r4 (the decoy fix), so E12 at the current HEAD is not covered by any signature yet. A further minimal round is being run for exactly that."
       }
     ],
-    "pending_note": "Seventh attempt, minimal single-question scope. Four of six prior rounds were void from provider 529 overload.",
+    "pending_note": "Parser ACCEPTed at r7. One more minimal round for E12, which changed after r4 and is therefore not yet covered by any signature.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -396,7 +407,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T13:00:00Z",
+    "updated_at": "2026-10-16T14:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
