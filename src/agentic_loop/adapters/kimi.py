@@ -58,7 +58,17 @@ class KimiAdapter(Adapter):
         """
         b = self._binding
         key = os.environ.get(b.api_key_env, "")
-        base_url = getattr(b, "openai_base_url", None) or b.anthropic_base_url
+        # No fallback to anthropic_base_url: this block declares an
+        # ``openai_legacy`` provider, so an anthropic endpoint here is a broken
+        # config that fails later as an opaque remote error. build_binding
+        # already refuses a kimi binding without openai_base_url, so a missing
+        # value here means the binding was constructed by hand — fail loudly.
+        if not b.openai_base_url:
+            raise ValueError(
+                "kimi adapter requires openai_base_url "
+                "(the injected provider uses type=openai_legacy)"
+            )
+        base_url = b.openai_base_url
         text = (
             f'[providers."{b.provider}"]\n'
             f'type     = "openai_legacy"\n'

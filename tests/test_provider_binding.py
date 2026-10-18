@@ -67,6 +67,42 @@ def test_codex_missing_openai_base_url_fail_closed():
         build_binding(adapter="codex", provider_cfg=bad)
 
 
+# --------------------------------------------------------------------------
+# The validated field must be the field the adapter actually injects.
+#
+# kimi's injected provider block is ``type = "openai_legacy"``, so the adapter
+# reads ``openai_base_url``. While kimi sat in the anthropic set, a config with
+# only ``anthropic_base_url`` (this repo's own providers.deepseekflash was in
+# exactly that shape) passed validation and then wrote the /anthropic endpoint
+# into an openai_legacy block -- a valid-looking file that could only fail later
+# as an opaque remote error.
+# --------------------------------------------------------------------------
+
+def test_kimi_missing_openai_base_url_fail_closed():
+    """kimi injects an openai_legacy provider, so it requires openai_base_url."""
+    bad = dict(DEEPSEEK_CFG, openai_base_url=None)
+    with pytest.raises(ProviderConfigError):
+        build_binding(adapter="kimi", provider_cfg=bad)
+
+
+def test_kimi_anthropic_only_config_is_rejected():
+    """The exact historical shape: anthropic_base_url present, openai absent."""
+    bad = {
+        "anthropic_base_url": "https://api.deepseek.com/anthropic",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "identity_model": "deepseek-v4-flash",
+        "selectors": {"kimi": "deepseek/v4-flash"},
+    }
+    with pytest.raises(ProviderConfigError):
+        build_binding(adapter="kimi", provider_cfg=bad)
+
+
+def test_kimi_with_openai_base_url_builds():
+    """Positive reachability: the same call succeeds once the field is declared."""
+    b = build_binding(adapter="kimi", provider_cfg=DEEPSEEK_CFG)
+    assert b.openai_base_url == "https://api.deepseek.com/v1"
+
+
 def test_error_message_does_not_leak_key_value(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
     bad = dict(DEEPSEEK_CFG, anthropic_base_url=None)

@@ -12,6 +12,7 @@ from agentic_loop.resolve_paths import resolve_role_fallback_binding
 FLASH_CFG = """\
 [providers.deepseekflash]
 anthropic_base_url = "https://api.deepseek.com/anthropic"
+openai_base_url    = "https://api.deepseek.com/v1"
 api_key_env        = "DEEPSEEK_API_KEY"
 identity_model     = "deepseek-v4-flash"
 [providers.deepseekflash.selectors]
@@ -55,7 +56,8 @@ def test_none_when_provider_section_missing(tmp_path):
 
 
 def test_none_when_provider_cfg_invalid_no_raise(tmp_path):
-    # 缺 anthropic_base_url（kimi 必需）→ build_binding 会抛；解析器须吞掉返回 None。
+    # 缺 openai_base_url（kimi 注入 openai_legacy provider，该字段必需）
+    # → build_binding 会抛；解析器须吞掉返回 None。
     bad = (
         '[providers.deepseekflash]\n'
         'api_key_env = "DEEPSEEK_API_KEY"\n'

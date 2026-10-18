@@ -136,6 +136,34 @@ def test_kimi_temp_config_contains_key_and_is_0600(monkeypatch):
     assert not Path(cfg_path).exists()                    # cleaned up after ctx
 
 
+def test_kimi_temp_config_never_writes_anthropic_endpoint(monkeypatch):
+    """The openai_legacy block must never carry the /anthropic endpoint.
+
+    When kimi fell back to ``anthropic_base_url``, a provider section declaring
+    only that field produced ``base_url = ".../anthropic"`` inside a
+    ``type = "openai_legacy"`` block: syntactically valid, semantically wrong,
+    and observable only as an opaque remote failure at dispatch time.
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-CANARY")
+    a = KimiAdapter(binding=mk_binding(selector="deepseek/v4-pro"))
+    with a._temp_config() as cfg_path:
+        text = Path(cfg_path).read_text()
+    assert "openai_legacy" in text
+    assert "/anthropic" not in text, text
+
+
+def test_kimi_temp_config_refuses_binding_without_openai_base_url(monkeypatch):
+    """A hand-built binding must fail loudly, not silently reuse the other URL."""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-CANARY")
+    b = mk_binding(selector="deepseek/v4-pro")
+    object.__setattr__(b, "openai_base_url", None)        # frozen dataclass
+    a = KimiAdapter(binding=b)
+    with pytest.raises(ValueError, match="openai_base_url"):
+        with a._temp_config() as _cfg:
+            pass
+
+
+
 def test_kimi_temp_mcp_config_declares_no_servers(monkeypatch):
     """Dispatch must not inherit the operator's ~/.kimi/mcp.json.
 
