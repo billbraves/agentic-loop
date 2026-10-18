@@ -1,0 +1,53 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-01",
+  "iteration_id": "2026-10-18-provider-binding-validation",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "IMPLEMENTING",
+  "role": "Developer",
+  "executor": {
+    "tool": "claude-code",
+    "session": "kimi dispatch not operable in this environment (no DEEPSEEK_API_KEY; sandbox blocks kimi's ~/.kimi/logs write, so probe_injection cannot pass). Implemented by the orchestrator acting as developer, per user decision; this is NOT reported as a kimi dispatch."
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-10-18-provider-binding-validation",
+    "base_commit": "5bd90b5249137c7d746f0f574a979d9811b2a29f",
+    "dispatch_commit": "",
+    "branch": "plan/2026-10-18-provider-binding-validation",
+    "worktree": "/tmp/pbv-plan",
+    "commit": ""
+  },
+  "scope": {
+    "allowed_paths": [
+      "tests/test_finalize_merge_triple_sign.py"
+    ],
+    "forbidden_paths": [
+      "src/",
+      "docs/plans/2026-09-22-framework-hardening/",
+      ".agentic/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": []
+  },
+  "review": {},
+  "consult": {},
+  "timestamps": {
+    "dispatched_at": ""
+  }
+}
