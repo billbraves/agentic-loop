@@ -384,29 +384,43 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
     HEAD) and ``prunable`` (True when git marked the entry prunable — its
     directory is gone). ``None`` signals malformed output (fail closed).
 
-    EVERY line must be one git actually documents for this format; an
-    unrecognised line yields ``None`` rather than being skipped. Skipping was a
-    real fail-open: a corrupted or unexpected record was silently accepted as a
-    valid holder, so this predicate — whose entire contract is fail-closed —
-    would have answered "yes, trusted" on output it did not understand. The
-    known set is the documented porcelain vocabulary (``worktree``, ``HEAD``,
-    ``branch``, ``detached``, ``bare``, ``locked``, ``prunable``); ``HEAD``,
-    ``detached``, ``bare`` and ``locked`` carry no fact this predicate uses, but
-    they must still be RECOGNISED so their presence is not mistaken for
-    corruption.
+    EVERY line must be one git actually documents for this format, matched as an
+    EXACT token; anything else yields ``None`` rather than being skipped.
+    Skipping was a real fail-open: a corrupted or unexpected record was silently
+    accepted as a valid holder, so this predicate — whose entire contract is
+    fail-closed — would have answered "yes, trusted" on output it did not
+    understand. The documented vocabulary is ``worktree``, ``HEAD``, ``branch``,
+    ``detached``, ``bare``, ``locked``, ``prunable``; the middle four carry no
+    fact this predicate consumes, but they must still be RECOGNISED so their
+    presence is not mistaken for corruption.
+
+    Prefix matching is not enough either (a first cut of this check used
+    ``startswith("locked")`` and let ``lockedevil`` through), so each token is
+    matched whole — bare, or followed by exactly one space and its argument.
+    ``HEAD`` and ``branch`` are single-valued and may not repeat; records must be
+    separated by a blank line, so a second ``worktree`` line while a record is
+    still open is malformed rather than a new record.
     """
     records: list[dict[str, object]] = []
     current: "dict[str, object] | None" = None
-    seen: dict[int, set] = {}
+    seen: "set[str]" = set()
+
+    def _token(line: str, name: str) -> bool:
+        """True when ``line`` is exactly ``name`` or ``name`` + one argument."""
+        return line == name or line.startswith(name + " ")
+
     for line in text.splitlines():
         if line.startswith("worktree "):
+            if current is not None:
+                # A new record without the blank separator: malformed.
+                return None
             current = {
                 "worktree": line[len("worktree ") :],
                 "branch": None,
                 "prunable": False,
             }
             records.append(current)
-            seen[id(current)] = {"worktree"}
+            seen = set()
         elif current is None:
             # Content before the first ``worktree`` line, or between records,
             # must be blank: git separates records with an empty line.
@@ -415,23 +429,26 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
         elif not line.strip():
             # Blank line: end of this record (git's record separator).
             current = None
-        elif line.startswith("branch "):
-            if "branch" in seen[id(current)]:
+        elif _token(line, "branch"):
+            if "branch" in seen:
                 return None
-            seen[id(current)].add("branch")
+            seen.add("branch")
             current["branch"] = line[len("branch ") :].strip()
-        elif line.startswith("prunable"):
+        elif _token(line, "HEAD"):
+            if "HEAD" in seen:
+                return None
+            seen.add("HEAD")
+        elif _token(line, "prunable"):
             current["prunable"] = True
         elif (
-            line == "detached"
+            _token(line, "locked")
+            or line == "detached"
             or line == "bare"
-            or line.startswith("HEAD ")
-            or line.startswith("locked")
         ):
             # Recognised, but carries nothing this predicate consumes.
             continue
         else:
-            # Unknown or blank line inside a record: refuse rather than guess.
+            # Unknown or malformed line inside a record: refuse rather than guess.
             return None
     if not records:
         return None

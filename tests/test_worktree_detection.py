@@ -47,6 +47,7 @@ variable, or bypass flag exists or is tested for.
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -523,6 +524,49 @@ CALL_SITES = [
 ]
 
 
+IMPORT_RE = re.compile(
+    r"^from\s+agentic_loop\.gate\s+import\s+(?:[A-Za-z_][\w]*,\s*)*"
+    r"path_is_in_worktree\s*$",
+    re.MULTILINE,
+)
+INVOCATION = "path_is_in_worktree("
+
+
+def _strip_comments(text: str, rel: str) -> str:
+    """Remove comments so an assertion cannot be satisfied by prose.
+
+    ``.py`` goes through ``tokenize`` so only real COMMENT spans are removed --
+    a line-local ``#`` rule is fooled by ``#`` inside strings. Shell files have
+    no lexer here, so only FULL-LINE comments (first non-space char ``#``) are
+    stripped, which is the form every ``.sh`` call site uses. Anything that
+    fails to lex is returned verbatim, so a file that cannot be read keeps the
+    assertion RED rather than silently skipping it.
+    """
+    if rel.endswith(".py"):
+        import io
+        import tokenize
+
+        try:
+            # Blank out each COMMENT token's OWN span in the original text.
+            # Re-joining token strings would drop the whitespace between them
+            # and make `def path_is_in_worktree(` unfindable.
+            lines = text.splitlines(keepends=True)
+            spans = []
+            for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+                if tok.type == tokenize.COMMENT:
+                    spans.append((tok.start, tok.end))
+            for (srow, scol), (erow, ecol) in spans:
+                if srow == erow:
+                    ln = lines[srow - 1]
+                    lines[srow - 1] = ln[:scol] + ln[ecol:]
+            return "".join(lines)
+        except (tokenize.TokenError, IndentationError, SyntaxError):
+            return text
+    return "\n".join(
+        ln for ln in text.splitlines() if not ln.lstrip().startswith("#")
+    )
+
+
 def test_e12_one_predicate_across_all_five_call_sites() -> None:
     """E12 [one-predicate-across-all-five-call-sites] (INV-5).
 
@@ -531,19 +575,37 @@ def test_e12_one_predicate_across_all_five_call_sites() -> None:
     texts = {
         rel: (PKG_ROOT / rel).read_text(encoding="utf-8") for rel in CALL_SITES
     }
-    for rel, text in texts.items():
-        assert "path_is_in_worktree" in text, rel
 
-    # The definition lives in exactly ONE place.
+    # Assert against CODE, not raw text. A first cut of this node only checked
+    # that the string appeared, and every one of these files mentions the name
+    # in a comment -- so renaming the real import and call while leaving the
+    # comments intact kept it green (reproduced by the consultant and again
+    # here). Comments are stripped before matching.
+    code = {rel: _strip_comments(text, rel) for rel, text in texts.items()}
+
     definition = "def path_is_in_worktree("
-    definers = [rel for rel, text in texts.items() if definition in text]
-    assert definers == ["src/agentic_loop/gate/__init__.py"], definers
+    home = "src/agentic_loop/gate/__init__.py"
+
+    # The definition lives in exactly ONE place, and that file gets no import
+    # assertion -- it DEFINES the predicate rather than importing it.
+    definers = [rel for rel, body in code.items() if definition in body]
+    assert definers == [home], definers
+    assert len(code[home].split(definition)) > 1
+
+    # Every OTHER entry point must import it exactly and then actually call it.
+    for rel, body in code.items():
+        if rel == home:
+            continue
+        assert IMPORT_RE.search(body), (
+            rel, "no exact `from agentic_loop.gate import ... path_is_in_worktree`"
+        )
+        assert INVOCATION in body, (rel, "never actually invokes the predicate")
 
     # No alternate predicate definition anywhere else in product code.
-    for rel in CALL_SITES:
+    for rel, body in code.items():
         if rel == "src/agentic_loop/gate/__init__.py":
             continue
-        assert "def path_is_in_worktree(" not in texts[rel], rel
+        assert definition not in body, rel
 
 
 # ---------------------------------------------------------------------------
@@ -848,6 +910,18 @@ def test_guard_null_byte_path_fails_closed_without_raising(repo: Path) -> None:
         "branch refs/heads/y\n",
         # A record with no `worktree` line at all.
         "HEAD abc\nbranch refs/heads/main\n",
+        # Prefix, not whole-token, matching. The first cut of this fix used
+        # startswith("locked") / startswith("prunable") and these slipped
+        # through -- found by the implementation second signature (r2).
+        "worktree /tmp/t\nbranch refs/heads/main\nlockedevil\n",
+        "worktree /tmp/t\nbranch refs/heads/main\nprunableevil\n",
+        "worktree /tmp/t\nbranch refs/heads/main\nHEADEVIL x\n",
+        # HEAD is single-valued; a second one is corruption, not a fact.
+        "worktree /tmp/t\nHEAD a\nHEAD b\nbranch refs/heads/main\n",
+        # Records must be separated by a blank line, so a second `worktree`
+        # line while one is still open is malformed rather than a new record.
+        "worktree /tmp/a\nbranch refs/heads/x\nworktree /tmp/b\n"
+        "branch refs/heads/y\n",
     ],
 )
 def test_e13_malformed_porcelain_fails_closed(listing: str) -> None:

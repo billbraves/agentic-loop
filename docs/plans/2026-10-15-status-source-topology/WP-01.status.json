@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r2",
+    "round": "topo-impl-r3",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -298,9 +298,23 @@
           "FIXED: the parser now recognises the documented porcelain vocabulary (worktree, HEAD, branch, detached, bare, locked, prunable) and returns None on anything else, on a duplicate branch line, and on junk between records. Blank lines are handled as git's real record separator.",
           "VERIFIED: real git worktree-list output in this repo still parses (19 records, every branch accounted for), so the gate is not broken; the live predicate still accepts this plan's authoritative status, and still accepts a different worktree that legitimately holds ITS OWN plan's base_branch, which is the correct per-plan semantics. Nine new E13 nodes cover four malformed and five well-formed forms. Mutation M-13 (restore the silent skip) turns the unknown-line case red, so the node is load-bearing. Full suite 956 passed / 4 skipped."
         ]
+      },
+      {
+        "round": "topo-impl-r2",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r3",
+        "findings": [
+          "Q2 and Q4 ACCEPT: all five entry points really import and call the one predicate, the single definition is in gate/__init__.py, refusal wordings and exit codes are unchanged, all 17 changed files are inside allowed_paths, and the seven fixture files only add a PLAN status declaring the branch their fixture repo actually holds (or, in test_worktree_literal_removal, unpin a line number), with assert counts identical to baseline.",
+          "Q1 REWORK, and it was aimed at MY OWN fix from this round: prefix matching was not whole-token matching. `startswith(\"locked\")` accepted `lockedevil`, `startswith(\"prunable\")` accepted `prunableevil`, and duplicate HEAD plus a second `worktree` line with no blank separator were all accepted. Orchestrator reproduced every one. Fixed: exact tokens (bare, or name + one space + argument), HEAD and branch single-valued, records must be blank-line separated.",
+          "Q3 REWORK, also aimed at my own work: E12 only asserted the string `path_is_in_worktree` appeared in each file, and every one of those files mentions the name in a comment -- so renaming the real import and call while leaving comments intact kept E12 green. The consultant reproduced it in memory; the orchestrator reproduced it against the real file. M-12's existing red evidence therefore only proved that ONE particular edit is caught, not INV-5.",
+          "FIXED: E12 now strips comments before matching (tokenize COMMENT spans for .py, full-line comments for .sh) and requires, per non-definition call site, an exact `from agentic_loop.gate import ... path_is_in_worktree` AND a real `path_is_in_worktree(` invocation; the definition file is asserted to be the single definer and is exempt from the import half. Re-running the consultant's exact bypass now turns E12 RED.",
+          "Both fixes verified: 13 parser cases (7 must-refuse, 6 must-parse) behave correctly; real `git worktree list --porcelain` in this repo still parses (19 records) so no gate is broken; the live predicate still accepts this plan's authoritative status. E13 grew to 9 cases covering the r2 counterexamples. Full suite 961 passed / 4 skipped."
+        ]
       }
     ],
-    "pending_note": "Second signature on the implementation INCLUDING the malformed-porcelain fix. r1 was void (no verdict marker) but surfaced a real fail-open that is now fixed and tested.",
+    "pending_note": "Third implementation signature round. r1 void (no marker), r2 REWORK on two real defects that were both in the orchestrator's own fixes; both now fixed and re-verified.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "RESOLVED",
@@ -314,11 +328,17 @@
         "topo-brief-r6"
       ],
       "note": "Six brief rounds, five REWORK then ACCEPT. Two were fatal and both orchestrator-reproduced: r4 showed the basis object (target_branch=main) had zero holders and no authoritative copy, and r5 showed the name validation forbade '/' while the real integration branch contains it -- each would have left the predicate failing closed. r3 produced the user's decision (c) to withdraw all security claims after the out-of-repo anchor was pierced via XDG_CONFIG_HOME. The user authorised continuing past the soft limit at rev6."
+    },
+    "checks_r2": {
+      "parser_cases": "7 must-refuse + 6 must-parse all correct",
+      "real_git_output": "19 records parse",
+      "e12_bypass": "now turns RED",
+      "full_suite": "961 passed / 4 skipped"
     }
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T08:00:00Z",
+    "updated_at": "2026-10-16T09:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
