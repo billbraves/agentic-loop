@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r1",
+    "round": "topo-impl-r2",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -284,9 +284,23 @@
           "Q4: each mutation turns its named test red through a specific witness -- M-1 stale-specific, M-3 name-validation, M-4 E1's self-proving linked layout, M-5 E3's wrong-branch witness, M-6 the existing caller-env tests, M-7 the legal WP git.base_branch set against the PLAN basis, M-11 the live main holder in E9 producing a wrongful acceptance, M-12 the five-call-site static assertion. All independently applicable, with no mutation needing another to go red, and the specific witnesses plus fixture premises prevent incidental greening via no-holder, schema-invalid or missing-branch.",
           "Three non-blocking wording slips were named and the orchestrator fixed them without another round: the opening line still said three call sites, section 2 still said the integration branch 'disappears', and M-3 still said 8 name forms (now 12 negative)."
         ]
+      },
+      {
+        "round": "topo-impl-r1",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_MALFORMED_OUTPUT",
+        "findings": [
+          "The session returned a 503-byte body with NO verdict marker, so the harness recorded form=None decision=INVALID. Formally the round is void.",
+          "Its content was nonetheless a REAL defect and the orchestrator verified it independently rather than discarding it: _parse_worktree_listing had an elif chain with no final else, so any line it did not recognise was silently skipped and the record was still returned as a valid holder. Probed directly: a listing of worktree + branch + 'MALFORMED junk line' parsed to one accepted record instead of None.",
+          "That contradicts the predicate's own contract, which lists malformed worktree-list porcelain as a fail-closed branch, and it is a fail-OPEN in the one predicate whose entire design is fail-closed: output the code did not understand was treated as a trustworthy holder. No test covered malformed porcelain at all, so the claim was unbacked.",
+          "FIXED: the parser now recognises the documented porcelain vocabulary (worktree, HEAD, branch, detached, bare, locked, prunable) and returns None on anything else, on a duplicate branch line, and on junk between records. Blank lines are handled as git's real record separator.",
+          "VERIFIED: real git worktree-list output in this repo still parses (19 records, every branch accounted for), so the gate is not broken; the live predicate still accepts this plan's authoritative status, and still accepts a different worktree that legitimately holds ITS OWN plan's base_branch, which is the correct per-plan semantics. Nine new E13 nodes cover four malformed and five well-formed forms. Mutation M-13 (restore the silent skip) turns the unknown-line case red, so the node is load-bearing. Full suite 956 passed / 4 skipped."
+        ]
       }
     ],
-    "pending_note": "Implementation second signature on the retargeted predicate, the five call sites and the E1-E12 nodes, including the user-approved fixture extension that closed spec gap 1.",
+    "pending_note": "Second signature on the implementation INCLUDING the malformed-porcelain fix. r1 was void (no verdict marker) but surfaced a real fail-open that is now fixed and tested.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "RESOLVED",
@@ -304,7 +318,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T07:00:00Z",
+    "updated_at": "2026-10-16T08:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }

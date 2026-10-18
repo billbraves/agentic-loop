@@ -828,3 +828,60 @@ def test_guard_null_byte_path_fails_closed_without_raising(repo: Path) -> None:
     # is not an OSError; the shared guard form catches it -> fail closed (True).
     nul_path = Path(str(repo) + "/a\x00b.json")
     assert path_is_in_worktree(nul_path) is True
+
+
+# ---------------------------------------------------------------------------
+# E13: malformed `git worktree list --porcelain` must refuse (found in the
+# WP-01 implementation second signature, verified by the orchestrator).
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "listing",
+    [
+        # An unrecognised line inside a record. This is the fail-open that was
+        # actually there: the parser skipped unknown lines, so a record it did
+        # not understand was still returned as a valid holder.
+        "worktree /tmp/t\nbranch refs/heads/main\nMALFORMED junk\n",
+        # A second `branch` line contradicts the first; refuse rather than pick.
+        "worktree /tmp/t\nbranch refs/heads/a\nbranch refs/heads/b\n",
+        # Junk BETWEEN records, not just inside one.
+        "worktree /tmp/a\nbranch refs/heads/x\n\nJUNK\nworktree /tmp/b\n"
+        "branch refs/heads/y\n",
+        # A record with no `worktree` line at all.
+        "HEAD abc\nbranch refs/heads/main\n",
+    ],
+)
+def test_e13_malformed_porcelain_fails_closed(listing: str) -> None:
+    """E13 [malformed-porcelain-fails-closed].
+
+    `path_is_in_worktree`'s contract says malformed `git worktree list
+    --porcelain` output refuses. The parser must therefore RECOGNISE every line
+    it accepts and return None on anything else -- silently skipping an
+    unknown line would answer "trusted" on output it did not understand, which
+    inverts the whole fail-closed design.
+    """
+    from agentic_loop.gate import _parse_worktree_listing
+
+    assert _parse_worktree_listing(listing) is None, listing
+
+
+@pytest.mark.parametrize(
+    "listing,count",
+    [
+        # The documented vocabulary must still parse: strictness that rejected
+        # real git output would break every gate.
+        ("worktree /tmp/t\nHEAD abc\nbranch refs/heads/main\n", 1),
+        ("worktree /tmp/t\nHEAD abc\ndetached\nlocked reason\n", 1),
+        ("worktree /tmp/t\nbare\n", 1),
+        ("worktree /tmp/t\nHEAD abc\nbranch refs/heads/x\nprunable gone\n", 1),
+        # Real porcelain separates records with an empty line.
+        ("worktree /tmp/a\nbranch refs/heads/x\n\n"
+         "worktree /tmp/b\nbranch refs/heads/y\n\n", 2),
+    ],
+)
+def test_e13_well_formed_porcelain_still_parses(listing: str, count: int) -> None:
+    """E13 (positive half): the strictness must not reject real porcelain."""
+    from agentic_loop.gate import _parse_worktree_listing
+
+    records = _parse_worktree_listing(listing)
+    assert records is not None, listing
+    assert len(records) == count, (listing, records)

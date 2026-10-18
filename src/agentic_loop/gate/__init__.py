@@ -383,9 +383,21 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
     ``branch`` (the full ref, e.g. ``refs/heads/x``, or ``None`` for a detached
     HEAD) and ``prunable`` (True when git marked the entry prunable — its
     directory is gone). ``None`` signals malformed output (fail closed).
+
+    EVERY line must be one git actually documents for this format; an
+    unrecognised line yields ``None`` rather than being skipped. Skipping was a
+    real fail-open: a corrupted or unexpected record was silently accepted as a
+    valid holder, so this predicate — whose entire contract is fail-closed —
+    would have answered "yes, trusted" on output it did not understand. The
+    known set is the documented porcelain vocabulary (``worktree``, ``HEAD``,
+    ``branch``, ``detached``, ``bare``, ``locked``, ``prunable``); ``HEAD``,
+    ``detached``, ``bare`` and ``locked`` carry no fact this predicate uses, but
+    they must still be RECOGNISED so their presence is not mistaken for
+    corruption.
     """
     records: list[dict[str, object]] = []
     current: "dict[str, object] | None" = None
+    seen: dict[int, set] = {}
     for line in text.splitlines():
         if line.startswith("worktree "):
             current = {
@@ -394,14 +406,33 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
                 "prunable": False,
             }
             records.append(current)
+            seen[id(current)] = {"worktree"}
         elif current is None:
-            # Any content before the first ``worktree`` line is malformed.
+            # Content before the first ``worktree`` line, or between records,
+            # must be blank: git separates records with an empty line.
             if line.strip():
                 return None
+        elif not line.strip():
+            # Blank line: end of this record (git's record separator).
+            current = None
         elif line.startswith("branch "):
+            if "branch" in seen[id(current)]:
+                return None
+            seen[id(current)].add("branch")
             current["branch"] = line[len("branch ") :].strip()
         elif line.startswith("prunable"):
             current["prunable"] = True
+        elif (
+            line == "detached"
+            or line == "bare"
+            or line.startswith("HEAD ")
+            or line.startswith("locked")
+        ):
+            # Recognised, but carries nothing this predicate consumes.
+            continue
+        else:
+            # Unknown or blank line inside a record: refuse rather than guess.
+            return None
     if not records:
         return None
     return records
