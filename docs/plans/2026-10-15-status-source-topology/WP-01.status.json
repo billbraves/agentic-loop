@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "IMPLEMENTING",
+  "state": "READY_FOR_REVIEW",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -201,10 +201,10 @@
   },
   "review": {},
   "consult": {
-    "state": "DECIDED",
-    "round": "topo-brief-r6",
-    "decision": "ACCEPT",
-    "kind": "wp-brief-second-signature",
+    "state": "PENDING",
+    "round": "topo-impl-r1",
+    "decision": null,
+    "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
     "prior_rounds": [
       {
@@ -286,7 +286,7 @@
         ]
       }
     ],
-    "pending_note": "Brief rev6 is double-signed. Ready to dispatch implementation.",
+    "pending_note": "Implementation second signature on the retargeted predicate, the five call sites and the E1-E12 nodes, including the user-approved fixture extension that closed spec gap 1.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "RESOLVED",
@@ -304,7 +304,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T05:00:00Z",
+    "updated_at": "2026-10-16T07:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
