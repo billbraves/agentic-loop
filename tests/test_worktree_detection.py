@@ -583,11 +583,43 @@ def _predicate_in_python(src: str) -> "tuple[bool, bool, bool]":
         and n.func.id == local
         for n in ast.walk(tree)
     )
-    decides = any(
-        (isinstance(n, ast.If) and is_call(n.test))
-        or (isinstance(n, ast.IfExp) and is_call(n.test))
-        for n in ast.walk(tree)
-    )
+
+    # "The call decides" must mean it PRODUCES the verdict, not merely that some
+    # `if <pred>(...)` exists. `if path_is_in_worktree(x): pass` followed by a
+    # local function driving the print satisfied the weaker test (found at r9),
+    # so the branch body has to actually raise, exit, or print.
+    def _emits(node) -> bool:
+        for st in ast.walk(node):
+            if isinstance(st, ast.Raise):
+                return True
+            if isinstance(st, ast.Call):
+                f = st.func
+                name = (
+                    f.id
+                    if isinstance(f, ast.Name)
+                    else f.attr
+                    if isinstance(f, ast.Attribute)
+                    else None
+                )
+                if name in {"print", "emit_verdict", "exit"}:
+                    return True
+        return False
+
+    decides = False
+    for n in ast.walk(tree):
+        if isinstance(n, ast.If) and is_call(n.test) and _emits(n):
+            decides = True
+        # The ternary only counts when its result is printed, so a decoy
+        # `x = 1 if <pred>(p) else 2` cannot satisfy it.
+        if isinstance(n, ast.IfExp) and is_call(n.test):
+            for parent in ast.walk(tree):
+                if (
+                    isinstance(parent, ast.Call)
+                    and n in ast.walk(parent)
+                    and isinstance(parent.func, ast.Name)
+                    and parent.func.id in {"print", "emit_verdict"}
+                ):
+                    decides = True
     return (True, invoked, decides)
 
 

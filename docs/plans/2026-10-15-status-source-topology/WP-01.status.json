@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r9",
+    "round": "topo-impl-r10",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -395,9 +395,21 @@
           "The now-redundant _strip_comments helper and the four residual regexes were deleted: ast subsumes them, and leaving an ineffective layer in place would mislead whoever reads this next.",
           "VERIFIED four ways after the rewrite: alias GREEN; inline-comment spoof RED; decoy-call RED; comment-only rename RED. Full suite 972 passed / 4 skipped."
         ]
+      },
+      {
+        "round": "topo-impl-r9",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r10",
+        "findings": [
+          "The finding targeted the AST rewrite from r8 and reproduced: `if path_is_in_worktree(x): pass` satisfied `decides`, because the check only asked whether SOME if-statement had the predicate as its test, never whether that branch produces a verdict. Pair it with a local function driving the print and a second implementation controls the outcome while E12 stays green.",
+          "FIXED: 'the call decides' now means the branch EMITS the verdict. An `if <pred>(...)` counts only when its body actually raises, exits, prints or calls emit_verdict; an IfExp counts only when its result is printed. A `pass` body and a bare `x = 1 if <pred> else 2` both fail.",
+          "VERIFIED six ways: the r9 pass-bypass and the r4 decoy are both rejected; the real ternary form (preflight/merge), the real `if <pred>: emit_verdict + sys.exit` form (finalize_merge), the real `if <pred>: raise` form (qoder_security) and the aliased ternary are all accepted. Full suite 972 passed / 4 skipped."
+        ]
       }
     ],
-    "pending_note": "Ninth attempt. Parser ACCEPTed at r7; r8 found two real defects in E12's shell branch, now fixed by switching it to heredoc+AST.",
+    "pending_note": "Tenth attempt. Parser ACCEPTed at r7. r8/r9 found four real holes in E12's strength; each fixed and verified in both directions.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -420,7 +432,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T15:00:00Z",
+    "updated_at": "2026-10-16T16:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
