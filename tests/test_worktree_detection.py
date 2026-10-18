@@ -525,135 +525,97 @@ CALL_SITES = [
 
 
 PREDICATE = "path_is_in_worktree"
-# Tolerant on purpose: a parenthesised multi-line import, a trailing comma, or an
-# `as` alias are all legitimate refactors and must not be reported as a second
-# implementation. For .py the AST answers this exactly; this regex is only the
-# shell fallback, where the import is a single line inside a Python heredoc.
-SH_IMPORT_RE = re.compile(
-    r"from\s+agentic_loop\.gate\s+import\b[\s\S]{0,200}?" + PREDICATE
-)
-SH_CALL_RE = re.compile(r"\b" + PREDICATE + r"\s*\(")
-# `if <pred>(...)`  /  `<cond> if <pred>(...) else <verdict>`
-SH_IF_RE = re.compile(r"\bif\s+" + PREDICATE + r"\s*\(")
-SH_TERNARY_RE = re.compile(
-    r"\bif\s+" + PREDICATE + r"\s*\([^)]*\)\s*else\b"
-)
+
+
+def _py_heredocs(text: str) -> "list[str]":
+    """Bodies of every ``<<'PY' ... PY`` block in a shell wrapper.
+
+    The three shell call sites carry their probe in a Python heredoc, so the
+    reliable way to ask "does this file import and call the predicate, and does
+    that call decide the verdict?" is to analyse that Python rather than to regex
+    the shell. Regexes here were twice wrong: an INLINE comment spelling the call
+    satisfied them, and a legitimate ``as`` alias failed them.
+    """
+    lines = text.splitlines()
+    out: "list[str]" = []
+    i = 0
+    while i < len(lines):
+        if "<<'PY'" in lines[i]:
+            i += 1
+            start = i
+            while i < len(lines) and lines[i].strip() != "PY":
+                i += 1
+            out.append("\n".join(lines[start:i]))
+            continue
+        i += 1
+    return out
+
+
+def _predicate_in_python(src: str) -> "tuple[bool, bool, bool]":
+    """(imports the predicate, calls it, that call decides the verdict)."""
+    import ast
+
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return (False, False, False)
+
+    # Resolve the LOCAL name, so `... import p as _pw` + `_pw(...)` counts.
+    local = None
+    for n in ast.walk(tree):
+        if isinstance(n, ast.ImportFrom) and n.module == "agentic_loop.gate":
+            for a in n.names:
+                if a.name == PREDICATE:
+                    local = a.asname or a.name
+    if local is None:
+        return (False, False, False)
+
+    def is_call(node) -> bool:
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == local
+        )
+
+    invoked = any(
+        isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == local
+        for n in ast.walk(tree)
+    )
+    decides = any(
+        (isinstance(n, ast.If) and is_call(n.test))
+        or (isinstance(n, ast.IfExp) and is_call(n.test))
+        for n in ast.walk(tree)
+    )
+    return (True, invoked, decides)
+
+
+def _shell_predicate(body: str) -> "tuple[bool, bool, bool]":
+    """Union across the file's heredocs; the file must reach all three."""
+    seen = [False, False, False]
+    for snippet in _py_heredocs(body):
+        for idx, got in enumerate(_predicate_in_python(snippet)):
+            seen[idx] = seen[idx] or got
+    return (seen[0], seen[1], seen[2])
+
+
+def _verdict_shape(body: str, rel: str) -> "tuple[bool, bool, bool]":
+    """(imports the predicate, calls it, that call decides the verdict)."""
+    if rel.endswith(".py"):
+        return _predicate_in_python(body)
+    return _shell_predicate(body)
 
 
 def _imports_and_calls(body: str, rel: str) -> "tuple[bool, bool]":
-    """(imports the predicate from gate, actually calls it) for one call site.
-
-    ``.py`` is parsed with ``ast`` so an alias or a multi-line import is handled
-    correctly instead of being mistaken for a missing import. Shell files carry
-    their Python in heredocs, so they fall back to a tolerant regex.
-    """
-    if rel.endswith(".py"):
-        import ast
-
-        try:
-            tree = ast.parse(body)
-        except SyntaxError:
-            return (False, False)
-        # Resolve the LOCAL name the import binds, so `... import p as _pw`
-        # followed by `_pw(...)` is recognised as the same predicate rather
-        # than mistaken for a second implementation.
-        local = None
-        for n in ast.walk(tree):
-            if isinstance(n, ast.ImportFrom) and n.module == "agentic_loop.gate":
-                for a in n.names:
-                    if a.name == PREDICATE:
-                        local = a.asname or a.name
-        if local is None:
-            return (False, False)
-        invoked = any(
-            isinstance(n, ast.Call)
-            and isinstance(n.func, ast.Name)
-            and n.func.id == local
-            for n in ast.walk(tree)
-        )
-        return (True, invoked)
-    return (
-        SH_IMPORT_RE.search(body) is not None,
-        SH_CALL_RE.search(body) is not None,
-    )
+    imported, invoked, _decides = _verdict_shape(body, rel)
+    return (imported, invoked)
 
 
 def _call_decides_verdict(body: str, rel: str) -> bool:
-    """True when the predicate call IS the verdict condition of this file.
-
-    Either an ``if <pred>(...)`` statement, or ``<pred>(...)`` as the condition
-    of the ternary that yields the verdict. A bare call kept as a decoy beside a
-    local reimplementation does not satisfy this.
-    """
-    if rel.endswith(".py"):
-        import ast
-
-        try:
-            tree = ast.parse(body)
-        except SyntaxError:
-            return False
-        local = None
-        for n in ast.walk(tree):
-            if isinstance(n, ast.ImportFrom) and n.module == "agentic_loop.gate":
-                for a in n.names:
-                    if a.name == PREDICATE:
-                        local = a.asname or a.name
-        if local is None:
-            return False
-
-        def _is_pred_call(node) -> bool:
-            return (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == local
-            )
-
-        for n in ast.walk(tree):
-            if isinstance(n, ast.If) and _is_pred_call(n.test):
-                return True
-            if isinstance(n, ast.IfExp) and _is_pred_call(n.test):
-                return True
-        return False
-
-    # Shell: the Python heredoc renders the verdict from one expression.
-    if re.search(SH_IF_RE, body):
-        return True
-    return re.search(SH_TERNARY_RE, body) is not None
+    return _verdict_shape(body, rel)[2]
 
 
-def _strip_comments(text: str, rel: str) -> str:
-    """Remove comments so an assertion cannot be satisfied by prose.
-
-    ``.py`` goes through ``tokenize`` so only real COMMENT spans are removed --
-    a line-local ``#`` rule is fooled by ``#`` inside strings. Shell files have
-    no lexer here, so only FULL-LINE comments (first non-space char ``#``) are
-    stripped, which is the form every ``.sh`` call site uses. Anything that
-    fails to lex is returned verbatim, so a file that cannot be read keeps the
-    assertion RED rather than silently skipping it.
-    """
-    if rel.endswith(".py"):
-        import io
-        import tokenize
-
-        try:
-            # Blank out each COMMENT token's OWN span in the original text.
-            # Re-joining token strings would drop the whitespace between them
-            # and make `def path_is_in_worktree(` unfindable.
-            lines = text.splitlines(keepends=True)
-            spans = []
-            for tok in tokenize.generate_tokens(io.StringIO(text).readline):
-                if tok.type == tokenize.COMMENT:
-                    spans.append((tok.start, tok.end))
-            for (srow, scol), (erow, ecol) in spans:
-                if srow == erow:
-                    ln = lines[srow - 1]
-                    lines[srow - 1] = ln[:scol] + ln[ecol:]
-            return "".join(lines)
-        except (tokenize.TokenError, IndentationError, SyntaxError):
-            return text
-    return "\n".join(
-        ln for ln in text.splitlines() if not ln.lstrip().startswith("#")
-    )
 
 
 def test_e12_one_predicate_across_all_five_call_sites() -> None:
@@ -670,7 +632,10 @@ def test_e12_one_predicate_across_all_five_call_sites() -> None:
     # in a comment -- so renaming the real import and call while leaving the
     # comments intact kept it green (reproduced by the consultant and again
     # here). Comments are stripped before matching.
-    code = {rel: _strip_comments(text, rel) for rel, text in texts.items()}
+    # No comment stripping needed: the analysis below is AST-based, and ast
+    # ignores comments by construction. Stripping was itself a source of two
+    # defects when this check was regex-based.
+    code = texts
 
     definition = "def path_is_in_worktree("
     home = "src/agentic_loop/gate/__init__.py"

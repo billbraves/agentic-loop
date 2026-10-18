@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r8",
+    "round": "topo-impl-r9",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -382,9 +382,22 @@
           "This round had ZERO HTTP 529s, which confirms the previous four void rounds were provider availability rather than anything about the code or the prompt."
         ],
         "coverage_note": "This ACCEPT covers the malformed-porcelain parser only. Q2 and Q4 were ACCEPTed at r2 and again at r4, but E12 was changed AFTER r4 (the decoy fix), so E12 at the current HEAD is not covered by any signature yet. A further minimal round is being run for exactly that."
+      },
+      {
+        "round": "topo-impl-r8",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r9",
+        "findings": [
+          "Both defects were in E12's SHELL branch, and both reproduced. (A) A legitimate alias in a shell wrapper -- `from agentic_loop.gate import path_is_in_worktree as _pw` then `_pw(...)` -- failed the call and verdict regexes, so a valid refactor would have been reported as a second implementation. (B) An INLINE comment spelling the patterns satisfied all three regexes, because only full-line comments were stripped: a file whose real verdict came from a local function could pass.",
+          "FIXED by removing regex from the shell branch entirely. The three shell call sites carry their probe in a `<<'PY' ... PY` heredoc, so E12 now extracts those heredoc bodies and runs the SAME AST analysis used for .py -- resolving the import alias and requiring the call to be the verdict condition. Comments are ignored by ast by construction, which removes the whole class of spoofing rather than patching one instance.",
+          "The now-redundant _strip_comments helper and the four residual regexes were deleted: ast subsumes them, and leaving an ineffective layer in place would mislead whoever reads this next.",
+          "VERIFIED four ways after the rewrite: alias GREEN; inline-comment spoof RED; decoy-call RED; comment-only rename RED. Full suite 972 passed / 4 skipped."
+        ]
       }
     ],
-    "pending_note": "Parser ACCEPTed at r7. One more minimal round for E12, which changed after r4 and is therefore not yet covered by any signature.",
+    "pending_note": "Ninth attempt. Parser ACCEPTed at r7; r8 found two real defects in E12's shell branch, now fixed by switching it to heredoc+AST.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -407,7 +420,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T14:00:00Z",
+    "updated_at": "2026-10-16T15:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
