@@ -18,6 +18,15 @@ import pytest
 PKG_ROOT = Path(__file__).resolve().parents[1]
 PKG_SRC = PKG_ROOT / "src"
 
+# The initial branch is pinned by THIS module, never inherited from the host's
+# ``init.defaultBranch``. A bare ``git init`` inherits that setting (``master``
+# on at least one developer machine), while the status fixtures and
+# ``_merge_wp_branch`` below hard-code ``main`` — so four end-to-end cases used
+# to fail on any host whose default branch is not ``main``. The failure surfaced
+# as ``CalledProcessError`` from ``git checkout -q main``, which reads like a
+# product defect rather than the environment dependency it is.
+INIT_BRANCH = "main"
+
 
 def _resolve_wrapper(name: str) -> Path:
     """Locate a wrapper shell in either layout.
@@ -68,7 +77,9 @@ def _make_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
 
-    _run_git(repo, "init", "-q")
+    # Pin the branch here; do not rely on the caller's environment or on the
+    # host ``init.defaultBranch``.
+    _run_git(repo, "init", "-q", "-b", INIT_BRANCH)
     _run_git(repo, "config", "user.email", "test@example.com")
     _run_git(repo, "config", "user.name", "Test")
 
@@ -127,7 +138,7 @@ def _make_status(
     git_commit: str | None = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
     tests: list | None = None,
     merged_commit: str | None = None,
-    base_branch: str = "main",
+    base_branch: str = INIT_BRANCH,
     branch: str = "feat/wp-a",
 ) -> dict:
     if tests is None:
@@ -247,7 +258,7 @@ def _merge_wp_branch(repo: Path, branch: str = "feat/wp-a") -> tuple[str, str]:
     _run_git(repo, "commit", "-q", "-m", "wp work")
     wp_tip = _head(repo)
 
-    _run_git(repo, "checkout", "-q", "main")
+    _run_git(repo, "checkout", "-q", INIT_BRANCH)
     _run_git(repo, "merge", "-q", "--no-ff", branch, "-m", "Merge WP-A")
     merge_commit = _head(repo)
     return wp_tip, merge_commit
