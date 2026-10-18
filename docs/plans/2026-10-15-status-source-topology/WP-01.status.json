@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r10",
+    "round": "topo-impl-r11",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -407,9 +407,18 @@
           "FIXED: 'the call decides' now means the branch EMITS the verdict. An `if <pred>(...)` counts only when its body actually raises, exits, prints or calls emit_verdict; an IfExp counts only when its result is printed. A `pass` body and a bare `x = 1 if <pred> else 2` both fail.",
           "VERIFIED six ways: the r9 pass-bypass and the r4 decoy are both rejected; the real ternary form (preflight/merge), the real `if <pred>: emit_verdict + sys.exit` form (finalize_merge), the real `if <pred>: raise` form (qoder_security) and the aliased ternary are all accepted. Full suite 972 passed / 4 skipped."
         ]
+      },
+      {
+        "round": "topo-impl-r10",
+        "decision": "ACCEPT_BARE",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r11",
+        "coverage_note": "Marker ACCEPT, but the entire body was one line asking whether it should write the conclusion into the WP status -- no reasoning, no construction named, nothing to check. The dispatch prompt states that a bare ACCEPT is treated as unsubstantiated, so it is recorded here as ACCEPT_BARE rather than as a signature. Zero HTTP 529s, so this was not truncation; the round simply did not do the work.",
+        "action": "One further round (r11) asks only for the list of constructions tested and which way each went."
       }
     ],
-    "pending_note": "Tenth attempt. Parser ACCEPTed at r7. r8/r9 found four real holes in E12's strength; each fixed and verified in both directions.",
+    "pending_note": "Parser ACCEPTed with concrete verification at r7. r10 returned a bare ACCEPT with no reasoning, so substantiation is being requested explicitly.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -432,7 +441,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T16:00:00Z",
+    "updated_at": "2026-10-16T17:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
