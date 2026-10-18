@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r6",
+    "round": "topo-impl-r7",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -357,9 +357,23 @@
           "This is chronic rather than a one-off. Counting 529s per round: r1=19, r2=29, r3=7, r4=17, r5=4. The rounds that DID produce a verdict (r2, r4) hit them too and survived; the ones that produced empty or truncated bodies (r1, r3, r5) did not. So of five rounds, only two yielded a usable verdict, and every finding those two made was real and has been fixed.",
           "Retried as r6 with a much shorter prompt, on the theory that a smaller review has less chance of being cut off mid-answer."
         ]
+      },
+      {
+        "round": "topo-impl-r6",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_PROVIDER_OVERLOAD",
+        "resolved_in_round": "topo-impl-r7",
+        "findings": [
+          "PROVIDER FAILURE AGAIN. 318-byte body, no verdict marker, 19 HTTP 529s in the event log. It had reached a positive conclusion in prose -- it confirmed the seven approved fixture files only add an adjacent PLAN status and that test_worktree_literal_removal.py merely replaces a brittle hardcoded line number while keeping the core `hits == []` assertion -- and then said it needed one more read before signing, at which point it was cut off.",
+          "So its partial content AGREES with Q4, but a truncated body is not a signature and is not recorded as one.",
+          "This is the fourth void round out of six (r1, r3, r5, r6); only r2 and r4 produced usable verdicts. The blocker is provider availability, not a disagreement about the code.",
+          "Retried as r7 with a deliberately minimal single-question ask -- just the parser, four commands maximum -- to maximise the chance of a complete answer."
+        ]
       }
     ],
-    "pending_note": "Sixth implementation signature attempt. Three prior rounds produced no usable verdict due to provider 529 overload (r1, r3, r5); the two that did (r2, r4) each found two real defects, all fixed.",
+    "pending_note": "Seventh attempt, minimal single-question scope. Four of six prior rounds were void from provider 529 overload.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -382,7 +396,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T12:00:00Z",
+    "updated_at": "2026-10-16T13:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
