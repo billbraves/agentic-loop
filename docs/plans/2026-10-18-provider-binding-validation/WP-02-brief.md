@@ -135,6 +135,7 @@
 本段与上文「范围」一节完全同义，非另一份口径：只能改
 `src/agentic_loop/provider_binding.py`、`src/agentic_loop/adapters/kimi.py`、
 `tests/test_provider_binding.py`、`tests/test_adapter_injection.py`、
+`tests/test_resolve_fallback_binding.py`、`tests/test_redispatch_quota_fallback.py`、
 `.agentic/config.toml`；绝不能碰 `src/agentic_loop/gate/**`、
 `src/agentic_loop/wrappers/**`、`src/agentic_loop/contract_render.py` 及三份契约文件。
 

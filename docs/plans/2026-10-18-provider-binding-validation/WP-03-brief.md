@@ -111,11 +111,12 @@ CLAUDE.md 的正文：
 
 ## Allowed and forbidden paths
 
-本段与上文「范围」一节完全同义，非另一份口径：只能改
-`src/agentic_loop/contract_render.py`、`tests/test_contract_render.py`、
-`AGENTS.md`、`CLAUDE.md`、`docs/agentic/OPERATING_MODEL.md`；绝不能碰
-`.agentic/config.toml`、`src/agentic_loop/gate/**`、
+本段与上文「范围」一节完全同义，非另一份口径（re-freeze r1 后）：
+只能改 `src/agentic_loop/contract_render.py`、`tests/test_contract_render.py`；
+绝不能碰 `.agentic/config.toml`、`AGENTS.md`、`CLAUDE.md`、
+`docs/agentic/OPERATING_MODEL.md`、`src/agentic_loop/gate/**`、
 `src/agentic_loop/wrappers/**`、`src/agentic_loop/provider_binding.py`。
+三份契约由禁止改为不得触碰，因为修好渲染器后它们本就无需改动。
 
 ## Completion definition
 
