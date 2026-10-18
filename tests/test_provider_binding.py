@@ -85,16 +85,36 @@ def test_kimi_missing_openai_base_url_fail_closed():
         build_binding(adapter="kimi", provider_cfg=bad)
 
 
-def test_kimi_anthropic_only_config_is_rejected():
-    """The exact historical shape: anthropic_base_url present, openai absent."""
+def test_kimi_missing_field_message_names_the_field_and_no_key(monkeypatch):
+    """The kimi failure must be self-diagnosing and must never echo the key.
+
+    Asserting only the exception TYPE is vacuous: an error raised for an
+    unrelated cause, or one that prints the key, passes such a test. Pinning the
+    field name in the message makes a wrong-cause failure red, and pinning the
+    absence of the canary keeps a future message from leaking the credential it
+    was handed the env-var name for.
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
+    bad = dict(DEEPSEEK_CFG, openai_base_url=None)
+    with pytest.raises(ProviderConfigError) as ei:
+        build_binding(adapter="kimi", provider_cfg=bad)
+    message = str(ei.value)
+    assert "openai_base_url" in message, message
+    assert "kimi" in message, message
+    assert "sk-SECRET-LEAK-CANARY" not in message, message
+
+
+def test_kimi_anthropic_only_config_message_names_openai_base_url():
+    """Same contract for the exact historical shape: name the missing field."""
     bad = {
         "anthropic_base_url": "https://api.deepseek.com/anthropic",
         "api_key_env": "DEEPSEEK_API_KEY",
         "identity_model": "deepseek-v4-flash",
         "selectors": {"kimi": "deepseek/v4-flash"},
     }
-    with pytest.raises(ProviderConfigError):
+    with pytest.raises(ProviderConfigError) as ei:
         build_binding(adapter="kimi", provider_cfg=bad)
+    assert "openai_base_url" in str(ei.value), ei.value
 
 
 def test_kimi_with_openai_base_url_builds():
