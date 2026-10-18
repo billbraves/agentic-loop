@@ -9,7 +9,11 @@
     "target_branch": "main",
     "merged_commit": ""
   },
-  "work_packages": ["WP-01", "WP-02"],
+  "work_packages": [
+    "WP-01",
+    "WP-02",
+    "WP-03"
+  ],
   "timestamps": {
     "created_at": "2026-10-18T00:00:00Z",
     "updated_at": "2026-10-18T00:00:00Z"
