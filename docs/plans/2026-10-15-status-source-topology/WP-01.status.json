@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r3",
+    "round": "topo-impl-r4",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -312,22 +312,35 @@
           "FIXED: E12 now strips comments before matching (tokenize COMMENT spans for .py, full-line comments for .sh) and requires, per non-definition call site, an exact `from agentic_loop.gate import ... path_is_in_worktree` AND a real `path_is_in_worktree(` invocation; the definition file is asserted to be the single definer and is exempt from the import half. Re-running the consultant's exact bypass now turns E12 RED.",
           "Both fixes verified: 13 parser cases (7 must-refuse, 6 must-parse) behave correctly; real `git worktree list --porcelain` in this repo still parses (19 records) so no gate is broken; the live predicate still accepts this plan's authoritative status. E13 grew to 9 cases covering the r2 counterexamples. Full suite 961 passed / 4 skipped."
         ]
+      },
+      {
+        "round": "topo-impl-r3",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_TRUNCATED_OUTPUT",
+        "resolved_in_round": "topo-impl-r4",
+        "findings": [
+          "Third session to return a body with no verdict marker (347 bytes this time), so the harness recorded INVALID again. It stopped to say it wanted to verify two boundaries before finishing.",
+          "Both boundaries were real and the orchestrator verified them rather than waiting: (1) `_token` accepted a BARE `HEAD` and a BARE `branch`, which are malformed because both carry a value -- while `locked` and `prunable` legitimately may stand alone; (2) E12's import regex was too tight, requiring one exact single-line form, so a parenthesised multi-line import, a trailing comma, or an `as` alias would have been falsely reported as a second implementation.",
+          "FIXED (1): tokens now declare whether they require an argument. `HEAD` and `branch` do; `locked` and `prunable` do not. Bare forms of the two value-carrying tokens are refused.",
+          "FIXED (2): E12 now resolves imports properly -- `ast` for .py, which additionally resolves `as` aliases so the local name is checked for the call -- and only falls back to a tolerant regex for the three shell files whose import lives inside a Python heredoc.",
+          "BOTH DIRECTIONS VERIFIED: renaming merge.sh's real import and call while keeping its comments still turns E12 RED; aliasing the import in qoder_security.py to `_pw` and calling `_pw(...)` stays GREEN. So the node now discriminates a second implementation from a legitimate refactor instead of merely matching a string.",
+          "E13 grew to 11 malformed + 7 well-formed cases. Real `git worktree list --porcelain` still parses (19 records); the live predicate still accepts this plan's authoritative status. Full suite 965 passed / 4 skipped."
+        ]
       }
     ],
-    "pending_note": "Third implementation signature round. r1 void (no marker), r2 REWORK on two real defects that were both in the orchestrator's own fixes; both now fixed and re-verified.",
+    "pending_note": "Fourth implementation signature round. r1 and r3 were void (no verdict marker) but each surfaced real defects, all now fixed; r2's two defects also fixed and re-verified.",
     "soft_limit": {
       "signal": "rework_twice",
-      "state": "RESOLVED",
-      "family": "WP-01 brief specification",
+      "state": "ACTIVE",
+      "family": "WP-01 implementation second signature",
       "rounds": [
-        "topo-brief-r1",
-        "topo-brief-r2",
-        "topo-brief-r3",
-        "topo-brief-r4",
-        "topo-brief-r5",
-        "topo-brief-r6"
+        "topo-impl-r1",
+        "topo-impl-r2",
+        "topo-impl-r3"
       ],
-      "note": "Six brief rounds, five REWORK then ACCEPT. Two were fatal and both orchestrator-reproduced: r4 showed the basis object (target_branch=main) had zero holders and no authoritative copy, and r5 showed the name validation forbade '/' while the real integration branch contains it -- each would have left the predicate failing closed. r3 produced the user's decision (c) to withdraw all security claims after the out-of-repo anchor was pierced via XDG_CONFIG_HOME. The user authorised continuing past the soft limit at rev6."
+      "note": "Three rounds, none of them a clean ACCEPT: r1 and r3 returned no verdict marker at all, r2 REWORKed on two real defects. Every finding was reproducible and every one was in the ORCHESTRATOR's own work rather than the developer's, so the loop is still converging, but the user should know the signature is costing multiple rounds."
     },
     "checks_r2": {
       "parser_cases": "7 must-refuse + 6 must-parse all correct",
@@ -338,7 +351,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T09:00:00Z",
+    "updated_at": "2026-10-16T10:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }

@@ -405,9 +405,13 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
     current: "dict[str, object] | None" = None
     seen: "set[str]" = set()
 
-    def _token(line: str, name: str) -> bool:
+    def _token(line: str, name: str, *, requires_arg: bool = True) -> bool:
         """True when ``line`` is exactly ``name`` or ``name`` + one argument."""
-        return line == name or line.startswith(name + " ")
+        if line == name:
+            # ``locked``/``prunable`` may stand alone; ``HEAD``/``branch`` carry
+            # a value and a bare one is malformed, not an empty fact.
+            return not requires_arg
+        return line.startswith(name + " ")
 
     for line in text.splitlines():
         if line.startswith("worktree "):
@@ -438,10 +442,10 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
             if "HEAD" in seen:
                 return None
             seen.add("HEAD")
-        elif _token(line, "prunable"):
+        elif _token(line, "prunable", requires_arg=False):
             current["prunable"] = True
         elif (
-            _token(line, "locked")
+            _token(line, "locked", requires_arg=False)
             or line == "detached"
             or line == "bare"
         ):

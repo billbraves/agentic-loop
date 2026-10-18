@@ -524,12 +524,53 @@ CALL_SITES = [
 ]
 
 
-IMPORT_RE = re.compile(
-    r"^from\s+agentic_loop\.gate\s+import\s+(?:[A-Za-z_][\w]*,\s*)*"
-    r"path_is_in_worktree\s*$",
-    re.MULTILINE,
+PREDICATE = "path_is_in_worktree"
+# Tolerant on purpose: a parenthesised multi-line import, a trailing comma, or an
+# `as` alias are all legitimate refactors and must not be reported as a second
+# implementation. For .py the AST answers this exactly; this regex is only the
+# shell fallback, where the import is a single line inside a Python heredoc.
+SH_IMPORT_RE = re.compile(
+    r"from\s+agentic_loop\.gate\s+import\b[\s\S]{0,200}?" + PREDICATE
 )
-INVOCATION = "path_is_in_worktree("
+SH_CALL_RE = re.compile(r"\b" + PREDICATE + r"\s*\(")
+
+
+def _imports_and_calls(body: str, rel: str) -> "tuple[bool, bool]":
+    """(imports the predicate from gate, actually calls it) for one call site.
+
+    ``.py`` is parsed with ``ast`` so an alias or a multi-line import is handled
+    correctly instead of being mistaken for a missing import. Shell files carry
+    their Python in heredocs, so they fall back to a tolerant regex.
+    """
+    if rel.endswith(".py"):
+        import ast
+
+        try:
+            tree = ast.parse(body)
+        except SyntaxError:
+            return (False, False)
+        # Resolve the LOCAL name the import binds, so `... import p as _pw`
+        # followed by `_pw(...)` is recognised as the same predicate rather
+        # than mistaken for a second implementation.
+        local = None
+        for n in ast.walk(tree):
+            if isinstance(n, ast.ImportFrom) and n.module == "agentic_loop.gate":
+                for a in n.names:
+                    if a.name == PREDICATE:
+                        local = a.asname or a.name
+        if local is None:
+            return (False, False)
+        invoked = any(
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == local
+            for n in ast.walk(tree)
+        )
+        return (True, invoked)
+    return (
+        SH_IMPORT_RE.search(body) is not None,
+        SH_CALL_RE.search(body) is not None,
+    )
 
 
 def _strip_comments(text: str, rel: str) -> str:
@@ -596,10 +637,11 @@ def test_e12_one_predicate_across_all_five_call_sites() -> None:
     for rel, body in code.items():
         if rel == home:
             continue
-        assert IMPORT_RE.search(body), (
-            rel, "no exact `from agentic_loop.gate import ... path_is_in_worktree`"
+        imported, invoked = _imports_and_calls(body, rel)
+        assert imported, (
+            rel, "does not import path_is_in_worktree from agentic_loop.gate"
         )
-        assert INVOCATION in body, (rel, "never actually invokes the predicate")
+        assert invoked, (rel, "imports the predicate but never calls it")
 
     # No alternate predicate definition anywhere else in product code.
     for rel, body in code.items():
@@ -918,6 +960,10 @@ def test_guard_null_byte_path_fails_closed_without_raising(repo: Path) -> None:
         "worktree /tmp/t\nbranch refs/heads/main\nHEADEVIL x\n",
         # HEAD is single-valued; a second one is corruption, not a fact.
         "worktree /tmp/t\nHEAD a\nHEAD b\nbranch refs/heads/main\n",
+        # HEAD and branch CARRY a value, so a bare one is malformed. `locked`
+        # and `prunable` may stand alone, and must still parse (positive half).
+        "worktree /tmp/t\nHEAD\nbranch refs/heads/main\n",
+        "worktree /tmp/t\nHEAD a\nbranch\n",
         # Records must be separated by a blank line, so a second `worktree`
         # line while one is still open is malformed rather than a new record.
         "worktree /tmp/a\nbranch refs/heads/x\nworktree /tmp/b\n"
@@ -946,6 +992,9 @@ def test_e13_malformed_porcelain_fails_closed(listing: str) -> None:
         ("worktree /tmp/t\nHEAD abc\nbranch refs/heads/main\n", 1),
         ("worktree /tmp/t\nHEAD abc\ndetached\nlocked reason\n", 1),
         ("worktree /tmp/t\nbare\n", 1),
+        # `locked` and `prunable` may appear with no argument.
+        ("worktree /tmp/t\nHEAD a\nlocked\n", 1),
+        ("worktree /tmp/t\nHEAD a\nprunable\n", 1),
         ("worktree /tmp/t\nHEAD abc\nbranch refs/heads/x\nprunable gone\n", 1),
         # Real porcelain separates records with an empty line.
         ("worktree /tmp/a\nbranch refs/heads/x\n\n"
