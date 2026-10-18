@@ -4,7 +4,7 @@
   "iteration_id": "2026-10-15-status-source-topology",
   "plan_id": "PLAN-01",
   "phase": "P1",
-  "state": "APPROVED_FOR_MERGE",
+  "state": "MERGED",
   "role": "Developer",
   "executor": {
     "tool": "kimi",
@@ -27,7 +27,7 @@
     "branch": "plan/2026-10-15-status-source-topology",
     "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
     "commit": "9180644bfbaf2fa0b807c6782ea0c8e3aced4a6e",
-    "merged_commit": null
+    "merged_commit": "78771ca97241c4e1c225c1444158bf07de1e4d76"
   },
   "scope": {
     "allowed_paths": [
@@ -295,7 +295,7 @@
   "timestamps": {
     "created_at": "2026-10-15T14:15:00Z",
     "approved_at": "2026-10-15T14:15:00Z",
-    "updated_at": "2026-10-15T20:30:00Z",
+    "updated_at": "2026-10-18T14:51:35Z",
     "dispatched_at": "2026-10-15T14:55:00Z"
   }
 }
