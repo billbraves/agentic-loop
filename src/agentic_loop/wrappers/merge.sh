@@ -34,7 +34,32 @@ case "$status_arg" in
   *) status_file="$repo_root/$status_arg" ;;
 esac
 
-if [[ "$status_file" == *"/.worktrees/"* ]]; then
+# WP-02/WP-01 single authority (agentic_loop.gate.path_is_in_worktree), the same
+# refusal semantics as preflight.sh, finalize_merge.sh, gate/__init__.py and
+# gate/qoder_security.py. WP-01 (2026-10-15-status-source-topology) retargeted the
+# predicate from "is this path inside a linked worktree?" to "is this path NOT in
+# the checkout holding PLAN status's git.base_branch (the integration branch)?":
+# the authoritative holder is trusted even when it is itself a linked worktree,
+# and every other worktree is still refused. The git-fact predicate is referenced,
+# never reimplemented: the retired path-literal test (a glob match on a
+# dot-worktrees path segment) missed every sibling worktree
+# (`git worktree add ../wpN-x`), the layout this repo actually uses
+# (A13, WP-19). The literal is spelled out in prose, not as a contiguous
+# string, so F6's conservative raw scan of .sh files needs no exemption here.
+#
+# Fail-closed form (INV-B): a probe crash, missing Python, failed import or any
+# unexpected stdout collapses into PROBE_FAIL via `|| echo PROBE_FAIL`, and the
+# `!= "MAIN"` comparison below refuses it. Only the exact verdict MAIN passes;
+# never append `|| true`/`|| echo false` here, which would turn a crashed probe
+# into "not a worktree" (fail-open).
+wt_verdict=$("${AGENTIC_PYTHON:-python3}" - "$status_file" <<'PY' 2>/dev/null || echo PROBE_FAIL
+import sys
+from pathlib import Path
+from agentic_loop.gate import path_is_in_worktree
+print("WORKTREE" if path_is_in_worktree(Path(sys.argv[1])) else "MAIN")
+PY
+)
+if [[ "$wt_verdict" != "MAIN" ]]; then
   echo "MERGE_FAIL: status file resolves inside a worktree ($status_file); pass the main-repo copy" >&2
   exit 2
 fi

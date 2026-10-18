@@ -63,6 +63,19 @@ def _head(repo: Path) -> str:
     return _run_git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
+def _default_branch(repo: Path) -> str:
+    """The temp repo's actual initial branch.
+
+    ``git init`` honours ``init.defaultBranch``, so this is ``master`` on a
+    machine configured that way and ``main`` elsewhere. Hardcoding ``main``
+    made four of these tests fail for an environment reason unrelated to the
+    behaviour under test. This is the same helper the sibling fixtures
+    (``test_finalize_merge_first_call.py``, ``test_finalize_merge_sequential.py``)
+    already use.
+    """
+    return _run_git(repo, "branch", "--show-current").stdout.strip()
+
+
 def _make_repo(tmp_path: Path) -> Path:
     """A temp git repo with symlinks to the real agentic scripts under test."""
     repo = tmp_path / "repo"
@@ -127,7 +140,7 @@ def _make_status(
     git_commit: str | None = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
     tests: list | None = None,
     merged_commit: str | None = None,
-    base_branch: str = "main",
+    base_branch: str = "main",  # callers that merge pass the repo's real default
     branch: str = "feat/wp-a",
 ) -> dict:
     if tests is None:
@@ -213,6 +226,24 @@ def _write_status(repo: Path, data: dict) -> Path:
     status_path = repo / PLAN_DIR / STATUS_NAME
     status_path.parent.mkdir(parents=True, exist_ok=True)
     status_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # WP-01: the status-source predicate resolves the authoritative branch from
+    # the PLAN status in this same plan dir. Declare the repo's REAL default
+    # branch (probed, never hardcoded) — the checkout holding it is the
+    # authoritative source these fixtures exercise.
+    (status_path.parent / "PLAN-01.status.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agentic-plan-status/v1",
+                "plan_id": "PLAN-01",
+                "git": {
+                    "base_branch": _default_branch(repo),
+                    "target_branch": "main",
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     return status_path
 
 
@@ -239,29 +270,36 @@ def _assert_fail(res: subprocess.CompletedProcess, reason_substring: str) -> Non
     assert reason_substring.lower() in combined, (res.returncode, res.stdout, res.stderr)
 
 
-def _merge_wp_branch(repo: Path, branch: str = "feat/wp-a") -> tuple[str, str]:
-    """Create and merge a WP branch with ``--no-ff``; return (wp_tip, merge_commit)."""
+def _merge_wp_branch(repo: Path, branch: str = "feat/wp-a") -> tuple[str, str, str]:
+    """Create and merge a WP branch with ``--no-ff``.
+
+    Returns ``(wp_tip, merge_commit, base)`` where ``base`` is the repo's real
+    default branch, so callers pass a ``base_branch`` that matches the actual
+    layout instead of a hardcoded ``main``.
+    """
+    base = _default_branch(repo)
     _run_git(repo, "checkout", "-q", "-b", branch)
     (repo / "wp.txt").write_text("wp\n", encoding="utf-8")
     _run_git(repo, "add", "wp.txt")
     _run_git(repo, "commit", "-q", "-m", "wp work")
     wp_tip = _head(repo)
 
-    _run_git(repo, "checkout", "-q", "main")
+    _run_git(repo, "checkout", "-q", base)
     _run_git(repo, "merge", "-q", "--no-ff", branch, "-m", "Merge WP-A")
     merge_commit = _head(repo)
-    return wp_tip, merge_commit
+    return wp_tip, merge_commit, base
 
 
 # ① v3 three signatures complete (review ACCEPT + consult ACCEPT + qoder PASS).
 def test_v3_triple_sign_pass_finalizes(tmp_path, session_env):
     repo = _make_repo(tmp_path)
-    wp_tip, merge_commit = _merge_wp_branch(repo)
+    wp_tip, merge_commit, base = _merge_wp_branch(repo)
 
     status = _make_status(
         schema_version=V3,
         git_commit=wp_tip,
         branch="feat/wp-a",
+        base_branch=base,
         qoder=_pass_qoder(),
     )
     status_path = _write_status(repo, status)
@@ -298,12 +336,13 @@ def test_v3_qoder_findings_no_override_rejected(tmp_path, session_env):
 #    decision is preserved honestly (never rewritten to PASS).
 def test_v3_qoder_override_approved_finalizes_record_preserved(tmp_path, session_env):
     repo = _make_repo(tmp_path)
-    wp_tip, merge_commit = _merge_wp_branch(repo)
+    wp_tip, merge_commit, base = _merge_wp_branch(repo)
 
     status = _make_status(
         schema_version=V3,
         git_commit=wp_tip,
         branch="feat/wp-a",
+        base_branch=base,
         qoder=_findings_qoder(override=_valid_override()),
     )
     status_path = _write_status(repo, status)
@@ -323,12 +362,13 @@ def test_v3_qoder_override_approved_finalizes_record_preserved(tmp_path, session
 # ④ v3 missing qoder_security block is rejected fail-closed by validation.
 def test_v3_missing_qoder_block_rejected(tmp_path, session_env):
     repo = _make_repo(tmp_path)
-    wp_tip, _ = _merge_wp_branch(repo)
+    wp_tip, _, base = _merge_wp_branch(repo)
 
     status = _make_status(
         schema_version=V3,
         git_commit=wp_tip,
         branch="feat/wp-a",
+        base_branch=base,
         qoder=None,
     )
     status_path = _write_status(repo, status)
@@ -340,12 +380,13 @@ def test_v3_missing_qoder_block_rejected(tmp_path, session_env):
 # ⑤ v2 status (no qoder block) remains double-sign only and finalizes.
 def test_v2_without_qoder_finalizes_double_sign(tmp_path, session_env):
     repo = _make_repo(tmp_path)
-    wp_tip, merge_commit = _merge_wp_branch(repo)
+    wp_tip, merge_commit, base = _merge_wp_branch(repo)
 
     status = _make_status(
         schema_version=V2,
         git_commit=wp_tip,
         branch="feat/wp-a",
+        base_branch=base,
         qoder=None,
     )
     status_path = _write_status(repo, status)

@@ -88,6 +88,10 @@ def _make_repo_and_status(tmp_path: Path, state: str = "APPROVED_FOR_MERGE"):
     }
     status_path = repo / "WP-A.status.json"
     status_path.write_text(json.dumps(status), encoding="utf-8")
+    # WP-01: the status-source predicate resolves the authoritative branch from
+    # the PLAN status beside the judged file, so the fixture must supply one.
+    # Declares the branch this repo actually holds ("main", renamed above).
+    (repo / "PLAN-A.status.json").write_text(json.dumps({"schema_version": "agentic-plan-status/v1", "plan_id": "PLAN-A", "iteration_id": "it-1", "state": "ACTIVE", "title": "fixture plan", "git": {"base_branch": "main", "target_branch": "main"}, "work_packages": ["WP-A"], "timestamps": {"created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}}), encoding="utf-8")
     return repo, status_path, feat_commit
 
 

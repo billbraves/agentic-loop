@@ -1,0 +1,26 @@
+{
+  "schema_version": "agentic-plan-status/v1",
+  "plan_id": "PLAN-01",
+  "iteration_id": "2026-10-15-status-source-topology",
+  "state": "READY_TO_MERGE",
+  "title": "",
+  "git": {
+    "base_branch": "plan/2026-10-15-status-source-topology",
+    "target_branch": "main",
+    "merged_commit": null
+  },
+  "work_packages": [
+    "WP-01",
+    "WP-02"
+  ],
+  "timestamps": {
+    "created_at": "2026-10-15T11:00:00Z",
+    "updated_at": "2026-10-16T18:30:00Z"
+  },
+  "lint_exemption": {
+    "approved": true,
+    "approver": "user (product owner) -- explicit approval in session",
+    "justification": "WP-01 and WP-02 were each reviewed across MANY rounds: 6 brief rounds and 11 implementation-signature rounds for WP-01, 3 brief and 11 consult rounds for WP-02. Every round's decision was committed as it happened so the audit trail stayed readable, which produced 39 status-only commits. Contract 4.3 asks for exactly two (freeze + finalize); the substance it protects -- that a WP's status is frozen once and finalised once, with no half-signed state committed as if final -- is satisfied: each WP has exactly ONE freeze commit (the add) and exactly ONE finalize commit recording state=MERGED with both signatures folded in. Squashing the 39 review-round commits would rewrite the integration branch and discard the per-round history that documents how two fatal spec defects were caught. The user chose this documented exemption over that rewrite.",
+    "reviewed_at": "2026-10-16T18:30:00Z"
+  }
+}
