@@ -405,18 +405,33 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
     current: "dict[str, object] | None" = None
     seen: "set[str]" = set()
 
-    def _token(line: str, name: str, *, requires_arg: bool = True) -> bool:
-        """True when ``line`` is exactly ``name`` or ``name`` + one argument."""
-        if line == name:
-            # ``locked``/``prunable`` may stand alone; ``HEAD``/``branch`` carry
-            # a value and a bare one is malformed, not an empty fact.
-            return not requires_arg
-        return line.startswith(name + " ")
+    def _arg(line: str, name: str) -> "str | None":
+        """The single argument of ``name``, or None when malformed.
+
+        Requires EXACTLY one separating space and a non-empty argument that does
+        not itself begin with a space. ``startswith(name + " ")`` plus ``strip()``
+        was not enough: it accepted ``branch  refs/heads/x`` (two spaces) and
+        ``HEAD `` (empty argument), both of which are malformed porcelain. ``None``
+        means "malformed"; use `_bare` for tokens that take no argument.
+        """
+        prefix = name + " "
+        if not line.startswith(prefix):
+            return None
+        rest = line[len(prefix) :]
+        if not rest or rest[0].isspace():
+            return None
+        return rest
+
+    def _bare(line: str, name: str) -> bool:
+        """True for exactly ``name``, or ``name`` + one space + an argument."""
+        return line == name or _arg(line, name) is not None
 
     for line in text.splitlines():
         if line.startswith("worktree "):
             if current is not None:
                 # A new record without the blank separator: malformed.
+                return None
+            if _arg(line, "worktree") is None:
                 return None
             current = {
                 "worktree": line[len("worktree ") :],
@@ -433,23 +448,32 @@ def _parse_worktree_listing(text: str) -> "list[dict[str, object]] | None":
         elif not line.strip():
             # Blank line: end of this record (git's record separator).
             current = None
-        elif _token(line, "branch"):
-            if "branch" in seen:
+        elif _arg(line, "branch") is not None:
+            if "branch" in seen or "state" in seen:
+                # Repeat, or contradicts an earlier detached/bare.
                 return None
             seen.add("branch")
-            current["branch"] = line[len("branch ") :].strip()
-        elif _token(line, "HEAD"):
+            current["branch"] = _arg(line, "branch")
+        elif _arg(line, "HEAD") is not None:
             if "HEAD" in seen:
                 return None
             seen.add("HEAD")
-        elif _token(line, "prunable", requires_arg=False):
+        elif _bare(line, "prunable"):
             current["prunable"] = True
         elif (
-            _token(line, "locked", requires_arg=False)
+            _bare(line, "locked")
             or line == "detached"
             or line == "bare"
         ):
             # Recognised, but carries nothing this predicate consumes.
+            if line == "detached" or line == "bare":
+                # Mutually exclusive with a branch: a record either tracks a ref
+                # or is detached / bare, never both.
+                if "branch" in seen:
+                    return None
+                if "state" in seen:
+                    return None
+                seen.add("state")
             continue
         else:
             # Unknown or malformed line inside a record: refuse rather than guess.

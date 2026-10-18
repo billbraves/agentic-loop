@@ -533,6 +533,11 @@ SH_IMPORT_RE = re.compile(
     r"from\s+agentic_loop\.gate\s+import\b[\s\S]{0,200}?" + PREDICATE
 )
 SH_CALL_RE = re.compile(r"\b" + PREDICATE + r"\s*\(")
+# `if <pred>(...)`  /  `<cond> if <pred>(...) else <verdict>`
+SH_IF_RE = re.compile(r"\bif\s+" + PREDICATE + r"\s*\(")
+SH_TERNARY_RE = re.compile(
+    r"\bif\s+" + PREDICATE + r"\s*\([^)]*\)\s*else\b"
+)
 
 
 def _imports_and_calls(body: str, rel: str) -> "tuple[bool, bool]":
@@ -571,6 +576,49 @@ def _imports_and_calls(body: str, rel: str) -> "tuple[bool, bool]":
         SH_IMPORT_RE.search(body) is not None,
         SH_CALL_RE.search(body) is not None,
     )
+
+
+def _call_decides_verdict(body: str, rel: str) -> bool:
+    """True when the predicate call IS the verdict condition of this file.
+
+    Either an ``if <pred>(...)`` statement, or ``<pred>(...)`` as the condition
+    of the ternary that yields the verdict. A bare call kept as a decoy beside a
+    local reimplementation does not satisfy this.
+    """
+    if rel.endswith(".py"):
+        import ast
+
+        try:
+            tree = ast.parse(body)
+        except SyntaxError:
+            return False
+        local = None
+        for n in ast.walk(tree):
+            if isinstance(n, ast.ImportFrom) and n.module == "agentic_loop.gate":
+                for a in n.names:
+                    if a.name == PREDICATE:
+                        local = a.asname or a.name
+        if local is None:
+            return False
+
+        def _is_pred_call(node) -> bool:
+            return (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == local
+            )
+
+        for n in ast.walk(tree):
+            if isinstance(n, ast.If) and _is_pred_call(n.test):
+                return True
+            if isinstance(n, ast.IfExp) and _is_pred_call(n.test):
+                return True
+        return False
+
+    # Shell: the Python heredoc renders the verdict from one expression.
+    if re.search(SH_IF_RE, body):
+        return True
+    return re.search(SH_TERNARY_RE, body) is not None
 
 
 def _strip_comments(text: str, rel: str) -> str:
@@ -642,6 +690,14 @@ def test_e12_one_predicate_across_all_five_call_sites() -> None:
             rel, "does not import path_is_in_worktree from agentic_loop.gate"
         )
         assert invoked, (rel, "imports the predicate but never calls it")
+        # The call must be the thing that DECIDES, not a decoy beside a local
+        # reimplementation. `invoked` alone was bypassable: keep one bare
+        # `path_is_in_worktree(x)` statement for this test and let a local
+        # `local_status_source()` drive the printed verdict -- it stayed green
+        # (found at r4). So require the call to sit in the verdict condition.
+        assert _call_decides_verdict(body, rel), (
+            rel, "the predicate call is not the verdict condition"
+        )
 
     # No alternate predicate definition anywhere else in product code.
     for rel, body in code.items():
@@ -968,6 +1024,18 @@ def test_guard_null_byte_path_fails_closed_without_raising(repo: Path) -> None:
         # line while one is still open is malformed rather than a new record.
         "worktree /tmp/a\nbranch refs/heads/x\nworktree /tmp/b\n"
         "branch refs/heads/y\n",
+        # Separator must be EXACTLY one space: two spaces is malformed, and
+        # startswith + strip() used to wave it through (found at r4).
+        "worktree /tmp/t\nHEAD a\nbranch  refs/heads/main\n",
+        # An argument that is empty is malformed, not an empty fact.
+        "worktree /tmp/t\nHEAD \nbranch refs/heads/main\n",
+        "worktree \nHEAD a\nbranch refs/heads/main\n",
+        # A record either tracks a ref or is detached/bare, never both --
+        # in EITHER order.
+        "worktree /tmp/t\nHEAD a\nbranch refs/heads/main\ndetached\n",
+        "worktree /tmp/t\nHEAD a\ndetached\nbranch refs/heads/main\n",
+        "worktree /tmp/t\nHEAD a\nbranch refs/heads/main\nbare\n",
+        "worktree /tmp/t\nHEAD a\nbare\nbranch refs/heads/main\n",
     ],
 )
 def test_e13_malformed_porcelain_fails_closed(listing: str) -> None:

@@ -202,7 +202,7 @@
   "review": {},
   "consult": {
     "state": "PENDING",
-    "round": "topo-impl-r4",
+    "round": "topo-impl-r5",
     "decision": null,
     "kind": "wp-implementation-second-signature",
     "bound_brief_rev": 6,
@@ -328,9 +328,24 @@
           "BOTH DIRECTIONS VERIFIED: renaming merge.sh's real import and call while keeping its comments still turns E12 RED; aliasing the import in qoder_security.py to `_pw` and calling `_pw(...)` stays GREEN. So the node now discriminates a second implementation from a legitimate refactor instead of merely matching a string.",
           "E13 grew to 11 malformed + 7 well-formed cases. Real `git worktree list --porcelain` still parses (19 records); the live predicate still accepts this plan's authoritative status. Full suite 965 passed / 4 skipped."
         ]
+      },
+      {
+        "round": "topo-impl-r4",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r5",
+        "findings": [
+          "Q2 and Q4 ACCEPT again: all five entry points call the one shared predicate with no second implementation present, the seven approved fixture files only add an adjacent PLAN status declaring the branch their repo actually holds, F6 only unpins a line number, and no assertion or attack form was weakened. Brief and status SHAs verified.",
+          "Defect 1 (P1, confidence 10/10): _token used startswith(name + \" \") then .strip() on the value, so `branch  refs/heads/x` (TWO spaces) and `HEAD ` (empty argument) parsed as valid. A record containing `branch` together with `detached` or `bare` was also accepted, in either order. Orchestrator reproduced all six forms.",
+          "Defect 2 (P1, confidence 10/10): E12 could still be bypassed while staying green. Keep a bare decoy call `path_is_in_worktree(x)` for the test to find, then let a local `local_status_source()` drive the printed verdict -- _imports_and_calls() returned (True, True), no forbidden same-name definition was present, and the endpoint verdict was controlled by the second implementation. Reproduced against the real file; so the earlier rename/alias verification only covered two mutations, not the property.",
+          "FIXED 1: replacement of prefix+strip with _arg(), which requires exactly one separating space and a non-empty argument that does not itself start with a space; _bare() for tokens that legitimately stand alone (locked, prunable). detached/bare are now mutually exclusive with branch in either order.",
+          "FIXED 2: E12 now also requires the predicate call to BE the verdict condition -- `if <pred>(...)` or the ternary `... if <pred>(...) else ...`, resolved through the import alias with ast for .py. Verified in three directions: the r4 decoy mutation is now RED, the alias refactor stays GREEN, and the earlier comment-only rename is still RED.",
+          "E13 is now 18 malformed + 7 well-formed cases. Real git worktree list output still parses (19 records); the live predicate still accepts this plan's authoritative status. Full suite 972 passed / 4 skipped."
+        ]
       }
     ],
-    "pending_note": "Fourth implementation signature round. r1 and r3 were void (no verdict marker) but each surfaced real defects, all now fixed; r2's two defects also fixed and re-verified.",
+    "pending_note": "Fifth implementation signature round. Four rounds so far: r1/r3 void (no marker), r2/r4 REWORK on four real defects, all in the orchestrator's own fixes and all now fixed.",
     "soft_limit": {
       "signal": "rework_twice",
       "state": "ACTIVE",
@@ -338,9 +353,10 @@
       "rounds": [
         "topo-impl-r1",
         "topo-impl-r2",
-        "topo-impl-r3"
+        "topo-impl-r3",
+        "topo-impl-r4"
       ],
-      "note": "Three rounds, none of them a clean ACCEPT: r1 and r3 returned no verdict marker at all, r2 REWORKed on two real defects. Every finding was reproducible and every one was in the ORCHESTRATOR's own work rather than the developer's, so the loop is still converging, but the user should know the signature is costing multiple rounds."
+      "note": "Four rounds, no clean ACCEPT yet: r1 and r3 returned no verdict marker (void), r2 and r4 REWORKed on two real defects each. Every finding was reproducible and every one was in the ORCHESTRATOR's own fixes rather than the developer's code. The product behaviour (E1-E10) has been ACCEPTed in every round that produced a verdict; the churn is concentrated in the malformed-porcelain parser and in E12's static-analysis strength, both of which are acceptance-test infrastructure."
     },
     "checks_r2": {
       "parser_cases": "7 must-refuse + 6 must-parse all correct",
@@ -351,7 +367,7 @@
   },
   "timestamps": {
     "created_at": "2026-10-15T11:00:00Z",
-    "updated_at": "2026-10-16T10:00:00Z",
+    "updated_at": "2026-10-16T11:00:00Z",
     "approved_at": "2026-10-15T11:20:00Z"
   }
 }
