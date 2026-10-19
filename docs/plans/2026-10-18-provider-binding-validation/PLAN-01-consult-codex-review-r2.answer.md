@@ -5,7 +5,8 @@
 > 范围：`git diff fix/tool-fixes-2026-10-14..aa15124`
 > 背景：r1 判 WP-02 REWORK；返工提交 `d0f1bf6` 后请求复审。
 > 分支历史在 r1 之后被重写，r1 引用的 SHA 均已失效。
-> 原始完整会话见 /tmp/codex-r2-out.txt。
+> 原始完整会话（约 5600 行）属临时产物，未入库；本文件即其结论部分的完整摘录。
+> 被引用的变异日志见 consult-evidence/。
 
 ## 结论摘要
 
@@ -55,10 +56,10 @@
 
    两个阻塞问题：
 
-   - [消息断言](/Users/admin/vibe/.worktrees/pbv-plan/tests/test_provider_binding.py:102)只要求包含字段名和 adapter，无法区分“缺少该字段”与“该字段有效、另一个字段缺失”。用户要求检查的“仅断言偶然出现的子串”问题仍存在。
-   - [历史配置形态用例](/Users/admin/vibe/.worktrees/pbv-plan/tests/test_provider_binding.py:107)没有设置 canary，也没有密钥缺席断言。现有脱敏断言只覆盖 `openai_base_url=None`；完全缺省字段时泄漏环境中的假密钥仍全绿。`d0f1bf6` 提交说明声称历史形态也有同样断言，与代码不符。
+   - [消息断言](tests/test_provider_binding.py:102)只要求包含字段名和 adapter，无法区分“缺少该字段”与“该字段有效、另一个字段缺失”。用户要求检查的“仅断言偶然出现的子串”问题仍存在。
+   - [历史配置形态用例](tests/test_provider_binding.py:107)没有设置 canary，也没有密钥缺席断言。现有脱敏断言只覆盖 `openai_base_url=None`；完全缺省字段时泄漏环境中的假密钥仍全绿。`d0f1bf6` 提交说明声称历史形态也有同样断言，与代码不符。
 
-   需要让两种输入形态都验证明确的缺字段原因及密钥不泄漏，并分别证明错误原因变异、泄漏变异转红。[原始 mutation 证据](/tmp/pbv-r2-review-4dijr7ro/exact-r1.log)、[缺省字段泄漏证据](/tmp/pbv-r2-review-4dijr7ro/absent-real-env-leak.log)。
+   需要让两种输入形态都验证明确的缺字段原因及密钥不泄漏，并分别证明错误原因变异、泄漏变异转红。[原始 mutation 证据](consult-evidence/r2-exact-r1.log)、[缺省字段泄漏证据](consult-evidence/r2-absent-real-env-leak.log)。
 
    **没有发现其他测试被削弱。** 其余 9 个既有测试函数 AST 完全不变；被折叠的历史形态用例保留了原输入、调用及异常类型检查，没有损失原覆盖。恢复旧校验产生 **3 failed**，删除 adapter 守卫产生 **1 failed**。实现本身的正确性判断不变。
 
@@ -68,8 +69,8 @@
 
    残留文字仍需清理：
 
-   - [WP-02 Brief:45](/Users/admin/vibe/.worktrees/pbv-plan/docs/plans/2026-10-18-provider-binding-validation/WP-02-brief.md:45)保留“除非 contract checksum 真的变了”的黑名单例外，而英文锚点/status 无条件禁止；附注又要求变化时停止报告。
-   - [WP-03 Brief:10](/Users/admin/vibe/.worktrees/pbv-plan/docs/plans/2026-10-18-provider-binding-validation/WP-03-brief.md:10)仍要求重渲三份契约，[附注:82](/Users/admin/vibe/.worktrees/pbv-plan/docs/plans/2026-10-18-provider-binding-validation/WP-03-brief.md:82)仍要求 `diff --apply`，与 re-freeze 后禁止触碰契约的范围不一致。
+   - [WP-02 Brief:45](docs/plans/2026-10-18-provider-binding-validation/WP-02-brief.md:45)保留“除非 contract checksum 真的变了”的黑名单例外，而英文锚点/status 无条件禁止；附注又要求变化时停止报告。
+   - [WP-03 Brief:10](docs/plans/2026-10-18-provider-binding-validation/WP-03-brief.md:10)仍要求重渲三份契约，[附注:82](docs/plans/2026-10-18-provider-binding-validation/WP-03-brief.md:82)仍要求 `diff --apply`，与 re-freeze 后禁止触碰契约的范围不一致。
 
    这些旧文字不能作为扩大权限的依据，但“全文无第二套范围”的关闭条件尚未满足。
 
@@ -85,7 +86,7 @@
 
    没有 status-sync 提交。逐提交提取并运行 `validate_wp_status`：**8 个提交、21 份本迭代 WP status 快照全部 STATUS_VALID**，包括首次 freeze；`executor.tool` 均为 `claude-code`。三份当前未提交 status 也通过 schema 校验。
 
-   但 schema 合法不等于证据完整：[WP-03 status:23](/Users/admin/vibe/.worktrees/pbv-plan/docs/plans/2026-10-18-provider-binding-validation/WP-03.status.json:23)仍以旧历史的 `480fb80` 为 `base_commit`，它不是 `3cdd101` 的祖先。
+   但 schema 合法不等于证据完整：[WP-03 status:23](docs/plans/2026-10-18-provider-binding-validation/WP-03.status.json:23)仍以旧历史的 `480fb80` 为 `base_commit`，它不是 `3cdd101` 的祖先。
 
 4. **历史重写本身未发现侵入无关用户修改；旧 ACCEPT 已重新建立依据。**
 
@@ -109,7 +110,7 @@
 
    `agentic plan check` 当前返回 **exit 3**：读取到的三份已提交 WP 状态都是 `IMPLEMENTING`。三份 live status 的 `consult` 也均为空。
 
-   [PLAN.md:76](/Users/admin/vibe/.worktrees/pbv-plan/docs/plans/2026-10-18-provider-binding-validation/PLAN.md:76)的恢复步骤顺序错误：不能先 plan merge，再用 plan finalize 补齐 WP finalize。实际门禁要求合并前集成分支上各 WP 已为 `MERGED`。此外，PLAN 声明的基线先落 `main` 的前置条件尚未满足：`5bd90b5` 目前不是本地 `main` 的祖先。
+   [PLAN.md:76](docs/plans/2026-10-18-provider-binding-validation/PLAN.md:76)的恢复步骤顺序错误：不能先 plan merge，再用 plan finalize 补齐 WP finalize。实际门禁要求合并前集成分支上各 WP 已为 `MERGED`。此外，PLAN 声明的基线先落 `main` 的前置条件尚未满足：`5bd90b5` 目前不是本地 `main` 的祖先。
 
    pre-push 问题已在 PLAN 登记，归因正确。我再次用绝对 `PYTHONPATH` 在当前版本和 `origin/main` 复现了 `PRE_PUSH_SKIP`：**它是真实的既有门禁缺陷，不是可忽略的环境异常。** 可接受留到后续迭代处理，**不单独阻断本次本地合并**，前提是本次显式完成所需门禁，不能将 hook 的 skip 当作通过。`AGENTIC_PYTHON` 绕过 PATH stub 的既有测试隔离问题也在两版本复现。
 

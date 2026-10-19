@@ -1,0 +1,72 @@
+ARTIFACTS /var/folders/v3/9xhgcr0s7v38f5_26h87md340000gp/T/pbv-review-5zrrjdwj
+wp01-current-master exit 0 
+.....                                                                    [100%]
+5 passed in 2.56s
+wp01-current-other exit 0 
+.....                                                                    [100%]
+5 passed in 2.16s
+wp01-origin-master exit 1 
+    _run_git(repo, "checkout", "-q", "main")
+tests/test_finalize_merge_triple_sign.py:57: in _run_git
+    return subprocess.run(
+/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['git', 'checkout', '-q', 'main']' returned non-zero exit status 1.
+=========================== short test summary info ============================
+FAILED tests/test_finalize_merge_triple_sign.py::test_v3_triple_sign_pass_finalizes
+FAILED tests/test_finalize_merge_triple_sign.py::test_v3_qoder_override_approved_finalizes_record_preserved
+FAILED tests/test_finalize_merge_triple_sign.py::test_v3_missing_qoder_block_rejected
+FAILED tests/test_finalize_merge_triple_sign.py::test_v2_without_qoder_finalizes_double_sign
+4 failed, 1 passed in 0.66s
+wp01-bare-init exit 1 
+    _run_git(repo, "checkout", "-q", INIT_BRANCH)
+tests/test_finalize_merge_triple_sign.py:66: in _run_git
+    return subprocess.run(
+/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['git', 'checkout', '-q', 'main']' returned non-zero exit status 1.
+=========================== short test summary info ============================
+FAILED tests/test_finalize_merge_triple_sign.py::test_v3_triple_sign_pass_finalizes
+FAILED tests/test_finalize_merge_triple_sign.py::test_v3_qoder_override_approved_finalizes_record_preserved
+FAILED tests/test_finalize_merge_triple_sign.py::test_v3_missing_qoder_block_rejected
+FAILED tests/test_finalize_merge_triple_sign.py::test_v2_without_qoder_finalizes_double_sign
+4 failed, 1 passed in 0.66s
+wp02-old-validation exit 1 
+________________ test_kimi_missing_openai_base_url_fail_closed _________________
+tests/test_provider_binding.py:84: in test_kimi_missing_openai_base_url_fail_closed
+    with pytest.raises(ProviderConfigError):
+E   Failed: DID NOT RAISE <class 'agentic_loop.provider_binding.ProviderConfigError'>
+_________________ test_kimi_anthropic_only_config_is_rejected __________________
+tests/test_provider_binding.py:96: in test_kimi_anthropic_only_config_is_rejected
+    with pytest.raises(ProviderConfigError):
+E   Failed: DID NOT RAISE <class 'agentic_loop.provider_binding.ProviderConfigError'>
+=========================== short test summary info ============================
+FAILED tests/test_provider_binding.py::test_kimi_missing_openai_base_url_fail_closed
+FAILED tests/test_provider_binding.py::test_kimi_anthropic_only_config_is_rejected
+2 failed, 8 passed in 0.03s
+wp02-no-guard exit 1 
+..........F...                                                           [100%]
+=================================== FAILURES ===================================
+________ test_kimi_temp_config_refuses_binding_without_openai_base_url _________
+tests/test_adapter_injection.py:161: in test_kimi_temp_config_refuses_binding_without_openai_base_url
+    with pytest.raises(ValueError, match="openai_base_url"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+=========================== short test summary info ============================
+FAILED tests/test_adapter_injection.py::test_kimi_temp_config_refuses_binding_without_openai_base_url
+1 failed, 13 passed in 0.26s
+wp02-wrong-cause-and-key-leak exit 0 
+........................                                                 [100%]
+24 passed in 0.20s
+wp03-list-wrap exit 1 
+E       - Background developer dispatch and low-risk `DRAFT -> APPROVED` scope freezes
+E         proceed without human approval. Low-risk means engine-side additive change,
+E         pure test/fixture, or docs, with every `risk.*` flag false and...
+E     
+E     ...Full output truncated (275 lines hidden), use '-vv' to show
+=========================== short test summary info ============================
+FAILED tests/test_contract_render.py::test_dispatch_hint_uses_bare_tool_name_for_every_binding_form[role0-kimi]
+FAILED tests/test_contract_render.py::test_dispatch_hint_uses_bare_tool_name_for_every_binding_form[role1-kimi]
+FAILED tests/test_contract_render.py::test_dispatch_hint_uses_bare_tool_name_for_every_binding_form[role2-kimi]
+FAILED tests/test_contract_render.py::test_dispatch_hint_uses_bare_tool_name_for_every_binding_form[role6-the developer tool]
+FAILED tests/test_contract_render.py::test_rendered_contracts_carry_no_python_repr_for_table_form_developer
+5 failed, 21 passed in 0.06s
