@@ -37,7 +37,7 @@ kimi 仍走 anthropic 端点，校验是自洽的。
 | WP | 主题 | 状态 |
 |---|---|---|
 | WP-01 | 固定 triple-sign 测试初始分支，基线转绿 | READY_FOR_REVIEW · codex ACCEPT |
-| WP-02 | kimi base_url 校验 fail-closed，禁止静默回退 | READY_FOR_REVIEW · r1 REWORK，返工已提交，r2 待重跑 |
+| WP-02 | kimi base_url 校验 fail-closed，禁止静默回退 | BLOCKED · codex r4 判 CONSULT，按 §7 待用户裁决 |
 | WP-03 | 表格式角色渲染成 adapter 名，修复契约漂移 | READY_FOR_REVIEW · codex ACCEPT |
 
 ## 明确不在本迭代范围
@@ -75,23 +75,69 @@ plan 分支从未推送。工作树：`/Users/admin/vibe/.worktrees/pbv-plan`。
 - 提交纪律按 §4.3 重整，`plan lint` 仅剩合并前应有的 `finalize commit x0`。
 - brief 口径残留清理（`f4c4f5a`）、WP-03 `base_commit` 修正为 `9d943b8`。
 
-**唯一阻断项**：WP-02 在 `5dbc0b8` 之后没有独立判决。codex 的 r3 在产出判决前
-配额耗尽（见 `PLAN-01-consult-codex-review-r3.answer.md`），它中断前已确认
-r2 变异被杀死，并提出了 adapter 路径这个新阻断发现。
+## 当前阻断项：WP-02 已按 §7 升级为 CONSULT，等用户裁决
 
-下一步：
+codex r4（完整跑完，见 `PLAN-01-consult-codex-review-r4.answer.md`）判：
 
-1. codex 配额恢复后跑 **r4**，评审对象 `5dbc0b8`。r4 必须回答两件事：
-   WP-02 的判决，以及**是否应按 AGENTS.md §7 升级为 CONSULT**——同一类缺陷
-   （错误消息未被钉死）已在三个不同位置被连续三轮发现：provider_binding
-   只断言异常类型、provider_binding 子串断言且只覆盖一种形态、adapter
-   子串断言且无 canary。r1~r3 的 REWORK 在 r4 出结论前仍是最新已记录决定。
-2. 判决齐备后 `agentic plan merge` 单次 `--no-ff` 合入 `main`，
-   再 `agentic plan finalize` 把 status 折叠进单个 finalize 提交。
-3. status 文件的当前改动**故意不提交**（§4.3：决策累积到工作树，在 finalize
-   提交里一次落地）。这也是 `agentic plan check` 读主仓副本时报
-   `IMPLEMENTING` 的原因，不是状态记录错误。此前每个提交的
-   `validate_wp_status` 均通过（codex r2 逐提交验过 21 份快照）。
+| WP | 判决 | 提交 |
+|---|---|---|
+| WP-01 | ACCEPT | `71c0658` |
+| WP-02 | **CONSULT** | `5dbc0b8` |
+| WP-03 | ACCEPT | `3cdd101` |
+
+r1~r3 的全部历史变异现在都被拦住。但 r4 发现**真实空字符串未覆盖**：两个
+模块都把「声明但为空」建模为 `None`，而 TOML 的自然空值是
+`openai_base_url = ""`；把 `not value` 改成 `value is None` 可放行空字符串，
+27 例仍全绿（编排者已独立复现）。**未变异的代码会正确拒绝空字符串，所以这是
+验收覆盖缺口，不是已泄漏凭据。**
+
+codex 拒绝开第四轮 REWORK，理由是三轮修复都只在上一条变异周围局部打补丁，
+没有系统覆盖「错误原因 × 输入形态 × 诊断路径」三个维度。归因：
+**(a) 测试设计问题是直接原因，(b) 实现者兼审核者是促成因素，
+(c) 对抗审核确实在起作用，但不能据此无限续跑返工。**
+
+可延期 / 不可延期的区分（codex 明确）：共享 helper/lint **可以延期**；
+空字符串覆盖缺口与本次 §7 裁决**不可延期**。
+
+### 待用户裁决
+
+验收边界划在哪里，以及后续修复方式。不要自动再开一轮返工。
+
+## 收敛顺序（§4.3 原文顺序，re-freeze r4 修正）
+
+codex r4 指出原文把 `plan merge` 写在 WP finalize 之前，顺序错误。正确顺序：
+
+1. 每个 WP 各自满足签名与证据要求，再 `agentic finalize <wp.status.json>`
+   到 `state=MERGED`（status-only，不碰 git）。
+2. 全部 WP 到 `MERGED` 后，plan 置 `READY_TO_MERGE`。
+3. `agentic plan check` / `plan lint` 只读确认。
+4. `agentic plan merge` 单次 `--no-ff` 合入 `main`。
+5. `agentic plan finalize` 盖 plan 级 `MERGED` + `merged_commit`。
+6. 人工批准后推送一次（`push` 是硬 `always_stop`）。
+
+另两项 r4 指出的待办：
+
+- 已提交的冻结版 WP-03 status 仍是旧 `480fb80`，需在 finalize 提交中折叠修正
+  （live 版已是 `9d943b8`，三份 live `base_commit` 均为各自实现提交的祖先）。
+- WP-01/03 的 `evidence.tests` 仍为空，需补齐后才满足 finalize 的证据要求。
+- 基线依赖 `5bd90b5` 虽在远端跟踪分支上，但仍不是本地 `main`／`origin/main`
+  的祖先，尚未满足本 PLAN 声明的基线前置条件。
+
+### 签名归属（r4 纠正，已落到三份 status）
+
+此前我把 codex 的判决记在 `review` 字段，归属错误。validator 与
+`finalize_merge.sh` 都支持 `review.decision = "N/A"` 的专用路径，注释明确
+写着它就是为「实现者兼审核者」这个冲突准备的。现已改为：
+
+- `review.decision = "N/A"`，并记明 claude 同时是实现者、无法自审；
+- `consult` 记录真实 codex 会话与结论：WP-01/03 为 ACCEPT，WP-02 为 CONSULT；
+- r3 保留「部分发现、无正式判决」，不补造正式 REWORK；
+- 不把同一次 codex 审核复制成两份 ACCEPT。
+
+status 文件的当前改动**故意不提交**（§4.3：决策累积到工作树，在 finalize
+提交里一次落地）。这也是 `agentic plan check` 读主仓副本时报 `IMPLEMENTING`
+的原因，不是状态记录错误。此前每个提交的 `validate_wp_status` 均通过
+（codex r2 逐提交验过 21 份快照）。
 
 ### 下一轮迭代候选（本轮登记，不在本轮范围）
 

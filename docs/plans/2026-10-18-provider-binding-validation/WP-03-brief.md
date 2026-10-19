@@ -67,7 +67,11 @@ CLAUDE.md 的正文：
 
 - [ ] 交付物逐项就绪
 - [ ] `agentic contract check` IN_SYNC（exit 0）
-- [ ] 重渲后的契约正文不含 `{'adapter'` / `'provider':` / `'fallback_provider':`
+- [ ] 契约正文不含 `{'adapter'` / `'provider':` / `'fallback_provider':`
+      （re-freeze r4：原文作「重渲后的契约正文」，codex r4 指出这是最后一处
+      「需要重渲」的措辞残留。本 WP 不重渲、不修改三份契约——修好渲染器后
+      expected checksum 自己回到文件里已有的 `307a6503bae68e97`，
+      `contract diff` 三份全部 unchanged。此项是对**现有**正文的只读校验。）
 - [ ] `python3.11 -m pytest tests -q` 无新增失败
 - [ ] 无 forbidden_paths / 跨 owner 写入
 - [ ] 无生产写入、无网络、无通知、无推送
