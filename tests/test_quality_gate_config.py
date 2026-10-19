@@ -388,6 +388,41 @@ def test_command_gate_present_but_unmatched_is_legitimate_pass(repo):
                for l in res.stdout.splitlines()), res.stdout
 
 
+# --------------------------------------------------------------------------
+# An empty plan stays a PASS, but it must be AUDIBLE. A silently-identical
+# PASS is what let consumer-repo WP-41 report "the import gate is live" twice
+# when the gate had never executed: the WP added the [[gate.rule]] on its own
+# branch while this wrapper reads the main-repo config, so nothing matched.
+# --------------------------------------------------------------------------
+
+def test_empty_plan_emits_explicit_marker(repo):
+    """An empty plan announces itself instead of passing silently."""
+    _write_config(repo, ["uv run pytest packages/never/tests -q"])  # match src/**
+    _make_change(repo, "docs/a.md")  # nothing under src/** changed
+    status = _status(repo, allowed=["docs/", ".agentic/"])
+    res = _run_qg(repo, status)
+    marker = [l for l in res.stdout.splitlines()
+              if l.startswith("QUALITY_GATE_PLAN_EMPTY:")]
+    assert len(marker) == 1, (res.stdout, res.stderr)
+    # the counts are what distinguish "nothing to do" from "nothing matched"
+    assert "1 configured rule(s)" in marker[0], marker[0]
+    # and the marker must not be mistakable for evidence that a rule ran
+    assert "NOT evidence" in marker[0], marker[0]
+    # exit code and PASS are deliberately unchanged
+    assert res.returncode == 0, (res.stdout, res.stderr)
+    assert any(l.strip() == "QUALITY_GATE_RESULT=PASS"
+               for l in res.stdout.splitlines()), res.stdout
+
+
+def test_non_empty_plan_has_no_empty_marker(repo):
+    """The marker must not fire when a rule actually drove a command."""
+    _make_change(repo, "packages/engine/z.py")
+    status = _status(repo, allowed=["packages/", "tests/", "tools/", "docs/"])
+    res = _run_qg(repo, status)
+    assert _plan(res.stdout), (res.stdout, res.stderr)
+    assert "QUALITY_GATE_PLAN_EMPTY" not in res.stdout, res.stdout
+
+
 def test_no_config_file_keeps_default_behavior_pass():
     """finding ② boundary: a repo with NO .agentic/config.toml at all is a bare
     bootstrap — no project config to betray — so the built-in default behavior is

@@ -216,10 +216,40 @@ PY
 # test-target expansion is fully observable — even if a later command aborts the
 # run — and so equivalence to the previous hard-coded target set can be asserted
 # directly from stdout.
+planned=0
 while IFS= read -r cmd; do
   [[ -z "$cmd" ]] && continue
   echo "QUALITY_GATE_PLAN: $cmd"
+  planned=$((planned + 1))
 done < "$plan_file"
+
+# An empty plan is a legitimate PASS (above), but it must never be MISTAKEN for
+# evidence that a gate rule actually ran. It silently looks identical to a real
+# pass on stdout, and a WP that ADDS a [[gate.rule]] is exactly the case that
+# produces one: the new rule lives on the WP branch while this wrapper reads the
+# MAIN-repo config, so the changed set matches nothing and the run reports PASS
+# having executed no quality command at all. That reading cost consumer-repo
+# WP-41 two false "gate is live" reports and a REWORK. So say it out loud: emit
+# an explicit marker with the counts that distinguish "nothing to do" from
+# "nothing configured to match". The exit code deliberately does NOT change —
+# a normal WP touching no gated path is still a pass, and failing it here would
+# break that. Callers that need a rule to have run must assert on this marker's
+# absence, not on QUALITY_GATE_RESULT=PASS.
+if [[ "$planned" -eq 0 ]]; then
+  qg_rule_count=$(python3 - "$qg_config" <<'PY'
+import json
+import sys
+
+try:
+    rules = json.loads(sys.argv[1]).get("rule") or []
+except ValueError:
+    rules = []
+print(len(rules) if isinstance(rules, list) else 0)
+PY
+) || qg_rule_count="?"
+  qg_changed_count=$(awk 'NF' "$changed_file" | wc -l | tr -d ' ')
+  echo "QUALITY_GATE_PLAN_EMPTY: no rule matched; 0 commands planned from ${qg_rule_count} configured rule(s) against ${qg_changed_count} changed path(s) (mode=${mode#--}); this PASS is NOT evidence that any gate rule executed"
+fi
 
 # Execute each planned command.
 #

@@ -48,25 +48,53 @@ class KimiAdapter(Adapter):
 
     @contextmanager
     def _temp_config(self):
-        """Yield a 0600 temp TOML with DeepSeek provider+model; always removed."""
+        """Yield a 0600 temp TOML with DeepSeek provider+model; always removed.
+
+        Wire format note: kimi 1.50 resolves a non-managed provider through its
+        ``openai_legacy`` type and ignores an ``anthropic``-typed provider for
+        these selectors, which surfaced as ``LLM not set`` even with a valid
+        key. The provider block therefore mirrors the shape kimi itself writes
+        in ``~/.kimi/config.toml`` and targets the OpenAI-compatible base URL.
+        """
         b = self._binding
         key = os.environ.get(b.api_key_env, "")
-        # provider name is fixed per DeepSeek anthropic-compat endpoint.
+        base_url = getattr(b, "openai_base_url", None) or b.anthropic_base_url
         text = (
-            f'[providers."{b.provider}-anthropic"]\n'
-            f'type     = "anthropic"\n'
-            f'base_url = "{b.anthropic_base_url}"\n'
+            f'[providers."{b.provider}"]\n'
+            f'type     = "openai_legacy"\n'
+            f'base_url = "{base_url}"\n'
             f'api_key  = "{key}"\n\n'
             f'[models."{b.cli_selector}"]\n'
-            f'provider = "{b.provider}-anthropic"\n'
+            f'provider = "{b.provider}"\n'
             f'model    = "{b.identity_model}"\n'
-            f'max_context_size = 786432\n'
+            f'max_context_size = 131072\n'
         )
         fd, path = tempfile.mkstemp(suffix=".toml", prefix="agentic-kimi-")
         try:
             os.fchmod(fd, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(text)
+            yield path
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    @contextmanager
+    def _temp_mcp_config(self):
+        """Yield a temp MCP config with no servers; always removed.
+
+        Without this, kimi loads the user's default ``~/.kimi/mcp.json`` and
+        aborts the whole run with ``MCPRuntimeError`` when any declared server
+        is unreachable. Dispatched work packages must not depend on the
+        operator's local MCP servers, so the dispatch runs with none.
+        """
+        fd, path = tempfile.mkstemp(suffix=".json", prefix="agentic-kimi-mcp-")
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write('{"mcpServers": {}}')
             yield path
         finally:
             try:
@@ -92,6 +120,7 @@ class KimiAdapter(Adapter):
         else:
             # dry_run shows the shape (temp path placeholder); real run below fills it.
             cmd = [self._kimi_bin, "--afk", "--print", "--config-file", "<tmp>",
+                   "--mcp-config-file", "<tmp-mcp>",
                    "--model", self._binding.cli_selector, "-w", worktree, "-p", prompt]
         if dry_run:
             return ImplementResult(
@@ -104,8 +133,9 @@ class KimiAdapter(Adapter):
         if self._binding is None:
             real_cmd = [self._kimi_bin, "--afk", "--print", "-w", worktree, "-p", prompt]
             return self._run(real_cmd, redact_env=None)
-        with self._temp_config() as cfg:
+        with self._temp_config() as cfg, self._temp_mcp_config() as mcp_cfg:
             real_cmd = [self._kimi_bin, "--afk", "--print", "--config-file", cfg,
+                        "--mcp-config-file", mcp_cfg,
                         "--model", self._binding.cli_selector, "-w", worktree, "-p", prompt]
             return self._run(real_cmd, redact_env=self._binding.api_key_env)
 
@@ -176,10 +206,11 @@ class KimiAdapter(Adapter):
                 return (False, "")
             out = proc.stdout or ""
             return (proc.returncode == 0 and "PROBE_OK" in out, out)
-        with self._temp_config() as cfg:
+        with self._temp_config() as cfg, self._temp_mcp_config() as mcp_cfg:
             try:
                 proc = subprocess.run(
                     [self._kimi_bin, "--config-file", cfg,
+                     "--mcp-config-file", mcp_cfg,
                      "--model", self._binding.cli_selector, "-p", self._PROBE_PROMPT],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
