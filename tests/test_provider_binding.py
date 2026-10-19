@@ -85,36 +85,51 @@ def test_kimi_missing_openai_base_url_fail_closed():
         build_binding(adapter="kimi", provider_cfg=bad)
 
 
-def test_kimi_missing_field_message_names_the_field_and_no_key(monkeypatch):
-    """The kimi failure must be self-diagnosing and must never echo the key.
-
-    Asserting only the exception TYPE is vacuous: an error raised for an
-    unrelated cause, or one that prints the key, passes such a test. Pinning the
-    field name in the message makes a wrong-cause failure red, and pinning the
-    absence of the canary keeps a future message from leaking the credential it
-    was handed the env-var name for.
-    """
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
-    bad = dict(DEEPSEEK_CFG, openai_base_url=None)
-    with pytest.raises(ProviderConfigError) as ei:
-        build_binding(adapter="kimi", provider_cfg=bad)
-    message = str(ei.value)
-    assert "openai_base_url" in message, message
-    assert "kimi" in message, message
-    assert "sk-SECRET-LEAK-CANARY" not in message, message
-
-
-def test_kimi_anthropic_only_config_message_names_openai_base_url():
-    """Same contract for the exact historical shape: name the missing field."""
-    bad = {
+# Two input shapes reach the same guard and must be pinned separately. They are
+# indistinguishable to the production code (`.get()` returns None either way) but
+# NOT to a mutation, which can branch on `"openai_base_url" in provider_cfg`:
+#   * declared-but-empty -- the field is present with a falsy value;
+#   * absent             -- the key is missing entirely (the historical shape,
+#                           a provider block that only declared anthropic_base_url).
+_MISSING_OPENAI_URL_SHAPES = {
+    "declared_but_empty": dict(DEEPSEEK_CFG, openai_base_url=None),
+    "absent_anthropic_only": {
         "anthropic_base_url": "https://api.deepseek.com/anthropic",
         "api_key_env": "DEEPSEEK_API_KEY",
         "identity_model": "deepseek-v4-flash",
         "selectors": {"kimi": "deepseek/v4-flash"},
-    }
+    },
+}
+
+# The exact diagnostic this one cause must produce. Pinned as full equality, not
+# as a substring: `"openai_base_url" in message` cannot tell "this field is
+# missing" apart from "this field is fine, a DIFFERENT one is missing", so a
+# message like "openai_base_url is valid; missing identity_model" satisfies a
+# substring check while being the wrong diagnosis. Equality also makes a
+# rewording a conscious edit here rather than a silent loss of the contract.
+_EXPECTED_MISSING_OPENAI_URL = "adapter 'kimi' requires openai_base_url"
+
+
+@pytest.mark.parametrize("shape", sorted(_MISSING_OPENAI_URL_SHAPES))
+def test_kimi_missing_openai_base_url_names_that_exact_cause(shape):
+    """The failure must say which field is missing, for both input shapes."""
     with pytest.raises(ProviderConfigError) as ei:
-        build_binding(adapter="kimi", provider_cfg=bad)
-    assert "openai_base_url" in str(ei.value), ei.value
+        build_binding(adapter="kimi", provider_cfg=_MISSING_OPENAI_URL_SHAPES[shape])
+    assert str(ei.value) == _EXPECTED_MISSING_OPENAI_URL, str(ei.value)
+
+
+@pytest.mark.parametrize("shape", sorted(_MISSING_OPENAI_URL_SHAPES))
+def test_kimi_missing_openai_base_url_never_echoes_the_key(monkeypatch, shape):
+    """No input shape may leak the credential whose env-var name it was given.
+
+    Both shapes need the canary. Covering only one leaves a mutation free to
+    leak exactly in the uncovered shape, which is how an earlier round of this
+    test stayed green while printing a key.
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
+    with pytest.raises(ProviderConfigError) as ei:
+        build_binding(adapter="kimi", provider_cfg=_MISSING_OPENAI_URL_SHAPES[shape])
+    assert "sk-SECRET-LEAK-CANARY" not in str(ei.value), str(ei.value)
 
 
 def test_kimi_with_openai_base_url_builds():
