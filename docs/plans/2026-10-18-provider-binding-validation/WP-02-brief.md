@@ -42,7 +42,11 @@
   - `src/agentic_loop/wrappers/**`
   - `src/agentic_loop/contract_render.py`
   - `AGENTS.md`、`CLAUDE.md`、`docs/agentic/OPERATING_MODEL.md`
-    （除非 contract checksum 真的变了，见附注）
+    （**无条件禁止**。re-freeze r3：原文写「除非 contract checksum 真的变了」，
+    codex r2 指出这是第二套口径——它读起来像一个放行例外，而英文锚点与
+    status 都是无条件禁止。实测本 WP 的配置改动并不改变 checksum（两侧
+    都是 `c2ab3c3bb360dadc`），那个例外从未适用；真的变了也应停下报告，
+    而不是顺手重渲。契约由 WP-03 处理。）
 - **owner 边界**：引擎侧配置校验，不跨 owner。
 
 ## 输入

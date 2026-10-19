@@ -7,8 +7,12 @@
 ## 目标（一句话）
 
 修好 `build_values` 对表格式角色绑定的处理，使 `$developer_dispatch_hint`
-渲染出裸工具名（`kimi`），然后重渲三份契约，让 `agentic contract check` 转
-IN_SYNC。
+渲染出裸工具名（`kimi`），让 `agentic contract check` 转 IN_SYNC。
+
+> re-freeze r3（codex r2 指出的口径残留）：原文此处写「然后重渲三份契约」。
+> 实测修好渲染器后 expected checksum 自己回到文件里已有的 `307a6503bae68e97`，
+> `contract diff` 三份全部 unchanged——契约**无需重渲**，重渲反而会把 repr
+> 和错误 checksum 烙进去。三份契约已在 re-freeze r1 移入 forbidden_paths。
 
 ## 不变式（验收标的）
 
@@ -79,9 +83,11 @@ CLAUDE.md 的正文：
 
 ## 附注
 
-- 已知陷阱 1：`agentic contract diff` 输出的就是「修好渲染器后应有的样子」，
-  但它会在渲染器修好**之前**把 repr 写进文件。顺序必须是先修渲染器、再 diff
-  --apply，不能反过来。
+- 已知陷阱 1（re-freeze r3 修正）：`agentic contract diff` 在渲染器修好
+  **之前**会把 repr 写进文件，所以绝不能先 apply。原文接着写「顺序必须是先修
+  渲染器、再 diff --apply」——codex r2 指出这与 r1 缩窄后的范围冲突：正确做法
+  是先修渲染器、再 `contract diff` **只读确认** unchanged，**不执行 apply**，
+  因为那时已无差异可应用。契约文件属 forbidden_paths。
 - 已知陷阱 2（re-freeze r1 已实证）：**不要先重渲再修渲染器**。修好渲染器后
   `contract diff` 会报三份全部 unchanged——因为文件本来就是对的内容；
   若先 apply 则会把 repr 与错误 checksum 烙进去。本 WP 因此最终未改动任何契约文件。
