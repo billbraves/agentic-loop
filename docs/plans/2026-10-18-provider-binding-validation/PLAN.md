@@ -37,7 +37,7 @@ kimi 仍走 anthropic 端点，校验是自洽的。
 | WP | 主题 | 状态 |
 |---|---|---|
 | WP-01 | 固定 triple-sign 测试初始分支，基线转绿 | READY_FOR_REVIEW · codex ACCEPT |
-| WP-02 | kimi base_url 校验 fail-closed，禁止静默回退 | BLOCKED · codex r4 判 CONSULT，按 §7 待用户裁决 |
+| WP-02 | kimi base_url 校验 fail-closed，禁止静默回退 | BLOCKED · 用户已裁决并补齐覆盖(b01dfd2)，等 codex r5 判决 |
 | WP-03 | 表格式角色渲染成 adapter 名，修复契约漂移 | READY_FOR_REVIEW · codex ACCEPT |
 
 ## 明确不在本迭代范围
@@ -99,9 +99,27 @@ codex 拒绝开第四轮 REWORK，理由是三轮修复都只在上一条变异�
 可延期 / 不可延期的区分（codex 明确）：共享 helper/lint **可以延期**；
 空字符串覆盖缺口与本次 §7 裁决**不可延期**。
 
-### 待用户裁决
+### 用户裁决（已给出）
 
-验收边界划在哪里，以及后续修复方式。不要自动再开一轮返工。
+**补空字符串覆盖后收尾。** 已在 `b01dfd2` 落地：provider_binding 的形态从
+两种扩为三种（`declared_none` / `declared_empty` / `absent`），其中
+`declared_empty` 从真实 TOML 解析而非手写 `""`，另加一个 fixture 自检测试
+防止该形态静默失效；adapter 侧的 `None` 与 `""` 也都参数化。
+
+codex r4 的四个空字符串变异全部转红（2/2/1/1，修复前均 27 全绿），
+r1~r3 历史变异检出数普遍上升（6/3/2/2/2）。
+quality-gate PASS，928 passed / 4 skipped。
+
+**但这些是编排者自测，不是独立签名。** r5 在配额耗尽前未产出判决
+（见 `PLAN-01-consult-codex-review-r5.answer.md`），所以 WP-02 的最新已记录
+独立决定仍是 r4 的 CONSULT。
+
+### 当前阻断项：等 codex 配额恢复（23:55）跑 r5
+
+r5 任务清单六项不变，其中第 2 项要求 codex 裁定形态枚举是否已完备，
+还是继续要求 whitespace-only、非 str 假值等即属过度拟合本守卫不拥有的职责。
+
+**在取得 codex 对 `b01dfd2` 的判决前，不得 finalize、不得合并。**
 
 ## 收敛顺序（§4.3 原文顺序，re-freeze r4 修正）
 
