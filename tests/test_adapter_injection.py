@@ -164,7 +164,16 @@ _EXPECTED_ADAPTER_GUARD = (
 )
 
 
-def test_kimi_temp_config_refuses_binding_without_openai_base_url(monkeypatch):
+# Both falsy shapes must be pinned here too. The guard sees a ProviderBinding
+# attribute rather than a config dict, so the shapes are None and "" -- and a
+# mutation can tell them apart with `is None` even though the production guard
+# cannot. Covering only None let the empty string through with this whole module
+# still green.
+_FALSY_URL_VALUES = {"none": None, "empty_string": ""}
+
+
+@pytest.mark.parametrize("shape", sorted(_FALSY_URL_VALUES))
+def test_kimi_temp_config_refuses_binding_without_openai_base_url(monkeypatch, shape):
     """A hand-built binding must fail loudly, not silently reuse the other URL.
 
     The message is pinned exactly, and the canary asserted absent: this guard
@@ -173,7 +182,8 @@ def test_kimi_temp_config_refuses_binding_without_openai_base_url(monkeypatch):
     """
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
     b = mk_binding(selector="deepseek/v4-pro")
-    object.__setattr__(b, "openai_base_url", None)        # frozen dataclass
+    # frozen dataclass
+    object.__setattr__(b, "openai_base_url", _FALSY_URL_VALUES[shape])
     a = KimiAdapter(binding=b)
     with pytest.raises(ValueError) as ei:
         with a._temp_config() as _cfg:

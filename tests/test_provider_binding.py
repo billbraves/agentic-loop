@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tomllib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -85,14 +86,35 @@ def test_kimi_missing_openai_base_url_fail_closed():
         build_binding(adapter="kimi", provider_cfg=bad)
 
 
-# Two input shapes reach the same guard and must be pinned separately. They are
-# indistinguishable to the production code (`.get()` returns None either way) but
-# NOT to a mutation, which can branch on `"openai_base_url" in provider_cfg`:
-#   * declared-but-empty -- the field is present with a falsy value;
-#   * absent             -- the key is missing entirely (the historical shape,
-#                           a provider block that only declared anthropic_base_url).
+# Three input shapes reach the same guard and must be pinned separately. All
+# three are indistinguishable to the production code -- `.get()` yields a falsy
+# value for each -- but NOT to a mutation, which can branch on
+# `"openai_base_url" in provider_cfg` or on `value is None`:
+#   * declared_none  -- the key is present and None;
+#   * declared_empty -- the key is present and "", which is what an operator
+#                       actually writes in TOML (openai_base_url = ""). Omitting
+#                       this shape let `not value` -> `value is None` admit the
+#                       empty string with the whole module still green;
+#   * absent         -- the key is missing entirely (the historical shape, a
+#                       provider block that only declared anthropic_base_url).
+#
+# declared_empty is parsed from real TOML rather than hand-written as "" so the
+# test pins the shape an actual config file produces, not our assumption about
+# how tomllib represents it.
+_EMPTY_URL_CFG = tomllib.loads(
+    """
+    anthropic_base_url = "https://api.deepseek.com/anthropic"
+    openai_base_url    = ""
+    api_key_env        = "DEEPSEEK_API_KEY"
+    identity_model     = "deepseek-v4-flash"
+    [selectors]
+    kimi = "deepseek/v4-flash"
+    """
+)
+
 _MISSING_OPENAI_URL_SHAPES = {
-    "declared_but_empty": dict(DEEPSEEK_CFG, openai_base_url=None),
+    "declared_none": dict(DEEPSEEK_CFG, openai_base_url=None),
+    "declared_empty": _EMPTY_URL_CFG,
     "absent_anthropic_only": {
         "anthropic_base_url": "https://api.deepseek.com/anthropic",
         "api_key_env": "DEEPSEEK_API_KEY",
@@ -100,6 +122,17 @@ _MISSING_OPENAI_URL_SHAPES = {
         "selectors": {"kimi": "deepseek/v4-flash"},
     },
 }
+
+
+def test_empty_url_shape_is_really_an_empty_string():
+    """Guard the fixture itself: the shape must be "" and present, not None.
+
+    If tomllib ever produced something else here, the parametrized cases above
+    would still pass while no longer covering the empty-string shape at all --
+    the silent-coverage-loss failure mode this whole block exists to prevent.
+    """
+    assert "openai_base_url" in _EMPTY_URL_CFG
+    assert _EMPTY_URL_CFG["openai_base_url"] == ""
 
 # The exact diagnostic this one cause must produce. Pinned as full equality, not
 # as a substring: `"openai_base_url" in message` cannot tell "this field is
