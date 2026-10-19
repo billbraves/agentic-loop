@@ -62,24 +62,40 @@ kimi 仍走 anthropic 端点，校验是自洽的。
 
 ## 当前进度与下一步（供新 session 恢复）
 
-分支从未推送。工作树：`/Users/admin/vibe/.worktrees/pbv-plan`。
+plan 分支从未推送。工作树：`/Users/admin/vibe/.worktrees/pbv-plan`。
+基线分支 `fix/tool-fixes-2026-10-14` 已推送到 origin（`5bd90b5`），
+因此**基线那两个提交不可再重写**。
 
-已完成：WP-01 / WP-03 获 codex 独立 ACCEPT；WP-02 返工（`d0f1bf6`）补齐了
-错误消息与脱敏断言并通过质量门（922 passed）；历史已按 §4.3 重整，
-`plan lint` 仅剩合并前应有的 `finalize commit x0`。
+已完成：
 
-下一步（按用户 2026-10-18 决定）：
+- WP-01（`71c0658`）、WP-03（`3cdd101`）获 codex ACCEPT，且在历史重写后
+  由 codex 用内容比对＋复跑重新建立依据，不是换填 SHA。
+- WP-02 经三轮返工：`d0f1bf6`（钉原因与脱敏）、`eb2947c`（改等式断言、
+  覆盖两种输入形态）、`5dbc0b8`（补 adapter 路径）。每轮都有变异转红证据。
+- 提交纪律按 §4.3 重整，`plan lint` 仅剩合并前应有的 `finalize commit x0`。
+- brief 口径残留清理（`f4c4f5a`）、WP-03 `base_commit` 修正为 `9d943b8`。
 
-1. codex 配额恢复（约 2026-10-19 03:03）后**只重跑 WP-02 的 r2 复审**。
-   启动前把 WP-02 的 reviewer 记录更新为 r2 结论；r1 的 REWORK 在此之前
-   仍是最新已记录决定，不得视为已通过。
-2. 三个 WP 的 review/consult 决策齐备后，运行 `agentic plan merge` 一次性
-   合入 `main`，再 `agentic plan finalize` 把 status 折叠进单个 finalize 提交。
-3. 注意：status 文件的当前改动**故意不提交**（§4.3 要求决策累积到工作树，
-   在 finalize 提交里一次性落地）。在此之前的每个提交
-   `validate_wp_status` 均通过。
+**唯一阻断项**：WP-02 在 `5dbc0b8` 之后没有独立判决。codex 的 r3 在产出判决前
+配额耗尽（见 `PLAN-01-consult-codex-review-r3.answer.md`），它中断前已确认
+r2 变异被杀死，并提出了 adapter 路径这个新阻断发现。
 
-## 收敛方式
+下一步：
 
-全部 WP 到 `MERGED` 后，`agentic plan merge` 单次 `--no-ff` 合入 `main`，
-一次推送。不做 N 个独立合并。
+1. codex 配额恢复后跑 **r4**，评审对象 `5dbc0b8`。r4 必须回答两件事：
+   WP-02 的判决，以及**是否应按 AGENTS.md §7 升级为 CONSULT**——同一类缺陷
+   （错误消息未被钉死）已在三个不同位置被连续三轮发现：provider_binding
+   只断言异常类型、provider_binding 子串断言且只覆盖一种形态、adapter
+   子串断言且无 canary。r1~r3 的 REWORK 在 r4 出结论前仍是最新已记录决定。
+2. 判决齐备后 `agentic plan merge` 单次 `--no-ff` 合入 `main`，
+   再 `agentic plan finalize` 把 status 折叠进单个 finalize 提交。
+3. status 文件的当前改动**故意不提交**（§4.3：决策累积到工作树，在 finalize
+   提交里一次落地）。这也是 `agentic plan check` 读主仓副本时报
+   `IMPLEMENTING` 的原因，不是状态记录错误。此前每个提交的
+   `validate_wp_status` 均通过（codex r2 逐提交验过 21 份快照）。
+
+### 下一轮迭代候选（本轮登记，不在本轮范围）
+
+- pre-push 钩子在 linked worktree 下漏读状态（详见上文「不在本迭代范围」）。
+- **错误消息不变式缺少结构化保障**：本轮三处同形缺陷说明，没有共享 helper
+  或 lint 来强制「报错消息按等式钉死且断言 canary 不出现」，第四处仍可能
+  复发。已记入 WP-02 status 的 risks。
