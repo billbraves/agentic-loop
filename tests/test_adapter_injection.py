@@ -152,15 +152,35 @@ def test_kimi_temp_config_never_writes_anthropic_endpoint(monkeypatch):
     assert "/anthropic" not in text, text
 
 
+# The adapter's own guard is the SECOND place this cause can be reported, and
+# the more dangerous one: by the time it runs, _temp_config has already read the
+# real credential out of the environment into a local. A substring match on
+# "openai_base_url" admits both a wrong diagnosis and a message that appends the
+# key -- the exact pair of defects codex rejected in provider_binding. Pinning
+# the message by equality covers both, in the one place that holds the secret.
+_EXPECTED_ADAPTER_GUARD = (
+    "kimi adapter requires openai_base_url "
+    "(the injected provider uses type=openai_legacy)"
+)
+
+
 def test_kimi_temp_config_refuses_binding_without_openai_base_url(monkeypatch):
-    """A hand-built binding must fail loudly, not silently reuse the other URL."""
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-CANARY")
+    """A hand-built binding must fail loudly, not silently reuse the other URL.
+
+    The message is pinned exactly, and the canary asserted absent: this guard
+    runs with the real key already in hand, so "fails loudly" must not mean
+    "fails loudly, with the credential in the exception text".
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
     b = mk_binding(selector="deepseek/v4-pro")
     object.__setattr__(b, "openai_base_url", None)        # frozen dataclass
     a = KimiAdapter(binding=b)
-    with pytest.raises(ValueError, match="openai_base_url"):
+    with pytest.raises(ValueError) as ei:
         with a._temp_config() as _cfg:
             pass
+    message = str(ei.value)
+    assert message == _EXPECTED_ADAPTER_GUARD, message
+    assert "sk-SECRET-LEAK-CANARY" not in message, message
 
 
 
