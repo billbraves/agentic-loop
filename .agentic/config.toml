@@ -38,7 +38,11 @@ codex = "gpt-5.6-sol"
 # kimi 套餐额度不足时的自动回退目标（仅 developer 派发用；主档仍是原生 kimi）。
 # 单跳：kimi 原生 → deepseek-v4-flash；flash 也额度失败则 REDISPATCH_STOP 交人工。
 [providers.deepseekflash]
-anthropic_base_url = "https://api.deepseek.com/anthropic"   # kimi 走 anthropic 兼容端
+# kimi 1.50 只通过 openai_legacy 类型的 provider 解析该 selector，适配器注入的
+# provider 块也据此写成 openai_legacy，故 base URL 用 OpenAI 兼容端；
+# anthropic_base_url 仍保留给走 anthropic 兼容端的 adapter（如 claude）。
+anthropic_base_url = "https://api.deepseek.com/anthropic"
+openai_base_url    = "https://api.deepseek.com/v1"
 api_key_env        = "DEEPSEEK_API_KEY"                      # 只存 env 名，绝不落盘明文
 identity_model     = "deepseek-v4-flash"                     # DESIGN §10.1：实现前须核实精确 id
 [providers.deepseekflash.selectors]

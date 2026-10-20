@@ -136,6 +136,64 @@ def test_kimi_temp_config_contains_key_and_is_0600(monkeypatch):
     assert not Path(cfg_path).exists()                    # cleaned up after ctx
 
 
+def test_kimi_temp_config_never_writes_anthropic_endpoint(monkeypatch):
+    """The openai_legacy block must never carry the /anthropic endpoint.
+
+    When kimi fell back to ``anthropic_base_url``, a provider section declaring
+    only that field produced ``base_url = ".../anthropic"`` inside a
+    ``type = "openai_legacy"`` block: syntactically valid, semantically wrong,
+    and observable only as an opaque remote failure at dispatch time.
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-CANARY")
+    a = KimiAdapter(binding=mk_binding(selector="deepseek/v4-pro"))
+    with a._temp_config() as cfg_path:
+        text = Path(cfg_path).read_text()
+    assert "openai_legacy" in text
+    assert "/anthropic" not in text, text
+
+
+# The adapter's own guard is the SECOND place this cause can be reported, and
+# the more dangerous one: by the time it runs, _temp_config has already read the
+# real credential out of the environment into a local. A substring match on
+# "openai_base_url" admits both a wrong diagnosis and a message that appends the
+# key -- the exact pair of defects codex rejected in provider_binding. Pinning
+# the message by equality covers both, in the one place that holds the secret.
+_EXPECTED_ADAPTER_GUARD = (
+    "kimi adapter requires openai_base_url "
+    "(the injected provider uses type=openai_legacy)"
+)
+
+
+# Both falsy shapes must be pinned here too. The guard sees a ProviderBinding
+# attribute rather than a config dict, so the shapes are None and "" -- and a
+# mutation can tell them apart with `is None` even though the production guard
+# cannot. Covering only None let the empty string through with this whole module
+# still green.
+_FALSY_URL_VALUES = {"none": None, "empty_string": ""}
+
+
+@pytest.mark.parametrize("shape", sorted(_FALSY_URL_VALUES))
+def test_kimi_temp_config_refuses_binding_without_openai_base_url(monkeypatch, shape):
+    """A hand-built binding must fail loudly, not silently reuse the other URL.
+
+    The message is pinned exactly, and the canary asserted absent: this guard
+    runs with the real key already in hand, so "fails loudly" must not mean
+    "fails loudly, with the credential in the exception text".
+    """
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-SECRET-LEAK-CANARY")
+    b = mk_binding(selector="deepseek/v4-pro")
+    # frozen dataclass
+    object.__setattr__(b, "openai_base_url", _FALSY_URL_VALUES[shape])
+    a = KimiAdapter(binding=b)
+    with pytest.raises(ValueError) as ei:
+        with a._temp_config() as _cfg:
+            pass
+    message = str(ei.value)
+    assert message == _EXPECTED_ADAPTER_GUARD, message
+    assert "sk-SECRET-LEAK-CANARY" not in message, message
+
+
+
 def test_kimi_temp_mcp_config_declares_no_servers(monkeypatch):
     """Dispatch must not inherit the operator's ~/.kimi/mcp.json.
 

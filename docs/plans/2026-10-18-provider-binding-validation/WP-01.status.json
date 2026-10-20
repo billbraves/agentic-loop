@@ -1,0 +1,113 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-01",
+  "iteration_id": "2026-10-18-provider-binding-validation",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "BLOCKED",
+  "role": "Developer",
+  "executor": {
+    "tool": "claude-code",
+    "session": "kimi dispatch not operable in this environment (no DEEPSEEK_API_KEY; sandbox blocks kimi's ~/.kimi/logs write, so probe_injection cannot pass). Implemented by the orchestrator acting as developer, per user decision; this is NOT reported as a kimi dispatch."
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "codex-cli",
+    "session": "codex exec, independent reviewer, 2026-10-18 (r1 + r2)"
+  },
+  "git": {
+    "base_branch": "plan/2026-10-18-provider-binding-validation",
+    "base_commit": "5bd90b5249137c7d746f0f574a979d9811b2a29f",
+    "dispatch_commit": "",
+    "branch": "plan/2026-10-18-provider-binding-validation",
+    "worktree": "/Users/admin/vibe/.worktrees/pbv-plan",
+    "commit": "71c06585bb7c25208083d41c5f8e3c9fb2052c55"
+  },
+  "scope": {
+    "allowed_paths": [
+      "tests/test_finalize_merge_triple_sign.py"
+    ],
+    "forbidden_paths": [
+      "src/",
+      "docs/plans/2026-09-22-framework-hardening/",
+      ".agentic/"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_finalize_merge_triple_sign.py -q",
+        "at_commit": "71c0658",
+        "exit_code": 0,
+        "result": "5 passed",
+        "note": "Acceptance test, measured in a detached worktree at this WP's own commit."
+      },
+      {
+        "command": "reverse mutation: _run_git(repo, \"init\", \"-q\", \"-b\", INIT_BRANCH) -> _run_git(repo, \"init\", \"-q\")",
+        "at_commit": "71c0658",
+        "exit_code": 1,
+        "result": "4 failed, 1 passed",
+        "note": "Dropping the explicit branch makes the fixture inherit the host's init.defaultBranch (master here), which is exactly the dependency this WP removed. Matches codex r4's reading of 4 failed."
+      },
+      {
+        "command": "control mutation: INIT_BRANCH = \"main\" -> \"master\"",
+        "at_commit": "71c0658",
+        "exit_code": 0,
+        "result": "5 passed (deliberately NOT red)",
+        "note": "Recorded because it looks like an undetected mutation but is not. The constant is used consistently at both init and checkout, so renaming it stays self-consistent -- which IS the fix: the suite no longer depends on the host default, rather than hard-coding 'main'. An earlier attempt of mine to mutate the literal string 'git init -q -b main' silently matched nothing (the source calls _run_git with separate args) and I briefly mis-read the resulting green as the test being insensitive."
+      },
+      {
+        "command": "env-independence: both host init.defaultBranch values",
+        "at_commit": "71c0658",
+        "exit_code": 0,
+        "result": "5 passed either way",
+        "note": "Global config here is init.defaultBranch=master; the suite passes regardless, which is the WP's objective."
+      }
+    ]
+  },
+  "review": {
+    "decision": "N/A",
+    "reason": "N/A, not ACCEPT: the orchestrator (claude-code) implemented this WP because kimi dispatch was not operable at the time, so it cannot supply an independent first-pass review of its own work. Independence for this WP is carried solely by consult (codex). Recorded per the validator's documented N/A path for the implementer-is-reviewer conflict, rather than by signing its own implementation as ACCEPT.",
+    "reviewer_is_implementer": true
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "tool": "codex-cli",
+    "session": "codex exec, independent consultant, rounds 1-4, 2026-10-18/19",
+    "rounds": [
+      1,
+      2,
+      4,
+      5
+    ],
+    "artifact": [
+      "PLAN-01-consult-codex-review-r1.answer.md",
+      "PLAN-01-consult-codex-review-r2.answer.md",
+      "PLAN-01-consult-codex-review-r4.answer.md",
+      "PLAN-01-consult-codex-review-r5b.answer.md"
+    ],
+    "evidence": "The branch history was rewritten after r1 to remove the status-sync commits, so the SHA r1 accepted no longer exists. Codex explicitly refused to transfer the ACCEPT by SHA substitution: it re-established it by comparing the content of 71c0658 against the reviewed version byte-for-byte and re-running the tests and reverse mutations. The ACCEPT stands on that re-verification, not on the rewrite.",
+    "r4_note": "Re-verified at r4 against this exact commit: forward and reverse mutations re-run, ACCEPT maintained.",
+    "r5_note": "Forward and reverse verification re-run at r5; ACCEPT maintained.",
+    "superseded": {
+      "decision": "ABANDONED by user adjudication 2026-10-20",
+      "superseded_by": "3955529 fix(tests): probe the default branch in the triple-sign fixture",
+      "reason": "main independently fixed the SAME root cause with a better approach while this plan branch was under review. This WP pinned INIT_BRANCH = 'main' and passed `git init -b main`; main's 3955529 keeps the bare `git init` and adds _default_branch(repo) to probe the host's actual default branch instead. Both remove the dependency on the host's init.defaultBranch, but main's adapts to any host default whereas this WP hard-codes the name. main's version was verified on this branch: 5 passed with the host's init.defaultBranch=master, and 928 passed / 4 skipped for the full suite.",
+      "the_clue_was_already_in_the_evidence": "The r4/r5 evidence for this WP already contained it. The deliberately-not-red control mutation (INIT_BRANCH 'main' -> 'master', still 5 passed) was recorded with the note that the constant is used consistently at both init and checkout, so renaming it stays self-consistent. main's fix carries that one step further: if the name is irrelevant, probe it instead of fixing it and the constant is not needed at all.",
+      "disposition": "tests/test_finalize_merge_triple_sign.py is reverted to main's version on this branch, so the plan merge introduces no competing fix. WP-02 and WP-03 are unaffected: neither touches this file, and the three WPs were linear with no content coupling.",
+      "codex_signatures_retained": "codex's r1/r2/r4/r5 ACCEPTs for this WP stay recorded as historical fact -- the work was correct when reviewed. It is simply no longer being merged."
+    }
+  },
+  "timestamps": {
+    "dispatched_at": ""
+  }
+}

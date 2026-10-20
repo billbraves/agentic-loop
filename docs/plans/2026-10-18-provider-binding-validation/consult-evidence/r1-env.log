@@ -1,0 +1,35 @@
+clean exit 0 
+ ..........                                                               [100%]
+10 passed in 0.65s
+
+agentic-python exit 1 
+ F.........                                                               [100%]
+=================================== FAILURES ===================================
+_______________ test_shell_entry_passes_status_and_writes_gates ________________
+tests/test_gate_runner_shell.py:155: in test_shell_entry_passes_status_and_writes_gates
+    assert proc.returncode == 0, proc.stderr
+E   AssertionError: /opt/homebrew/opt/python@3.11/bin/python3.11: Error while finding module specification for 'agentic_loop.validate_wp_status' (ModuleNotFoundError: No module named 'agentic_loop')
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['bash', '/private/tmp/pbv-plan/src/agentic_loop/wrappers/gate-runner.sh', '/private/var/folders...ng module specification for 'agentic_loop.validate_wp_status' (ModuleNotFoundError: No module named 'agentic_loop')\n").returncode
+=========================== short test summary info ============================
+FAILED tests/test_gate_runner_shell.py::test_shell_entry_passes_status_and_writes_gates
+1 failed, 9 passed in 1.21s
+
+absolute-pythonpath exit 1 
+ ........F.                                                               [100%]
+=================================== FAILURES ===================================
+_____ test_prepush_hook_targets_current_worktree_status_in_linked_worktree _____
+tests/test_init_githooks.py:197: in test_prepush_hook_targets_current_worktree_status_in_linked_worktree
+    assert "PRE_PUSH_SKIP" not in r.stderr, r.stderr
+E   AssertionError: PRE_PUSH_SKIP: no active work-package status for branch feat/wp-demo
+E     
+E   assert 'PRE_PUSH_SKIP' not in 'PRE_PUSH_SK...at/wp-demo\n'
+E     
+E     'PRE_PUSH_SKIP' is contained here:
+E       PRE_PUSH_SKIP: no active work-package status for branch feat/wp-demo
+E     ? +++++++++++++
+=========================== short test summary info ============================
+FAILED tests/test_init_githooks.py::test_prepush_hook_targets_current_worktree_status_in_linked_worktree
+1 failed, 9 passed in 0.42s
+

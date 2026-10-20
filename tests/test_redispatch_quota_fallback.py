@@ -33,10 +33,13 @@ class _StubAdapter:
 
 
 def _flash_binding():
+    # openai_base_url is required: the kimi adapter injects a
+    # ``type = "openai_legacy"`` provider block and now fails closed without it,
+    # rather than silently pointing that block at the anthropic endpoint.
     return ProviderBinding(
         provider="deepseekflash",
         anthropic_base_url="https://api.deepseek.com/anthropic",
-        openai_base_url=None,
+        openai_base_url="https://api.deepseek.com/v1",
         identity_model="deepseek-v4-flash",
         cli_selector="deepseek/v4-flash",
         api_key_env="DEEPSEEK_API_KEY",

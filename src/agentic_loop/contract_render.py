@@ -86,6 +86,30 @@ def _fmt_role(value):
     return str(value)
 
 
+def _primary_role_name(value, default):
+    """The bare adapter name of a role, for prose that needs a tool name only.
+
+    Accepts the same three binding forms as :func:`_fmt_role`. A table yields
+    its ``adapter``, not the table's repr; an array yields its primary entry.
+
+    This exists because building the primary name by list-wrapping the role and
+    taking ``[0]`` silently breaks on the table form: a dict is not a
+    list/tuple, so the dict itself came back and ``str()`` emitted a Python repr
+    straight into ``$developer_dispatch_hint`` -- i.e. into the body of
+    AGENTS.md and CLAUDE.md:
+
+        dispatch the developer role (configured tool: {'adapter': 'kimi',
+        'fallback_provider': 'deepseekflash'}) into an isolated worktree
+    """
+    if isinstance(value, dict):
+        adapter = value.get("adapter")
+        return str(adapter) if adapter else default
+    if isinstance(value, (list, tuple)):
+        return str(value[0]) if value else default
+    text = str(value)
+    return text if text else default
+
+
 def _command_gate_rules(config):
     """Return the command-gate rule list from the unified ``[[gate]]`` array.
 
@@ -143,8 +167,7 @@ def build_values(config, *, project_name):
     scripts = config.get("scripts", {}) if isinstance(config, dict) else {}
 
     developer = roles.get("developer", "Developer")
-    developer_names = developer if isinstance(developer, (list, tuple)) else [developer]
-    primary_developer = str(developer_names[0]) if developer_names else "the developer tool"
+    primary_developer = _primary_role_name(developer, "the developer tool")
 
     values = {
         "project_name": project_name,

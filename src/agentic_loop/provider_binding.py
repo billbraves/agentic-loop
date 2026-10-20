@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# claude/kimi 走 anthropic 兼容端；codex 走 openai 兼容端。
-_ANTHROPIC_ADAPTERS = {"claude", "kimi"}
-_OPENAI_ADAPTERS = {"codex"}
+# Which endpoint each adapter's CLI actually talks to. This must track the wire
+# format the adapter INJECTS, not the vendor's marketing shape: kimi 1.50
+# resolves a non-managed provider only through its ``openai_legacy`` type, so the
+# kimi adapter writes an OpenAI-compatible provider block and therefore needs
+# ``openai_base_url``. Leaving kimi in the anthropic set validated a field the
+# adapter no longer reads while the field it does read went unchecked — a config
+# declaring only ``anthropic_base_url`` then produced a syntactically valid
+# ``openai_legacy`` block pointing at the /anthropic endpoint.
+_ANTHROPIC_ADAPTERS = {"claude"}
+_OPENAI_ADAPTERS = {"codex", "kimi"}
 
 
 class ProviderConfigError(ValueError):

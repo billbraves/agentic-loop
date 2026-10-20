@@ -1,0 +1,114 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-03",
+  "iteration_id": "2026-10-18-provider-binding-validation",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "claude-code",
+    "session": "kimi dispatch not operable in this environment (no DEEPSEEK_API_KEY; sandbox blocks kimi's ~/.kimi/logs write, so probe_injection cannot pass). Implemented by the orchestrator acting as developer, per user decision; this is NOT reported as a kimi dispatch."
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "codex-cli",
+    "session": "codex exec, independent reviewer, 2026-10-18 (r1 + r2)"
+  },
+  "git": {
+    "base_branch": "plan/2026-10-18-provider-binding-validation",
+    "base_commit": "9d943b83d0083b10ab6f1c83708db387ab12223c",
+    "dispatch_commit": "",
+    "branch": "plan/2026-10-18-provider-binding-validation",
+    "worktree": "/Users/admin/vibe/.worktrees/pbv-plan",
+    "commit": "3cdd1014b9162197fb2d6616b9d6ff611952dcc8",
+    "notes": [
+      "base_commit corrected from 480fb80 to 9d943b8 after the branch history was rewritten to remove the status-sync commits codex flagged in r1: 480fb80 survived as a dangling object but is no longer an ancestor of this WP's commit. Found by codex r2; schema validity had masked it."
+    ],
+    "merged_commit": "5d1caca2b2d907c506b89876513105add4325fd5"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/contract_render.py",
+      "tests/test_contract_render.py"
+    ],
+    "forbidden_paths": [
+      ".agentic/config.toml",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/agentic/OPERATING_MODEL.md",
+      "src/agentic_loop/gate/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/provider_binding.py"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_contract_render.py -q",
+        "at_commit": "3cdd101",
+        "exit_code": 0,
+        "result": "26 passed",
+        "note": "Acceptance test, measured in a detached worktree at this WP's own commit."
+      },
+      {
+        "command": "agentic contract check",
+        "at_commit": "3cdd101",
+        "exit_code": 0,
+        "result": "AGENTS.md / CLAUDE.md / OPERATING_MODEL.md all IN_SYNC"
+      },
+      {
+        "command": "reverse mutation: _primary_role_name(developer, ...) -> (developer if isinstance(developer, list) else [developer])[0]",
+        "at_commit": "3cdd101",
+        "exit_code": 1,
+        "result": "6 failed, 20 passed",
+        "note": "Restoring the old list-wrap form reproduces the Python-repr leak."
+      },
+      {
+        "command": "agentic contract check UNDER that same mutation",
+        "at_commit": "3cdd101",
+        "exit_code": 1,
+        "result": "all three files CONFIG_DRIFT",
+        "note": "The strongest evidence for this WP: with the renderer broken the expected checksum moves away from the 307a6503bae68e97 already stamped in the files. Fixing the renderer moved it back, which is why contract diff reports all three unchanged and NO contract file was edited. Applying the diff first would have baked the repr plus a wrong checksum into the governance contract."
+      }
+    ]
+  },
+  "review": {
+    "decision": "N/A",
+    "reason": "N/A, not ACCEPT: the orchestrator (claude-code) implemented this WP because kimi dispatch was not operable at the time, so it cannot supply an independent first-pass review of its own work. Independence for this WP is carried solely by consult (codex). Recorded per the validator's documented N/A path for the implementer-is-reviewer conflict, rather than by signing its own implementation as ACCEPT.",
+    "reviewer_is_implementer": true
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "tool": "codex-cli",
+    "session": "codex exec, independent consultant, rounds 1-4, 2026-10-18/19",
+    "rounds": [
+      1,
+      2,
+      4,
+      5
+    ],
+    "artifact": [
+      "PLAN-01-consult-codex-review-r1.answer.md",
+      "PLAN-01-consult-codex-review-r2.answer.md",
+      "PLAN-01-consult-codex-review-r4.answer.md",
+      "PLAN-01-consult-codex-review-r5b.answer.md"
+    ],
+    "evidence": "The branch history was rewritten after r1 to remove the status-sync commits, so the SHA r1 accepted no longer exists. Codex explicitly refused to transfer the ACCEPT by SHA substitution: it re-established it by comparing the content of 3cdd101 against the reviewed version byte-for-byte and re-running the tests and reverse mutations. The ACCEPT stands on that re-verification, not on the rewrite.",
+    "r4_note": "Re-verified at r4 against this exact commit: forward and reverse mutations re-run, ACCEPT maintained.",
+    "r5_note": "Forward and reverse verification re-run at r5; ACCEPT maintained."
+  },
+  "timestamps": {
+    "dispatched_at": "",
+    "updated_at": "2026-10-20T00:04:51Z"
+  }
+}

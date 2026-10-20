@@ -1,0 +1,18 @@
+.......FF................                                                [100%]
+=================================== FAILURES ===================================
+__________ test_kimi_missing_field_message_names_the_field_and_no_key __________
+tests/test_provider_binding.py:102: in test_kimi_missing_field_message_names_the_field_and_no_key
+    assert "openai_base_url" in message, message
+E   AssertionError: unrelated failure sk-SECRET-LEAK-CANARY
+E   assert 'openai_base_url' in 'unrelated failure sk-SECRET-LEAK-CANARY'
+________ test_kimi_anthropic_only_config_message_names_openai_base_url _________
+tests/test_provider_binding.py:117: in test_kimi_anthropic_only_config_message_names_openai_base_url
+    assert "openai_base_url" in str(ei.value), ei.value
+E   AssertionError: ProviderConfigError('unrelated failure sk-SECRET-LEAK-CANARY')
+E   assert 'openai_base_url' in 'unrelated failure sk-SECRET-LEAK-CANARY'
+E    +  where 'unrelated failure sk-SECRET-LEAK-CANARY' = str(ProviderConfigError('unrelated failure sk-SECRET-LEAK-CANARY'))
+E    +    where ProviderConfigError('unrelated failure sk-SECRET-LEAK-CANARY') = <ExceptionInfo ProviderConfigError('unrelated failure sk-SECRET-LEAK-CANARY') tblen=2>.value
+=========================== short test summary info ============================
+FAILED tests/test_provider_binding.py::test_kimi_missing_field_message_names_the_field_and_no_key
+FAILED tests/test_provider_binding.py::test_kimi_anthropic_only_config_message_names_openai_base_url
+2 failed, 23 passed in 0.30s
