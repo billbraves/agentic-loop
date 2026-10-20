@@ -1,0 +1,301 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-02",
+  "iteration_id": "2026-10-15-status-source-topology",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "provider": "deepseekflash",
+    "session_id": null,
+    "redispatch_count": 0
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-10-15-status-source-topology",
+    "base_commit": "17cbcf4069eacc60e0dd4fada1c613e97544a43a",
+    "dispatch_commit": "",
+    "branch": "plan/2026-10-15-status-source-topology",
+    "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
+    "commit": "9180644bfbaf2fa0b807c6782ea0c8e3aced4a6e",
+    "merged_commit": "78771ca97241c4e1c225c1444158bf07de1e4d76"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/wrappers/merge.sh",
+      "src/agentic_loop/gate/qoder_security.py",
+      "tests/test_worktree_literal_removal.py",
+      "src/agentic_loop/wrappers/finalize_merge.sh"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "tests/test_worktree_detection.py",
+      "src/agentic_loop/wrappers/preflight.sh",
+      "src/agentic_loop/plan_cmd.py",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/autonomy.py",
+      ".agentic/config.toml",
+      "uv.lock",
+      "docs/plans/**",
+      "docs/agentic/templates/**"
+    ],
+    "decisions": {
+      "origin": "Split from WP-01 by user decision: this is a pre-existing INV-5 violation, independent of WP-01's trust-root question, and the user chose to fix it first. Measured in the current tree with no change of mine: merge.sh:37 and qoder_security.py:1012 test the literal '/.worktrees/' fragment, so they ACCEPT a sibling linked-worktree path that preflight.sh:44, finalize_merge.sh:160 and gate/__init__.py:810 REFUSE via the hardened git-fact predicate.",
+      "scope_extension_r6": "USER-APPROVED scope extension. finalize_merge.sh moved from forbidden_paths to allowed_paths for ONE reworded comment (line 38), nothing else. Reason: wp02-impl-r6 showed that any exemption pinned to a line -- by number, by file, or even by verbatim text -- is defeatable by opening a quote on an ADJACENT line, leaving the exempt line byte-identical while turning it into a runtime string. Orchestrator-reproduced against the real file. No line-local predicate can see the enclosing quote, so the exemption was DELETED rather than hardened and the comment now spells the literal out in prose. The product behaviour of finalize_merge.sh is unchanged -- comment text only.",
+      "brief_rev3": "USER-APPROVED brief revision. rev2's INV-C narrowed L to 'a real .worktrees directory inside the main repo', which omitted ALIAS paths of the same kind. wp02-impl-r7 produced a real counter-example that the old literal refuses and the predicate accepts: <parent>/.worktrees/../<repo>/docs/.../WP-01.status.json. Orchestrator-reproduced and ruled a FALSE POSITIVE of the old literal, not a loosening defect -- it resolves into the primary repo (git-dir and git-common-dir agree), so the file the gate opens IS the main-repo single source of truth, and refusing it would refuse what the rule protects. rev3 therefore states that L is judged by RESOLVED LOCATION, not by path spelling. Scope, acceptance tests and deliverables are unchanged; the clarification is pinned by test_inv_c_alias_resolving_to_main_repo_is_accepted."
+    }
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "name": "targeted",
+        "result": "8 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent)"
+      },
+      {
+        "name": "guards",
+        "result": "19 passed, file diff empty",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent)"
+      },
+      {
+        "name": "protected",
+        "result": "36 passed",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent)"
+      },
+      {
+        "name": "full",
+        "result": "910 passed, 4 skipped (baseline 902/4)",
+        "exit_code": 0,
+        "run_by": "orchestrator (independent)"
+      }
+    ],
+    "brief": {
+      "rev": 3,
+      "sha256": "b329d32b420bea3a79bb61b34d421d701a673ffbef1554cb16a6bbcd853c77a6",
+      "snapshots": {
+        "rev1": "aabc0366017ec934218015d29e5bf23c1c853d83d4aa87f7ae2b1b5709d43ba6",
+        "rev2": "39a11525952c9b1ad5a2d3374da42d950f89bf242c4bffcc7bdb15c492cc465b"
+      }
+    },
+    "orchestrator_verified_mutations": {
+      "M-A": "F1 red; red form = execution passed the refusal and hit the branch-tip gate at :109, proving wrongful acceptance",
+      "M-B": "F2 red (qoder literal restored)",
+      "M-C": "F5 red (PROBE_FAIL -> MAIN, fail-open)"
+    }
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "round": "wp02-impl-r2",
+    "bound_commit": "9180644bfbaf2fa0b807c6782ea0c8e3aced4a6e",
+    "reviewed_by": "orchestrator (independent re-run; every mutation hand-applied and reverted)",
+    "findings": [
+      "The code change itself is CORRECT: qoder_security.py now calls path_is_in_worktree, and merge.sh copies preflight.sh's inline-probe pattern verbatim including the `|| echo PROBE_FAIL` fail-closed form. Independently re-run by the orchestrator: targeted 7 passed, guards 19 passed with tests/test_worktree_detection.py's git diff EMPTY, protected set 36 passed.",
+      "M-A IS NOT LOAD-BEARING -- the same class of defect the consultant caught in rev1's F5. The orchestrator hand-applied M-A (restoring the literal in merge.sh) and F1 did turn red, but for the WRONG REASON: the actual stderr was 'STATUS_INVALID: git.worktree is required in state APPROVED_FOR_MERGE ... MERGE_FAIL: status validation failed'. merge.sh validates the status BEFORE reaching the worktree decision, so under M-A execution never gets there and F1 cannot demonstrate that the literal wrongly ACCEPTS a sibling worktree -- which is exactly what the brief's M-A demands ('red form must be the linked worktree being wrongly accepted').",
+      "Root cause: the _status() fixture helper documents itself as 'A schema-valid v2 status document' and asserts the worktree refusal 'fires long before state/scope/risk are consulted', but that is false for merge.sh. The document is missing git.worktree, git.commit and review.decision for state APPROVED_FOR_MERGE, so validation rejects it first.",
+      "F1 also under-constrains its cause assertion: it excludes 'status file not found' but NOT 'status validation failed', so it cannot distinguish the worktree refusal from a validation failure. F2's qoder path is unaffected (qoder_security.main decides the worktree question before run_validator), which is why only the merge.sh side is wrong.",
+      "REQUIRED FIX (no brief change needed): make the fixture status actually schema-valid for its declared state so merge.sh reaches the worktree decision, and tighten F1 to exclude 'status validation failed' as well, so a validation error can never be mistaken for the refusal. Then re-capture M-A's red evidence and show the red form is the wrongful acceptance."
+    ],
+    "prior_decisions": [
+      {
+        "round": "wp02-impl-r1",
+        "decision": "REWORK",
+        "note": "M-A was not load-bearing: F1's red was 'status validation failed', an abort BEFORE the worktree decision."
+      }
+    ],
+    "evidence": [
+      "Orchestrator-run, not taken on trust: targeted 8 passed; tests/test_worktree_detection.py 19 passed with that file's git diff EMPTY; protected set 36 passed; full suite 910 passed / 4 skipped against the 902 baseline.",
+      "M-A hand-applied: F1 red, and the red form is CORRECT this time. stderr was \"MERGE_FAIL: cannot resolve branch 'feat/wp02' tip\" -- neither the worktree refusal nor a validation failure, meaning execution passed the refusal point at :57 and reached the branch-tip gate at :109. That is the evidence the literal wrongly ACCEPTED the sibling worktree, which is what the brief's M-A demands. impl-r1's red aborted before the decision; this is materially different.",
+      "M-B hand-applied (qoder literal restored): F2 red. M-C hand-applied (PROBE_FAIL replaced by MAIN, i.e. fail-open): F5 red. Each reverted precisely, `git diff` empty for the mutated file afterwards.",
+      "INV-A verified by the orchestrator's own comment-stripping scan: ZERO non-comment matches of the literal in product code under src/agentic_loop/. The two comment-only matches at finalize_merge.sh:38 and gate/__init__.py:809 remain, as the brief requires.",
+      "Single authority confirmed: all five sites producing the refusal semantics now reference path_is_in_worktree -- preflight.sh, finalize_merge.sh, merge.sh, gate/__init__.py, gate/qoder_security.py.",
+      "ORCHESTRATOR DISCLOSURE: the r2 developer session exited abnormally mid-edit (DISPATCH_EXIT=1), leaving _make_repo missing its `repo = tmp_path / name` assignment (NameError, 6 cases failing). The orchestrator completed that single line rather than spending another dispatch round; the substance of r2 -- the schema-valid premise node and the VALIDATION_FAILED exclusion -- is the developer's work. This is disclosed because it means the final file is not purely developer-authored."
+    ]
+  },
+  "consult": {
+    "state": "DECIDED",
+    "round": "wp02-r9b",
+    "decision": "ACCEPT",
+    "kind": "wp-brief-and-impl-second-signature",
+    "bound_brief_rev": 3,
+    "prior_rounds": [
+      {
+        "round": "wp02-brief-r1",
+        "decision": "REWORK",
+        "bound_brief_rev": 1,
+        "resolved_in_rev": 2,
+        "findings": [
+          "F5 DID NOT HOLD -- ORCHESTRATOR REPRODUCED IT: rev1 told the developer to make the probe fail by pointing AGENTIC_PYTHON at an always-failing executable. Measured: merge.sh:29 calls resolve_paths --root main_repo BEFORE the worktree probe at line 37, so execution dies there. Actual output `MERGE_FAIL: resolver failed to resolve main_repo`, exit 2 -- which satisfies exactly the assertions rev1 demanded (MERGE_FAIL prefix plus exit code), so the test would have gone GREEN WITHOUT EVER REACHING THE PROBE. rev2 requires a conditional shim that passes `-m agentic_loop.*` calls through to the real Python and fails only the inline probe form, and must assert the output does NOT contain 'resolver failed'.",
+          "M-C's evidence was therefore untrustworthy too: under rev1's construction F5 never reached the probe, so applying or reverting M-C could not change the result. rev2 makes proving 'F5 actually reaches the probe' a precondition of M-C's red evidence.",
+          "INV-C was self-contradictory as a set relation: rev1 said the new refused set is a SUPERSET of the old one while also permitting one loosening, but a real .worktrees directory in the main repo is in the old set and not in the new. rev2 states it precisely as R_new superset-or-equal (R_old minus L), with all linked-worktree paths in R_new.",
+          "F6 must not demand zero raw grep matches: two legitimate COMMENT-ONLY matches exist at finalize_merge.sh:38 and gate/__init__.py:809. rev2 requires zero NON-COMMENT product-code matches and that the implementation explain how it distinguishes comments from code.",
+          "Q1 otherwise confirmed sound: the consultant agreed the brief did not understate the operational impact, and that callers relying on the current acceptance are not legitimate under the documented rule. rev2 nevertheless strengthens the residual-risk section with the orchestrator's measurement that the deadlock grows from 3 entry points to 5."
+        ]
+      },
+      {
+        "round": "wp02-brief-r2",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 2,
+        "resolved_in_rev": null,
+        "substantiation": [
+          "Q1: R_new superset-or-equal (R_old minus L) plus 'every linked-worktree path is in R_new' expresses the single permitted loosening accurately and agrees with test_verdict_does_not_depend_on_directory_name. The sibling-worktree flip from accept to refuse conforms to the documented single-source rule and is not a legitimate-caller regression; the brief records the 3-to-5 entry-point impact, so the blast radius is not understated.",
+          "Q2: preflight.sh:40-49's PROBE_FAIL plus the != MAIN comparison refuses probe errors, Python/import failure, empty output and any unexpected output, so INV-B is tight enough. The conditional shim passes merge.sh:29's `-m agentic_loop.resolve_paths` through and breaks only the later `python - <status>` form, so it genuinely reaches the probe; asserting the worktree/probe message and excluding 'resolver failed' prevents rev1's false green.",
+          "Q3: F1/F2's self-proving assertion combined with a real `git worktree add` shows the refusal comes from the git-fact predicate, not the old literal. F2's requirement of a real absolute status file correctly passes qoder_security.main:1007's is_file() check and reaches the decision at 1012. F6's zero-non-comment-match rule preserves the two comment-only matches while M-A/M-B reintroduce a detectable code match. M-A..M-D each cover a distinct property -- the two authority references, probe fail-closed, and wrongful acceptance -- and are independently constructible."
+        ]
+      },
+      {
+        "round": "wp02-impl-r3",
+        "decision": "REWORK",
+        "bound_commit": "ebd2407",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "e8e6ba273b96b3d65e2367770c30db2f090dab80",
+        "findings": [
+          "Q1 ACCEPT: merge.sh's probe mirrors preflight.sh:40-49 and only the exact single line MAIN passes; crash, missing interpreter, import failure, empty and extra output all reach the refusal branch. The quoted heredoc and the separate \"$status_file\" argument leave no shell-expansion hole, and 2>/dev/null hides only probe diagnostics, not the exit status. Running the probe before the file check and the validator can only refuse earlier, never skip a later gate.",
+          "Q2 ACCEPT: INV-C and INV-D hold. path_is_in_worktree returns True for linked worktrees and fails closed on git/path resolution errors; every member of the old refused set except L is still refused, and sibling linked worktrees are added. Both refusal texts and exit codes are unchanged (merge.sh MERGE_FAIL exit 2, qoder GateError via GATE_FAIL exit 2).",
+          "Q3 REWORK, ORCHESTRATOR-REPRODUCED: F6's own scanner could be bypassed. _code_without_comments() truncated the line at any '#' preceded by whitespace, including inside a string literal, so `if \" # /.worktrees/\"[3:] in str(status_file):` became `if \" ` and the scan reported ZERO hits while the code would reconstruct the literal at runtime. The consultant also confirmed M-A's red evidence IS sound: the real validator asserts STATUS_VALID on the same file merge.sh receives, so reaching the branch-tip gate at :109 necessarily means execution passed the refusal at :57, and no final MERGE_OK is needed to prove wrongful acceptance.",
+          "FIX APPLIED at e8e6ba2: trailing-comment stripping removed entirely rather than made quote-aware -- both legitimate matches are whole-line comments already handled, and keeping the rest of the line can only over-report, which fails safe for INV-A. An adversarial node (test_f6_scanner_cannot_be_hidden_behind_a_quoted_hash) pins it and was verified red under a mutation restoring the quote-blind stripper. Targeted 9 passed, full suite 911 passed / 4 skipped.",
+          "Note: the consultant could not re-run the targeted module because the read-only sandbox has no writable temp dir; its conclusions came from the full diff, the sources and the existing evidence, with all bound SHAs matching."
+        ]
+      },
+      {
+        "round": "wp02-impl-r4",
+        "decision": "REWORK",
+        "bound_commit": "45580f9",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "e93ba1c7b062f5d49bbdd062be17bb029590b94b",
+        "findings": [
+          "Q1/Q2 ACCEPT again (r4 touched no product code). Q3 REWORK: a SECOND, deeper bypass of F6's scanner. Blanking any physical line whose first non-space character is '#' also blanks a line INSIDE a triple-quoted string, so `if \"\"\"\\n# /.worktrees/\\n\"\"\"[3:-1] in str(f):` scanned clean while reconstructing the literal exactly at runtime. Orchestrator-reproduced, including asserting by eval that the expression rebuilds the literal.",
+          "Root diagnosis accepted: both defeated versions judged comments by POSITION rather than lexing. FIX: Python now goes through tokenize, which reports COMMENT tokens and leaves string contents alone, removing only the comment's own span so code before a trailing comment is still scanned; shell keeps the conservative whole-line rule (sound for its single legitimate whole-line match, and otherwise can only over-report); unlexable Python keeps every line verbatim. The adversarial node pins both bypasses and two negative directions, verified red under a mutation reinstating each defeated version."
+        ]
+      },
+      {
+        "round": "wp02-impl-r5",
+        "decision": "CONSULT",
+        "bound_commit": "e93ba1c7b062f5d49bbdd062be17bb029590b94b",
+        "kind": "wp-impl-second-signature",
+        "outcome": "VOID_SESSION_FAILURE",
+        "findings": [
+          "Not a finding: the consultant session came up without a usable tool interface, so it could not read the pre-extracted diff, verify the bound SHA-256 values, or inspect preflight.sh and the test implementation. It correctly declined to sign on a summary alone rather than rubber-stamping. Its design-level remarks matched the orchestrator's own verification but were explicitly non-independent. Sandbox config was identical to r3/r4 (read-only), so this was a transient session failure; the round is VOID and re-dispatched unchanged as r5b."
+        ]
+      },
+      {
+        "round": "wp02-impl-r5b",
+        "decision": "REWORK",
+        "bound_commit": "1df2365",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "88e6c3c922fd27618c08bdfac26c7892c8ac8e46",
+        "findings": [
+          "Q1/Q2 ACCEPT. Q3 REWORK: the THIRD instance of one root cause. A shell single-quoted string also spans physical lines, so the whole-line rule failed for .sh exactly as it had for Python: `needle='\\n# /.worktrees/\\n'` scans clean while `tr -d '\\n# '` rebuilds the literal. The consultant measured scanner_sees_literal=False and bash_exit=7; the orchestrator reproduced it and additionally confirmed the rebuilt value equals the literal.",
+          "FIX at 88e6c3c, taking the consultant's conservative option rather than patching a third heuristic: .sh is scanned RAW with no comment stripping at all. Over-reporting is the safe direction for INV-A. merge.sh's own comment was reworded to spell the retired literal out in prose instead of as a contiguous string, so it needs no exemption.",
+          "finalize_merge.sh:38 is OUTSIDE WP-02's allowed paths and cannot be reworded, so it gets the single exemption -- pinned by VERBATIM TEXT, not by file name or line number. Verified unabusable: a mutation turning that comment into live code fails F6 immediately.",
+          "The consultant also flagged that the bound diff SHA did not match (cd6a12ba vs the declared 3d25e742). Correct: the orchestrator had regenerated the diff before the last edit. The next round regenerates it as the final step."
+        ]
+      },
+      {
+        "round": "wp02-impl-r6",
+        "decision": "REWORK",
+        "bound_commit": "6200bf8",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "fea2bd8e21efa632ead88a06a60b4769348f09be",
+        "findings": [
+          "Q1/Q2 ACCEPT for the fifth consecutive round; product code unchanged since r3.",
+          "Q3 REWORK: the FOURTH instance of the root cause, aimed at the exemption itself. Rewriting finalize_merge.sh:37 to `needle='` and :39 to `'` leaves :38 byte-identical while turning it into runtime string content, and an exemption pinned to path + line number + verbatim text still waves it through. Orchestrator-reproduced against the real file: the predicate returned True on a line that is no longer a comment.",
+          "FIX at fea2bd8: the exemption is DELETED, not hardened, because no line-local predicate can observe a quote opened on an adjacent line. Under a USER-APPROVED scope extension, finalize_merge.sh:38 was reworded to spell the retired literal out in prose, so no .sh file needs exempting; verified zero contiguous literals remain in shell comments tree-wide. finalize_merge.sh changes by two comment lines only, behaviour untouched. A regression assertion keeps the exemption from returning.",
+          "The consultant was right on both evidence-binding complaints: the diff SHA was stale (actual ebdd0069) and consult.bound_commit still pointed at e93ba1c instead of the then-final 88e6c3c. Both are regenerated as the final step this round, and the orchestrator now verifies each SHA literally appears in the prompt before dispatching."
+        ]
+      },
+      {
+        "round": "wp02-impl-r7",
+        "decision": "REWORK",
+        "bound_commit": "6d2ca2d",
+        "kind": "wp-impl-second-signature",
+        "resolved_in_commit": "22cd0d0edb59541f4731c295b8dc0625b476b4c6",
+        "findings": [
+          "Q1 ACCEPT for the sixth consecutive round.",
+          "Q2 REWORK, ruled a FALSE POSITIVE after reproduction: the consultant's real path <parent>/.worktrees/../<repo>/docs/.../WP-01.status.json is refused by the old literal and accepted by the predicate, and is not rev2's L. The orchestrator reproduced it (path exists; old_refuses=True; new_refuses=False) but ruled it a false positive of the LITERAL, not a loosening defect: it resolves into the primary repo (git-dir /Users/admin/vibe/agentic_loop/.git, git-common-dir agreeing), so the file the gate opens IS the main-repo single source of truth and refusing it would refuse what the rule protects. Resolve-before-decide is the predicate's hardened A19/A27 behaviour. Resolution: a USER-APPROVED brief revision to rev3 stating that L is judged by RESOLVED LOCATION rather than path spelling, pinned by test_inv_c_alias_resolving_to_main_repo_is_accepted which also checks a genuine sibling worktree still refuses.",
+          "Q3 REWORK, a REAL gap and the first one not line-local: F6's {'.py','.sh'} suffix filter silently skipped src/agentic_loop/templates/install.sh.tmpl and pre-push.tmpl, which init_cmd.py:99-101 installs at mode 0o755 -- they ship as executable shell, so a literal-based check added there would never have been seen. Fixed: both are in scope, asserted to still exist and to still be installed as executables so the set cannot silently drift, and M-J (planting the literal in install.sh.tmpl) is verified red.",
+          "Evidence binding: the consultant confirmed all bound SHA-256 values, HEAD and the single untracked forbidden path matched this round, after the orchestrator began verifying each SHA literally appears in the prompt before dispatch."
+        ]
+      },
+      {
+        "round": "wp02-r8",
+        "decision": "REWORK",
+        "bound_commit": "50dd044",
+        "kind": "wp-brief-and-impl-second-signature",
+        "resolved_in_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
+        "findings": [
+          "Q1 ACCEPT (seventh consecutive). Q2 ACCEPT: the consultant independently walked path_is_in_worktree -- resolve() first, then compare --absolute-git-dir against --git-common-dir, returning True on resolution/git/output failure -- and confirmed every linked-worktree path and every unresolvable path the old rule refused is still refused, with the newly-accepted inputs all resolving into a plain primary checkout, i.e. rev3's L. INV-D holds.",
+          "Q4 ACCEPT: rev3's clarification judged correct and minimal. The consultant's reasoning: the validator and later gates read the file the path RESOLVES to, so two spellings resolving to the same main-repo file must not get opposite verdicts; the revision only generalises an already-permitted false-positive class from one directory example to the same class of aliases, without touching product behaviour, scope, acceptance items or deliverables. Even an alias into another plain primary checkout would already be accepted by its canonical path, so object-identity consistency is not an extra worktree loosening.",
+          "Q3 REWORK, the one blocking defect and correctly aimed at my own fix: the executable-template coverage was ONE-WAY. A hard-coded {install.sh.tmpl, pre-push.tmpl} plus an assertion that those two are still installed cannot detect a THIRD entry added to _HOOK_TEMPLATES -- planting the literal in a new .tmpl is skipped by the suffix filter while every assertion and F6 stay green, so the 'cannot drift silently' claim was false.",
+          "FIX at this commit: the set is now DERIVED from init_cmd._HOOK_TEMPLATES, selecting every entry whose mode carries an executable bit, so a new executable template is in scope the moment it is added with no test edit. M-K -- the consultant's exact construction, adding ('merge-hook.tmpl', ..., 0o755) and planting the literal -- is verified red."
+        ]
+      },
+      {
+        "round": "wp02-r9",
+        "decision": "CONSULT",
+        "bound_commit": "e0959105db5432753e82b16178c6da8e4b6111e8",
+        "kind": "wp-brief-and-impl-second-signature",
+        "outcome": "VOID_SESSION_FAILURE",
+        "findings": [
+          "Not a finding; the same transient failure as the voided r5. The session came up with no tool-execution context, so it could not read the bound diff, the target files or the status evidence, and correctly declined to sign rather than rubber-stamp. Re-dispatched unchanged as r9b."
+        ]
+      },
+      {
+        "round": "wp02-r9b",
+        "decision": "ACCEPT",
+        "bound_commit": "9180644bfbaf2fa0b807c6782ea0c8e3aced4a6e",
+        "kind": "wp-brief-and-impl-second-signature",
+        "substantiation": [
+          "Q1: the probe matches preflight.sh's pattern and only an exact single-line MAIN passes; crash, interpreter/import failure, empty, extra or unexpected output all reach the refusal branch. The quoted <<'PY' forbids shell expansion, \"$status_file\" is passed as its own argument, and 2>/dev/null hides diagnostics without swallowing exit status. Running the probe before validation can only refuse earlier, never bypass a later check.",
+          "Q2: path_is_in_worktree resolves first, then compares --absolute-git-dir against --git-common-dir, returning True on resolution, git-execution, output-shape or re-resolution failure, so every linked-worktree path stays in R_new. Every input the old literal refused and the predicate accepts resolves outside any linked worktree, i.e. is in L, so R_new superset-or-equal (R_old minus L) holds. Both refusal texts and exit 2 are unchanged.",
+          "Q3: _assert_status_is_schema_valid runs the real validator on the same file merge.sh receives, so reaching the branch-tip gate under M-A proves execution passed BOTH the worktree refusal and status validation -- sufficient to show the literal wrongly accepted, with no need to complete a merge or hard-code mutant-specific output into the normal F1 path. F6 uses tokenize.COMMENT for Python and a raw scan for shell and shell templates, excluding genuine Python comments while surviving multiline-string and shell-quoting tricks. _executable_templates() derives from init_cmd._HOOK_TEMPLATES by mode & 0o111 and verifies each template exists and sits inside the scanned tree, so a third executable template enters scope immediately: r8's one-way drift hole is closed."
+        ]
+      }
+    ],
+    "pending_note": "Brief rev3 and the implementation are both double-signed.",
+    "bound_commit": "9180644bfbaf2fa0b807c6782ea0c8e3aced4a6e",
+    "soft_limit": {
+      "signal": "rework_twice",
+      "state": "SOFT_LIMIT_ENABLED",
+      "family": "F6 static scanner: comment detection by position",
+      "rounds": [
+        "wp02-impl-r3",
+        "wp02-impl-r4",
+        "wp02-impl-r5b",
+        "wp02-impl-r6",
+        "wp02-impl-r7",
+        "wp02-r8"
+      ],
+      "note": "Each round narrowed the defect and each was orchestrator-reproduced, so the loop was productive rather than thrashing. The final fix is a root-cause change (raw .sh scan, real lexer for Python) rather than a third heuristic patch. Escalated for a user decision on whether to run another second-signature round.",
+      "user_decision": "User approved one further second-signature round (r6) past SOFT_LIMIT_ENABLED, on the reasoning that each round narrowed a real defect and the last fix was root-cause.",
+      "resolution": "Converged at r9b after the user authorised continuing past SOFT_LIMIT_ENABLED. Nine rounds, two of them void session failures (r5, r9). Every REWORK found a real, reproducible defect and the loop narrowed monotonically; the product code (merge.sh, qoder_security.py) was ACCEPTed from r3 onward and never changed again. All later rounds concerned the acceptance test's own static scanner, which was hardened from position-based guessing to a real Python lexer plus a raw shell scan with a dynamically derived file set."
+    },
+    "brief_sha256": "b329d32b420bea3a79bb61b34d421d701a673ffbef1554cb16a6bbcd853c77a6",
+    "brief_snapshots": {
+      "rev2": "39a11525952c9b1ad5a2d3374da42d950f89bf242c4bffcc7bdb15c492cc465b"
+    }
+  },
+  "timestamps": {
+    "created_at": "2026-10-15T14:15:00Z",
+    "approved_at": "2026-10-15T14:15:00Z",
+    "updated_at": "2026-10-18T14:51:35Z",
+    "dispatched_at": "2026-10-15T14:55:00Z"
+  }
+}

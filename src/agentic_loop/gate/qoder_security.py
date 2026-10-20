@@ -55,6 +55,7 @@ from agentic_loop.gate import gate_log
 from agentic_loop.gate import gate_warn
 from agentic_loop.gate import git_output
 from agentic_loop.gate import load_status_json
+from agentic_loop.gate import path_is_in_worktree
 from agentic_loop.gate import read_field
 from agentic_loop.gate import run_validator
 from agentic_loop.resolve_paths import get_gates
@@ -1009,7 +1010,16 @@ def main(argv: list[str]) -> int:
             f"status file not found at {status_file} "
             f"(resolved against main repo root {repo_root})"
         )
-    if "/.worktrees/" in str(status_file):
+    # WP-02/WP-01: single authoritative predicate (gate.path_is_in_worktree,
+    # A13/WP-19), the same git-fact judgment gate/__init__.py, preflight.sh,
+    # merge.sh and finalize_merge.sh apply. The retired `"/.worktrees/" in
+    # str(status_file)` literal missed every sibling worktree (`git worktree add
+    # ../wpN-x`), the layout this repo actually uses — a fail-open hole — while
+    # falsely refusing a genuine `.worktrees/` directory inside the main repo.
+    # WP-01 retargeted the predicate to "is this path in the checkout holding the
+    # plan's authoritative branch?", so an authoritative status inside a linked
+    # worktree is now accepted while every other worktree is refused.
+    if path_is_in_worktree(status_file):
         raise GateError(
             f"status file resolves inside a worktree ({status_file}); "
             "pass the main-repo copy (single source of truth)"

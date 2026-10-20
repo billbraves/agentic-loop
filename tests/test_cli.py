@@ -316,6 +316,20 @@ def test_bundled_preflight_resolves_siblings_in_external_project(tmp_path):
     }
     import json as _json
     (iterdir / "WP-01.status.json").write_text(_json.dumps(status))
+    # WP-01: the predicate needs a PLAN status beside the judged file. This
+    # fixture renames to "main" below and keeps the primary repo there, so
+    # "main" is the branch actually held.
+    (iterdir / "PLAN-FIXTURE.status.json").write_text(_json.dumps({
+        "schema_version": "agentic-plan-status/v1",
+        "plan_id": "PLAN-FIXTURE",
+        "iteration_id": "it-1",
+        "state": "ACTIVE",
+        "title": "fixture plan",
+        "git": {"base_branch": "main", "target_branch": "main"},
+        "work_packages": ["WP-01"],
+        "timestamps": {"created_at": "2026-01-01T00:00:00Z",
+                       "updated_at": "2026-01-01T00:00:00Z"},
+    }))
     _git(proj, "add", "-A")
     _git(proj, "commit", "-qm", "seed")
     _git(proj, "branch", "-M", "main")
@@ -495,6 +509,18 @@ def test_bundled_finalize_resolves_lock_sibling_in_external_project(tmp_path):
     }
     (proj / "docs").mkdir(exist_ok=True)
     (proj / "docs" / "wp.status.json").write_text(_json.dumps(status))
+    # WP-01: PLAN status beside the judged file; this proj holds "main".
+    (proj / "docs" / "PLAN-FIXTURE.status.json").write_text(_json.dumps({
+        "schema_version": "agentic-plan-status/v1",
+        "plan_id": "PLAN-FIXTURE",
+        "iteration_id": "it-1",
+        "state": "ACTIVE",
+        "title": "fixture plan",
+        "git": {"base_branch": "main", "target_branch": "main"},
+        "work_packages": ["WP-01"],
+        "timestamps": {"created_at": "2026-01-01T00:00:00Z",
+                       "updated_at": "2026-01-01T00:00:00Z"},
+    }))
 
     r = subprocess.run(
         ["bash", str(BUNDLED_WRAPPERS / "finalize_merge.sh"), "docs/wp.status.json"],

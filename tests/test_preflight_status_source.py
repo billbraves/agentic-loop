@@ -177,9 +177,34 @@ def _write_status_and_brief(repo: Path, wp: str, status: dict) -> Path:
     brief = repo / PLAN_DIR / f"{wp}-brief.md"
     brief.parent.mkdir(parents=True, exist_ok=True)
     brief.write_text(BRIEF, encoding="utf-8")
+    # WP-01: the status-source predicate resolves the authoritative branch from
+    # the PLAN status in this same plan directory, so every fixture must carry
+    # one. It declares the PRIMARY repo's current branch: that is the checkout
+    # holding the authoritative copy in these fixtures, which is exactly the
+    # layout the tests exercise. Without it the predicate would fail closed
+    # (unresolved) and the main-repo control paths could never pass.
+    _write_plan_status(repo)
     status_path = repo / PLAN_DIR / f"{wp}.status.json"
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
     return status_path
+
+
+def _write_plan_status(repo: Path) -> Path:
+    """Declare the authoritative branch as the primary repo's current branch."""
+    branch = _default_branch(repo)
+    plan_path = repo / PLAN_DIR / "PLAN-01.status.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "agentic-plan-status/v1",
+                "plan_id": "PLAN-01",
+                "git": {"base_branch": branch, "target_branch": "main"},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return plan_path
 
 
 def _run_preflight(

@@ -175,9 +175,38 @@ def _make_repo_with_unmerged_real_branch(
     return repo, base, real_tip, decoy_tip, decoy_merge
 
 
+def _write_plan_status_near(path: Path, base_branch: str) -> None:
+    """WP-01: declare the authoritative branch in the plan dir of ``path``.
+
+    The status-source predicate resolves the authoritative branch from the PLAN
+    status in the JUDGED file's own plan directory, so a fixture without one is
+    refused (fail-closed). The declaration is always the repo's default branch:
+    the primary checkout holds it, so a main-repo copy is authoritative and a
+    worktree copy (on its own branch) is not.
+    """
+    plan_dir = path.parent
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    (plan_dir / "PLAN-01.status.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "agentic-plan-status/v1",
+                "plan_id": "PLAN-01",
+                "git": {"base_branch": base_branch, "target_branch": "main"},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_status(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # WP-01: every fixture status needs an authoritative-branch declaration in
+    # its own plan dir, or the predicate fails closed (unresolved) and no
+    # positive control could reach FINALIZE_OK.
+    base_branch = str(data.get("git", {}).get("base_branch") or "main")
+    _write_plan_status_near(path, base_branch)
 
 
 def _run_finalize(repo: Path, env, status_arg: str = str(PLAN_DIR / STATUS_NAME)):
@@ -332,10 +361,14 @@ def test_unresolvable_path_fails_closed_without_traceback(
 ) -> None:
     """A status path that does not exist still fails closed, cleanly."""
     repo, base, wp_tip, merge_commit = _make_repo_with_merged_wp(tmp_path)
-    # Status file intentionally never created; its parent dir DOES exist, so
-    # the worktree predicate resolves the main repo and answers False (a
-    # missing parent dir would fail the predicate closed as "worktree").
+    # Status file intentionally never created; its parent dir DOES exist and
+    # carries a PLAN status declaring this repo's default branch, so the
+    # predicate resolves authority to the primary checkout and answers False —
+    # the run then reaches the not-found verdict (WP-01: without the PLAN status
+    # the predicate would instead fail closed as unresolved and the case would
+    # never exercise the not-found path it exists to pin).
     (repo / PLAN_DIR).mkdir(parents=True)
+    _write_plan_status_near(repo / PLAN_DIR / STATUS_NAME, base)
 
     result = _run_finalize(repo, session_env)
 

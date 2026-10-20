@@ -1,0 +1,474 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-01",
+  "iteration_id": "2026-10-15-status-source-topology",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "provider": "deepseekflash",
+    "role": "developer",
+    "session_id": null,
+    "redispatch_count": 0,
+    "dispatched_at": "2026-10-16T00:10:00Z"
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": ""
+  },
+  "git": {
+    "base_branch": "plan/2026-10-15-status-source-topology",
+    "base_commit": "fa8632b3b182a56e0df0a1c2b810c8e217c9e4be",
+    "dispatch_commit": "",
+    "branch": "plan/2026-10-15-status-source-topology",
+    "worktree": "/Users/admin/vibe/agentic-loop-main-codex-merge",
+    "commit": "b91388c1bc709159e53ed720fd0503c32c162718",
+    "merged_commit": "78771ca97241c4e1c225c1444158bf07de1e4d76",
+    "worktree_note": "Sequential WP per contract 4.3: it works directly on the plan's integration branch, so there is no separate per-WP worktree. The recorded path is the checkout that HOLDS the integration branch -- which is exactly the 'authoritative branch holder' this WP teaches the predicate to recognise. Note this checkout is itself a linked worktree, which is why every gate currently refuses it."
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/wrappers/preflight.sh",
+      "tests/test_worktree_detection.py",
+      "tests/test_preflight_status_source.py",
+      "tests/test_finalize_merge_first_call.py",
+      "tests/test_finalize_merge_toctou.py",
+      "src/agentic_loop/wrappers/merge.sh",
+      "src/agentic_loop/gate/qoder_security.py",
+      "src/agentic_loop/wrappers/finalize_merge.sh",
+      "tests/test_finalize_merge_triple_sign.py",
+      "tests/test_qoder_security.py",
+      "tests/test_finalize_merge_sequential.py",
+      "tests/test_preflight_branch_binding.py",
+      "tests/test_gate_diff_start.py",
+      "tests/test_merge_wrapper.py",
+      "tests/test_cli.py",
+      "tests/test_worktree_literal_removal.py"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/plan_cmd.py",
+      "src/agentic_loop/validate_wp_status.py",
+      "src/agentic_loop/autonomy.py",
+      ".agentic/config.toml",
+      "uv.lock",
+      "docs/plans/**",
+      "docs/agentic/templates/**"
+    ],
+    "decisions": {
+      "inv1_semantics": "User-selected: the trusted source is the registered worktree that currently has git.target_branch checked out. Whether that checkout is the physical primary repo or a linked worktree does NOT affect the verdict; every other worktree is still refused. The rejected alternative was to additionally require it be an explicitly configured checkout -- narrower, but it needs a new config key and a misconfiguration would deadlock the tooling exactly as today.",
+      "existing_tests": "User-approved earlier, and corrected after brief-r3 flagged the wording: the 17 guards in tests/test_worktree_detection.py are NOT read-only. They may receive premise-preserving rewrites under INV-4, each justified line by line, with no attack shape weakened. The three other test files (test_preflight_status_source.py, test_finalize_merge_first_call.py, test_finalize_merge_toctou.py) may receive minimal, individually justified adjustment.",
+      "flow": "User-selected: brief second signature BEFORE dispatching any implementation. The WP-03 experience is that specification defects are cheapest to catch at this gate.",
+      "anchor": "User-selected after brief-r2: the trusted branch anchor must live OUTSIDE the repository write domain. rev3 uses $XDG_CONFIG_HOME/agentic_loop/policy.toml (default $HOME/.config/...) key [trust] protected_branch, measured to be inside no git worktree. Rejected, each measured: .agentic/config.toml (git TRACKED), refs/remotes/origin/HEAD (movable by one local symbolic-ref call), server ls-remote (remote.origin.url is locally rewritable, plus a network dependency), environment variable (caller-declared fact -- the A22 bypass family).",
+      "literal_defect": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing INV-5 violation in merge.sh:37 and qoder_security.py:1012 (literal '/.worktrees/' instead of the hardened predicate) is fixed by a SEPARATE WP. Both files are therefore forbidden here.",
+      "direction_c": "User-selected after three REWORKs in one root-cause family: option (c). WP-01 is DOWNGRADED to a pure usability fix. It resolves the finalize/preflight/merge deadlock and explicitly WITHDRAWS any claim of defending against a malicious LOCAL actor. Rationale accepted from the escalation: in this threat model anyone who can write the repository or set the caller's environment can already modify the code itself, so an unmovable local trust root is a false goal, whereas the deadlock is a real daily obstruction. Every anchor attempt is therefore abandoned: rev1 (status field), rev2 (origin/HEAD + tracked config), rev3 (XDG_CONFIG_HOME policy file) are all superseded.",
+      "wp02_split": "[SUPERSEDED by scope_rev5 at brief rev5/rev6 -- merge.sh and gate/qoder_security.py are now ALLOWED, because WP-02 merged both into the single predicate and WP-01 faces five call sites, not three. Original note kept for history:] User-selected: the pre-existing literal-path defect (wrappers/merge.sh:37 and gate/qoder_security.py:1012 testing the '/.worktrees/' fragment instead of the hardened predicate) is fixed FIRST, in its own WP-02, because it is independent of the trust-root question and is a live INV-5 violation. Those two files are removed from WP-01's allowed_paths and remain forbidden here.",
+      "scope_rev5": "D13 closed. brief section 6 and status forbidden_paths previously contradicted each other on merge.sh and gate/qoder_security.py: the brief allowed them, the status forbade them. WP-02 merged both into the single predicate, so WP-01 must be able to edit them -- there are FIVE call sites, not three. finalize_merge.sh was missing from allowed_paths entirely despite being one of the original three. Flagged by topo-brief-r4 Q2.",
+      "fixture_fix_user_approved": "USER-APPROVED SCOPE EXTENSION. tests/test_finalize_merge_triple_sign.py is added to allowed_paths so the environment-dependent baseline can be fixed at the root instead of re-freezing the DoD number. The file hardcoded `git checkout -q main` and a base_branch default of 'main', while git init honours init.defaultBranch, which is 'master' in this machine's global config -- so four tests failed for a reason unrelated to the behaviour under test, and they already failed at the pushed main (9ec3c38). The fix adopts the sibling fixtures' existing _default_branch() idiom: _merge_wp_branch now returns the repo's real default branch and each caller passes it as base_branch. No assertion was weakened and no behaviour under test was changed. Verified green under three different init.defaultBranch values (master, main, trunk), which proves the branch is probed rather than re-hardcoded. The user's git config was NOT modified, per contract section 5.",
+      "fixture_scope_extension_user_approved": "USER-APPROVED option (a), asked as an explicit choice. Adds the seven test files that spec gap 1 breaks. freeze_scope is AUTONOMY_STOP so this could not be self-approved. Justification measured, not estimated: every live iteration carries a PLAN status, and all seven files build plan dirs containing no PLAN status at all, so this is a fixture-contract change rather than a product regression. Two kinds of edit are permitted and nothing else: (1) write one agentic-plan-status/v1 object beside the judged WP status, declaring base_branch = the branch that fixture's repo actually holds; (2) in test_worktree_literal_removal.py ONLY, unpin test_f6's hardcoded line number so it asserts the comment EXISTS rather than where it sits -- its real invariant (hits == []) already passes. NO assertion may be weakened, NO attack form dropped, NO product code touched. Prototyped on test_merge_wrapper.py before asking: 3 failed -> 3 passed, then reverted with git diff HEAD empty."
+    }
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "python3.11 -m pytest tests -q",
+        "exit_code": 1,
+        "result": "53 failed, 894 passed, 4 skipped",
+        "note": "Against the verified 912 passed / 4 skipped baseline. All 53 failures are in seven files OUTSIDE allowed_paths and share one cause: the new predicate refuses a plain primary repo whose plan dir has no PLAN status, which the old predicate accepted. Orchestrator-reproduced."
+      },
+      {
+        "command": "python3.11 -m pytest tests/test_worktree_detection.py tests/test_preflight_status_source.py tests/test_finalize_merge_first_call.py tests/test_finalize_merge_toctou.py tests/test_finalize_merge_triple_sign.py -q",
+        "exit_code": 0,
+        "result": "77 passed",
+        "note": "The in-scope suites, including the new E1-E6/E8/E9/E10/E12 nodes."
+      },
+      {
+        "command": "pre-WP-01 control in a throwaway worktree at 3955529, then at HEAD",
+        "exit_code": 0,
+        "result": "old predicate refuse=True, new predicate refuse=False for the authoritative status in this linked-worktree holder",
+        "note": "Proves the predicate change is load-bearing for the target layout."
+      },
+      {
+        "command": "wrapper end-to-end with a RELATIVE vs an ABSOLUTE path, at HEAD and at the pre-WP-01 commit",
+        "exit_code": 1,
+        "result": "pre-WP-01 (worktree at 3955529) with the ABSOLUTE path: all three gates REFUSE. At HEAD with the same absolute path: preflight STATUS_VALID, merge and finalize_merge past the worktree verdict into their ordinary business gates. Relative paths still fail at both commits, by the wrappers' documented main-repo anchoring.",
+        "note": "Correct control, using a throwaway worktree. This REPLACES an earlier invalid control that used git stash against an already-committed change and wrongly suggested the absolute path worked before WP-01."
+      }
+    ],
+    "brief": {
+      "rev": 6,
+      "sha256": "df3916fe19cb04701baa8be852002c251f8b086261db6ef6a1c53ca90f517c9e",
+      "snapshots": {
+        "rev3": "e94a7670d1370bd94a6d54151763367ddc5799f0479b249e20aa51e0d35de59b",
+        "rev4": "bbe4be96ce73cb7a90a9ed521329762e1ca35452fcfeb63763599aef427a0957",
+        "rev5": "34dd681bb0d1e6f3b3b586b0f5aa9d10742029a21c747b1cdc798d328078d126"
+      },
+      "path": "docs/plans/2026-10-15-status-source-topology/WP-01-brief.md",
+      "anchor_sections_note": "Three English anchor sections (Acceptance tests / Allowed and forbidden paths / Completion definition) were appended AFTER the rev6 ACCEPT because agentic dispatch-lint matches those exact headings. They restate the Chinese sections 4/6/7 verbatim in meaning and introduce no new acceptance item, exactly as WP-03 of 2026-10-12-sequential-plan-gates did. The consultant's ACCEPT covered the normative content, which is unchanged; this changed the bound brief SHA, which is recorded here."
+    },
+    "dispatch_lint": {
+      "result": "PASS_MANUAL",
+      "why_manual": "agentic dispatch-lint resolves iterations_dir through the resolver, which lands in the PHYSICAL primary repo (/Users/admin/vibe/agentic_loop) where this iteration's files do not exist -- they are committed only on the integration branch. It therefore reports DISPATCH_LINT_FAIL: brief not found. This is the SAME root cause WP-01 exists to fix, now observed in a sixth place (preflight, merge, finalize_merge, qoder_security, health, dispatch-lint).",
+      "checks": [
+        "1 validate_wp_status -> STATUS_VALID",
+        "2 brief exists at the authoritative path -> True",
+        "3 all three required sections present and non-empty -> True",
+        "4 no risk.* flag authorized -> production_writes/network/notifications FORBIDDEN, data_access READ_ONLY",
+        "5 scope.allowed_paths non-empty -> 9 entries"
+      ]
+    },
+    "preflight": {
+      "result": "BLOCKED_BY_THE_DEFECT_UNDER_REPAIR",
+      "observed": "PREFLIGHT_FAIL: status file resolves inside a worktree (...); pass the main-repo copy",
+      "workaround": "Same workaround the 2026-10-12 iteration recorded: verify by hand that branch == base_branch (sequential WP per contract 4.3, so it works on the integration branch and needs no separate worktree), that the WP lock is free, and that dispatch-lint's five checks pass against the authoritative copy. Recorded rather than bypassed with a flag; WP-01 is the fix for this.",
+      "branch_equals_base": true,
+      "wp_lock": "free then acquired by kiro-dsh-wp01-impl"
+    },
+    "impl_r1": {
+      "result": "BLOCKED_BY_ENVIRONMENT_BASELINE",
+      "executor": "kimi/deepseekflash",
+      "files_changed": "none",
+      "developer_claim": "Baseline is 908 passed, not the frozen 912; 4 tests in tests/test_finalize_merge_triple_sign.py fail before any edit, and that file is not in allowed_paths.",
+      "orchestrator_verification": [
+        "CONFIRMED and the developer is right; my frozen DoD figure of 912 was wrong. Measured now: 4 failed, 908 passed, 4 skipped.",
+        "Pre-existing, NOT caused by this plan: the same 4 fail at the merge-base with main (9ec3c38, the commit already pushed to origin/main), verified in a throwaway worktree.",
+        "Root cause proven by injection, not inference: git config --global init.defaultBranch = master on this machine, while tests/test_finalize_merge_triple_sign.py hardcodes `git checkout -q main`. Running that file with GIT_CONFIG_KEY_0=init.defaultBranch GIT_CONFIG_VALUE_0=main makes all 5 pass; with the global master value, 4 fail. Sibling fixtures (test_finalize_merge_sequential.py, test_finalize_merge_first_call.py) probe the default branch via a _default_branch() helper; this one does not.",
+        "Arithmetic reconciliation: 916 tests collected both then and now. 912 passed + 4 skipped = 916, and 908 passed + 4 failed + 4 skipped = 916. So those 4 were PASSING when I measured 912 -- the WP-02 developer dispatch runs under an isolated temporary HOME, which did not carry the global master setting, whereas I now run with the user's real HOME. The 912 figure was an artefact of the isolated HOME, not a property of the code.",
+        "The developer also self-reported running `git checkout -- tests/` as hygiene and correcting it. Verified harmless: git diff -- tests/ is empty and the only working-tree modification is my own PLAN-01 edit plus the pre-existing untracked uv.lock. Its warning is sound -- that command is unsafe here because this checkout is the sole maintainer of those files."
+      ],
+      "developer_brief_observations": "It also flagged that the historical trigger sections (1.95/1.98/1.99) still narrate rev5's restore of E7/M-2 and rev5's 8-form E6, while the normative sections and the DoD carry rev6's deletions and 12 negative forms. It correctly read the historical prose as superseded and did not stop on it. Worth tightening if the brief is revised again, but it is a modification history, not a second contract."
+    },
+    "baseline": {
+      "frozen_dod_figure": "912 passed / 4 skipped",
+      "resolution": "The figure is now TRUE on this machine with the user's real HOME and git config: 912 passed / 4 skipped, measured after the fixture fix. Before the fix it was 908 passed / 4 failed / 4 skipped. The original 912 had been measured through the developer dispatch script's isolated temporary HOME, which did not carry the global init.defaultBranch=master, so the discrepancy was an artefact of the measurement environment rather than of the code. 916 tests are collected in both cases, which is what made the two numbers reconcilable."
+    },
+    "impl_r2": {
+      "result": "IMPLEMENTED_WITH_A_SPEC_GAP",
+      "executor": "kimi/deepseekflash",
+      "commit": "759df4b",
+      "files_changed": 10,
+      "scope": "all 10 changed paths are inside allowed_paths; no forbidden path touched",
+      "orchestrator_verified": [
+        "The predicate change is REAL and load-bearing. Controlled with a throwaway worktree at the pre-WP-01 commit 3955529: the OLD predicate returns refuse=True for the authoritative status in this linked-worktree holder, the NEW one returns refuse=False. (An earlier attempt to control via git stash gave a polluted answer and is discarded; see the incident note.)",
+        "INV-5 holds: all five call sites still reference the one path_is_in_worktree function; the name is kept, the semantics retargeted.",
+        "The developer's regression mechanism claim is INDEPENDENTLY REPRODUCED: in a plain primary repo whose plan dir has no PLAN status, the new predicate returns refuse=True reason='authoritative branch unresolved'; adding a PLAN status declaring that repo's current branch flips the same path to refuse=False. That is INV-1b clauses 1-2 working as specified.",
+        "Full suite: 53 failed, 894 passed, 4 skipped, against the verified 912/4 baseline. All 53 are in SEVEN files outside allowed_paths: test_qoder_security.py (22), test_finalize_merge_sequential.py (11), test_preflight_branch_binding.py (6), test_gate_diff_start.py (5), test_worktree_literal_removal.py (4), test_merge_wrapper.py (3), test_cli.py (2). The developer stopped at the scope boundary rather than editing them, which is the correct behaviour.",
+        "The in-scope suites are green: 77 passed, 0 failed."
+      ],
+      "spec_gap_1_orchestrator_found": "THE BRIEF HAS A GAP I OWN, and six review rounds missed it. INV-1b mandates fail-closed when the PLAN status is unreadable, but nobody checked what the OLD predicate ACCEPTED. The old rule accepted any path in a plain primary repo with no PLAN status at all; the new rule refuses it. INV-4 only required that the hardening not degrade and said nothing about not breaking previously-accepted inputs, so the implementation is faithful to the brief while the brief is wrong. The 53 failures are the measured cost of that gap, not developer error.",
+      "spec_gap_2_orchestrator_found": "MORE SERIOUS, and it invalidates part of my own section 1 diagnosis. The predicate is not the only thing standing between these gates and the authoritative file: the wrappers themselves anchor RELATIVE paths to the physical primary repo (preflight.sh lines 31-34 via resolve_paths --root main_repo, same device in dispatch_lint.sh), then hand the predicate a path inside /Users/admin/vibe/agentic_loop where this iteration does not exist. Measured after this implementation: a relative path still yields PREFLIGHT_FAIL, while the ABSOLUTE path to the same file yields STATUS_VALID for preflight and carries merge and finalize_merge past the worktree verdict into their ordinary business gates (wrong-branch, lock warning). Controlled at the pre-WP-01 commit: the absolute path ALREADY worked before this WP. So the deadlock I recorded was caused at least as much by my passing RELATIVE paths as by the predicate, and WP-01's end-to-end DoD item cannot be satisfied by a predicate change alone.",
+      "spec_gap_2_RETRACTED": "RETRACTED BY THE ORCHESTRATOR. I claimed the absolute path already worked before WP-01 and that the deadlock was mostly my own fault for passing relative paths. That control was invalid: I used `git stash`, which cannot revert an already-COMMITTED predicate, so HEAD was the new code in both arms of the experiment. Redone correctly with a throwaway worktree checked out at the pre-WP-01 commit 3955529: with the ABSOLUTE path, the pre-WP-01 wrappers refuse all three gates (PREFLIGHT_FAIL / MERGE_FAIL / FINALIZE_FAIL, 'status file resolves inside a worktree'), while at HEAD the same absolute path yields STATUS_VALID for preflight and carries merge and finalize_merge past the worktree verdict into their ordinary business gates (wrong-branch, lock warning). WP-01 IS what fixed the deadlock. My section 1 diagnosis stands.",
+      "spec_gap_2_residual": "What remains true, and is a much smaller point: the wrappers anchor RELATIVE paths to the physical primary repo (preflight.sh lines 31-34 via resolve_paths --root main_repo), so a relative path still fails because it names a file that does not exist there. That is pre-existing, deliberate anchoring behaviour documented in the wrapper comment, not a WP-01 defect, and the gates are usable when given the absolute path the contract already requires. No action needed in this WP.",
+      "spec_gap_1_blast_radius": "Measured, and it narrows the decision. EVERY live iteration carries a PLAN status: the six iterations present at HEAD on this branch each have exactly one, and the branch the physical primary repo is parked on (plan/2026-09-22-framework-hardening) has 10 WP status files alongside 10 PLAN status files. So no real caller loses access. All seven failing files are TEST FIXTURES that build a plan dir with no PLAN status at all: grep -c 'agentic-plan-status' returns 0 in each of test_qoder_security.py, test_finalize_merge_sequential.py, test_preflight_branch_binding.py, test_gate_diff_start.py, test_merge_wrapper.py, test_cli.py and test_worktree_literal_removal.py. The 53 failures are therefore a fixture-contract change, not a product regression, which makes extending scope to add a PLAN status to those fixtures the proportionate fix and makes relaxing INV-1b unnecessary.",
+      "spec_gap_1_fix_prototyped": "PROTOTYPED AND REVERTED, so the decision can be made on measured cost rather than estimate. The predicate derives plan_dir as simply the judged file's PARENT (gate/__init__.py:579), so each failing fixture needs exactly one PLAN status file written beside its WP status -- no source change, no assertion change, no attack form touched. Demonstrated on tests/test_merge_wrapper.py: adding a single agentic-plan-status/v1 object declaring base_branch=main (the branch that fixture already renames to) turned it from 3 failed to 3 PASSED. The prototype was then reverted and `git diff HEAD` confirmed empty. Remaining cost is the same edit in six more files. This is the 'pure test/fixture' category of contract 4.1, but `agentic autonomy freeze_scope` returns AUTONOMY_STOP, so the scope extension is held for explicit user approval rather than self-approved.",
+      "failure_taxonomy_refined": {
+        "note": "I earlier said all 53 failures were fixture-only. That was too broad. Investigated test_worktree_literal_removal.py (WP-02's own guard file) because 2 of its failures appeared even at the pre-WP-01 commit.",
+        "harness_artifact": "Those 2 pre-WP-01 failures were MY measurement error, not a defect: the probe worktree had no PYTHONPATH, so test_f6 and test_inv_c raised ModuleNotFoundError: No module named 'agentic_loop'. Re-run with PYTHONPATH=src at WP-02's accepted commit 3955529: 10 passed, 0 failed. WP-02's ACCEPT signature is sound and its evidence stands.",
+        "at_head_with_pythonpath": "4 failed, 6 passed. Three distinct causes, not one:",
+        "cause_a_line_number_brittleness": "test_f6 asserts the literal appears ONLY in comments and pins one by HARDCODED LINE NUMBER ('agentic_loop/gate/__init__.py:809' in comment_only). WP-01's insertions moved that same comment to :1117. CRITICALLY, F6's real invariant still PASSES: `assert hits == []` holds, so no literal-based worktree check was reintroduced into product code. Goal part 1's INV-5 closure is INTACT; only the brittle line-number pin broke.",
+        "cause_b_fixture_missing_plan_status": "test_f3 and test_f4 build a literal .worktrees/ dir inside a main repo with no PLAN status beside the judged file, so the new predicate refuses with 'status file resolves inside a worktree'. This is spec gap 1, the fixture-contract change.",
+        "cause_c": "test_inv_c is the same gap-1 cause as b.",
+        "implication": "Spec gap 1's fix must also unpin test_f6's line number (assert the comment exists, not WHERE). That is still a fixture-only change with no product-code effect, but it is a second kind of edit I had not identified."
+      }
+    },
+    "mutations_orchestrator_verified": {
+      "method": "Each mutation applied ONE AT A TIME to the working tree, the named node re-run, then the file restored from a byte copy and `git diff --stat` confirmed EMPTY before the next one. No two mutations were ever live together.",
+      "results": {
+        "M-1 accept prunable ghost holders (liveness check at gate/__init__.py:449)": "E5 RED (test_e5_stale_holder_fails_closed); revert clean",
+        "M-3 neutralise _is_valid_branch_name": "E6 RED (17 failed, 5 passed -- the negative forms); revert clean",
+        "M-4 revert to the old positional git-dir != git-common-dir rule": "E1 RED (test_e1_linked_worktree_holding_authoritative_branch_is_accepted), E10 also red; revert clean",
+        "M-5 accept ANY registered worktree of the repo": "E3 RED (test_e3_other_worktree_still_refused); revert clean",
+        "M-6 inherit the caller's GIT_* environment (undo A22 stripping)": "guard_caller_env_* RED (2 failed, incl. GIT_COMMON_DIR); revert clean",
+        "M-7 read the basis from the judged WP status instead of PLAN": "E10 RED (test_e10_judged_object_cannot_declare_its_own_basis); revert clean",
+        "M-11 fall back to \"main\" when PLAN is unresolvable": "E9 RED (6 parametrized forms, incl. non_string_value and illegal_name); revert clean",
+        "M-12 give merge.sh its own predicate implementation": "E12 RED (test_e12_one_predicate_across_all_five_call_sites); revert clean"
+      },
+      "verdict": "All eight are load-bearing and each went red for its STATED reason, not incidentally. M-4 and M-5 were applied and verified SEPARATELY as the brief required, and they fail in opposite directions: M-4 shows the deadlock is genuinely fixed, M-5 shows the door was not thrown open.",
+      "inv4_mapping": "Verified against the pre-WP-01 tree: 17 old nodes -> 17 new guard_* nodes, one-to-one. Seven were RENAMED (worktree -> non_holder / authoritative) to match the retargeted semantics, not deleted. Attack-form counts are preserved or higher: caller-env disguise 2->2, overlong 4->4, NUL 4->7, symlink loop 18->25. No attack form was weakened or dropped."
+    }
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "bound_commit": "b91388c1bc709159e53ed720fd0503c32c162718",
+    "reviewer": "claude (orchestrator), independent",
+    "evidence": "Reviewed the diff independently of the developer's report. Scope: 10 changed paths, all inside allowed_paths, none forbidden, no product code touched by the fixture extension. Product change verified load-bearing by controlled comparison in a throwaway worktree at the pre-WP-01 commit: the OLD predicate refuses the authoritative status in this linked-worktree holder, the NEW one accepts it. Eight mutations applied one at a time with exact reverts (M-1/M-3/M-4/M-5/M-6/M-7/M-11/M-12), each turning its named node red for the stated reason, with M-4 and M-5 failing in opposite directions. INV-4 mapping 17 old nodes -> 17 new guard_* nodes, seven renamed not deleted, attack coverage preserved or higher. E12 verified in six directions and E13 now covers 18 malformed plus 7 well-formed porcelain cases. Full suite 972 passed / 4 skipped against a 912/4 baseline. Two API-visible behaviours deliberately unchanged: refusal wording and exit codes.",
+    "lock_note": "The status write for this review happened while the WP lock was NOT held: agentic lock heartbeat returned HEARTBEAT_LOST no_lock. Recorded here rather than hidden; the lock was re-acquired before this commit."
+  },
+  "consult": {
+    "state": "DECIDED",
+    "round": "topo-impl-r11",
+    "decision": "ACCEPT",
+    "kind": "wp-implementation-second-signature",
+    "bound_brief_rev": 6,
+    "prior_rounds": [
+      {
+        "round": "topo-brief-r1",
+        "decision": "REWORK",
+        "bound_brief_rev": 1,
+        "resolved_in_rev": 2,
+        "findings": [
+          "D1 (fatal, orchestrator-reproduced): rev1 had the predicate read git.target_branch from the status file, but that field exists ONLY in the PLAN schema. Measured -- WP template git keys: base_branch, base_commit, branch, commit, dispatch_commit, worktree. Four of the five call sites validate a WP status, so rev1 required reading a field that does not exist on the object being validated: not implementable.",
+          "D2: even if the field existed it comes from the file under validation, so an attacker checking out feat/evil in their own worktree and writing that name into the status satisfies all three rev1 conjuncts and becomes the trusted source. rev2 moves the expected branch to an EXTERNAL dual anchor (origin/HEAD with the origin/ prefix stripped, plus a new [project] protected_branch config key) that must agree byte-for-byte; a status field may only cross-check, never override.",
+          "D3 (orchestrator-reproduced): rev1's 'all 17 guards stay green read-only' is impossible -- all 17 call path_is_in_worktree(path) with a SINGLE argument and cannot pass a target branch, and their assertions encode the premise 'every linked worktree is refused' that the new contract deliberately changes. rev2 replaces it with 'the attack guarantees are preserved, the assertions may be rewritten premise-preserving' plus a mandatory 17-row old-node-to-new-assertion mapping."
+        ]
+      },
+      {
+        "round": "topo-brief-r2",
+        "decision": "REWORK",
+        "bound_brief_rev": 2,
+        "resolved_in_rev": 3,
+        "findings": [
+          "Q1 CONFIRMED BY ORCHESTRATOR MEASUREMENT: the dual anchor is not a real trust boundary. Both anchors sit in the same write domain -- a single local `git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/<evil>` moves anchor 1 with no server, push or approval involved (reproduced in /tmp/anchprobe), and anchor 2 is a tracked file in the same tree. An actor who can commit moves both in one step and keeps them byte-identical. rev2's security claim ('two sources in the same trust domain constitute an independent anchor') must be withdrawn.",
+          "Q2 BLOCKING DEFECT A (scope self-contradiction): the brief's scope permits adding [project] protected_branch to .agentic/config.toml, but this frozen status still lists that file under forbidden_paths. Any implementation would be out of scope on its first edit.",
+          "Q2 BLOCKING DEFECT B (wrong call-site inventory): the brief claims five call sites of the predicate, with plan_cmd.py as a PLAN-side one. Measured: plan_cmd.py never calls it (grep count 0). Only THREE files call it -- wrappers/preflight.sh:44, wrappers/finalize_merge.sh:160, gate/__init__.py:810.",
+          "ORCHESTRATOR-DISCOVERED, INDEPENDENT PRE-EXISTING DEFECT (not caused by this WP): wrappers/merge.sh:37 and gate/qoder_security.py:1012 do NOT use the hardened predicate at all -- they test the literal path fragment '/.worktrees/'. That is precisely the abandoned approach documented as wrong by test_verdict_does_not_depend_on_directory_name. Consequence measured today, before any change of mine: the path /Users/admin/vibe/agentic-loop-main-codex-merge/docs/plans/.../WP.status.json does not contain '/.worktrees/', so merge.sh and qoder_security ACCEPT it while preflight/finalize/gate REFUSE it. INV-5 (single authority) is therefore already violated in the current tree.",
+          "Q3: E10 as written would write git.target_branch into a WP fixture, producing a schema-invalid object, so it could fail for the wrong reason; it must use a legal PLAN status or an explicit declared-target input. E9/M-8 cannot catch the coordinated two-anchor move, so a coordinated-move attack test is required."
+        ]
+      },
+      {
+        "round": "topo-brief-r3",
+        "decision": "REWORK",
+        "bound_brief_rev": 3,
+        "resolved_in_rev": 4,
+        "findings": [
+          "D7 FATAL, ORCHESTRATOR-REPRODUCED: the rev3 anchor is itself caller-controlled. XDG_CONFIG_HOME comes from the caller's environment, so `XDG_CONFIG_HOME=/tmp/evil agentic ...` with /tmp/evil/agentic_loop/policy.toml declaring feat/evil resolves the anchor to an attacker-chosen file that is outside any git worktree and therefore PASSES E9b. Reproduced: the probe resolved /tmp/evil/agentic_loop/policy.toml, read 'feat/evil', and the worktree check answered False. This is precisely the A22 caller-declared-fact family that the predicate's own docstring rejects -- rev3 believed it had escaped that family and had not.",
+          "D8 (orchestrator-reproduced): scope self-contradiction returned in a new form -- merge.sh and qoder_security.py are now in BOTH allowed_paths and forbidden_paths, and the brief body still permits editing them while the recorded literal_defect decision reserves them for a separate WP. Additionally scope.decisions.existing_tests still calls the 17 guards 'read-only', contradicting INV-4's premise-preserving-rewrite rule.",
+          "D9 (orchestrator-reproduced): INV-3 conjunct 3 requires comparing git-common-dir against 'the repository owning the anchor', but INV-1b specifies the anchor lives outside any repository -- so it has no git-common-dir. The brief contradicts itself; a trusted repository identity must come from somewhere else.",
+          "D10: M-2 and M-2b both require 'E7 must turn red', but rev3 no longer defines E7 (it was replaced during the E9/E10/E11 rewrite). Two DoD items are therefore unexecutable as written.",
+          "D11: tests cannot relocate the anchor via XDG_CONFIG_HOME once that variable is removed from the production path; fixtures need internal dependency injection or a mockable path resolver instead."
+        ]
+      },
+      {
+        "round": "topo-brief-r4",
+        "decision": "REWORK",
+        "bound_brief_rev": 4,
+        "kind": "wp-brief-second-signature",
+        "resolved_in_rev": 5,
+        "findings": [
+          "Q1 mostly ACCEPT: the withdrawal was judged honest -- INV-1b clause 3 denies the trust boundary explicitly, E10/M-7's recasting as structural correctness is legitimate, and section 8 is specific enough to stop re-litigation. One incomplete spot: E1 still required an out-of-repo policy file, contradicting section 6's ban (D11).",
+          "Q3 FATAL, orchestrator-reproduced: rev4 keyed the predicate on PLAN git.target_branch, which is main. Measured here: ZERO worktrees hold main (git worktree list --porcelain | grep -c 'branch refs/heads/main$' = 0), and the authoritative status does not exist on main at all (git cat-file -e main:.../WP-01.status.json fails) while it does exist on the integration branch, held by this very checkout. rev4 would therefore fail-closed immediately with 'no checkout holds target_branch' -- trading the physical-location deadlock for a branch-lifecycle deadlock. USER DECISION: switch the basis to the integration branch, PLAN git.base_branch (D10).",
+          "Q2/Q4: M-2 was repointed from the deleted E7 to E3, but E3 is 'same repo, wrong branch' and would still be refused by INV-3 clause 2 after removing the common-dir comparison, so M-2 could not turn it red -- not load-bearing (D12). INV-5 had no acceptance test, only a DoD self-check. The brief said three call sites in section 1 and five in section 7. status forbidden_paths banned merge.sh and qoder_security.py while brief section 6 allowed them (D13). M-7 did not pin WHICH field is misread. INV-1b's no-fallback half and INV-5 had no guarding mutation.",
+          "rev5 fixes all of it: basis switched to base_branch with the measurement recorded; E1 uses a legal PLAN fixture; E7 restored as a dedicated cross-repository node with M-2 repointed at it; E12 added for INV-5 with M-12 guarding it; M-11 added to guard the no-fallback rule; M-7 now names WP status's own git.base_branch as the misread field; scope unified on five call sites in both the brief and this status; the duplicated topo-brief-r3 record merged."
+        ]
+      },
+      {
+        "round": "topo-brief-r5",
+        "decision": "REWORK",
+        "bound_brief_rev": 5,
+        "kind": "wp-brief-second-signature",
+        "resolved_in_rev": 6,
+        "findings": [
+          "Q1/Q3 directionally ACCEPT: the withdrawal is honest and keying on the integration branch is the right basis -- the consultant independently confirmed the integration branch is held by this linked worktree and carries the status while main has no holder and lacks the file.",
+          "D14 FATAL, orchestrator-reproduced: INV-3 clause 1 still used rev1's single-path-component check forbidding '/', but the real base_branch is plan/2026-10-15-status-source-topology, which contains '/'. The spec would reject its own authoritative branch and still fail closed, so rev5 did NOT lift the deadlock. The fixture names in E1/E3/E10 (plan/x, plan/y, plan/authoritative) were all illegal too. git check-ref-format --branch accepts the real name. Fix: validate by git's own ref syntax, and carry path safety as an implementation constraint -- the branch name is only ever string-compared against git worktree list --porcelain output, never concatenated into a path.",
+          "D15: M-2 still was not load-bearing. Candidates are enumerated by running git worktree list in the repository resolved FROM THE JUDGED PATH, so a foreign repository's worktree can never enter the candidate set; INV-3 clause 3 was therefore redundant and E7 could not go red. The consultant offered the smaller fix and the orchestrator took it: delete clause 3, E7 and M-2, and record that cross-repository confusion is excluded by the enumeration source itself.",
+          "D16: M-11 needed E9's fixture to contain a LIVE main holder, or adding a 'main' fallback merely turns 'unresolved' into 'no holder' -- still fail-closed, so E9 would not go red for wrongful acceptance. Premise added to E9.",
+          "D17: wording and stale values -- section 2 still said git.target_branch is not a trust boundary; section 1 still claimed three call sites; status scope notes literal_defect/wp02_split still said those two files were forbidden, contradicting allowed_paths and scope_rev5. All corrected; the stale notes are explicitly marked SUPERSEDED.",
+          "Also adopted from r5: section 8 no longer claims the integration branch 'disappears' after the plan merges (git merge does not necessarily delete it); it now says a merged plan's status no longer enters these gates whether or not the branch is kept."
+        ]
+      },
+      {
+        "round": "topo-brief-r6",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 6,
+        "kind": "wp-brief-second-signature",
+        "substantiation": [
+          "Q1: the withdrawal is complete and honest. INV-1b clause 3 denies that git.base_branch is a trust boundary, section 8 names the undefended actors and cites D7, and E10/M-7's structural-correctness recasting only prevents an implementation from reading the WP's own same-named field into a self-reference. No surviving requirement depends on an immovable trust root, and no environment variable, out-of-repo policy file or anchor was reintroduced.",
+          "Q2: E7 and M-2 are fully deleted from the normative text with no dangling reference. Surviving sets are E1-E6/E8/E9/E10/E12 and M-1/M-3/M-4/M-5/M-6/M-7/M-11/M-12, matching the DoD exactly. Every invariant has coverage: INV-1 by E1-E3, INV-1b by E9/E10, INV-2 by E2/E4, INV-2b by E5, INV-3 by E3/E6, INV-4 by E8, INV-5 by E12. The enumeration baseline is implementable -- resolve the repository from the judged path, run git worktree list --porcelain there -- so a foreign repository's worktree cannot be a candidate and dropping the common-dir comparison is the correct reduction.",
+          "Q3: independently measured -- the only holder is the linked worktree at /Users/admin/vibe/agentic-loop-main-codex-merge on plan/2026-10-15-status-source-topology, the PLAN/WP status exists on that integration branch and not on main, and git accepts the slashed name. Keying on PLAN git.base_branch with git check-ref-format validation and a unique live holder chosen from the judged repository's registered worktrees leaves no remaining conjunct that would reject the real layout. No phase-aware switching is needed because a MERGED plan's status no longer enters these gates.",
+          "Q4: each mutation turns its named test red through a specific witness -- M-1 stale-specific, M-3 name-validation, M-4 E1's self-proving linked layout, M-5 E3's wrong-branch witness, M-6 the existing caller-env tests, M-7 the legal WP git.base_branch set against the PLAN basis, M-11 the live main holder in E9 producing a wrongful acceptance, M-12 the five-call-site static assertion. All independently applicable, with no mutation needing another to go red, and the specific witnesses plus fixture premises prevent incidental greening via no-holder, schema-invalid or missing-branch.",
+          "Three non-blocking wording slips were named and the orchestrator fixed them without another round: the opening line still said three call sites, section 2 still said the integration branch 'disappears', and M-3 still said 8 name forms (now 12 negative)."
+        ]
+      },
+      {
+        "round": "topo-impl-r1",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_MALFORMED_OUTPUT",
+        "findings": [
+          "The session returned a 503-byte body with NO verdict marker, so the harness recorded form=None decision=INVALID. Formally the round is void.",
+          "Its content was nonetheless a REAL defect and the orchestrator verified it independently rather than discarding it: _parse_worktree_listing had an elif chain with no final else, so any line it did not recognise was silently skipped and the record was still returned as a valid holder. Probed directly: a listing of worktree + branch + 'MALFORMED junk line' parsed to one accepted record instead of None.",
+          "That contradicts the predicate's own contract, which lists malformed worktree-list porcelain as a fail-closed branch, and it is a fail-OPEN in the one predicate whose entire design is fail-closed: output the code did not understand was treated as a trustworthy holder. No test covered malformed porcelain at all, so the claim was unbacked.",
+          "FIXED: the parser now recognises the documented porcelain vocabulary (worktree, HEAD, branch, detached, bare, locked, prunable) and returns None on anything else, on a duplicate branch line, and on junk between records. Blank lines are handled as git's real record separator.",
+          "VERIFIED: real git worktree-list output in this repo still parses (19 records, every branch accounted for), so the gate is not broken; the live predicate still accepts this plan's authoritative status, and still accepts a different worktree that legitimately holds ITS OWN plan's base_branch, which is the correct per-plan semantics. Nine new E13 nodes cover four malformed and five well-formed forms. Mutation M-13 (restore the silent skip) turns the unknown-line case red, so the node is load-bearing. Full suite 956 passed / 4 skipped."
+        ]
+      },
+      {
+        "round": "topo-impl-r2",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r3",
+        "findings": [
+          "Q2 and Q4 ACCEPT: all five entry points really import and call the one predicate, the single definition is in gate/__init__.py, refusal wordings and exit codes are unchanged, all 17 changed files are inside allowed_paths, and the seven fixture files only add a PLAN status declaring the branch their fixture repo actually holds (or, in test_worktree_literal_removal, unpin a line number), with assert counts identical to baseline.",
+          "Q1 REWORK, and it was aimed at MY OWN fix from this round: prefix matching was not whole-token matching. `startswith(\"locked\")` accepted `lockedevil`, `startswith(\"prunable\")` accepted `prunableevil`, and duplicate HEAD plus a second `worktree` line with no blank separator were all accepted. Orchestrator reproduced every one. Fixed: exact tokens (bare, or name + one space + argument), HEAD and branch single-valued, records must be blank-line separated.",
+          "Q3 REWORK, also aimed at my own work: E12 only asserted the string `path_is_in_worktree` appeared in each file, and every one of those files mentions the name in a comment -- so renaming the real import and call while leaving comments intact kept E12 green. The consultant reproduced it in memory; the orchestrator reproduced it against the real file. M-12's existing red evidence therefore only proved that ONE particular edit is caught, not INV-5.",
+          "FIXED: E12 now strips comments before matching (tokenize COMMENT spans for .py, full-line comments for .sh) and requires, per non-definition call site, an exact `from agentic_loop.gate import ... path_is_in_worktree` AND a real `path_is_in_worktree(` invocation; the definition file is asserted to be the single definer and is exempt from the import half. Re-running the consultant's exact bypass now turns E12 RED.",
+          "Both fixes verified: 13 parser cases (7 must-refuse, 6 must-parse) behave correctly; real `git worktree list --porcelain` in this repo still parses (19 records) so no gate is broken; the live predicate still accepts this plan's authoritative status. E13 grew to 9 cases covering the r2 counterexamples. Full suite 961 passed / 4 skipped."
+        ]
+      },
+      {
+        "round": "topo-impl-r3",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_TRUNCATED_OUTPUT",
+        "resolved_in_round": "topo-impl-r4",
+        "findings": [
+          "Third session to return a body with no verdict marker (347 bytes this time), so the harness recorded INVALID again. It stopped to say it wanted to verify two boundaries before finishing.",
+          "Both boundaries were real and the orchestrator verified them rather than waiting: (1) `_token` accepted a BARE `HEAD` and a BARE `branch`, which are malformed because both carry a value -- while `locked` and `prunable` legitimately may stand alone; (2) E12's import regex was too tight, requiring one exact single-line form, so a parenthesised multi-line import, a trailing comma, or an `as` alias would have been falsely reported as a second implementation.",
+          "FIXED (1): tokens now declare whether they require an argument. `HEAD` and `branch` do; `locked` and `prunable` do not. Bare forms of the two value-carrying tokens are refused.",
+          "FIXED (2): E12 now resolves imports properly -- `ast` for .py, which additionally resolves `as` aliases so the local name is checked for the call -- and only falls back to a tolerant regex for the three shell files whose import lives inside a Python heredoc.",
+          "BOTH DIRECTIONS VERIFIED: renaming merge.sh's real import and call while keeping its comments still turns E12 RED; aliasing the import in qoder_security.py to `_pw` and calling `_pw(...)` stays GREEN. So the node now discriminates a second implementation from a legitimate refactor instead of merely matching a string.",
+          "E13 grew to 11 malformed + 7 well-formed cases. Real `git worktree list --porcelain` still parses (19 records); the live predicate still accepts this plan's authoritative status. Full suite 965 passed / 4 skipped."
+        ]
+      },
+      {
+        "round": "topo-impl-r4",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r5",
+        "findings": [
+          "Q2 and Q4 ACCEPT again: all five entry points call the one shared predicate with no second implementation present, the seven approved fixture files only add an adjacent PLAN status declaring the branch their repo actually holds, F6 only unpins a line number, and no assertion or attack form was weakened. Brief and status SHAs verified.",
+          "Defect 1 (P1, confidence 10/10): _token used startswith(name + \" \") then .strip() on the value, so `branch  refs/heads/x` (TWO spaces) and `HEAD ` (empty argument) parsed as valid. A record containing `branch` together with `detached` or `bare` was also accepted, in either order. Orchestrator reproduced all six forms.",
+          "Defect 2 (P1, confidence 10/10): E12 could still be bypassed while staying green. Keep a bare decoy call `path_is_in_worktree(x)` for the test to find, then let a local `local_status_source()` drive the printed verdict -- _imports_and_calls() returned (True, True), no forbidden same-name definition was present, and the endpoint verdict was controlled by the second implementation. Reproduced against the real file; so the earlier rename/alias verification only covered two mutations, not the property.",
+          "FIXED 1: replacement of prefix+strip with _arg(), which requires exactly one separating space and a non-empty argument that does not itself start with a space; _bare() for tokens that legitimately stand alone (locked, prunable). detached/bare are now mutually exclusive with branch in either order.",
+          "FIXED 2: E12 now also requires the predicate call to BE the verdict condition -- `if <pred>(...)` or the ternary `... if <pred>(...) else ...`, resolved through the import alias with ast for .py. Verified in three directions: the r4 decoy mutation is now RED, the alias refactor stays GREEN, and the earlier comment-only rename is still RED.",
+          "E13 is now 18 malformed + 7 well-formed cases. Real git worktree list output still parses (19 records); the live predicate still accepts this plan's authoritative status. Full suite 972 passed / 4 skipped."
+        ]
+      },
+      {
+        "round": "topo-impl-r5",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_PROVIDER_OVERLOAD",
+        "resolved_in_round": "topo-impl-r6",
+        "findings": [
+          "PROVIDER FAILURE, NOT A REVIEW RESULT. The answer body is 19 bytes, literally '(empty placeholder)'. No finding was made in either direction.",
+          "Root cause visible in the session event log: 8 occurrences of HTTP 529 (provider overloaded); the turn ended with an empty agent message after 1271 output tokens.",
+          "This is chronic rather than a one-off. Counting 529s per round: r1=19, r2=29, r3=7, r4=17, r5=4. The rounds that DID produce a verdict (r2, r4) hit them too and survived; the ones that produced empty or truncated bodies (r1, r3, r5) did not. So of five rounds, only two yielded a usable verdict, and every finding those two made was real and has been fixed.",
+          "Retried as r6 with a much shorter prompt, on the theory that a smaller review has less chance of being cut off mid-answer."
+        ]
+      },
+      {
+        "round": "topo-impl-r6",
+        "decision": "INVALID",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "outcome": "VOID_PROVIDER_OVERLOAD",
+        "resolved_in_round": "topo-impl-r7",
+        "findings": [
+          "PROVIDER FAILURE AGAIN. 318-byte body, no verdict marker, 19 HTTP 529s in the event log. It had reached a positive conclusion in prose -- it confirmed the seven approved fixture files only add an adjacent PLAN status and that test_worktree_literal_removal.py merely replaces a brittle hardcoded line number while keeping the core `hits == []` assertion -- and then said it needed one more read before signing, at which point it was cut off.",
+          "So its partial content AGREES with Q4, but a truncated body is not a signature and is not recorded as one.",
+          "This is the fourth void round out of six (r1, r3, r5, r6); only r2 and r4 produced usable verdicts. The blocker is provider availability, not a disagreement about the code.",
+          "Retried as r7 with a deliberately minimal single-question ask -- just the parser, four commands maximum -- to maximise the chance of a complete answer."
+        ]
+      },
+      {
+        "round": "topo-impl-r7",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "substantiation": [
+          "Scoped deliberately to the parser, which is where r4's Q1 defect lived. The consultant ran the commands rather than reasoning from the text: it reported that _parse_worktree_listing returns None for all four malformed inputs, parses all three well-formed ones, that the two-space case prints None on the real command, and that real git worktree list --porcelain output still parses -- so the strictness did not go too far.",
+          "This round had ZERO HTTP 529s, which confirms the previous four void rounds were provider availability rather than anything about the code or the prompt."
+        ],
+        "coverage_note": "This ACCEPT covers the malformed-porcelain parser only. Q2 and Q4 were ACCEPTed at r2 and again at r4, but E12 was changed AFTER r4 (the decoy fix), so E12 at the current HEAD is not covered by any signature yet. A further minimal round is being run for exactly that."
+      },
+      {
+        "round": "topo-impl-r8",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r9",
+        "findings": [
+          "Both defects were in E12's SHELL branch, and both reproduced. (A) A legitimate alias in a shell wrapper -- `from agentic_loop.gate import path_is_in_worktree as _pw` then `_pw(...)` -- failed the call and verdict regexes, so a valid refactor would have been reported as a second implementation. (B) An INLINE comment spelling the patterns satisfied all three regexes, because only full-line comments were stripped: a file whose real verdict came from a local function could pass.",
+          "FIXED by removing regex from the shell branch entirely. The three shell call sites carry their probe in a `<<'PY' ... PY` heredoc, so E12 now extracts those heredoc bodies and runs the SAME AST analysis used for .py -- resolving the import alias and requiring the call to be the verdict condition. Comments are ignored by ast by construction, which removes the whole class of spoofing rather than patching one instance.",
+          "The now-redundant _strip_comments helper and the four residual regexes were deleted: ast subsumes them, and leaving an ineffective layer in place would mislead whoever reads this next.",
+          "VERIFIED four ways after the rewrite: alias GREEN; inline-comment spoof RED; decoy-call RED; comment-only rename RED. Full suite 972 passed / 4 skipped."
+        ]
+      },
+      {
+        "round": "topo-impl-r9",
+        "decision": "REWORK",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r10",
+        "findings": [
+          "The finding targeted the AST rewrite from r8 and reproduced: `if path_is_in_worktree(x): pass` satisfied `decides`, because the check only asked whether SOME if-statement had the predicate as its test, never whether that branch produces a verdict. Pair it with a local function driving the print and a second implementation controls the outcome while E12 stays green.",
+          "FIXED: 'the call decides' now means the branch EMITS the verdict. An `if <pred>(...)` counts only when its body actually raises, exits, prints or calls emit_verdict; an IfExp counts only when its result is printed. A `pass` body and a bare `x = 1 if <pred> else 2` both fail.",
+          "VERIFIED six ways: the r9 pass-bypass and the r4 decoy are both rejected; the real ternary form (preflight/merge), the real `if <pred>: emit_verdict + sys.exit` form (finalize_merge), the real `if <pred>: raise` form (qoder_security) and the aliased ternary are all accepted. Full suite 972 passed / 4 skipped."
+        ]
+      },
+      {
+        "round": "topo-impl-r10",
+        "decision": "ACCEPT_BARE",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "resolved_in_round": "topo-impl-r11",
+        "coverage_note": "Marker ACCEPT, but the entire body was one line asking whether it should write the conclusion into the WP status -- no reasoning, no construction named, nothing to check. The dispatch prompt states that a bare ACCEPT is treated as unsubstantiated, so it is recorded here as ACCEPT_BARE rather than as a signature. Zero HTTP 529s, so this was not truncation; the round simply did not do the work.",
+        "action": "One further round (r11) asks only for the list of constructions tested and which way each went."
+      },
+      {
+        "round": "topo-impl-r11",
+        "decision": "ACCEPT",
+        "bound_brief_rev": 6,
+        "kind": "wp-implementation-second-signature",
+        "bound_commit": "b91388c",
+        "substantiation": [
+          "Substantiated, construction by construction, and it matches the orchestrator's own independent checks exactly. It states it RAN them, and each verdict is the one the code produces:",
+          "1 REJECT -- renaming the real import and call while comments still spell the name: ast ignores comments.",
+          "2 REJECT -- a bare decoy call does not decide the printed verdict.",
+          "3 REJECT -- `if <pred>: pass` never emits a verdict.",
+          "4 ACCEPT -- a legitimate `as _pw` alias resolves and `_pw(...)` decides the ternary.",
+          "5 ACCEPT -- the real merge.sh / preflight.sh form: the predicate directly decides the printed ternary.",
+          "6 ACCEPT -- the real finalize_merge.sh form: the predicate branch calls emit_verdict and exits.",
+          "7 ACCEPT -- the real qoder_security.py form: the predicate branch raises GateError.",
+          "Together with r7's ACCEPT of the malformed-porcelain parser, the implementation ID at this commit is signed twice: parser by r7, E12 by r11. Q2 and Q4 were ACCEPTed at r2 and again at r4 and did not change afterwards."
+        ]
+      }
+    ],
+    "pending_note": "Implementation second-signed: parser at r7, E12 at r11, Q2/Q4 at r2 and r4.",
+    "soft_limit": {
+      "signal": "rework_twice",
+      "state": "ACTIVE",
+      "family": "WP-01 implementation second signature",
+      "rounds": [
+        "topo-impl-r1",
+        "topo-impl-r2",
+        "topo-impl-r3",
+        "topo-impl-r4"
+      ],
+      "note": "Four rounds, no clean ACCEPT yet: r1 and r3 returned no verdict marker (void), r2 and r4 REWORKed on two real defects each. Every finding was reproducible and every one was in the ORCHESTRATOR's own fixes rather than the developer's code. The product behaviour (E1-E10) has been ACCEPTed in every round that produced a verdict; the churn is concentrated in the malformed-porcelain parser and in E12's static-analysis strength, both of which are acceptance-test infrastructure.",
+      "provider_note": "Of five implementation-signature rounds, three were void from provider overload (HTTP 529) rather than disagreement. Only r2 and r4 returned usable verdicts, and both REWORKed on genuine defects in the orchestrator's own fixes. The soft-limit signal therefore overstates the amount of real disagreement.",
+      "resolution": "Eleven rounds. Of these, FOUR were void from provider overload (r1, r3, r5, r6) and ONE was a bare marker with no reasoning (r10). Only six produced usable verdicts, and five of those found real defects -- every single one in the ORCHESTRATOR's own fixes, never in the developer's product code, which was ACCEPTed whenever it was examined. The defects clustered in two places: the malformed-porcelain parser and E12's static strength. Convergence was monotonic; each round narrowed the hole rather than finding a new area.",
+      "final_state": "RESOLVED: parser ACCEPT r7, E12 ACCEPT r11"
+    },
+    "checks_r2": {
+      "parser_cases": "7 must-refuse + 6 must-parse all correct",
+      "real_git_output": "19 records parse",
+      "e12_bypass": "now turns RED",
+      "full_suite": "961 passed / 4 skipped"
+    },
+    "bound_commit": "b91388c1bc709159e53ed720fd0503c32c162718"
+  },
+  "timestamps": {
+    "created_at": "2026-10-15T11:00:00Z",
+    "updated_at": "2026-10-18T14:51:35Z",
+    "approved_at": "2026-10-15T11:20:00Z"
+  }
+}
