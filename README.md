@@ -1,6 +1,6 @@
 # agentic-loop
 
-可移植的 Agent 编排框架（在 baofu monorepo 中自用 dogfood）。
+可移植的 Agent 编排框架（在内部私有 monorepo 中长期 dogfood）。
 
 `agentic-loop` 把「派发 → 实现 → 评审 → 合并门」这套跨编码 Agent（Claude / Codex / Kimi / …）的工作流打包成一个引擎。它提供：
 
