@@ -28,17 +28,23 @@ kimi 仍走 anthropic 端点，校验是自洽的。
 
 | 依赖分支 | 状态 |
 |---|---|
-| `fix/tool-fixes-2026-10-14` | 本地已验证（1082 passed 等价于其基线），推送因网络未完成 |
+| `fix/tool-fixes-2026-10-14` | 已合入本地 `main`（`--no-ff` merge `c91cf0f`，978 passed / 4 skipped）；推送因网络未完成 |
 
-该分支落地到 `main` 后，本迭代分支需 rebase 到 `main` 再收敛。
+用户裁决（2026-10-20）：先落基线，再合 `main`。基线已作为一次 `--no-ff`
+合并进入本地 `main`，随后把 `main` 合入本迭代分支（merge `5d1caca`），
+而不是 rebase——rebase 会重写 WP-02/03 已获 codex 签名的提交 SHA。合并后
+plan 分支全套 998 passed / 4 skipped。
 
 ## Work packages
 
 | WP | 主题 | 状态 |
 |---|---|---|
-| WP-01 | 固定 triple-sign 测试初始分支，基线转绿 | READY_FOR_REVIEW · codex ACCEPT |
-| WP-02 | kimi base_url 校验 fail-closed，禁止静默回退 | BLOCKED · 用户已裁决并补齐覆盖(b01dfd2)，等 codex r5 判决 |
-| WP-03 | 表格式角色渲染成 adapter 名，修复契约漂移 | READY_FOR_REVIEW · codex ACCEPT |
+| WP-01 | 固定 triple-sign 测试初始分支，基线转绿 | BLOCKED · 已弃用；main `3955529` 用更优方案修复同一问题 |
+| WP-02 | kimi base_url 校验 fail-closed，禁止静默回退 | MERGED · codex r5 ACCEPT（`b01dfd2`），finalize 记录 `merged_commit=5d1caca` |
+| WP-03 | 表格式角色渲染成 adapter 名，修复契约漂移 | MERGED · codex r5 ACCEPT（`3cdd101`），finalize 记录 `merged_commit=5d1caca` |
+
+WP-02/03 是顺序布局（`git.branch == git.base_branch`），`merged_commit` 即
+集成分支尖端；两个 WP 各自的实现提交都在该分支的 first-parent 历史上。
 
 ## 明确不在本迭代范围
 
@@ -110,16 +116,22 @@ codex r4 的四个空字符串变异全部转红（2/2/1/1，修复前均 27 全
 r1~r3 历史变异检出数普遍上升（6/3/2/2/2）。
 quality-gate PASS，928 passed / 4 skipped。
 
-**但这些是编排者自测，不是独立签名。** r5 在配额耗尽前未产出判决
-（见 `PLAN-01-consult-codex-review-r5.answer.md`），所以 WP-02 的最新已记录
-独立决定仍是 r4 的 CONSULT。
+**但这些是编排者自测，不是独立签名。** r5 第一次尝试在配额耗尽前未产出判决
+（`PLAN-01-consult-codex-review-r5.answer.md`），配额恢复后完整跑完 r5b
+（`PLAN-01-consult-codex-review-r5b.answer.md`），判决见下。
 
-### 当前阻断项：等 codex 配额恢复（23:55）跑 r5
+### r5b 判决（已完成）
 
-r5 任务清单六项不变，其中第 2 项要求 codex 裁定形态枚举是否已完备，
-还是继续要求 whitespace-only、非 str 假值等即属过度拟合本守卫不拥有的职责。
+| WP | 判决 | 提交 |
+|---|---|---|
+| WP-01 | ACCEPT（实现已弃用） | `71c0658` |
+| WP-02 | ACCEPT | `b01dfd2` |
+| WP-03 | ACCEPT | `3cdd101` |
 
-**在取得 codex 对 `b01dfd2` 的判决前，不得 finalize、不得合并。**
+r5b 同时判定 PLAN.md 的 rebase 前置条件阻断收敛。该条件已按用户裁决改写为
+「基线先落 `main`，再把 `main` 合入迭代分支」并执行完毕（见「基线依赖」）。
+WP-01 的实现因 main `3955529` 的更优修复而弃用，不计入本 plan 的
+`work_packages`；其 status 置 BLOCKED，保留 codex ACCEPT 记录。
 
 ## 收敛顺序（§4.3 原文顺序，re-freeze r4 修正）
 
@@ -133,13 +145,11 @@ codex r4 指出原文把 `plan merge` 写在 WP finalize 之前，顺序错误�
 5. `agentic plan finalize` 盖 plan 级 `MERGED` + `merged_commit`。
 6. 人工批准后推送一次（`push` 是硬 `always_stop`）。
 
-另两项 r4 指出的待办：
+另两项 r4 指出的待办，已在 finalize 提交中处理：
 
-- 已提交的冻结版 WP-03 status 仍是旧 `480fb80`，需在 finalize 提交中折叠修正
-  （live 版已是 `9d943b8`，三份 live `base_commit` 均为各自实现提交的祖先）。
-- WP-01/03 的 `evidence.tests` 仍为空，需补齐后才满足 finalize 的证据要求。
-- 基线依赖 `5bd90b5` 虽在远端跟踪分支上，但仍不是本地 `main`／`origin/main`
-  的祖先，尚未满足本 PLAN 声明的基线前置条件。
+- 冻结版 WP-03 status 的旧 `base_commit=480fb80` 已折叠为 `9d943b8`。
+- WP-01/03 的 `evidence.tests` 已补齐，满足 finalize 的非空证据要求。
+- 基线 `5bd90b5` 已经由 `c91cf0f` 进入本地 `main`，满足 PLAN 的基线前置条件。
 
 ### 签名归属（r4 纠正，已落到三份 status）
 
@@ -163,3 +173,5 @@ status 文件的当前改动**故意不提交**（§4.3：决策累积到工作�
 - **错误消息不变式缺少结构化保障**：本轮三处同形缺陷说明，没有共享 helper
   或 lint 来强制「报错消息按等式钉死且断言 canary 不出现」，第四处仍可能
   复发。已记入 WP-02 status 的 risks。
+- **codex 调用路径仍只断言异常类型**：r4 判为可延期的既有债务；本轮不改，
+  待后续迭代补上「错误消息按等式钉死 + canary 不存在」的断言。
