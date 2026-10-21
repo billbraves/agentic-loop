@@ -150,8 +150,8 @@ def test_project_config_resolves_flash_fallback():
     b = resolve_role_fallback_binding("developer", repo=REPO)
     assert b is not None
     assert b.provider == "deepseekflash"
-    assert b.identity_model == "deepseek-v4-flash"
-    assert b.cli_selector == "deepseek/v4-flash"
+    assert b.identity_model == "deepseek-flash"
+    assert b.cli_selector == "deepseek/deepseek-flash"
     assert b.api_key_env == "DEEPSEEK_API_KEY"
 
 

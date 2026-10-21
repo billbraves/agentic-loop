@@ -35,8 +35,20 @@ identity_model     = "gpt-5.6-sol"                          # canonical
 [providers.kirogpt.selectors]
 codex = "gpt-5.6-sol"
 
+# consult（gate 独立第二签）的自动回退目标（WP-01 2026-10-21-consult-llm-failover）。
+# 主档 kirogpt（gpt-5.6-sol）基础设施失败（quota/transport/server）时单跳到这里；
+# 直连 api.deepseek.com、Responses 协议（codex 0.159 实测 wire_api=responses OK，
+# chat 已移除）。fallback 再失败即 GATE_FAIL 交编排者，绝不第三跳。
+# key 只存 env 名，绝不落盘明文。
+[providers.deepseekpro]
+openai_base_url    = "https://api.deepseek.com/v1"
+api_key_env        = "DEEPSEEK_API_KEY"                      # 只存 env 名，绝不落盘明文
+identity_model     = "deepseek-v4-pro"                       # canonical
+[providers.deepseekpro.selectors]
+codex = "deepseek-v4-pro"
+
 # kimi 套餐额度不足时的自动回退目标（仅 developer 派发用；主档仍是原生 kimi）。
-# 单跳：kimi 原生 → deepseek-v4-flash；flash 也额度失败则 REDISPATCH_STOP 交人工。
+# 单跳：kimi 原生 → deepseek-flash；flash 也基础设施失败则 DISPATCH_STOP 交人工。
 [providers.deepseekflash]
 # kimi 1.50 只通过 openai_legacy 类型的 provider 解析该 selector，适配器注入的
 # provider 块也据此写成 openai_legacy，故 base URL 用 OpenAI 兼容端；
@@ -44,9 +56,9 @@ codex = "gpt-5.6-sol"
 anthropic_base_url = "https://api.deepseek.com/anthropic"
 openai_base_url    = "https://api.deepseek.com/v1"
 api_key_env        = "DEEPSEEK_API_KEY"                      # 只存 env 名，绝不落盘明文
-identity_model     = "deepseek-v4-flash"                     # DESIGN §10.1：实现前须核实精确 id
+identity_model     = "deepseek-flash"                         # 官方浮动 id（版本号不属于 model id，始终指向最新 Flash）
 [providers.deepseekflash.selectors]
-kimi = "deepseek/v4-flash"                                   # DESIGN §10.1：实现前须核实精确 selector
+kimi = "deepseek/deepseek-flash"                             # 约定 deepseek/<model>
 
 [roles]
 # reviewer=opus5 / consultant=gpt5.6 已是异源，但 gate 路径下仍评 weak
@@ -56,11 +68,13 @@ orchestrator = "claude"
 # 默认（kimi-for-coding）。绑了也不影响评级——只有 review.decision == "N/A"
 # 时才用 executor.tool 构造 implementer_id，那里只有 tool 名没有 model，
 # independence._model_known() 恒 False。
-# fallback_provider 是可选键：仅 resolve_role_fallback_binding 读它；
-# 主档 resolve_role_binding("developer") 仍返回 ("kimi", None)（零回归）。
+# fallback_provider 是可选键：仅 resolve_role_fallback_binding 读它；主档
+# resolve_role_binding("developer") 仍返回 ("kimi", None)（零回归）。
+# consult 主档仍是 kirogpt（gpt-5.6-sol，零变化）；gate 的 consult 在
+# quota/transport/server 故障时单跳 deepseekpro，auth/task 绝不回退。
 developer    = { adapter = "kimi", fallback_provider = "deepseekflash" }
 reviewer     = { adapter = "claude", provider = "kiroopus" }
-consultant   = { adapter = "codex",  provider = "kirogpt" }
+consultant   = { adapter = "codex",  provider = "kirogpt", fallback_provider = "deepseekpro" }
 
 # 路径→测试命令规则。正式形式是 [[gate]]（kind="command", stage="pre_review"），
 # 见 docs/QUICKSTART.zh-CN.md §「配置」。注意 `agentic init` 的模板生成的是

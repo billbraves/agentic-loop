@@ -41,11 +41,15 @@ from agentic_loop.adapters.base import Verdict
 from agentic_loop.adapters.codex import CodexAdapter
 from agentic_loop.independence import evaluate
 from agentic_loop.independence import meets_threshold
+from agentic_loop.quota_fallback import FALLBACK_CATEGORIES
+from agentic_loop.quota_fallback import classify_failure
+from agentic_loop.quota_fallback import load_quota_patterns
 from agentic_loop.resolve_paths import get_adapters
 from agentic_loop.resolve_paths import get_review_policy
 from agentic_loop.resolve_paths import iterations_dir
 from agentic_loop.resolve_paths import main_repo
 from agentic_loop.resolve_paths import resolve_role_binding
+from agentic_loop.resolve_paths import resolve_role_fallback_binding
 
 
 VERDICT_SCHEMA: dict[str, Any] = {
@@ -903,21 +907,166 @@ def build_notes(verdict: Verdict) -> str:
     return notes
 
 
-def persist_answer(iteration_dir: Path, wp_id: str, verdict: Verdict) -> Path:
+class ConsultFailoverError(Exception):
+    """Fail-closed consult failure with a sanitized, category-aware reason.
+
+    WP-01 (2026-10-21-consult-llm-failover): raised by
+    ``_consult_with_failover`` when the consult cannot be served (original
+    failure not fallback-eligible, no fallback configured, missing fallback
+    credential, or the single fallback hop failed too). The message names the
+    failure category (and, for a failed fallback, BOTH categories) but never
+    the raw stderr and never any credential value. The gate turns it into a
+    ``GATE_FAIL`` (exit 2) via ``GateError``.
+    """
+
+
+def _sanitize_failure_text(text: str, limit: int = 200) -> str:
+    """One-line, bounded failure snippet; never the full raw stderr."""
+    return " ".join((text or "").split())[:limit]
+
+
+def _consult_with_failover(
+    primary_adapter: Any,
+    primary_binding: Any,
+    fallback_binding: Any,
+    fallback_factory: Any,
+    review_kwargs: dict[str, Any],
+    quota_patterns: Any,
+) -> tuple[Any, Any, str, "str | None", bool, "tuple[str, str] | None"]:
+    """Run the gate consult with single-hop provider failover (pure orchestration).
+
+    Mirrors ``dispatch.run_dispatch`` semantics for the consultant role:
+
+    * the primary adapter is tried exactly once;
+    * only a failure classified by ``quota_fallback.classify_failure`` as
+      ``quota`` / ``transport`` / ``server`` (infrastructure) may trigger the
+      hop; ``auth_config`` and ``task`` are reported unchanged and never
+      retried (AGENTS.md §7);
+    * the fallback binding must exist AND its ``api_key_env`` must be present
+      in the environment (existence only — the value is never read, echoed,
+      or persisted); otherwise fail closed with an explicit reason naming the
+      env var NAME only;
+    * the fallback adapter is built via ``fallback_factory`` (default in the
+      caller: ``CodexAdapter(binding=b, direct_finalization=True)`` — the same
+      review contract as the primary) and tried exactly once; a failing
+      fallback is the end: the error reports BOTH categories and there is
+      never a third attempt.
+
+    Returns ``(verdict, effective_adapter, provider, model, fallback_used,
+    primary_failure)`` where ``effective_adapter`` is the adapter that actually
+    served the consult (the independence rating must use ITS ``identity()``),
+    and ``primary_failure`` is ``None`` on primary success or
+    ``(category, sanitized_text)`` when the fallback served.
+
+    Raises ``ConsultFailoverError`` (fail-closed) when the consult cannot be
+    served. Never raises the original provider exception.
+    """
+    primary_provider = (
+        primary_binding.provider if primary_binding is not None else "codex"
+    )
+    primary_model = (
+        primary_binding.identity_model if primary_binding is not None else None
+    )
+    try:
+        verdict = primary_adapter.review(**review_kwargs)
+    except Exception as exc:
+        primary_category = classify_failure(
+            str(exc), None, quota_patterns=quota_patterns
+        )
+        primary_failure = (primary_category, _sanitize_failure_text(str(exc)))
+    else:
+        return verdict, primary_adapter, primary_provider, primary_model, False, None
+
+    if primary_category not in FALLBACK_CATEGORIES:
+        # auth_config / task: report the original failure unchanged, never
+        # mask it behind a hop to another provider.
+        raise ConsultFailoverError(
+            f"codex review failed ({primary_category}); category not eligible "
+            f"for provider fallback: {primary_failure[1]}"
+        )
+    if fallback_binding is None:
+        raise ConsultFailoverError(
+            f"codex review failed ({primary_category}) and no consultant "
+            "fallback_provider configured"
+        )
+    env_name = getattr(fallback_binding, "api_key_env", None)
+    if not env_name or not os.environ.get(env_name):
+        # Fail closed naming the env var NAME only; never probe/echo a value.
+        missing = f"${env_name}" if env_name else "(unconfigured api_key_env)"
+        raise ConsultFailoverError(
+            f"codex review failed ({primary_category}) but fallback provider "
+            f"credential env var {missing} is not set; "
+            "set it to enable consult failover"
+        )
+
+    fb_provider = fallback_binding.provider
+    fb_model = fallback_binding.identity_model
+    try:
+        fallback_adapter = fallback_factory(fallback_binding)
+    except Exception as exc:  # adapter/binding construction failed
+        # Single-hop fail-closed: the primary category is preserved and the
+        # fallback STAGE is named; no third attempt exists.
+        raise ConsultFailoverError(
+            f"codex review failed on primary provider ({primary_category}); "
+            f"fallback construction failed (fallback_construction): "
+            f"{type(exc).__name__}"
+        ) from None
+    fb_capabilities = fallback_adapter.capabilities()
+    if not (fb_capabilities.sandbox_enforced and fb_capabilities.structured_output):
+        # Single-hop fail-closed: the primary category is preserved and the
+        # fallback STAGE is named; no third attempt exists.
+        raise ConsultFailoverError(
+            f"codex review failed on primary provider ({primary_category}); "
+            "fallback capabilities not provable (fallback_capabilities): "
+            "sandbox_enforced or structured_output false"
+        )
+    try:
+        verdict = fallback_adapter.review(**review_kwargs)
+    except Exception as exc:
+        fb_category = classify_failure(
+            str(exc), None, quota_patterns=quota_patterns
+        )
+        # Single hop exhausted: report BOTH categories, never a third attempt.
+        raise ConsultFailoverError(
+            f"codex review failed on primary provider ({primary_category}) "
+            f"and on fallback provider ({fb_category}); "
+            "single-hop failover exhausted"
+        ) from None
+    return verdict, fallback_adapter, fb_provider, fb_model, True, primary_failure
+
+
+def persist_answer(
+    iteration_dir: Path,
+    wp_id: str,
+    verdict: Verdict,
+    *,
+    provider: "str | None" = None,
+    model: "str | None" = None,
+    fallback_used: "bool | None" = None,
+) -> Path:
     """Persist the codex answer artifact; ``CodexAdapter.review`` only writes its
-    own tempdir, so the gate re-materializes the answer file verbatim here."""
+    own tempdir, so the gate re-materializes the answer file verbatim here.
+
+    WP-01 (2026-10-21-consult-llm-failover): the artifact records the provider
+    that ACTUALLY served the consult (``provider`` / ``model`` /
+    ``fallback_used``) so the audit trail cannot claim the primary after a
+    failover hop. Fields are only written when supplied (callers that predate
+    failover keep the old shape).
+    """
+    payload: dict[str, Any] = {
+        "decision": verdict.decision,
+        "rationale": verdict.rationale,
+        "findings": list(verdict.findings),
+    }
+    if provider is not None:
+        payload["provider"] = provider
+    if model is not None:
+        payload["model"] = model
+    if fallback_used is not None:
+        payload["fallback_used"] = fallback_used
     answer_file = iteration_dir / f"{wp_id}-codex-merge-gate.answer.md"
     answer_file.write_text(
-        json.dumps(
-            {
-                "decision": verdict.decision,
-                "rationale": verdict.rationale,
-                "findings": list(verdict.findings),
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     return answer_file
@@ -929,12 +1078,32 @@ def write_consult_block(
     independence_level: str,
     independence_reasons: list[str],
     reviewed_at: str,
+    *,
+    provider: "str | None" = None,
+    model: "str | None" = None,
+    fallback_used: "bool | None" = None,
+    primary_failure: "tuple[str, str] | None" = None,
 ) -> None:
     data = load_status_json(status_file)
     consult = data.get("consult", {})
     if not isinstance(consult, dict):
         consult = {}
     notes = build_notes(verdict)
+    # WP-01: when a failover hop served the consult, the notes must name the
+    # primary failure category and the provider that actually served — a
+    # bounded, sanitized record, never the raw stderr.
+    if fallback_used:
+        primary_category = primary_failure[0] if primary_failure else "unknown"
+        notes = (
+            notes
+            + "\n\nConsult failover: primary provider failed ("
+            + primary_category
+            + "); review served by "
+            + str(provider)
+            + "/"
+            + str(model)
+            + "."
+        )
     if independence_reasons:
         notes = (
             notes
@@ -946,6 +1115,12 @@ def write_consult_block(
     consult["decision"] = verdict.decision
     consult["reviewed_by"] = "codex-cli"
     consult["reviewed_at"] = reviewed_at
+    if provider is not None:
+        consult["provider"] = provider
+    if model is not None:
+        consult["model"] = model
+    if fallback_used is not None:
+        consult["fallback_used"] = fallback_used
     consult["notes"] = notes
     consult["independence"] = independence_level
     data["consult"] = consult
@@ -1308,11 +1483,58 @@ def main(argv: list[str]) -> int:
             "structured_output false"
         )
 
+    # WP-01 (2026-10-21-consult-llm-failover): single-hop provider failover.
+    # The optional fallback binding comes from ``roles.consultant.fallback_provider``
+    # (zero-regression: None when unconfigured). Project quota-pattern overrides
+    # are loaded exactly like the developer dispatch.
+    fallback_binding = resolve_role_fallback_binding("consultant", repo=repo_root)
+    quota_patterns = load_quota_patterns(repo_root)
+
     # ------------------------------------------------------------------
-    # Independence rating (WP-09/WP-07) with structured bootstrap attestation
+    # Invoke consultant (single-hop failover) — BEFORE the independence
+    # rating, so the rating can use the identity of the adapter that
+    # actually served the consult.
+    # ------------------------------------------------------------------
+    gate_log(f"invoking codex adapter for {wp_id} ...")
+    try:
+        (
+            verdict,
+            effective_adapter,
+            effective_provider,
+            effective_model,
+            fallback_used,
+            primary_failure,
+        ) = _consult_with_failover(
+            adapter,
+            consultant_binding,
+            fallback_binding,
+            lambda b: CodexAdapter(binding=b, direct_finalization=True),
+            {
+                "diff": diff_text,
+                "brief": brief_text or None,
+                "contract": contract,
+                "effort": gate_effort,
+            },
+            quota_patterns,
+        )
+    except ConsultFailoverError as exc:
+        raise GateError(str(exc)) from None
+
+    if fallback_used:
+        _fb_category = primary_failure[0] if primary_failure else "unknown"
+        gate_log(
+            f"consult failover: primary provider failed ({_fb_category}); "
+            f"review served by {effective_provider}/{effective_model}"
+        )
+
+    # ------------------------------------------------------------------
+    # Independence rating (WP-09/WP-07) with structured bootstrap attestation.
+    # Runs AFTER a successful consult: the consultant identity MUST come from
+    # the adapter that actually served the review (deepseek-v4-pro after a
+    # failover hop), not from the primary binding.
     # ------------------------------------------------------------------
     min_independence = review_policy.get("min_independence", "strong")
-    consultant_identity = adapter.identity()
+    consultant_identity = effective_adapter.identity()
 
     implementer_id: AgentIdentity | None = None
     if _should_populate_implementer(review_decision):
@@ -1377,27 +1599,27 @@ def main(argv: list[str]) -> int:
             )
 
     # ------------------------------------------------------------------
-    # Invoke consultant and persist verdict + answer artifact
+    # Persist verdict + answer artifact with the effective provider audit
     # ------------------------------------------------------------------
-    gate_log(f"invoking codex adapter for {wp_id} ...")
-    try:
-        verdict = adapter.review(
-            diff=diff_text,
-            brief=brief_text or None,
-            contract=contract,
-            effort=gate_effort,
-        )
-    except Exception as exc:
-        raise GateError(f"codex review failed: {exc}") from None
-
     reviewed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    answer_file = persist_answer(iteration_dir, wp_id, verdict)
+    answer_file = persist_answer(
+        iteration_dir,
+        wp_id,
+        verdict,
+        provider=effective_provider,
+        model=effective_model,
+        fallback_used=fallback_used,
+    )
     write_consult_block(
         status_file=status_file,
         verdict=verdict,
         independence_level=level,
         independence_reasons=independence_reasons,
         reviewed_at=reviewed_at,
+        provider=effective_provider,
+        model=effective_model,
+        fallback_used=fallback_used,
+        primary_failure=primary_failure if fallback_used else None,
     )
 
     run_validator(validator, status_file)

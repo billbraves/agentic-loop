@@ -1,0 +1,230 @@
+{
+  "schema_version": "agentic-wp-status/v2",
+  "work_package_id": "WP-01",
+  "iteration_id": "2026-10-21-consult-llm-failover",
+  "plan_id": "PLAN-01",
+  "phase": "P1",
+  "state": "MERGED",
+  "role": "Developer",
+  "executor": {
+    "tool": "kimi",
+    "model": "kimi-code/kimi-for-coding",
+    "session": "kimi-cli session dffee2bae979c922406f5da0cbfe4b51 (afk harness, WP-01 developer run, REWORK r2)",
+    "redispatch_count": 1
+  },
+  "orchestrator": {
+    "tool": "claude-code",
+    "session": "7f3d3b4c-534f-4a3b-acf6-b89f64f95132"
+  },
+  "reviewer": {
+    "tool": "claude-code",
+    "session": "7f3d3b4c-534f-4a3b-acf6-b89f64f95132"
+  },
+  "git": {
+    "base_branch": "plan/2026-10-21-consult-llm-failover",
+    "base_commit": "4593b7e1ceaebb9e97c9b699488008931b97cb97",
+    "dispatch_commit": "",
+    "branch": "wp/2026-10-21-consult-llm-failover",
+    "worktree": "/Users/admin/vibe/.worktrees/consult-llm-failover",
+    "commit": "005db1e6de9317e88f69806897ce8275f3b96bb7",
+    "merged_commit": "79e3d767f5a320e8005a4fddbbd45d8ae81d093a"
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/agentic_loop/gate/__init__.py",
+      "src/agentic_loop/quota_fallback.py",
+      ".agentic/config.toml",
+      "tests/test_gate_consult_failover.py",
+      "tests/test_quota_failure_classifier.py",
+      "docs/plans/2026-10-21-consult-llm-failover/"
+    ],
+    "forbidden_paths": [
+      "src/agentic_loop/dispatch.py",
+      "src/agentic_loop/redispatch.py",
+      "src/agentic_loop/cli.py",
+      "src/agentic_loop/plan_cmd.py",
+      "src/agentic_loop/resolve_paths.py",
+      "src/agentic_loop/provider_binding.py",
+      "src/agentic_loop/adapters/",
+      "src/agentic_loop/wrappers/",
+      "src/agentic_loop/templates/",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/agentic/",
+      ".env",
+      ".context/",
+      "uv.lock"
+    ]
+  },
+  "risk": {
+    "production_writes": "FORBIDDEN",
+    "network": "FORBIDDEN",
+    "notifications": "FORBIDDEN",
+    "data_access": "READ_ONLY"
+  },
+  "evidence": {
+    "tests": [
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "at_commit": "4593b7e1ceaebb9e97c9b699488008931b97cb97",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 1112,
+        "failed": 0,
+        "skipped": 4,
+        "duration_s": 197.4,
+        "note": "frozen baseline re-run in the worktree before changes"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py tests/test_quota_failure_classifier.py -q",
+        "at_commit": "4a76a4b0f328a9ed857b781a729cad3a08c388c8",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 93,
+        "failed": 0,
+        "skipped": 0,
+        "duration_s": 13.1,
+        "note": "targeted suite: 14 failover e2e (stub codex, temp git repo) + 7 helper unit tests + 72 classifier cases"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "at_commit": "4a76a4b0f328a9ed857b781a729cad3a08c388c8",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 1130,
+        "failed": 0,
+        "skipped": 4,
+        "duration_s": 220.0,
+        "note": "full suite at the WP commit; 1112 baseline + 18 new, 4 skipped unchanged"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py -q (with mutation A applied to src/agentic_loop/gate/__init__.py)",
+        "at_commit": "4a76a4b0f328a9ed857b781a729cad3a08c388c8 (working tree, uncommitted mutation)",
+        "exit_code": 1,
+        "result": "fail-as-expected",
+        "passed": 11,
+        "failed": 3,
+        "skipped": 0,
+        "duration_s": 14.1,
+        "note": "mutation A: removed the `primary_category not in FALLBACK_CATEGORIES` guard (all categories fall back) -> test_auth_primary_failure_never_fails_back, test_task_primary_failure_never_falls_back, test_helper_auth_failure_raises_without_fallback turned RED; source restored byte-identically and suite re-run green"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py -q (with mutation B applied to src/agentic_loop/gate/__init__.py)",
+        "at_commit": "4a76a4b0f328a9ed857b781a729cad3a08c388c8 (working tree, uncommitted mutation)",
+        "exit_code": 1,
+        "result": "fail-as-expected",
+        "passed": 11,
+        "failed": 3,
+        "skipped": 0,
+        "duration_s": 13.1,
+        "note": "mutation B: fallback success returns the PRIMARY adapter/provider/model (effective identity not used) -> test_quota_primary_failure_fails_over_to_deepseekpro, test_independence_and_audit_use_fallback_identity, test_helper_quota_failure_returns_fallback_adapter_identity turned RED; source restored byte-identically and suite re-run green (93 passed)"
+      },
+      {
+        "command": "PYTHONPATH=src bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/2026-10-21-consult-llm-failover/WP-01.status.json",
+        "at_commit": "4a76a4b0f328a9ed857b781a729cad3a08c388c8",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 1130,
+        "failed": 0,
+        "skipped": 4,
+        "duration_s": 219.5,
+        "note": "agentic quality-gate from the worktree: QUALITY_GATE_RESULT=PASS (scope allowed/forbidden check + full pytest). Deviation from the suggested env: AGENTIC_PYTHON=python3.11 was dropped because it makes gate-runner.sh bypass the stubbed python3 in tests/test_gate_runner_shell.py (pre-existing wiring, fails identically at baseline), and absolute PYTHONPATH makes the pre-push hook template in tests/test_init_githooks.py resolve the live package from a tmp cwd (also pre-existing, code untouched by this WP). The recorded command is the exact environment of the green full-suite runs."
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py tests/test_quota_failure_classifier.py -q",
+        "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 104,
+        "failed": 0,
+        "skipped": 0,
+        "duration_s": 17.99,
+        "note": "REWORK r2 targeted suite: 93 round-1 tests + 2 finding-3 helper tests (fallback construction/capabilities stage labels) + 3 invariant-10 mutation-oracle tests (positive control + status-bytes mutation + call-log mutations) + 5 new quota regex samples + 1 new port-429 negative sample"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests -q",
+        "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 1141,
+        "failed": 0,
+        "skipped": 4,
+        "duration_s": 197.58,
+        "note": "full suite at the rework commit; 1130 round-1 + 11 new, 4 skipped unchanged; source hash sha256 3a4c99ab...e49fed0 verified clean before the run (an earlier concurrent run overlapped an uncommitted mutation in the working tree and was discarded, not recorded as evidence)"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py -q (with mutation A applied to src/agentic_loop/gate/__init__.py)",
+        "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7 (working tree, uncommitted mutation)",
+        "exit_code": 1,
+        "result": "fail-as-expected",
+        "passed": 17,
+        "failed": 2,
+        "skipped": 0,
+        "duration_s": 19.81,
+        "note": "mutation A: removed the `primary_category not in FALLBACK_CATEGORIES` guard (all categories fall back) -> test_auth_primary_failure_never_falls_back, test_task_primary_failure_never_falls_back turned RED. Round 1 saw 3 red; the count dropped to 2 because the finding-3 fix makes the fallback-construction error message carry the primary category, so the auth helper test still observes its category witness even under the mutation (stronger, not weaker). Source restored byte-identically (sha256 3a4c99ab...e49fed0) and suite re-run green"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py -q (with mutation B applied to src/agentic_loop/gate/__init__.py)",
+        "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7 (working tree, uncommitted mutation)",
+        "exit_code": 1,
+        "result": "fail-as-expected",
+        "passed": 14,
+        "failed": 5,
+        "skipped": 0,
+        "duration_s": 18.82,
+        "note": "mutation B: fallback success returns the PRIMARY adapter/provider/model (effective identity not used) -> test_quota_primary_failure_fails_over_to_deepseekpro, test_independence_and_audit_use_fallback_identity, test_helper_quota_failure_returns_fallback_adapter_identity turned RED (the round-1 3) PLUS test_invariant10_oracle_positive_control_untouched_artifacts_pass and test_invariant10_forbidden_mutation_status_provider_becomes_kirogpt_turns_oracle_red (the new invariant-10 oracle witnesses effective identity on the real persisted bytes). Source restored byte-identically and suite re-run green (104 passed)"
+      },
+      {
+        "command": "PYTHONPATH=src python3.11 -m pytest tests/test_gate_consult_failover.py -q -k 'invariant10'",
+        "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "duration_s": 5.3,
+        "note": "invariant-10 mutation-oracle tests isolated: positive reachability control on untouched real artifacts passes; forbidden mutation (a) corrupting the persisted status JSON bytes so consult.provider reads kirogpt turns the SAME audit oracle red; forbidden mutation (b) dropping the fallback invocation from the real stub JSONL call log (and rewriting its provider to kirogpt) turns the SAME oracle red"
+      },
+      {
+        "command": "PYTHONPATH=src bash src/agentic_loop/wrappers/quality-gate.sh docs/plans/2026-10-21-consult-llm-failover/WP-01.status.json",
+        "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7",
+        "exit_code": 0,
+        "result": "pass",
+        "passed": 1141,
+        "failed": 0,
+        "skipped": 4,
+        "duration_s": 204.1,
+        "note": "agentic quality-gate from the worktree at the rework commit: QUALITY_GATE_RESULT=PASS (scope allowed/forbidden check + full pytest 1141 passed / 4 skipped)"
+      }
+    ]
+  },
+  "review": {
+    "decision": "ACCEPT",
+    "reviewed_by": "orchestrator (claude-code)",
+    "reviewed_at": "2026-10-21T08:25:00Z",
+    "at_commit": "005db1e6de9317e88f69806897ce8275f3b96bb7",
+    "note": "Independent orchestrator review of the full diff (5 allowed files, +910/-30). Verified on my own runs: targeted 93 passed; full suite 1130 passed / 4 skipped (baseline 1112/4); mutation A (fallback guard removed) and mutation B (primary identity kept after hop) each reproduced exactly 3 red and the source was restored byte-identically; consultant binding resolution on the real config returns primary kirogpt/gpt-5.6-sol and fallback deepseekpro/deepseek-v4-pro with the expected base URL/env name/selector. Code review: failover is exactly one hop, only quota/transport/server are eligible, auth_config/task/missing-provider/missing-credential fail closed before a second call, independence uses the effective adapter identity, and the audit records provider/model/fallback_used without raw stderr. Scope: no forbidden path touched; tests are offline (stub codex / fake adapters). | REWORK r2 verification (005db1e): all three consult findings closed — real-surface mutation-oracle tests (status JSON bytes + stub call log, positive control + 2 mutations), quota regex tightened to HTTP status-code syntax (port-429 negative green, 5 new positives green), fallback construction/capability errors now preserve the primary category and name the fallback stage. My own reruns: targeted 104 passed; full 1141 passed / 4 skipped; classifier samples spot-checked green.",
+    "attestation": {
+      "reviewer_role": "orchestrator",
+      "reviewer_tool": "claude-code",
+      "fresh_session": true,
+      "adversarial_prompt": true,
+      "attested_by": "orchestrator",
+      "attested_at": "2026-10-21T08:36:25Z"
+    }
+  },
+  "consult": {
+    "decision": "ACCEPT",
+    "reviewed_by": "codex-cli",
+    "reviewed_at": "2026-10-21T09:07:35Z",
+    "provider": "kirogpt",
+    "model": "gpt-5.6-sol",
+    "fallback_used": false,
+    "notes": "已完整读取并验证两份绑定输入：字节数与 SHA-256 均匹配。Diff 仅修改 allowed_paths，实现了 consultant 主档不变、仅 quota/transport/server 触发的单跳回退、凭据与缺省配置 fail-closed、fallback 实际身份参与 independence 评级、provider/model/fallback_used 审计落盘，以及分类器加固。主档与 fallback 调用次数、失败类别、实际 argv、status JSON 和 answer artifact 均有正向及禁止变异测试覆盖；未发现阻塞性的正确性、架构、迁移、时间语义或安全问题，也未发现为通过测试而弱化阈值、信号或失败分类语义。\n\nIndependence: weak\n- reviewer identity unavailable (orchestrator, attested not engine-proven)\n- no implementer fallback available\n- reviewer attestation present and complete (reviewer_role=orchestrator, reviewer_tool=claude-code, fresh_session=True, adversarial_prompt=True, attested_by=orchestrator)\n- level=weak-attested: reviewer=orchestrator, attested not engine-proven",
+    "independence": "weak"
+  },
+  "timestamps": {
+    "dispatched_at": "2026-10-21T07:38:11Z",
+    "updated_at": "2026-10-21T09:09:26Z"
+  }
+}
